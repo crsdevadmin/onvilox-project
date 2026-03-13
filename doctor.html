@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard - Onvilox</title>
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">Onvilox</div>
+  <div class="nav">
+    <span class="nav-pill" id="rolePill">DOCTOR</span>
+    <a href="#" onclick="auth.logout()">Logout</a>
+    <button id="themeToggleBtn" onclick="toggleTheme()" class="btn-secondary btn-sm" style="margin-left: 20px; border-radius: 30px; padding: 6px 14px; cursor: pointer;">🌙 Dark Mode</button>
+  </div>
+</div>
+
+
+<div class="container page">
+
+  <div class="page-header">
+    <div>
+      <h1 id="title" class="page-title">My Patients</h1>
+      <div class="page-subtitle">Quickly review, approve and generate reports.</div>
+    </div>
+
+    <div class="toolbar">
+      <div class="toolbar-field">
+        <label class="sr-only" for="searchBox">Search</label>
+        <input id="searchBox" class="input input-sm" type="search" placeholder="Search name / UHIC" autocomplete="off">
+      </div>
+
+      <div class="toolbar-field">
+        <label class="sr-only" for="statusFilter">Status</label>
+        <select id="statusFilter" class="input input-sm">
+          <option value="ALL">All Status</option>
+          <option value="CREATED">Created</option>
+          <option value="APPROVED">Approved</option>
+          <option value="PROCESSING">Processing</option>
+          <option value="READY">Ready</option>
+          <option value="DISPATCHED">Dispatched</option>
+          <option value="DELIVERED">Delivered</option>
+        </select>
+      </div>
+
+      <a class="btn-primary btn-sm" href="patient-create.html">+ Create Patient</a>
+    </div>
+  </div>
+
+  <div class="kpis">
+    <div class="kpi-card">
+      <div class="kpi-label">Total</div>
+      <div class="kpi-value" id="kpiTotal">0</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Pending Approval</div>
+      <div class="kpi-value" id="kpiPending">0</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">In Progress</div>
+      <div class="kpi-value" id="kpiProgress">0</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Ready / Delivered</div>
+      <div class="kpi-value" id="kpiReady">0</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Patient</th>
+          <th>UHIC</th>
+          <th>Cancer</th>
+          <th>Created</th>
+          <th>Status</th>
+          <th class="th-actions">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="patientTable"></tbody>
+    </table>
+  </div>
+
+</div>
+
+
+<!-- QR Modal -->
+<div id="qrOverlay" class="modal-overlay" onclick="closeQr()">
+  <div class="modal" onclick="event.stopPropagation();">
+    <div class="modal-header">
+      <h3 class="modal-title" id="qrTitle">Patient QR</h3>
+      <button class="modal-close" aria-label="Close" onclick="closeQr()">×</button>
+    </div>
+    <div class="modal-body">
+      <div id="qrBox" style="display:flex;justify-content:center;padding:10px 0;"></div>
+      <div style="text-align:center;color:#6b7280;font-size:13px;" id="qrHint">Scan to view patient summary</div>
+      <div class="modal-actions" style="justify-content:center;">
+        <button class="btn-secondary" onclick="copyQrLink()">Copy Link</button>
+        <button class="btn-primary" onclick="openQrLink()">Open Link</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="js/storage.js"></script>
+<script src="js/seed.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/mappings.js"></script>
+<script src="js/patient-store.js"></script>
+<script src="js/nutrition-engine.js"></script>
+<script src="js/manufacturing.js"></script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+<script>
+auth.requireRole(['DOCTOR','ASSISTANT']);
+const me = auth.getCurrentUser();
+
+// Top-right role pill
+const rolePill = document.getElementById('rolePill');
+if(rolePill) rolePill.textContent = me.role;
+
+// Filters
+let searchQuery = '';
+let statusQuery = 'ALL';
+
+const searchBox = document.getElementById('searchBox');
+const statusFilter = document.getElementById('statusFilter');
+
+if(searchBox){
+  searchBox.addEventListener('input', (e) => {
+    searchQuery = (e.target.value || '').trim().toLowerCase();
+    render();
+  });
+}
+
+if(statusFilter){
+  statusFilter.addEventListener('change', (e) => {
+    statusQuery = e.target.value || 'ALL';
+    render();
+  });
+}
+
+
+if(me.role === 'ASSISTANT'){
+  document.getElementById('title').innerText = "Doctor's Patients";
+}
+
+
+function render(){
+  const table = document.getElementById('patientTable');
+  table.innerHTML = '';
+
+  let doctorId = me.id;
+  if(me.role === 'ASSISTANT'){
+    doctorId = mappingService.getDoctorForAssistant(me.id);
+  }
+
+  const patients = getPatients().filter(p => p.assignedDoctorId === doctorId);
+  patients.sort((a,b)=> (b.createdAt||'').localeCompare(a.createdAt||''));
+
+  // KPI counts (based on all patients for this doctor)
+  const total = patients.length;
+  const pending = patients.filter(p => (p.status || 'CREATED') === 'CREATED').length;
+  const progress = patients.filter(p => ['APPROVED','PROCESSING','DISPATCHED'].includes(p.status || '')).length;
+  const ready = patients.filter(p => ['READY','DELIVERED'].includes(p.status || '')).length;
+
+  const setKpi = (id, val) => {
+    const el = document.getElementById(id);
+    if(el) el.textContent = String(val);
+  };
+  setKpi('kpiTotal', total);
+  setKpi('kpiPending', pending);
+  setKpi('kpiProgress', progress);
+  setKpi('kpiReady', ready);
+
+  // Apply filters for table view
+  const filtered = patients.filter(p => {
+    const status = p.status || 'CREATED';
+    if(statusQuery !== 'ALL' && status !== statusQuery) return false;
+
+    if(searchQuery){
+      const name = (p.name || '').toLowerCase();
+      const uhic = (p.uhic || '').toLowerCase();
+      if(!name.includes(searchQuery) && !uhic.includes(searchQuery)) return false;
+    }
+    return true;
+  });
+
+  filtered.forEach(p => {
+    const status = p.status || 'CREATED';
+    const statusClass = status.toLowerCase();
+
+    const approveBtn = (me.role === 'DOCTOR' && status === 'CREATED')
+      ? `<a href="patient-profile.html?id=${p.id}&review=1" class="btn-warning" style="padding: 6px 10px; border-radius: 6px; display:flex; align-items:center; justify-content:center;" title="Review & Approve" onclick="event.stopPropagation();"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M10.97 4.97a.75.75 0 0 1 1.07 1.05l-3.99 4.99a.75.75 0 0 1-1.08.02L4.324 8.384a.75.75 0 1 1 1.06-1.06l2.094 2.093 3.473-4.425a.267.267 0 0 1 .02-.022z"/></svg></a>`
+      : '';
+
+    // Compute a quick nutrition preview (engine output). Full plan/overrides live in patient-profile page.
+    let preview = null;
+    try {
+      const patientForCalc = Object.assign({}, p, {
+        weight: parseFloat(p.weight),
+        height: parseFloat(p.height),
+        albumin: parseFloat(p.albumin),
+        weightLossPercent: parseFloat(p.weightLossPercent || 0),
+        giIssues: !!p.giIssues
+      });
+      preview = generateNutritionPlan(patientForCalc);
+    } catch(e){ /* ignore */ }
+
+    const mainRow = document.createElement('tr');
+    mainRow.className = 'patient-row';
+    mainRow.style.cursor = 'pointer';
+    mainRow.onclick = () => toggleDetails(p.id);
+
+    mainRow.innerHTML = `
+      <td><button class="linklike" onclick="showQr(\'${p.id}\');event.stopPropagation();" title="Show QR for patient">${p.name}</button></td>
+      <td>${p.uhic}</td>
+      <td>${p.cancer}</td>
+      <td>${p.createdDate || '-'}</td>
+      <td><span class="status ${statusClass}">${status}</span></td>
+      <td>
+        <div class="action-row" onclick="event.stopPropagation();" style="display:flex; gap:8px;">
+          <a href="patient-profile.html?id=${p.id}" class="btn-primary" style="padding: 6px 10px; border-radius: 6px; display:flex; align-items:center; justify-content:center;" title="Edit / Report">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207 11.207 2.5zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293l6.5-6.5zm-9.761 5.175-.106.106-1.528 3.821 3.821-1.528.106-.106A.5.5 0 0 1 5 12.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.468-.325z"/></svg>
+          </a>
+          <button class="btn-secondary" onclick="openPdf('${p.id}')" style="padding: 6px 10px; border-radius: 6px; display:flex; align-items:center; justify-content:center;" title="Download PDF">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/><path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/></svg>
+          </button>
+          ${approveBtn}
+        </div>
+      </td>
+    `;
+    table.appendChild(mainRow);
+
+    const detailsRow = document.createElement('tr');
+    detailsRow.id = `details_${p.id}`;
+    detailsRow.style.display = 'none';
+    detailsRow.innerHTML = `
+      <td colspan="6">
+        <div class="card" style="margin:10px 0 0 0; box-shadow:none; border:1px solid #e5e7eb;">
+          <div style="display:flex; gap:24px; flex-wrap:wrap;">
+            <div style="min-width:260px;">
+              <div style="font-weight:700; margin-bottom:10px;">Patient Details</div>
+              <div><b>Age/Sex:</b> ${p.age || '-'} / ${p.sex || '-'}</div>
+              <div><b>Weight/Height:</b> ${p.weight || '-'} kg / ${p.height || '-'} cm</div>
+              <div><b>Albumin:</b> ${p.albumin || '-'} g/dL</div>
+              <div><b>Feeding:</b> ${p.feedingMethod || '-'}</div>
+              <div><b>Regimen:</b> ${p.regimen || '-'}</div>
+            </div>
+
+            <div style="min-width:260px;">
+              <div style="font-weight:700; margin-bottom:10px;">Nutrition Preview (Engine)</div>
+              ${preview ? `
+                <div><b>Calories/day:</b> ${preview.dailyCalories} kcal</div>
+                <div><b>Protein/day:</b> ${preview.dailyProtein} g</div>
+                <div><b>Per Serving (2x):</b> ${preview.perServingCalories} kcal, ${preview.perServingProtein} g protein</div>
+                <div><b>Macros/serving:</b> C ${preview.macroCarbs} g, F ${preview.macroFat} g</div>
+                <div><b>Protein Type:</b> ${preview.proteinType}</div>
+              ` : `<div style="color:#6b7280;">Preview unavailable (missing inputs)</div>`}
+              <div style="margin-top:10px;color:#6b7280;font-size:13px;">
+                Full report includes calculation trace + doctor overrides.
+              </div>
+            </div>
+          </div>
+        </div>
+      </td>
+    `;
+    table.appendChild(detailsRow);
+  });
+}
+
+function toggleDetails(id){
+  const el = document.getElementById('details_' + id);
+  if(!el) return;
+  el.style.display = (el.style.display === 'none' ? 'table-row' : 'none');
+}
+
+
+render();
+
+
+let __qrCurrentLink = '';
+
+function getBaseUrlForQr(){
+  try{
+    const cfg = localStorage.getItem('onvilox_public_base_url');
+    if(cfg && /^https?:\/\//i.test(cfg)) return cfg.replace(/\/$/,'');
+  }catch(e){}
+  
+  // Always use an absolute URL so phones can scan
+  let base = window.location.origin;
+  
+  if(base === 'null' || base === 'file://'){
+    return 'http://192.168.1.8:8000'; // Fallback
+  }
+  
+  const path = window.location.pathname;
+  const dir = path.substring(0, path.lastIndexOf('/'));
+  return base + dir;
+}
+
+function buildQrLink(patientId){
+  const base = getBaseUrlForQr();
+  return `${base}/patient-qr.html?id=${encodeURIComponent(patientId)}`;
+}
+
+
+function showQr(patientId){
+  const p = getPatientById(patientId);
+  const title = p ? `QR for ${p.name}` : 'Patient QR';
+  document.getElementById('qrTitle').innerText = title;
+
+  const link = buildQrLink(patientId);
+  __qrCurrentLink = link;
+
+  const box = document.getElementById('qrBox');
+  box.innerHTML = '';
+  new QRCode(box, { text: link, width: 220, height: 220 });
+
+  const isFile = (window.location.origin === 'null');
+  if(isFile && !localStorage.getItem('onvilox_public_base_url')){
+    document.getElementById('qrHint').innerText = 'Warning: Local URLs cannot be scanned by phones. Ensure you are running this on a reachable IP address (e.g. your WiFi IP) and set localStorage key "onvilox_public_base_url".';
+  }else{
+    document.getElementById('qrHint').innerText = 'Scan to view patient report';
+  }
+  document.getElementById('qrOverlay').style.display = 'flex';
+}
+
+function closeQr(){
+  const ov = document.getElementById('qrOverlay');
+  if(ov) ov.style.display = 'none';
+}
+
+async function copyQrLink(){
+  if(!__qrCurrentLink) return;
+  try{
+    await navigator.clipboard.writeText(__qrCurrentLink);
+    document.getElementById('qrHint').innerText = 'Link copied ✅';
+  }catch(e){
+    prompt('Copy this link:', __qrCurrentLink);
+  }
+}
+
+function openQrLink(){
+  if(!__qrCurrentLink) return;
+  window.open(__qrCurrentLink, '_blank', 'noopener');
+}
+
+function openPdf(patientId){
+  const url = `patient-profile.html?id=${encodeURIComponent(patientId)}&print=1`;
+  window.open(url, '_blank', 'noopener');
+}
+</script>
+
+<script src="js/theme.js"></script>
+</body>
+</html>

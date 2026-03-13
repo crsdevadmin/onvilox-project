@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Patient Workflow - Onvilox</title>
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">Onvilox</div>
+  <div class="nav">
+    <a href="doctor.html">Dashboard</a>
+    <a href="index.html">Logout</a>
+  </div>
+</div>
+
+<div class="container page">
+
+<div class="card">
+  <div class="workflow">
+    <div class="workflow-step workflow-complete">Created</div>
+    <div class="workflow-step workflow-active">Approved</div>
+    <div class="workflow-step">Processing</div>
+    <div class="workflow-step">Ready</div>
+    <div class="workflow-step">Dispatched</div>
+    <div class="workflow-step">Delivered</div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Patient Summary</h2>
+
+  <table>
+    <tr><th>Name</th><td>John Mathew</td></tr>
+    <tr><th>UHIC</th><td>UH123</td></tr>
+    <tr><th>Cancer</th><td>Lung Cancer</td></tr>
+    <tr><th>Status</th><td><span class="status approved">Approved</span></td></tr>
+  </table>
+</div>
+
+<div class="card">
+  <button class="btn-primary" onclick="location.href='doctor.html'">Back</button>
+</div>
+
+</div>
+
+<script src="js/theme.js"></script>
+</body>
+</html>

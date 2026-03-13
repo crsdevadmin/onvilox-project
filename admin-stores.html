@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stores - Onvilox</title>
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">Onvilox Admin</div>
+  <div class="nav">
+    <a href="admin.html">Dashboard</a>
+    <a href="admin-stores.html">Stores</a>
+    <a href="admin-users.html">Create Users</a>
+    <a href="admin-mapping.html">Mapping</a>
+    <a href="admin-tracking.html">Tracking</a>
+    <a href="admin-reports.html">Reports</a>
+    <a href="#" onclick="auth.logout()">Logout</a>
+    <button id="themeToggleBtn" onclick="toggleTheme()" class="btn-secondary btn-sm" style="margin-left: 20px; border-radius: 30px; padding: 6px 14px; cursor: pointer;">🌙 Dark Mode</button>
+  </div>
+</div>
+
+<div class="container page">
+
+  <div class="card">
+    <h2>Store Master</h2>
+
+    <div class="form-grid">
+      <div class="form-group">
+        <label class="required">Store Name</label>
+        <input id="storeName" type="text" placeholder="Central Pharma Store" onkeyup="validateStoreName()" onblur="validateStoreName()">
+        <div class="validation-msg" id="storeName_msg"></div>
+      </div>
+      <div class="form-group">
+        <label>Client / Hospital (optional)</label>
+        <input id="storeHospital" type="text" placeholder="Apollo Hospital">
+      </div>
+      <div class="form-group">
+        <label>Location</label>
+        <input id="storeLocation" type="text" placeholder="Chennai">
+      </div>
+    </div>
+
+    <div id="storeError" style="color:#ef4444;font-weight:600;margin-top:8px;"></div>
+
+    <div style="margin-top:18px;">
+      <button class="btn-primary" onclick="createStoreUI()">Create Store</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>All Stores</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Store</th>
+          <th>Client / Hospital</th>
+          <th>Location</th>
+          <th>Store Login</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody id="storeTable"></tbody>
+    </table>
+  </div>
+
+</div>
+
+<script src="js/storage.js"></script>
+<script src="js/seed.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/stores.js"></script>
+<script src="js/users.js"></script>
+
+<script>
+auth.requireRole(['SUPER_ADMIN']);
+
+function validateStoreName(){
+  const el = document.getElementById('storeName');
+  const msg = document.getElementById('storeName_msg');
+  const val = (el.value||'').trim();
+  if(!val){
+    el.classList.add('field-invalid');
+    el.classList.remove('field-valid');
+    msg.className = 'validation-msg validation-error';
+    msg.innerText = 'Store Name is required';
+    return false;
+  }
+  if(val.length < 3){
+    el.classList.add('field-invalid');
+    el.classList.remove('field-valid');
+    msg.className = 'validation-msg validation-error';
+    msg.innerText = 'Enter a valid store name';
+    return false;
+  }
+  el.classList.add('field-valid');
+  el.classList.remove('field-invalid');
+  msg.className = 'validation-msg validation-success';
+  msg.innerText = '✓ Looks good';
+  return true;
+}
+
+function renderStores(){
+  const stores = storeService.getStores();
+  const tbody = document.getElementById('storeTable');
+  tbody.innerHTML = '';
+
+  const users = userService.getUsers();
+
+  stores.forEach(s => {
+    const storeUser = users.find(u => u.role === 'STORE' && u.storeId === s.id);
+    const loginText = storeUser ? storeUser.username : '<span style="color:#ef4444;font-weight:600;">No login</span>';
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${s.name}</td>
+      <td>${s.hospital || '-'}</td>
+      <td>${s.location || '-'}</td>
+      <td>${loginText}</td>
+      <td style="display:flex;gap:10px;flex-wrap:wrap;">
+        ${storeUser ? `<button class="btn-warning" onclick="resetStorePassword('${storeUser.id}')">Reset Password</button>` : ``}
+        <button class="btn-secondary" onclick="deleteStoreUI('${s.id}')">Delete</button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  if(stores.length === 0){
+    tbody.innerHTML = '<tr><td colspan="5">No stores created yet.</td></tr>';
+  }
+}
+
+function createStoreUI(){
+  if(!validateStoreName()) return;
+  const name = document.getElementById('storeName').value;
+  const hospital = document.getElementById('storeHospital').value;
+  const location = document.getElementById('storeLocation').value;
+
+  const res = storeService.createStore({name, hospital, location});
+  if(!res.ok){
+    document.getElementById('storeError').innerText = res.error;
+    return;
+  }
+  document.getElementById('storeError').innerText = '';
+  if(res && res.storeLogin){
+    alert(
+      'Store created. Store Login Credentials:\n\n' +
+      'Username: ' + res.storeLogin.username + '\n' +
+      'Password: ' + res.storeLogin.password + '\n\n' +
+      '(Share this with the Store user.)'
+    );
+  }
+  document.getElementById('storeName').value='';
+  document.getElementById('storeHospital').value='';
+  document.getElementById('storeLocation').value='';
+  renderStores();
+}
+
+function resetStorePassword(userId){
+  const res = userService.resetUserPassword(userId);
+  if(!res.ok){ alert(res.error || 'Unable to reset password'); return; }
+  alert('New Store Login Password\n\nUsername: ' + res.user.username + '\nPassword: ' + res.password + '\n\nPlease share securely.');
+  renderStores();
+}
+
+function deleteStoreUI(id){
+  const res = storeService.deleteStore(id);
+  if(res && res.ok === false){
+    document.getElementById('storeError').innerText = res.error;
+    return;
+  }
+  document.getElementById('storeError').innerText = '';
+  renderStores();
+}
+
+renderStores();
+</script>
+
+<script src="js/theme.js"></script>
+</body>
+</html>

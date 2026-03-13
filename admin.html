@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Dashboard - Onvilox</title>
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">Onvilox Admin</div>
+  <div class="nav">
+    <a href="admin.html">Dashboard</a>
+    <a href="admin-stores.html">Stores</a>
+    <a href="admin-users.html">Create Users</a>
+    <a href="admin-mapping.html">Mapping</a>
+    <a href="admin-tracking.html">Tracking</a>
+    <a href="admin-reports.html">Reports</a>
+    <a href="#" onclick="auth.logout()">Logout</a>
+    <button id="themeToggleBtn" onclick="toggleTheme()" class="btn-secondary btn-sm" style="margin-left: 20px; border-radius: 30px; padding: 6px 14px; cursor: pointer;">🌙 Dark Mode</button>
+  </div>
+</div>
+
+<div class="container page">
+
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">System Overview</h1>
+      <div class="page-subtitle">Real-time metrics across all facilities</div>
+    </div>
+  </div>
+
+  <div class="kpis">
+    <div class="kpi-card">
+      <div class="kpi-label">Total Doctors</div>
+      <div class="kpi-value" id="tDoctors">0</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Total Stores</div>
+      <div class="kpi-value" id="tStores">0</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Total Patients</div>
+      <div class="kpi-value" id="tPatients">0</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Pending Approval</div>
+      <div class="kpi-value" id="tPending">0</div>
+    </div>
+  </div>
+
+  <div class="kpis">
+    <div class="kpi-card">
+      <div class="kpi-label">Processing</div>
+      <div class="kpi-value" id="tProcessing">0</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Ready</div>
+      <div class="kpi-value" id="tReady">0</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Dispatched</div>
+      <div class="kpi-value" id="tDispatched">0</div>
+    </div>
+    <div class="kpi-card" style="border-color: rgba(16, 185, 129, 0.4);">
+      <div class="kpi-label" style="color: var(--success);">Delivered</div>
+      <div class="kpi-value" id="tDelivered">0</div>
+    </div>
+  </div>
+
+</div>
+
+<script src="js/storage.js"></script>
+<script src="js/seed.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/users.js"></script>
+<script src="js/stores.js"></script>
+<script src="js/manufacturing.js"></script>
+<script src="js/patient-store.js"></script>
+
+<script>
+auth.requireRole(['SUPER_ADMIN']);
+
+const doctors = userService.getUsersByRole('DOCTOR');
+const stores = storeService.getStores();
+const patients = getPatients();
+const jobs = manufacturingService.getJobs();
+
+function countJobs(status){
+  return jobs.filter(j => j.status === status).length;
+}
+
+// Pending approval = patient status CREATED
+const pending = patients.filter(p => p.status === 'CREATED').length;
+
+document.getElementById('tDoctors').innerText = doctors.length;
+document.getElementById('tStores').innerText = stores.length;
+document.getElementById('tPatients').innerText = patients.length;
+document.getElementById('tPending').innerText = pending;
+document.getElementById('tProcessing').innerText = countJobs('PROCESSING');
+document.getElementById('tReady').innerText = countJobs('READY');
+document.getElementById('tDispatched').innerText = countJobs('DISPATCHED');
+document.getElementById('tDelivered').innerText = countJobs('DELIVERED');
+</script>
+
+<script src="js/theme.js"></script>
+</body>
+</html>

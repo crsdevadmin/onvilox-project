@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reports - Onvilox</title>
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">Onvilox Admin</div>
+  <div class="nav">
+    <a href="admin.html">Dashboard</a>
+    <a href="admin-stores.html">Stores</a>
+    <a href="admin-users.html">Create Users</a>
+    <a href="admin-mapping.html">Mapping</a>
+    <a href="admin-tracking.html">Tracking</a>
+    <a href="admin-reports.html">Reports</a>
+    <a href="#" onclick="auth.logout()">Logout</a>
+    <button id="themeToggleBtn" onclick="toggleTheme()" class="btn-secondary btn-sm" style="margin-left: 20px; border-radius: 30px; padding: 6px 14px; cursor: pointer;">🌙 Dark Mode</button>
+  </div>
+</div>
+
+<div class="container page">
+
+  <div class="card">
+    <h2>Admin Reports (MVP)</h2>
+    <p style="color:#6b7280;">This MVP provides basic counts. Advanced analytics will be added in cloud version.</p>
+
+    <table>
+      <tr><th>Metric</th><th>Value</th></tr>
+      <tr><td>Total Patients</td><td id="rpPatients">0</td></tr>
+      <tr><td>Patients Pending Approval</td><td id="rpPending">0</td></tr>
+      <tr><td>Jobs In Production</td><td id="rpProcessing">0</td></tr>
+      <tr><td>Jobs Delivered</td><td id="rpDelivered">0</td></tr>
+    </table>
+  </div>
+
+</div>
+
+<script src="js/storage.js"></script>
+<script src="js/seed.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/patient-store.js"></script>
+<script src="js/manufacturing.js"></script>
+
+<script>
+auth.requireRole(['SUPER_ADMIN']);
+const patients = getPatients();
+const jobs = manufacturingService.getJobs();
+document.getElementById('rpPatients').innerText = patients.length;
+document.getElementById('rpPending').innerText = patients.filter(p => p.status === 'CREATED').length;
+document.getElementById('rpProcessing').innerText = jobs.filter(j => j.status === 'PROCESSING').length;
+document.getElementById('rpDelivered').innerText = jobs.filter(j => j.status === 'DELIVERED').length;
+</script>
+
+<script src="js/theme.js"></script>
+</body>
+</html>

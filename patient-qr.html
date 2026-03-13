@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Patient Report - Onvilox</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="css/app.css">
+  <style>
+    /* QR report is intentionally self-contained so it doesn't affect the rest of the app */
+    body{background:#f3f4f6;}
+    .qr-report-wrap{max-width:980px;margin:18px auto;padding:0 14px;}
+    .qr-report{background:#fff;border:1px solid #e5e7eb;border-radius:16px;box-shadow:0 10px 24px rgba(17,24,39,.06);overflow:hidden;}
+    .qr-header{display:flex;gap:16px;align-items:center;justify-content:space-between;padding:18px 18px;background:linear-gradient(135deg,#eaf2ff,#f8fbff);border-bottom:1px solid #e5e7eb;}
+    .qr-brand{display:flex;flex-direction:column;gap:2px;}
+    .qr-brand .title{font-size:18px;font-weight:800;letter-spacing:.2px;color:#111827;}
+    .qr-brand .sub{color:#6b7280;font-size:12.5px;}
+    .qr-meta{display:flex;flex-direction:column;align-items:flex-end;gap:3px;color:#374151;font-size:12.5px;}
+    .qr-meta .badge{display:inline-flex;align-items:center;gap:8px;padding:6px 10px;border-radius:999px;border:1px solid #dbeafe;background:#eff6ff;font-weight:800;}
+    .qr-body{padding:18px;}
+    .qr-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+    @media (max-width:860px){.qr-grid{grid-template-columns:1fr;}}
+    .qr-section{border:1px solid #e5e7eb;border-radius:14px;padding:14px;background:#fff;}
+    .qr-section h3{margin:0 0 10px 0;font-size:14px;letter-spacing:.2px;color:#111827;}
+    .qr-section h3 small{color:#6b7280;font-weight:700;}
+    .qr-kv{display:grid;grid-template-columns:180px 1fr;gap:8px 12px;font-size:13.5px;}
+    @media (max-width:500px){.qr-kv{grid-template-columns:1fr;}}
+    .qr-k{color:#6b7280;font-weight:700;}
+    .qr-v{color:#111827;font-weight:800;}
+    .qr-table{width:100%;border-collapse:collapse;font-size:13.5px;}
+    .qr-table th,.qr-table td{border-top:1px solid #eef2f7;padding:10px 8px;text-align:left;vertical-align:top;}
+    .qr-table th{color:#6b7280;font-weight:800;width:220px;}
+    .qr-list{margin:8px 0 0 18px;color:#374151;font-size:13.5px;}
+    .qr-footer{display:flex;gap:10px;justify-content:space-between;align-items:center;padding:14px 18px;border-top:1px solid #e5e7eb;background:#fafafa;flex-wrap:wrap;}
+    .qr-footer .note{color:#6b7280;font-size:12.5px;max-width:720px;}
+    .qr-actions{display:flex;gap:10px;}
+
+    /* Print tweaks */
+    @media print{
+      body{background:#fff;}
+      .topbar{display:none;}
+      .qr-report-wrap{margin:0;max-width:none;padding:0;}
+      .qr-report{border:none;box-shadow:none;border-radius:0;}
+      .qr-footer{display:none;}
+    }
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">Onvilox</div>
+  <div class="nav">
+    <a href="index.html">Home</a>
+  </div>
+</div>
+
+<div class="qr-report-wrap">
+  <div class="qr-report">
+    <div class="qr-header">
+      <div class="qr-brand">
+        <div class="title">ONVILOX Clinical Nutrition Report</div>
+        <div class="sub" id="ptHospitalLine">Generated from QR • Shareable clinical summary</div>
+      </div>
+      <div class="qr-meta">
+        <div class="badge" id="ptBadge">PATIENT</div>
+        <div><span style="color:#6b7280;font-weight:800;">Report ID:</span> <span id="ptReportId" style="font-weight:900;"></span></div>
+        <div><span style="color:#6b7280;font-weight:800;">Generated:</span> <span id="ptGenerated" style="font-weight:900;"></span></div>
+      </div>
+    </div>
+
+    <div class="qr-body">
+      <div id="ptError" class="status created" style="display:none;">Patient not found</div>
+
+      <div id="ptContent" style="display:none;">
+        <div class="qr-grid">
+          <div class="qr-section">
+            <h3>Patient Information <small>(UHIC & demographics)</small></h3>
+            <div class="qr-kv">
+              <div class="qr-k">Patient Name</div><div class="qr-v" id="ptName"></div>
+              <div class="qr-k">UHIC</div><div class="qr-v" id="ptUhic"></div>
+              <div class="qr-k">Age / Sex</div><div class="qr-v" id="ptAgeSex"></div>
+              <div class="qr-k">Weight / Height</div><div class="qr-v" id="ptWtHt"></div>
+              <div class="qr-k">Weight Loss %</div><div class="qr-v" id="ptWl"></div>
+              <div class="qr-k">Serum Albumin</div><div class="qr-v" id="ptAlb"></div>
+            </div>
+          </div>
+
+          <div class="qr-section">
+            <h3>Clinical Details <small>(oncology & feeding)</small></h3>
+            <div class="qr-kv">
+              <div class="qr-k">Cancer Type</div><div class="qr-v" id="ptCancer"></div>
+              <div class="qr-k">Chemo Regimen</div><div class="qr-v" id="ptRegimen"></div>
+              <div class="qr-k">GI Issues</div><div class="qr-v" id="ptGi"></div>
+              <div class="qr-k">Feeding Method</div><div class="qr-v" id="ptFeeding"></div>
+              <div class="qr-k">Comorbidities</div><div class="qr-v" id="ptCom"></div>
+              <div class="qr-k">Side Effects</div><div class="qr-v" id="ptSe"></div>
+              <div class="qr-k">Allergies</div><div class="qr-v" id="ptAlg"></div>
+              <div class="qr-k" style="grid-column: 1 / -1; margin-top: 8px;">Clinical Notes</div>
+              <div class="qr-v" style="grid-column: 1 / -1; font-weight: 500; font-size: 13px;" id="ptNote"></div>
+            </div>
+          </div>
+        </div>
+
+        <div style="height:14px;"></div><div style="color:#6b7280;font-size:12.5px;margin:0 2px 14px;">This view reflects the latest saved patient data and nutrition plan available in Onvilox.</div>
+
+        <div class="qr-grid">
+          <div class="qr-section">
+            <h3>Care Team & Tracking <small>(status & ownership)</small></h3>
+            <div class="qr-kv">
+              <div class="qr-k">Doctor</div><div class="qr-v" id="ptDoctor"></div>
+              <div class="qr-k">Store</div><div class="qr-v" id="ptStore"></div>
+              <div class="qr-k">Patient Status</div><div class="qr-v" id="ptStatus"></div>
+              <div class="qr-k">Created</div><div class="qr-v" id="ptCreated"></div>
+              <div class="qr-k">Last Update</div><div class="qr-v" id="ptUpdated"></div>
+            </div>
+          </div>
+
+          <div class="qr-section" id="planCard" style="display:none;">
+            <h3>Nutrition Prescription <small>(latest plan)</small></h3>
+            <table class="qr-table">
+              <tr><th>Daily Calories</th><td id="plCalories"></td></tr>
+              <tr><th>Daily Protein</th><td id="plProtein"></td></tr>
+              <tr><th>Per-Serving Calories</th><td id="plPSCalories"></td></tr>
+              <tr><th>Per-Serving Protein</th><td id="plPSProtein"></td></tr>
+              <tr><th>Macros (per serving)</th><td id="plMacros"></td></tr>
+              <tr><th>Protein Type</th><td id="plType"></td></tr>
+              <tr><th>Micronutrients</th><td id="plMicros"></td></tr>
+              <tr><th>Override Notes</th><td id="plNotes"></td></tr>
+            </table>
+            <div class="note" style="margin-top:10px;" id="plMeta"></div>
+            <div id="plRationaleWrap" style="margin-top:10px;display:none;">
+              <div style="color:#6b7280;font-weight:900;font-size:12.5px;">Rationale</div>
+              <ul class="qr-list" id="plRationale"></ul>
+            </div>
+          </div>
+        </div>
+            <div id="approvalBlock" class="qr-section" style="margin-top:14px;display:none;">
+        <h3>Approved By <small>(clinical authorization)</small></h3>
+        <div style="font-size:14px;line-height:1.8;color:#111827;">
+          <div id="apDoctor" style="font-weight:800;"></div>
+          <div>Digitally Approved by Onvilox System</div>
+          <div id="apTime" style="color:#6b7280;"></div>
+          <div style="margin-top:10px;color:#6b7280;font-size:12.5px;">This is a system-generated clinical nutrition report. No physical signature is required.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="qr-footer">
+      <div class="note">This report view is system-generated from Onvilox. For clinical decisions, verify patient identity and latest updates in the app.</div>
+      <div class="qr-actions">
+        <button class="btn-secondary" onclick="window.print()">Print</button>
+        <button class="btn-secondary" onclick="history.length ? history.back() : (location.href='index.html')">Back</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="js/storage.js"></script>
+<script src="js/seed.js"></script>
+<script src="js/patient-store.js"></script>
+<script src="js/users.js"></script>
+<script src="js/stores.js"></script>
+<script src="js/manufacturing.js"></script>
+
+
+  
+<script>
+(function(){
+  function qp(name){
+    const u = new URL(window.location.href);
+    return u.searchParams.get(name);
+  }
+  const id = qp('id');
+  const p = id ? getPatientById(id) : null;
+
+  const setText = (id, val) => {
+    const el = document.getElementById(id);
+    if(el) el.innerText = (val ?? '-');
+  };
+
+  setText('ptReportId', id || '-');
+  setText('ptGenerated', new Date().toLocaleString());
+
+  if(!p){
+    document.getElementById('ptError').style.display = 'inline-block';
+    return;
+  }
+
+  document.getElementById('ptContent').style.display = '';
+
+  const doc = (p.approvedBy ? userService.getUserById(p.approvedBy) : (p.assignedDoctorId ? userService.getUserById(p.assignedDoctorId) : null));
+  const store = p.storeId ? storeService.getStoreById(p.storeId) : null;
+
+  // Hospital line (prefer persisted hospitalName; else store.hospital)
+  const hosp = p.hospitalName || (store && store.hospital) || '';
+  if(hosp){
+    document.getElementById('ptHospitalLine').innerText = hosp;
+  }
+
+  setText('ptName', p.name);
+  setText('ptUhic', p.uhic);
+  setText('ptAgeSex', `${p.age ?? '-'} / ${p.sex ?? '-'}`);
+  setText('ptWtHt', `${p.weight ?? '-'} kg / ${p.height ?? '-'} cm`);
+  setText('ptWl', (p.weightLossPercent != null ? (p.weightLossPercent + ' %') : '-') );
+  setText('ptAlb', (p.albumin != null ? (p.albumin + ' g/dL') : '-') );
+
+  setText('ptCancer', p.cancer);
+  setText('ptRegimen', p.regimen || '-');
+  setText('ptGi', (p.giIssues ? 'Yes' : 'No'));
+  setText('ptFeeding', p.feedingMethod || '-');
+  setText('ptCom', (Array.isArray(p.comorbidities) && p.comorbidities.length) ? p.comorbidities.join(', ') : '-');
+  setText('ptSe', (Array.isArray(p.sideEffects) && p.sideEffects.length) ? p.sideEffects.join(', ') : '-');
+  setText('ptAlg', p.allergies || 'None Reported');
+  setText('ptNote', p.notes || '-');
+
+  setText('ptStatus', p.status || 'CREATED');
+  setText('ptDoctor', p.approvedByName || (doc ? doc.name : '-') );
+  setText('ptStore', store ? store.name : '-');
+  setText('ptCreated', p.createdDate || '-');
+  setText('ptUpdated', (p.updatedAt ? new Date(p.updatedAt).toLocaleString() : '-') );
+
+  if(p.approvedByName || p.approvedAt){
+    document.getElementById('approvalBlock').style.display = '';
+    setText('apDoctor', p.approvedByName || (doc ? doc.name : '-'));
+    setText('apTime', p.approvedAt ? ('Approved on: ' + new Date(p.approvedAt).toLocaleString()) : '-');
+  }
+
+  // Latest plan (if any)
+  const plan = (typeof getLatestPlanForPatient === 'function') ? getLatestPlanForPatient(p.id) : null;
+  if(plan && plan.finalPlan){
+    document.getElementById('planCard').style.display = '';
+    const fp = plan.finalPlan;
+
+    setText('plCalories', fp.dailyCalories != null ? (fp.dailyCalories + ' kcal/day') : '-');
+    setText('plProtein', fp.dailyProtein != null ? (fp.dailyProtein + ' g/day') : '-');
+    setText('plPSCalories', fp.perServingCalories != null ? (fp.perServingCalories + ' kcal') : '-');
+    setText('plPSProtein', fp.perServingProtein != null ? (fp.perServingProtein + ' g') : '-');
+    setText('plType', fp.proteinType || '-');
+
+    const macros = [];
+    if(fp.macroProtein != null) macros.push('Protein ' + fp.macroProtein + ' g');
+    if(fp.macroCarbs != null) macros.push('Carbs ' + fp.macroCarbs + ' g');
+    if(fp.macroFat != null) macros.push('Fat ' + fp.macroFat + ' g');
+    setText('plMacros', macros.length ? macros.join(' • ') : '-');
+
+    const micros = fp.micronutrients || {};
+    const microParts = [];
+    if(micros.vitD) microParts.push('Vit D: ' + micros.vitD);
+    if(micros.vitC) microParts.push('Vit C: ' + micros.vitC);
+    if(micros.zinc) microParts.push('Zinc: ' + micros.zinc);
+    if(micros.omega3) microParts.push('Omega-3: ' + micros.omega3);
+    if(micros.selenium) microParts.push('Selenium: ' + micros.selenium);
+    if(micros.magnesium) microParts.push('Magnesium: ' + micros.magnesium);
+    if(micros.bComplex) microParts.push('B-Complex: ' + micros.bComplex);
+    if(micros.glutamine) microParts.push('Glutamine: ' + micros.glutamine);
+    setText('plMicros', microParts.length ? microParts.join(' • ') : '-');
+
+    setText('plNotes', plan.overrideNotes || '-');
+
+    const meta = [];
+    meta.push('Plan Source: ' + (plan.generatedBy || 'ENGINE'));
+    meta.push('Generated: ' + (plan.generatedAt ? new Date(plan.generatedAt).toLocaleString() : '-'));
+    meta.push('Version: ' + (plan.version || 1));
+    if(fp.cachexia != null) meta.push('Cachexia: ' + (fp.cachexia ? 'Yes' : 'No'));
+    setText('plMeta', meta.join(' | '));
+
+    const r = Array.isArray(plan.rationale) ? plan.rationale : (Array.isArray(fp.rationale) ? fp.rationale : []);
+    if(r && r.length){
+      document.getElementById('plRationaleWrap').style.display = '';
+      const ul = document.getElementById('plRationale');
+      ul.innerHTML = '';
+      r.forEach(item=>{
+        const li = document.createElement('li');
+        li.textContent = item;
+        ul.appendChild(li);
+      });
+    }
+  }
+})();
+</script>
+
+<script src="js/theme.js"></script>
+</body>
+</html>

@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Production Workflow - Onvilox</title>
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">Onvilox Store</div>
+  <div class="nav">
+    <a href="store.html">Dashboard</a>
+    <a href="#" onclick="auth.logout()">Logout</a>
+    <button id="themeToggleBtn" onclick="toggleTheme()" class="btn-secondary btn-sm" style="margin-left: 20px; border-radius: 30px; padding: 6px 14px; cursor: pointer;">🌙 Dark Mode</button>
+  </div>
+</div>
+
+<div class="container page">
+
+<div class="card">
+  <div class="workflow" id="workflow"></div>
+</div>
+
+<div class="card">
+  <h2>Patient Production Profile</h2>
+  <table>
+    <tr><th>Patient Name</th><td id="pName"></td></tr>
+    <tr><th>UHIC</th><td id="pUHIC"></td></tr>
+    <tr><th>Doctor</th><td id="pDoctor"></td></tr>
+    <tr><th>Cancer Type</th><td id="pCancer"></td></tr>
+    <tr><th>Current Status</th><td><span class="status" id="pStatus"></span></td></tr>
+  </table>
+</div>
+
+
+<div class="card">
+  <h3>Nutrition & Manufacturing Specifications</h3>
+
+  <table class="report-table">
+    <tr><th>Daily Calories</th><td id="nDailyCalories"></td></tr>
+    <tr><th>Daily Protein</th><td id="nDailyProtein"></td></tr>
+    <tr><th>Per Serving Calories (2x daily)</th><td id="nPerServingCalories"></td></tr>
+    <tr><th>Per Serving Protein (2x daily)</th><td id="nPerServingProtein"></td></tr>
+    <tr><th>Carbs per Serving</th><td id="nCarbs"></td></tr>
+    <tr><th>Fat per Serving</th><td id="nFat"></td></tr>
+    <tr><th>Protein Type</th><td id="nProteinType"></td></tr>
+  </table>
+
+  <div style="margin-top:16px;display:flex;gap:12px;flex-wrap:wrap;">
+    <button class="btn-primary" id="viewReportBtn">View Full Patient Report / PDF</button>
+    <button class="btn-secondary" onclick="location.href='store.html'">Back</button>
+  </div>
+</div>
+
+<div class="card">
+  <h3>Update Production Status</h3>
+  <div style="display:flex;gap:12px;flex-wrap:wrap;">
+    <button class="btn-warning" onclick="setStatus('PROCESSING')">Mark Processing</button>
+    <button class="btn-warning" onclick="setStatus('READY')">Mark Ready</button>
+    <button class="btn-primary" onclick="setStatus('DISPATCHED')">Mark Dispatched</button>
+    <button class="btn-primary" onclick="setStatus('DELIVERED')">Mark Delivered</button>
+    <button class="btn-secondary" onclick="location.href='store.html'">Back</button>
+  </div>
+</div>
+
+</div>
+
+<script src="js/storage.js"></script>
+<script src="js/seed.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/users.js"></script>
+<script src="js/patient-store.js"></script>
+<script src="js/nutrition-engine.js"></script>
+<script src="js/manufacturing.js"></script>
+
+<script>
+auth.requireRole(['STORE']);
+const me = auth.getCurrentUser();
+
+const params = new URLSearchParams(window.location.search);
+const jobId = params.get('job');
+
+const jobs = manufacturingService.getJobs();
+const job = jobs.find(j => j.id === jobId);
+
+if(!job){
+  alert('Job not found');
+  window.location.href='store.html';
+}
+
+if(me.storeId && job.storeId !== me.storeId){
+  alert('This job does not belong to your store.');
+  window.location.href='store.html';
+}
+
+const patient = getPatientById(job.patientId);
+if(!patient){
+  alert('Patient not found');
+  window.location.href='store.html';
+}
+
+function getUserName(id){
+  const u = userService.getUsers().find(x => x.id === id);
+  return u ? u.name : '-';
+}
+
+function statusClass(s){ return (s||'APPROVED').toLowerCase(); }
+
+function renderWorkflow(status){
+  const steps = ['CREATED','APPROVED','PROCESSING','READY','DISPATCHED','DELIVERED'];
+  const idx = steps.indexOf(status);
+  const wrap = document.getElementById('workflow');
+  wrap.innerHTML = '';
+  steps.forEach((s,i)=>{
+    const div = document.createElement('div');
+    div.className = 'workflow-step ' + (i < idx ? 'workflow-complete' : (i === idx ? 'workflow-active' : ''));
+    div.innerText = s.charAt(0) + s.slice(1).toLowerCase();
+    wrap.appendChild(div);
+  });
+}
+
+function bind(){
+  pName.innerText = patient.name;
+  pUHIC.innerText = patient.uhic;
+  pDoctor.innerText = getUserName(job.doctorId);
+  pCancer.innerText = patient.cancer;
+  pStatus.className = 'status ' + statusClass(job.status);
+  pStatus.innerText = job.status;
+  renderWorkflow(job.status);
+}
+
+function setStatus(status){
+  const updated = manufacturingService.updateJobStatus(job.id, status);
+  if(updated){
+    // reflect patient status too for clinician view
+    patient.status = status;
+    updatePatient(patient);
+    job.status = status;
+    bind();
+    alert('Status updated to ' + status);
+  }
+}
+
+bind();
+
+// Nutrition plan for manufacturing view (same engine as doctor)
+const plan = generateNutritionPlan({
+  ...patient,
+  weight: parseFloat(patient.weight),
+  height: parseFloat(patient.height),
+  albumin: parseFloat(patient.albumin),
+  weightLossPercent: parseFloat(patient.weightLossPercent || 0),
+  giIssues: !!patient.giIssues
+});
+
+document.getElementById('nDailyCalories').innerText = plan.dailyCalories + ' kcal';
+document.getElementById('nDailyProtein').innerText = plan.dailyProtein + ' g';
+document.getElementById('nPerServingCalories').innerText = plan.perServingCalories + ' kcal';
+document.getElementById('nPerServingProtein').innerText = plan.perServingProtein + ' g';
+document.getElementById('nCarbs').innerText = plan.macroCarbs + ' g';
+document.getElementById('nFat').innerText = plan.macroFat + ' g';
+document.getElementById('nProteinType').innerText = plan.proteinType;
+
+document.getElementById('viewReportBtn').onclick = function(){
+  location.href = 'patient-profile.html?id=' + encodeURIComponent(patient.id) + '&view=store';
+};
+
+</script>
+
+<script src="js/theme.js"></script>
+</body>
+</html>

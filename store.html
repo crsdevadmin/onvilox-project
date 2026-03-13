@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Store Dashboard - Onvilox</title>
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">Onvilox Store</div>
+  <div class="nav">
+    <a href="store.html">Dashboard</a>
+    <a href="#" onclick="auth.logout()">Logout</a>
+    <button id="themeToggleBtn" onclick="toggleTheme()" class="btn-secondary btn-sm" style="margin-left: 20px; border-radius: 30px; padding: 6px 14px; cursor: pointer;">🌙 Dark Mode</button>
+  </div>
+</div>
+
+<div class="container page">
+
+  <div class="card">
+    <h2>Production Queue</h2>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Doctor</th>
+          <th>Patient</th>
+          <th>UHIC</th>
+          <th>Cancer</th>
+          <th>Status</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody id="jobTable"></tbody>
+    </table>
+  </div>
+
+</div>
+
+
+<!-- QR Modal -->
+<div id="qrOverlay" class="modal-overlay" onclick="closeQr()">
+  <div class="modal" onclick="event.stopPropagation();">
+    <div class="modal-header">
+      <h3 class="modal-title" id="qrTitle">Patient QR</h3>
+      <button class="modal-close" aria-label="Close" onclick="closeQr()">×</button>
+    </div>
+    <div class="modal-body">
+      <div id="qrBox" style="display:flex;justify-content:center;padding:10px 0;"></div>
+      <div style="text-align:center;color:#6b7280;font-size:13px;" id="qrHint">Scan to view patient summary</div>
+      <div class="modal-actions" style="justify-content:center;">
+        <button class="btn-secondary" onclick="copyQrLink()">Copy Link</button>
+        <button class="btn-primary" onclick="openQrLink()">Open Link</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="js/storage.js"></script>
+<script src="js/seed.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/users.js"></script>
+<script src="js/patient-store.js"></script>
+<script src="js/manufacturing.js"></script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+<script>
+auth.requireRole(['STORE']);
+const me = auth.getCurrentUser();
+
+function getUserName(id){
+  const users = userService.getUsers();
+  const u = users.find(x => x.id === id);
+  return u ? u.name : '-';
+}
+
+function statusClass(s){
+  return (s||'APPROVED').toLowerCase();
+}
+
+
+function toggleDetails(jobId){
+  const el = document.getElementById('details_' + jobId);
+  if(!el) return;
+  el.style.display = (el.style.display === 'none' || el.style.display === '') ? 'table-row' : 'none';
+}
+
+function render(){
+  const tbody = document.getElementById('jobTable');
+  tbody.innerHTML='';
+
+  if(!me.storeId){
+    tbody.innerHTML = '<tr><td colspan="6">Store is not mapped to a store. Admin must map Store → Store.</td></tr>';
+    return;
+  }
+
+  const jobs = manufacturingService.getJobsForStore(me.storeId);
+  jobs.sort((a,b)=> (b.updatedAt||'').localeCompare(a.updatedAt||''));
+
+  if(jobs.length === 0){
+    tbody.innerHTML = '<tr><td colspan="6">No jobs yet.</td></tr>';
+    return;
+  }
+
+    jobs.forEach(j => {
+    const p = getPatientById(j.patientId);
+    if(!p) return;
+    const plan = getLatestPlanForPatient(p.id);
+    const planFinal = plan ? plan.finalPlan : null;
+
+    const main = document.createElement('tr');
+    main.className = 'clickable-row';
+    main.innerHTML = `
+      <td>${getUserName(j.doctorId)}</td>
+      <td><a href="javascript:void(0)" class="link" onclick="showQr('${p.id}'); event.stopPropagation();">${p.name}</a></td>
+      <td>${p.uhic}</td>
+      <td>${p.cancer}</td>
+      <td><span class="status ${statusClass(j.status)}">${j.status}</span></td>
+      <td>
+        <button class="btn-warning" onclick="toggleDetails('${j.id}'); event.stopPropagation();">Details</button>
+      </td>
+    `;
+    tbody.appendChild(main);
+
+    const details = document.createElement('tr');
+    details.id = `details_${j.id}`;
+    details.style.display = 'none';
+    details.innerHTML = `
+      <td colspan="6">
+        <div class="card" style="margin:0; padding:18px;">
+          <div style="display:flex; flex-wrap:wrap; gap:18px; align-items:flex-start;">
+            <div style="flex:1; min-width:260px;">
+              <div style="font-weight:700; margin-bottom:8px;">Patient</div>
+              <div><b>Name:</b> ${p.name}</div>
+              <div><b>UHIC:</b> ${p.uhic}</div>
+              <div><b>Age/Sex:</b> ${p.age} / ${p.sex}</div>
+              <div><b>Weight/Height:</b> ${p.weight} kg / ${p.height} cm</div>
+              <div><b>Albumin:</b> ${p.albumin} g/dL</div>
+              <div><b>Weight loss %:</b> ${p.weightLossPercent ?? '-'}</div>
+              <div><b>Feeding:</b> ${p.feedingMethod}</div>
+            </div>
+
+            <div style="flex:1; min-width:260px;">
+              <div style="font-weight:700; margin-bottom:8px;">Nutrition (latest plan)</div>
+              ${planFinal ? `
+                <div><b>Calories/day:</b> ${planFinal.dailyCalories} kcal</div>
+                <div><b>Protein/day:</b> ${planFinal.dailyProtein} g</div>
+                <div><b>Per serving (2x):</b> ${planFinal.perServingCalories} kcal, ${planFinal.perServingProtein} g protein</div>
+                <div><b>Carbs/serving:</b> ${planFinal.macroCarbs} g</div>
+                <div><b>Fat/serving:</b> ${planFinal.macroFat} g</div>
+                <div><b>Protein type:</b> ${planFinal.proteinType}</div>
+                <div style="margin-top:8px; font-size:13px; color:#6b7280;">
+                  Plan v${plan.version} • ${plan.generatedBy}
+                </div>
+              ` : `
+                <div style="color:#6b7280;">No plan generated yet. Open report to generate.</div>
+              `}
+            </div>
+          </div>
+
+          <div style="margin-top:14px; display:flex; flex-wrap:wrap; gap:10px;">
+            <button class="btn-primary" onclick="event.stopPropagation(); location.href='store-patient.html?job=${j.id}'" style="display:flex; align-items:center; gap:6px;" title="Update Production Status">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M11 2a3 3 0 0 1 2.995 2.824L14 5v6a3 3 0 0 1-2.824 2.995L11 14H5a3 3 0 0 1-2.995-2.824L2 11V5a3 3 0 0 1 2.824-2.995L5 2h6zm-1.5 6h-3a.5.5 0 0 0 0 1h3a.5.5 0 0 0 0-1zm.5-3h-4a.5.5 0 0 0 0 1h4a.5.5 0 0 0 0-1z"/></svg>
+              Production
+            </button>
+            <button class="btn-secondary" onclick="event.stopPropagation(); location.href='patient-profile.html?id=${p.id}'" style="display:flex; align-items:center; gap:6px;" title="View Report">
+               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M8.636 3.5a.5.5 0 0 0-.5-.5H1.5A1.5 1.5 0 0 0 0 4.5v10A1.5 1.5 0 0 0 1.5 16h10a1.5 1.5 0 0 0 1.5-1.5V7.864a.5.5 0 0 0-1 0V14.5a.5.5 0 0 1-.5.5h-10a.5.5 0 0 1-.5-.5v-10a.5.5 0 0 1 .5-.5h6.636a.5.5 0 0 0 .5-.5z"/><path fill-rule="evenodd" d="M16 .5a.5.5 0 0 0-.5-.5h-5a.5.5 0 0 0 0 1h3.793L6.146 9.146a.5.5 0 1 0 .708.708L15 1.707V5.5a.5.5 0 0 0 1 0v-5z"/></svg>
+               Report
+            </button>
+            <button class="btn-warning" onclick="event.stopPropagation(); openPdf('${p.id}')" style="display:flex; align-items:center; gap:6px;" title="Download PDF">
+               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/><path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/></svg>
+               PDF
+            </button>
+          </div>
+        </div>
+      </td>
+    `;
+    tbody.appendChild(details);
+  });
+}
+
+function openPdf(patientId){
+  const url = `patient-profile.html?id=${encodeURIComponent(patientId)}&print=1`;
+  window.open(url, '_blank', 'noopener');
+}
+
+render();
+
+let __qrCurrentLink = '';
+
+function getBaseUrlForQr(){
+  try{
+    const cfg = localStorage.getItem('onvilox_public_base_url');
+    if(cfg && /^https?:\/\//i.test(cfg)) return cfg.replace(/\/$/,'');
+  }catch(e){}
+  
+  // Always use an absolute URL so phones can scan
+  let base = window.location.origin;
+  
+  if(base === 'null' || base === 'file://'){
+    return 'http://192.168.1.8:8000'; // Fallback
+  }
+  
+  const path = window.location.pathname;
+  const dir = path.substring(0, path.lastIndexOf('/'));
+  return base + dir;
+}
+
+function buildQrLink(patientId){
+  const base = getBaseUrlForQr();
+  return `${base}/patient-qr.html?id=${encodeURIComponent(patientId)}`;
+}
+
+
+function showQr(patientId){
+  const p = getPatientById(patientId);
+  const title = p ? `QR for ${p.name}` : 'Patient QR';
+  document.getElementById('qrTitle').innerText = title;
+
+  const link = buildQrLink(patientId);
+  __qrCurrentLink = link;
+
+  const box = document.getElementById('qrBox');
+  box.innerHTML = '';
+  new QRCode(box, { text: link, width: 220, height: 220 });
+
+  const isFile = (window.location.origin === 'null');
+  if(isFile && !localStorage.getItem('onvilox_public_base_url')){
+    document.getElementById('qrHint').innerText = 'Warning: Local URLs cannot be scanned by phones. Ensure you are running this on a reachable IP address (e.g. your WiFi IP) and set localStorage key "onvilox_public_base_url".';
+  }else{
+    document.getElementById('qrHint').innerText = 'Scan to view patient report';
+  }
+  document.getElementById('qrOverlay').style.display = 'flex';
+}
+
+function closeQr(){
+  const ov = document.getElementById('qrOverlay');
+  if(ov) ov.style.display = 'none';
+}
+
+async function copyQrLink(){
+  if(!__qrCurrentLink) return;
+  try{
+    await navigator.clipboard.writeText(__qrCurrentLink);
+    document.getElementById('qrHint').innerText = 'Link copied ✅';
+  }catch(e){
+    prompt('Copy this link:', __qrCurrentLink);
+  }
+}
+
+function openQrLink(){
+  if(!__qrCurrentLink) return;
+  window.open(__qrCurrentLink, '_blank', 'noopener');
+}
+
+</script>
+
+<script src="js/theme.js"></script>
+</body>
+</html>

@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Create Users - Onvilox</title>
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">Onvilox Admin</div>
+  <div class="nav">
+    <a href="admin.html">Dashboard</a>
+    <a href="admin-stores.html">Stores</a>
+    <a href="admin-users.html">Create Users</a>
+    <a href="admin-mapping.html">Mapping</a>
+    <a href="admin-tracking.html">Tracking</a>
+    <a href="admin-reports.html">Reports</a>
+    <a href="#" onclick="auth.logout()">Logout</a>
+    <button id="themeToggleBtn" onclick="toggleTheme()" class="btn-secondary btn-sm" style="margin-left: 20px; border-radius: 30px; padding: 6px 14px; cursor: pointer;">🌙 Dark Mode</button>
+  </div>
+</div>
+
+<div class="container page">
+<div class="card">
+
+<h2>Create User Login</h2>
+
+<div class="form-grid">
+
+  <div class="form-group">
+    <label class="required">User Role</label>
+    <select id="role" onchange="onRoleChange()">
+      <option value="">Select Role</option>
+      <option value="DOCTOR">Doctor</option>
+      <option value="STORE">Store Manager</option>
+      <option value="ASSISTANT">Assistant</option>
+    </select>
+  </div>
+
+  <div class="form-group">
+    <label class="required">Full Name</label>
+    <input id="fullName" type="text" placeholder="Dr. Rao" onkeyup="validateUserField(this,'Full Name')" onblur="validateUserField(this,'Full Name')">
+    <div class="validation-msg" id="fullName_msg"></div>
+  </div>
+
+  <div class="form-group">
+    <label class="required">Login Email (or Phone)</label>
+    <input id="email" type="email" placeholder="doctor@hospital.com" onkeyup="validateUserField(this,'Email')" onblur="validateUserField(this,'Email')">
+    <div class="validation-msg" id="email_msg"></div>
+  </div>
+
+  <div class="form-group">
+    <label>Phone Number</label>
+    <input id="phone" type="text" placeholder="10-digit" onkeyup="validateUserField(this,'Phone')" onblur="validateUserField(this,'Phone')">
+    <div class="validation-msg" id="phone_msg"></div>
+  </div>
+
+  <div class="form-group">
+    <label>Address</label>
+    <input id="address" type="text" onkeyup="validateUserField(this,'Address')" onblur="validateUserField(this,'Address')">
+    <div class="validation-msg" id="address_msg"></div>
+  </div>
+
+  <!-- Store mapping for Doctor / Store -->
+
+  <div class="form-group" id="doctorHospitalGroup" style="display:none;">
+    <label class="required">Hospital Name</label>
+    <input id="hospitalName" type="text" placeholder="Apollo Cancer Centre" onkeyup="validateUserField(this,'Hospital Name')" onblur="validateUserField(this,'Hospital Name')">
+    <div class="validation-msg" id="hospitalName_msg"></div>
+  </div>
+
+  <div class="form-group" id="storeGroup" style="display:none;">
+    <label class="required">Mapped Store</label>
+    <select id="storeSelect"></select>
+    <div class="validation-msg" id="storeSelect_msg"></div>
+  </div>
+
+  <!-- Doctor mapping for Assistant -->
+  <div class="form-group" id="doctorGroup" style="display:none;">
+    <label class="required">Mapped Doctor</label>
+    <select id="doctorSelect"></select>
+    <div class="validation-msg" id="doctorSelect_msg"></div>
+  </div>
+
+</div>
+
+<div id="errorBox" style="color:#ef4444;font-weight:600;margin-top:10px;"></div>
+
+<div style="margin-top:22px;">
+  <button class="btn-primary" onclick="createUserUI()">Create Login</button>
+</div>
+
+<div id="successBox" style="margin-top:18px;display:none;">
+  <div class="card" style="background:#f0fdf4;border:1px solid #bbf7d0;">
+    <div style="font-weight:700;color:#166534;">User created successfully</div>
+    <div style="margin-top:8px;">Share these credentials:</div>
+    <div style="margin-top:10px;">
+      <div><b>Username:</b> <span id="sUser"></span></div>
+      <div><b>Password:</b> <span id="sPass"></span></div>
+      <div><b>Role:</b> <span id="sRole"></span></div>
+    </div>
+  </div>
+</div>
+
+
+<hr style="margin:32px 0;border:none;border-top:1px solid #e5e7eb;">
+
+<h2>Existing Users</h2>
+<p style="margin-top:-8px;color:#6b7280;">Use Reset Password if someone missed the generated password.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Role</th>
+      <th>Name</th>
+      <th>Username</th>
+      <th>Mapped Store / Doctor</th>
+      <th>Hospital</th>
+      <th>Action</th>
+    </tr>
+  </thead>
+  <tbody id="usersTableBody"></tbody>
+</table>
+
+<div id="resetBox" style="margin-top:18px;display:none;">
+  <div class="card" style="background:#fff7ed;border:1px solid #fed7aa;">
+    <div style="font-weight:700;color:#9a3412;">Password reset</div>
+    <div style="margin-top:8px;">New credentials (share securely):</div>
+    <div style="margin-top:10px;">
+      <div><b>Username:</b> <span id="rUser"></span></div>
+      <div><b>New Password:</b> <span id="rPass"></span></div>
+      <div><b>Role:</b> <span id="rRole"></span></div>
+    </div>
+  </div>
+</div>
+</div>
+</div>
+
+<script src="js/storage.js"></script>
+<script src="js/seed.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/stores.js"></script>
+<script src="js/users.js"></script>
+
+<script>
+auth.requireRole(['SUPER_ADMIN']);
+
+function setFieldState(field, ok, msg){
+  const msgBox = document.getElementById(field.id + '_msg');
+  if(!msgBox) return;
+  if(ok){
+    field.classList.add('field-valid');
+    field.classList.remove('field-invalid');
+    msgBox.className = 'validation-msg validation-success';
+    msgBox.innerText = msg || '✓ Looks good';
+  } else {
+    field.classList.add('field-invalid');
+    field.classList.remove('field-valid');
+    msgBox.className = 'validation-msg validation-error';
+    msgBox.innerText = msg || 'Invalid';
+  }
+}
+
+function validateUserField(field, fieldName){
+  const val = (field.value || '').trim();
+  // required fields
+  const requiredIds = new Set(['role','fullName','username']);
+  if(requiredIds.has(field.id) && !val){
+    setFieldState(field, false, fieldName + ' is required');
+    return false;
+  }
+
+  // email / phone cross validation
+  if(field.id === 'email' || field.id === 'phone'){
+    const emailVal = (document.getElementById('email').value || '').trim();
+    const phoneVal = (document.getElementById('phone').value || '').trim();
+    
+    if(!emailVal && !phoneVal){
+      if(field.id==='email'){ setFieldState(field, false, 'Either Email or Phone is required for login'); }
+      return false;
+    }
+
+    if(field.id === 'email' && emailVal){
+      const ok = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailVal);
+      setFieldState(field, ok, ok ? '✓ Valid email' : 'Enter a valid email');
+      return ok;
+    }
+
+    if(field.id === 'phone' && phoneVal){
+      const digits = phoneVal.replace(/\D/g,'');
+      const ok = digits.length >= 10 && digits.length <= 15;
+      setFieldState(field, ok, ok ? '✓ Valid phone' : 'Phone must be 10–15 digits');
+      return ok;
+    }
+    
+    // If one is filled and valid, the other empty one is fine
+    setFieldState(field, true, '');
+    return true;
+  }
+
+  if(field.id === 'hospitalName'){
+    const role = document.getElementById('role').value;
+    if(role === 'DOCTOR'){
+      if(!val){ setFieldState(field, false, 'Hospital Name is required'); return false; }
+      if(val.length < 3){ setFieldState(field, false, 'Enter a valid hospital name'); return false; }
+      setFieldState(field, true, '✓ Looks good');
+      return true;
+    }
+    field.classList.remove('field-valid','field-invalid');
+    document.getElementById('hospitalName_msg').innerText='';
+    return true;
+  }
+
+  // address optional
+  if(field.id === 'address'){
+    if(!val){
+      field.classList.remove('field-valid','field-invalid');
+      document.getElementById('address_msg').innerText='';
+      return true;
+    }
+    setFieldState(field, true, '');
+    return true;
+  }
+
+  // full name required
+  if(field.id === 'fullName'){
+    if(!val){ setFieldState(field, false, 'Full Name is required'); return false; }
+    if(val.length < 3){ setFieldState(field, false, 'Enter a valid name'); return false; }
+    setFieldState(field, true, '✓ Looks good');
+    return true;
+  }
+
+  return true;
+}
+
+function validateUserForm(){
+  const roleEl = document.getElementById('role');
+  const nameEl = document.getElementById('fullName');
+  const emailEl = document.getElementById('email');
+  const phoneEl = document.getElementById('phone');
+  const hospitalEl = document.getElementById('hospitalName');
+
+  // Role required
+  if(!roleEl.value){
+    document.getElementById('errorBox').innerText = 'Please select a role';
+    return false;
+  }
+  // Validate base fields
+  const baseFieldsOk = [
+    validateUserField(nameEl,'Full Name'),
+    validateUserField(emailEl,'Email'),
+    validateUserField(phoneEl,'Phone')
+  ].every(Boolean);
+
+  if(!baseFieldsOk) return false;
+
+  // Role-specific required mapping
+  const role = roleEl.value;
+  if(role === 'DOCTOR' || role === 'STORE'){
+    if(role === 'DOCTOR' && !validateUserField(hospitalEl,'Hospital Name')) return false;
+    
+    const storeEl = document.getElementById('storeSelect');
+    if(!storeEl.value){
+      storeEl.classList.add('field-invalid');
+      document.getElementById('storeSelect_msg').className='validation-msg validation-error';
+      document.getElementById('storeSelect_msg').innerText='Store is required';
+      storeEl.scrollIntoView({behavior:'smooth', block:'center'});
+      return false;
+    }
+    storeEl.classList.remove('field-invalid');
+    document.getElementById('storeSelect_msg').innerText='';
+  }
+  if(role === 'ASSISTANT'){
+    const docEl = document.getElementById('doctorSelect');
+    if(!docEl.value){
+      docEl.classList.add('field-invalid');
+      document.getElementById('doctorSelect_msg').className='validation-msg validation-error';
+      document.getElementById('doctorSelect_msg').innerText='Doctor is required';
+      docEl.scrollIntoView({behavior:'smooth', block:'center'});
+      return false;
+    }
+    docEl.classList.remove('field-invalid');
+    document.getElementById('doctorSelect_msg').innerText='';
+  }
+
+  return true;
+}
+
+function fillStores(role){
+  const sel = document.getElementById('storeSelect');
+  const stores = storeService.getStores();
+  const managedStoreIds = new Set(
+    userService.getUsersByRole('STORE')
+      .map(u => u.storeId)
+      .filter(Boolean)
+  );
+  sel.innerHTML = '<option value="">Select Store</option>';
+  stores
+    .filter(s => role !== 'STORE' || !managedStoreIds.has(s.id))
+    .forEach(s => {
+    const opt = document.createElement('option');
+    opt.value = s.id;
+    opt.text = s.name;
+    sel.add(opt);
+  });
+
+  // If creating a store manager and none are available
+  if(role === 'STORE'){
+    const availableCount = stores.filter(s => !managedStoreIds.has(s.id)).length;
+    if(availableCount === 0){
+      sel.innerHTML = '<option value="">No available stores</option>';
+    }
+  }
+}
+
+function fillDoctors(){
+  const sel = document.getElementById('doctorSelect');
+  const doctors = userService.getUsersByRole('DOCTOR');
+  sel.innerHTML = '<option value="">Select Doctor</option>';
+  doctors.forEach(d => {
+    const opt = document.createElement('option');
+    opt.value = d.id;
+    opt.text = d.name + ' (' + d.username + ')';
+    sel.add(opt);
+  });
+}
+
+function onRoleChange(){
+  const role = document.getElementById('role').value;
+  document.getElementById('errorBox').innerText='';
+  document.getElementById('successBox').style.display='none';
+
+  const storeGroup = document.getElementById('storeGroup');
+  const doctorGroup = document.getElementById('doctorGroup');
+  const doctorHospitalGroup = document.getElementById('doctorHospitalGroup');
+
+  storeGroup.style.display = (role === 'DOCTOR' || role === 'STORE') ? 'block' : 'none';
+  doctorGroup.style.display = (role === 'ASSISTANT') ? 'block' : 'none';
+  doctorHospitalGroup.style.display = (role === 'DOCTOR') ? 'block' : 'none';
+
+  if(role === 'DOCTOR' || role === 'STORE'){
+    fillStores(role);
+  }
+  if(role === 'ASSISTANT'){
+    fillDoctors();
+  }
+}
+
+function createUserUI(){
+  if(!validateUserForm()) return;
+  const role = document.getElementById('role').value;
+  const name = document.getElementById('fullName').value;
+  const email = document.getElementById('email').value;
+  const phone = document.getElementById('phone').value;
+  const address = document.getElementById('address').value;
+  const hospitalName = document.getElementById('hospitalName').value;
+
+  if(!role){
+    document.getElementById('errorBox').innerText = 'Please select a role';
+    return;
+  }
+
+  // enforce prerequisites
+  if((role === 'DOCTOR' || role === 'STORE') && storeService.getStores().length === 0){
+    document.getElementById('errorBox').innerText = 'Please create a Store first (Store Master).';
+    return;
+  }
+
+  // one store manager per store UX guard
+  if(role === 'STORE'){
+    const managed = userService.getUsersByRole('STORE').filter(u => u.storeId).length;
+    const totalStores = storeService.getStores().length;
+    if(totalStores > 0 && managed >= totalStores){
+      document.getElementById('errorBox').innerText = 'All stores already have a Store.';
+      return;
+    }
+  }
+
+  if(role === 'ASSISTANT' && userService.getUsersByRole('DOCTOR').length === 0){
+    document.getElementById('errorBox').innerText = 'Please create at least one Doctor before creating an Assistant.';
+    return;
+  }
+
+  const storeId = document.getElementById('storeSelect').value;
+  const mappedDoctorId = document.getElementById('doctorSelect').value;
+
+  const res = userService.createUser({ role, name, email, phone, address, storeId, mappedDoctorId, hospitalName });
+  if(!res.ok){
+    document.getElementById('errorBox').innerText = res.error;
+    return;
+  }
+  
+  // Simulate sending SMS/Email
+  const target = email || phone;
+  const notifMsg = `[SIMULATED NOTIFICATION]\n\nSending to: ${target}\n\n"Welcome to Onvilox! Your secure login is:\nUsername: ${target}\nPassword: ${res.password}"`;
+  
+  // Actually pop it up for the admin
+  setTimeout(() => alert(notifMsg), 100);
+
+  document.getElementById('errorBox').innerText='';
+  document.getElementById('successBox').style.display='block';
+  document.getElementById('sUser').innerText = res.user.username;
+  document.getElementById('sPass').innerText = res.password;
+  document.getElementById('sRole').innerText = res.user.role;
+
+  renderUsersTable();
+
+  // clear form
+  document.getElementById('fullName').value='';
+  document.getElementById('email').value='';
+  document.getElementById('phone').value='';
+  document.getElementById('address').value='';
+  document.getElementById('hospitalName').value='';
+}
+
+function renderUsersTable(){
+  const tbody = document.getElementById('usersTableBody');
+  if(!tbody) return;
+  tbody.innerHTML = '';
+
+  const users = userService.getUsers().filter(u => u.role !== 'SUPER_ADMIN');
+  const stores = storeService.getStores();
+  const storeName = (id) => (stores.find(s => s.id === id)?.name) || '-';
+
+  const assistantMap = db.getTable('doctor_assistant_map', []);
+  const doctors = userService.getUsersByRole('DOCTOR');
+
+  users.forEach(u => {
+    let mapped = '-';
+    if(u.role === 'DOCTOR'){
+      mapped = storeName(u.storeId);
+    } else if(u.role === 'STORE'){
+      mapped = storeName(u.storeId);
+    } else if(u.role === 'ASSISTANT'){
+      const docId = assistantMap.find(m => m.assistantId === u.id)?.doctorId;
+      const doc = doctors.find(d => d.id === docId);
+      mapped = doc ? (doc.name + ' (' + doc.username + ')') : '-';
+    }
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${u.role}</td>
+      <td>${u.name || '-'}</td>
+      <td>${u.username}</td>
+      <td>${mapped}</td>
+      <td>${u.hospitalName || '-'}</td>
+      <td>
+        <div class="action-row" style="gap:8px;">
+          <button class="btn-warning btn-sm" onclick="resetPasswordUI('${u.id}')">Reset Pass</button>
+          <button class="btn-sm" style="background:var(--danger-glass);color:var(--danger);border:1px solid rgba(239, 68, 68, 0.3);" onclick="deleteUserUI('${u.id}', '${u.username}')">Delete</button>
+        </div>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function resetPasswordUI(userId){
+  const res = userService.resetUserPassword(userId);
+  if(!res.ok){
+    alert(res.error || 'Unable to reset password');
+    return;
+  }
+  document.getElementById('resetBox').style.display='block';
+  document.getElementById('rUser').innerText = res.user.username;
+  document.getElementById('rPass').innerText = res.password;
+  document.getElementById('rRole').innerText = res.user.role;
+  renderUsersTable();
+}
+
+function deleteUserUI(userId, username){
+  if(confirm(`Are you sure you want to delete the user: ${username}?\nThis action cannot be undone.`)){
+    const res = userService.deleteUser(userId);
+    if(!res.ok){
+      alert(res.error || 'Unable to delete user');
+      return;
+    }
+    renderUsersTable();
+  }
+}
+
+
+onRoleChange();
+renderUsersTable();
+</script>
+
+<script src="js/theme.js"></script>
+</body>
+</html>

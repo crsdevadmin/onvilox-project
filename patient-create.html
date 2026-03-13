@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8">
+  <title>Create Patient - Onvilox</title>
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">Onvilox</div>
+  <div class="nav">
+    <a href="doctor.html">Dashboard</a>
+    <a href="#" onclick="auth.logout()">Logout</a>
+    <button id="themeToggleBtn" onclick="toggleTheme()" class="btn-secondary btn-sm" style="margin-left: 20px; border-radius: 30px; padding: 6px 14px; cursor: pointer;">🌙 Dark Mode</button>
+  </div>
+</div>
+
+<div class="container page">
+<div class="card">
+
+<h2>Create New Patient</h2>
+
+<div class="form-grid">
+
+  <div class="form-group">
+    <label class="required">Patient Name</label>
+    <input type="text" id="patientName" onkeyup="validateField(this,'Patient Name')">
+    <div class="validation-msg" id="patientName_msg"></div>
+  </div>
+
+  <div class="form-group">
+    <label class="required">UHIC Code</label>
+    <input type="text" id="uhic" onkeyup="validateField(this,'UHIC Code')">
+    <div class="validation-msg" id="uhic_msg"></div>
+  </div>
+
+  <div class="form-group">
+    <label class="required">Age</label>
+    <input type="number" id="age" onkeyup="validateField(this,'Age')" min="1" max="120">
+    <div class="validation-msg" id="age_msg"></div>
+  </div>
+
+  <div class="form-group">
+    <label class="required">Sex</label>
+    <select id="sex" onchange="validateField(this,'Sex')">
+      <option value="">Select</option>
+      <option>Male</option>
+      <option>Female</option>
+    </select>
+    <div class="validation-msg" id="sex_msg"></div>
+  </div>
+
+  <div class="form-group">
+    <label class="required">Usual Weight (kg) - before illness</label>
+    <input type="number" id="usualWeight" onkeyup="calculateWeightLoss(); validateField(this,'Usual Weight')" min="25" max="300">
+    <div class="validation-msg" id="usualWeight_msg"></div>
+  </div>
+
+  <div class="form-group">
+    <label class="required">Current Weight (kg)</label>
+    <input type="number" id="weight" onkeyup="calculateWeightLoss(); validateField(this,'Current Weight')" min="25" max="300">
+    <div class="validation-msg" id="weight_msg"></div>
+  </div>
+
+  <div class="form-group">
+    <label class="required">Height (cm)</label>
+    <input type="number" id="height" onkeyup="validateField(this,'Height')" min="30" max="250">
+    <div class="validation-msg" id="height_msg"></div>
+  </div>
+
+  <div class="form-group">
+    <label class="required">Weight Loss % (last 6 months)</label>
+    <input type="number" id="weightLossPercent" step="0.1" min="0" max="50" onkeyup="validateField(this,'Weight Loss %')" readonly style="background:var(--bg-card); cursor:not-allowed;">
+    <div class="validation-msg" id="weightLossPercent_msg"></div>
+  </div>
+
+  <div class="form-group">
+    <label>GI Issues (diarrhea/malabsorption)</label>
+    <select id="giIssues">
+      <option value="false">No</option>
+      <option value="true">Yes</option>
+    </select>
+  </div>
+
+  <div class="form-group">
+    <label class="required">Reduced Food Intake (%)</label>
+    <input type="number" id="reducedFoodIntake" placeholder="e.g. 20" step="1" min="0" max="100" onkeyup="validateField(this,'Reduced Food Intake %')">
+    <div class="validation-msg" id="reducedFoodIntake_msg"></div>
+  </div>
+
+  <div class="form-group">
+    <label class="required">Cancer Type</label>
+    <input type="text" id="cancerInput"
+           placeholder="Search cancer type..."
+           onclick="openCancerDropdown()"
+           onkeyup="filterCancerList()" onblur="validateField(this,'Cancer Type')">
+    <div class="dropdown-list" id="cancerDropdown"></div>
+    <div class="validation-msg" id="cancerInput_msg"></div>
+  </div>
+
+  <div class="form-group">
+    <label class="required">Chemo Regimen</label>
+    <input type="text" id="regimenInput"
+           placeholder="Search regimen..."
+           onclick="openRegimenDropdown()"
+           onkeyup="filterRegimenList()" onblur="validateField(this,'Chemo Regimen')">
+    <div class="dropdown-list" id="regimenDropdown"></div>
+    <div class="validation-msg" id="regimenInput_msg"></div>
+  </div>
+
+  <div class="form-group">
+    <label class="required">Serum Albumin (g/dL)</label>
+    <input type="number" id="albumin" step="0.1" onkeyup="validateField(this,'Serum Albumin')">
+    <div class="validation-msg" id="albumin_msg"></div>
+  </div>
+
+  <div class="form-group">
+    <label class="required">Feeding Method</label>
+    <select id="feedingMethod" onchange="validateField(this,'Feeding Method')"></select>
+    <div class="validation-msg" id="feedingMethod_msg"></div>
+  </div>
+
+</div>
+
+<div class="form-group">
+  <label>Comorbidities</label>
+  <div class="tag-box">
+    <div class="tag-container" id="comorbidityTags"></div>
+    <input type="text" placeholder="Search comorbidities..." onkeyup="filterMultiList(this,'comorbidityDropdown')">
+    <div class="dropdown-list" id="comorbidityDropdown"></div>
+  </div>
+</div>
+
+<div class="form-group">
+  <label>Side Effects</label>
+  <div class="tag-box">
+    <div class="tag-container" id="sideEffectTags"></div>
+    <input type="text" placeholder="Search side effects..." onkeyup="filterMultiList(this,'sideEffectDropdown')">
+    <div class="dropdown-list" id="sideEffectDropdown"></div>
+  </div>
+</div>
+
+<div class="form-group">
+  <label>Allergies</label>
+  <textarea id="allergies" placeholder="e.g., lactose, soy"></textarea>
+</div>
+
+<div class="form-group">
+  <label>Notes</label>
+  <textarea id="notes" placeholder="Clinical notes"></textarea>
+</div>
+
+<div style="margin-top:30px;">
+  <div id="errorBox" style="color:#ef4444;font-weight:600;margin-bottom:15px;"></div>
+  <button class="btn-primary" onclick="submitPatient()">Create Patient</button>
+  <button class="btn-secondary" onclick="location.href='doctor.html'">Cancel</button>
+</div>
+
+</div>
+</div>
+
+<script src="js/storage.js"></script>
+<script src="js/seed.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/mappings.js"></script>
+<script src="js/master-data.js"></script>
+<script src="js/form-loader.js"></script>
+<script src="js/patient-store.js"></script>
+
+<script>
+auth.requireRole(['DOCTOR','ASSISTANT']);
+
+function tagsToArray(containerId){
+  const c = document.getElementById(containerId);
+  return [...c.children].map(el => el.dataset.value);
+}
+
+function submitPatient(){
+  const fields = [
+    { id: "patientName", name: "Patient Name" },
+    { id: "uhic", name: "UHIC Code" },
+    { id: "age", name: "Age" },
+    { id: "sex", name: "Sex" },
+    { id: "weight", name: "Current Weight" },
+    { id: "height", name: "Height" },
+    { id: "weightLossPercent", name: "Weight Loss %" },
+    { id: "reducedFoodIntake", name: "Reduced Food Intake %" },
+    { id: "cancerInput", name: "Cancer Type" },
+    { id: "regimenInput", name: "Chemo Regimen" },
+    { id: "albumin", name: "Serum Albumin" },
+    { id: "feedingMethod", name: "Feeding Method" }
+  ];
+
+  for (let f of fields) {
+    const el = document.getElementById(f.id);
+    if (!validateField(el, f.name)) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+  }
+
+  // assistants must be mapped
+  const me = auth.getCurrentUser();
+  if(me.role === 'ASSISTANT'){
+    const docId = mappingService.getDoctorForAssistant(me.id);
+    if(!docId){
+      document.getElementById('errorBox').innerText = 'Assistant is not mapped to a Doctor. Admin must map Assistant → Doctor.';
+      return;
+    }
+  }
+
+  const patient = {
+    name: patientName.value,
+    uhic: uhic.value,
+    age: parseInt(age.value),
+    sex: sex.value,
+    usualWeight: parseFloat(usualWeight.value),
+    weight: parseFloat(weight.value),
+    height: parseFloat(height.value),
+    weightLossPercent: parseFloat(weightLossPercent.value),
+    reducedFoodIntake: parseFloat(document.getElementById('reducedFoodIntake').value) || 0,
+    giIssues: (giIssues.value === 'true'),
+    cancer: cancerInput.value,
+    regimen: regimenInput.value,
+    albumin: parseFloat(albumin.value),
+    feedingMethod: feedingMethod.value,
+    comorbidities: tagsToArray('comorbidityTags'),
+    sideEffects: tagsToArray('sideEffectTags'),
+    allergies: document.getElementById('allergies').value,
+    notes: document.getElementById('notes').value
+  };
+
+  savePatient(patient);
+  window.location.href = 'doctor.html';
+}
+
+function calculateWeightLoss(){
+  const uw = parseFloat(document.getElementById('usualWeight').value);
+  const cw = parseFloat(document.getElementById('weight').value);
+  const wL = document.getElementById('weightLossPercent');
+  
+  if(uw > 0 && cw > 0){
+    if(cw > uw){
+      wL.value = "0"; // No loss if current > usual
+    } else {
+      const loss = ((uw - cw) / uw) * 100;
+      wL.value = loss.toFixed(1);
+    }
+    validateField(wL, 'Weight Loss %');
+  } else {
+    wL.value = "";
+  }
+}
+</script>
+
+<script src="js/theme.js"></script>
+</body>
+</html>

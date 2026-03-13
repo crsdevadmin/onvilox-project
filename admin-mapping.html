@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mapping - Onvilox</title>
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">Onvilox Admin</div>
+  <div class="nav">
+    <a href="admin.html">Dashboard</a>
+    <a href="admin-stores.html">Stores</a>
+    <a href="admin-users.html">Create Users</a>
+    <a href="admin-mapping.html">Mapping</a>
+    <a href="admin-tracking.html">Tracking</a>
+    <a href="admin-reports.html">Reports</a>
+    <a href="#" onclick="auth.logout()">Logout</a>
+    <button id="themeToggleBtn" onclick="toggleTheme()" class="btn-secondary btn-sm" style="margin-left: 20px; border-radius: 30px; padding: 6px 14px; cursor: pointer;">🌙 Dark Mode</button>
+  </div>
+</div>
+
+<div class="container page">
+
+  <div class="card">
+    <h2>Doctor → Store Mapping</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Doctor</th>
+          <th>Mapped Store</th>
+          <th>Change</th>
+        </tr>
+      </thead>
+      <tbody id="docStoreTable"></tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>Assistant → Doctor Mapping</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Assistant</th>
+          <th>Mapped Doctor</th>
+          <th>Change</th>
+        </tr>
+      </thead>
+      <tbody id="asstDocTable"></tbody>
+    </table>
+  </div>
+
+</div>
+
+<script src="js/storage.js"></script>
+<script src="js/seed.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/users.js"></script>
+<script src="js/stores.js"></script>
+
+<script>
+auth.requireRole(['SUPER_ADMIN']);
+
+function getUsers(){ return db.getTable('users', []); }
+function saveUsers(u){ db.setTable('users', u); }
+
+function renderDoctorStore(){
+  const doctors = userService.getUsersByRole('DOCTOR');
+  const stores = storeService.getStores();
+  const tbody = document.getElementById('docStoreTable');
+  tbody.innerHTML='';
+
+  doctors.forEach(d => {
+    const tr = document.createElement('tr');
+    const storeName = (stores.find(s => s.id === d.storeId) || {}).name || '-';
+
+    const options = ['<option value="">Select Store</option>']
+      .concat(stores.map(s => `<option value="${s.id}" ${s.id===d.storeId?'selected':''}>${s.name}</option>`))
+      .join('');
+
+    tr.innerHTML = `
+      <td>${d.name} (${d.username})</td>
+      <td>${storeName}</td>
+      <td>
+        <select id="ds_${d.id}">${options}</select>
+        <button class="btn-warning" style="margin-left:10px;" onclick="updateDoctorStore('${d.id}')">Save</button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function updateDoctorStore(doctorId){
+  const sel = document.getElementById('ds_' + doctorId);
+  const storeId = sel.value;
+  const users = getUsers();
+  const d = users.find(u => u.id === doctorId);
+  if(d){
+    d.storeId = storeId || null;
+    saveUsers(users);
+    renderDoctorStore();
+  }
+}
+
+function renderAssistantDoctor(){
+  const assistants = userService.getUsersByRole('ASSISTANT');
+  const doctors = userService.getUsersByRole('DOCTOR');
+  const map = db.getTable('doctor_assistant_map', []);
+  const tbody = document.getElementById('asstDocTable');
+  tbody.innerHTML='';
+
+  assistants.forEach(a => {
+    const m = map.find(x => x.assistantId === a.id);
+    const mappedDoctorId = m ? m.doctorId : '';
+    const mappedDoctorName = (doctors.find(d => d.id === mappedDoctorId) || {}).name || '-';
+
+    const options = ['<option value="">Select Doctor</option>']
+      .concat(doctors.map(d => `<option value="${d.id}" ${d.id===mappedDoctorId?'selected':''}>${d.name} (${d.username})</option>`))
+      .join('');
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${a.name} (${a.username})</td>
+      <td>${mappedDoctorName}</td>
+      <td>
+        <select id="ad_${a.id}">${options}</select>
+        <button class="btn-warning" style="margin-left:10px;" onclick="updateAssistantDoctor('${a.id}')">Save</button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function updateAssistantDoctor(assistantId){
+  const sel = document.getElementById('ad_' + assistantId);
+  const doctorId = sel.value;
+  let map = db.getTable('doctor_assistant_map', []);
+  map = map.filter(x => x.assistantId !== assistantId);
+  if(doctorId){
+    map.push({ assistantId, doctorId });
+  }
+  db.setTable('doctor_assistant_map', map);
+  renderAssistantDoctor();
+}
+
+renderDoctorStore();
+renderAssistantDoctor();
+</script>
+
+<script src="js/theme.js"></script>
+</body>
+</html>

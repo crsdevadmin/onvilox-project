@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8">
+  <title>Patient Nutrition Plan - Onvilox</title>
+  <link rel="stylesheet" href="css/app.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <style>
+    /* Hospital Report Override Styles */
+    .hospital-report {
+      background-color: #ffffff !important;
+      color: #000000 !important;
+      font-family: 'Times New Roman', Times, serif !important;
+      padding: 40px !important;
+      border: 1px solid #ccc !important;
+      box-shadow: none !important;
+      border-radius: 0 !important;
+    }
+    
+    .hospital-report h2, .hospital-report h3 {
+      color: #000000 !important;
+      border-bottom: 2px solid #000000 !important;
+      padding-bottom: 5px !important;
+      margin-top: 20px !important;
+      font-family: Arial, sans-serif !important;
+    }
+    
+    .hospital-report .report-table {
+      width: 100% !important;
+      border-collapse: collapse !important;
+      margin-bottom: 20px !important;
+      background: #ffffff !important;
+    }
+    
+    .hospital-report .report-table th, .hospital-report .report-table td {
+      border: 1px solid #000000 !important;
+      padding: 8px 12px !important;
+      color: #000000 !important;
+      background: #ffffff !important;
+      text-align: left !important;
+      font-size: 14px !important;
+    }
+    
+    .hospital-report .report-table th {
+      background-color: #f0f0f0 !important;
+      font-weight: bold !important;
+      width: 35% !important;
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="topbar">
+  <div class="logo">Onvilox</div>
+  <div class="nav">
+    <a href="doctor.html">Back</a>
+    <a href="#" onclick="auth.logout()">Logout</a>
+    <button id="themeToggleBtn" onclick="toggleTheme()" class="btn-secondary btn-sm" style="margin-left: 20px; border-radius: 30px; padding: 6px 14px; cursor: pointer;">🌙 Dark Mode</button>
+  </div>
+</div>
+
+<div class="container page">
+<div class="hospital-report" id="pdfExportRoot">
+
+  <h2 style="text-align: center;">ONVILOX CLINICAL NUTRITION REPORT</h2>
+  <h3 style="text-align: center; border: none !important; margin-top: 0 !important;">Personalized Oncology Nutrition Support Plan</h3>
+  <div style="text-align: center; font-style: italic; margin-bottom: 20px;">System-generated recommendation for clinician review.</div>
+
+  <table class="report-table">
+    <tr><th>Hospital</th><td id="pHospital"></td></tr>
+    <tr><th>Approved By</th><td id="pApprovedBy"></td></tr>
+    <tr><th>Approved At</th><td id="pApprovedAt"></td></tr>
+    <tr><th>Patient Name</th><td id="pName"></td></tr>
+    <tr><th>UHIC Code</th><td id="pUHIC"></td></tr>
+    <tr><th>Age</th><td id="pAge"></td></tr>
+    <tr><th>Sex</th><td id="pSex"></td></tr>
+    <tr><th>Weight</th><td id="pWeight"></td></tr>
+    <tr><th>Height</th><td id="pHeight"></td></tr>
+    <tr><th>BMI</th><td id="pBMI"></td></tr>
+    <tr><th>Usual Weight</th><td id="pUW"></td></tr>
+    <tr><th>Weight Loss %</th><td id="pWL"></td></tr>
+    <tr><th>Cancer Type</th><td id="pCancer"></td></tr>
+    <tr><th>Chemo Regimen</th><td id="pRegimen"></td></tr>
+    <tr><th>Feeding Method</th><td id="pFeeding"></td></tr>
+    <tr><th>Serum Albumin</th><td id="pAlbumin"></td></tr>
+  </table>
+
+  <h3>PATIENT HISTORY & CLINICAL RISK</h3>
+  <table class="report-table">
+    <tr><th>Reduced Food Intake</th><td id="pFoodIntake"></td></tr>
+    <tr><th>Comorbidities</th><td id="pHxComorbidities"></td></tr>
+    <tr><th>Side Effects</th><td id="pHxSideEffects"></td></tr>
+    <tr><th>Allergies</th><td id="pHxAllergies"></td></tr>
+    <tr><th>Clinical Notes</th><td id="pHxNotes"></td></tr>
+    <tr><th>BMI Category</th><td id="riskBmi"></td></tr>
+    <tr><th>Nutrition Risk</th><td id="riskNutrition"></td></tr>
+    <tr><th>Cachexia Trigger</th><td id="riskCachexia"></td></tr>
+    <tr><th>Assessment Note</th><td id="riskNote"></td></tr>
+    <tr><th>Monitoring Recommendation</th><td id="riskMonitor"></td></tr>
+  </table>
+
+  <h3>PERSONALIZED NUTRITION PLAN</h3>
+
+  <table class="report-table">
+    <tr>
+      <th>Parameter</th>
+      <th>Daily Total</th>
+      <th id="servingHeader">Per Serving</th>
+    </tr>
+    <tr><td>Total Calories</td><td id="dailyCalories"></td><td id="perServingCalories"></td></tr>
+    <tr><td>Protein</td><td id="dailyProtein"></td><td id="perServingProtein"></td></tr>
+    <tr><td>Carbohydrates</td><td id="dailyCarbs"></td><td id="perServingCarbs"></td></tr>
+    <tr><td>Fat</td><td id="dailyFat"></td><td id="perServingFat"></td></tr>
+    <tr><td>Protein Type</td><td id="proteinType"></td><td>-</td></tr>
+  </table>
+
+  <h3>SUGGESTED FEEDING PATTERN</h3>
+  <table class="report-table">
+    <tr><th>Servings Per Day</th><td id="servingsPerDay"></td></tr>
+    <tr><th>Per Serving Calories</th><td id="servingCalories"></td></tr>
+    <tr><th>Per Serving Protein</th><td id="servingProtein"></td></tr>
+    <tr><th>Tolerance Note</th><td id="servingTolerance"></td></tr>
+    <tr><th>Review Advice</th><td id="servingReview"></td></tr>
+  </table>
+
+  <h3>MICRONUTRIENT & FUNCTIONAL SUPPORT</h3>
+
+  <table class="report-table">
+    <tr><th>Nutrient</th><th>Recommended Dose</th></tr>
+    <tr><td>Vitamin D</td><td id="vitD"></td></tr>
+    <tr><td>Vitamin C</td><td id="vitC"></td></tr>
+    <tr><td>Zinc</td><td id="zinc"></td></tr>
+    <tr><td>Omega-3 / EPA+DHA</td><td id="omega3"></td></tr>
+	<tr><td>EPA</td><td id="epa"></td></tr>
+	<tr><td>Leucine</td><td id="leucine"></td></tr>
+	<tr><td>HMB</td><td id="hmb"></td></tr>
+    <tr><td>Selenium</td><td id="selenium"></td></tr>
+    <tr><td>Magnesium</td><td id="magnesium"></td></tr>
+    <tr><td>B-Complex</td><td id="bComplex"></td></tr>
+    <tr><td>Glutamine</td><td id="glutamine"></td></tr>
+  </table>
+
+  <h3>HOW THE VALUES WERE DERIVED</h3>
+  <div id="calcTrace" style="line-height:1.6;"></div>
+
+  <h3>CLINICAL RATIONALE</h3>
+  <ul id="clinicalRationale"></ul>
+  <div style="color:#6b7280;font-size:13px;margin-top:8px;">Suggested monitoring: reassess oral intake, GI tolerance, body weight, and biochemical markers at follow-up.</div>
+
+  <h3>FORMULATION SPECIFICATIONS</h3>
+
+  <table class="report-table">
+    <tr><th>Specification</th><th>Value</th></tr>
+    <tr><td>Calories per Serving</td><td id="mCalories"></td></tr>
+    <tr><td>Protein per Serving</td><td id="mProtein"></td></tr>
+    <tr><td>Carbs per Serving</td><td id="mCarbs"></td></tr>
+    <tr><td>Fat per Serving</td><td id="mFat"></td></tr>
+    <tr><td>Recommended Form</td><td id="mForm"></td></tr>
+  </table>
+
+  
+  <div id="editPatientSection" style="margin-top:28px;display:none;">
+    <h3>Edit Patient Details</h3>
+    <div style="color:#6b7280;font-size:13px;margin-bottom:14px;">
+      Update clinical inputs (weight/albumin/weight loss etc.). The plan will be recalculated and versioned.
+    </div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label class="required">Weight (kg)</label>
+        <input id="epWeight" type="number" min="25" max="300" step="0.1">
+        <div class="validation-msg" id="epWeight_msg"></div>
+      </div>
+      <div class="form-group">
+        <label class="required">Height (cm)</label>
+        <input id="epHeight" type="number" min="30" max="250" step="0.1">
+        <div class="validation-msg" id="epHeight_msg"></div>
+      </div>
+      <div class="form-group">
+        <label class="required">Serum Albumin (g/dL)</label>
+        <input id="epAlbumin" type="number" min="1" max="6" step="0.1">
+        <div class="validation-msg" id="epAlbumin_msg"></div>
+      </div>
+      <div class="form-group">
+        <label class="required">Weight Loss % (last 6 months)</label>
+        <input id="epWL" type="number" min="0" max="60" step="0.1">
+        <div class="validation-msg" id="epWL_msg"></div>
+      </div>
+      <div class="form-group">
+        <label class="required">Feeding Method</label>
+        <select id="epFeeding"></select>
+        <div class="validation-msg" id="epFeeding_msg"></div>
+      </div>
+      <div class="form-group">
+        <label class="required">GI Issues (need hydrolyzed whey?)</label>
+        <select id="epGi">
+          <option value="false">No</option>
+          <option value="true">Yes</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="required">Cancer Type</label>
+        <select id="epCancer"></select>
+        <div class="validation-msg" id="epCancer_msg"></div>
+      </div>
+      <div class="form-group">
+        <label class="required">Chemo Regimen</label>
+        <select id="epRegimen"></select>
+        <div class="validation-msg" id="epRegimen_msg"></div>
+      </div>
+
+      <div class="form-group" style="grid-column:1 / -1;">
+        <label>Doctor Note (optional)</label>
+        <input id="epNote" type="text" placeholder="Reason for input correction (e.g., updated lab / corrected weight)">
+      </div>
+    </div>
+
+    <div style="display:flex; gap:12px; flex-wrap:wrap; margin-top:14px;">
+      <button class="btn-warning" type="button" onclick="savePatientEdits()">Save Changes & Recalculate</button>
+      <button id="approveBtn" class="btn-primary" type="button" onclick="approveFromReport()">Approve Patient</button>
+    </div>
+  </div>
+
+
+  <div id="overrideSection" style="margin-top:28px;display:none;">
+    <h3>Doctor Override (optional)</h3>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Override Daily Calories (kcal)</label>
+        <input id="ovCalories" type="number" min="0" step="1">
+      </div>
+      <div class="form-group">
+        <label>Override Daily Protein (g)</label>
+        <input id="ovProtein" type="number" min="0" step="1">
+      </div>
+      <div class="form-group">
+        <label>Override Omega-3 text</label>
+        <input id="ovOmega" type="text" placeholder="e.g., 1.5–2 g EPA+DHA">
+      </div>
+      <div class="form-group">
+        <label>Override Note (why changed)</label>
+        <input id="ovNote" type="text" placeholder="Reason for adjustment">
+      </div>
+    </div>
+    <button class="btn-warning" onclick="applyOverride()">Apply Override & Regenerate</button>
+  </div>
+
+  <br>
+  <div style="text-align: center; margin-top: 20px;">
+    <button class="btn-primary" onclick="downloadNutritionPDF()">Download PDF</button>
+  </div>
+
+</div>
+</div>
+
+<script src="js/storage.js"></script>
+<script src="js/seed.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/users.js"></script>
+<script src="js/stores.js"></script>
+<script src="js/mappings.js"></script>
+<script src="js/manufacturing.js"></script>
+<script src="js/master-data.js"></script>
+<script src="js/patient-store.js"></script>
+<script src="js/nutrition-engine.js"></script>
+
+<script>
+auth.requireRole(['DOCTOR','ASSISTANT','STORE']);
+
+const me = auth.getCurrentUser();
+const params = new URLSearchParams(window.location.search);
+const patientId = params.get('id');
+const patient = getPatientById(patientId);
+
+if (!patient) {
+  alert('Patient not found');
+  window.location.href = 'doctor.html';
+}
+
+const printMode = params.get('print') === '1';
+const reviewMode = params.get('review') === '1';
+
+// Only the assigned doctor (or their assistant) can edit/approve
+function canEditOrApprove(){
+  if(!me) return false;
+  if(me.role === 'DOCTOR') {
+    return patient.assignedDoctorId === me.id;
+  }
+  if(me.role === 'ASSISTANT') {
+    const docId = mappingService.getDoctorForAssistant(me.id);
+    return patient.assignedDoctorId === docId;
+  }
+  return false;
+}
+
+// Populate selects for edit section
+function loadEditSelects(){
+  const feedingSel = document.getElementById('epFeeding');
+  feedingSel.innerHTML = '<option value="">Select</option>';
+  (typeof feedingMethods !== 'undefined' ? feedingMethods : []).forEach(m=>{
+    const o=document.createElement('option'); o.value=m; o.text=m; feedingSel.appendChild(o);
+  });
+
+  const cancerSel = document.getElementById('epCancer');
+  cancerSel.innerHTML = '<option value="">Select</option>';
+  Object.keys(typeof cancerRegimenMap !== 'undefined' ? cancerRegimenMap : {}).forEach(c=>{
+    const o=document.createElement('option'); o.value=c; o.text=c; cancerSel.appendChild(o);
+  });
+
+  cancerSel.onchange = () => {
+    loadRegimensForCancer(cancerSel.value);
+    validateSelect('epCancer','Cancer Type');
+  };
+
+  const regimenSel = document.getElementById('epRegimen');
+  regimenSel.onchange = ()=> validateSelect('epRegimen','Chemo Regimen');
+}
+
+function loadRegimensForCancer(cancer){
+  const regimenSel = document.getElementById('epRegimen');
+  regimenSel.innerHTML = '<option value="">Select</option>';
+  if(!cancer || !cancerRegimenMap || !cancerRegimenMap[cancer]) return;
+  cancerRegimenMap[cancer].forEach(r=>{
+    const o=document.createElement('option'); o.value=r; o.text=r; regimenSel.appendChild(o);
+  });
+}
+
+// Simple inline validation helpers
+function setMsg(id, ok, msg){
+  const box = document.getElementById(id + '_msg');
+  const el = document.getElementById(id);
+  if(!box || !el) return ok;
+  if(ok){
+    el.classList.add('field-valid'); el.classList.remove('field-invalid');
+    box.className='validation-msg validation-success'; box.innerText='✓ Looks good';
+  }else{
+    el.classList.add('field-invalid'); el.classList.remove('field-valid');
+    box.className='validation-msg validation-error'; box.innerText=msg;
+  }
+  return ok;
+}
+function validateNumber(id, label, min, max){
+  const v = parseFloat(document.getElementById(id).value);
+  if(Number.isNaN(v)) return setMsg(id,false,label+' is required');
+  if(v < min || v > max) return setMsg(id,false,`${label} must be between ${min} and ${max}`);
+  return setMsg(id,true,'');
+}
+function validateSelect(id,label){
+  const v = document.getElementById(id).value;
+  if(!v) return setMsg(id,false,label+' is required');
+  return setMsg(id,true,'');
+}
+
+function showEditSectionIfAllowed(){
+  const section = document.getElementById('editPatientSection');
+  if(!section) return;
+
+  // Always show edit for authorized Doctor/Assistant
+  const shouldShow = canEditOrApprove();
+  section.style.display = shouldShow ? 'block' : 'none';
+
+  const bar = document.getElementById('doctorReviewBar');
+  if(bar) bar.style.display = shouldShow ? 'block' : 'none';
+
+  // Only show APPROVE button if patient is still in CREATED state
+  const approveBtn = document.getElementById('approveBtn');
+  if(approveBtn) approveBtn.style.display = (shouldShow && patient.status === 'CREATED') ? 'inline-block' : 'none';
+
+  if(shouldShow){
+    loadEditSelects();
+
+    // Prefill values
+    document.getElementById('epWeight').value = patient.weight ?? '';
+    document.getElementById('epHeight').value = patient.height ?? '';
+    document.getElementById('epAlbumin').value = patient.albumin ?? '';
+    document.getElementById('epWL').value = patient.weightLossPercent ?? 0;
+    document.getElementById('epGi').value = String(!!patient.giIssues);
+    document.getElementById('epFeeding').value = patient.feedingMethod ?? '';
+    document.getElementById('epCancer').value = patient.cancer ?? '';
+    loadRegimensForCancer(patient.cancer);
+    document.getElementById('epRegimen').value = patient.regimen ?? '';
+
+    // validate on blur
+    ['epWeight','epHeight','epAlbumin','epWL'].forEach(id=>{
+      document.getElementById(id).addEventListener('blur', ()=>{
+        if(id==='epWeight') validateNumber(id,'Weight',25,300);
+        if(id==='epHeight') validateNumber(id,'Height',30,250);
+        if(id==='epAlbumin') validateNumber(id,'Serum Albumin',1,6);
+        if(id==='epWL') validateNumber(id,'Weight Loss %',0,60);
+      });
+    });
+    document.getElementById('epFeeding').addEventListener('change', ()=>validateSelect('epFeeding','Feeding Method'));
+  }
+
+  if(reviewMode && shouldShow){
+    section.scrollIntoView({behavior:'smooth', block:'start'});
+  }
+}
+
+function savePatientEdits(){
+  // validate
+  const ok =
+    validateNumber('epWeight','Weight',25,300) &
+    validateNumber('epHeight','Height',30,250) &
+    validateNumber('epAlbumin','Serum Albumin',1,6) &
+    validateNumber('epWL','Weight Loss %',0,60) &
+    validateSelect('epFeeding','Feeding Method') &
+    validateSelect('epCancer','Cancer Type') &
+    validateSelect('epRegimen','Chemo Regimen');
+
+  if(!ok){
+    document.getElementById('editPatientSection').scrollIntoView({behavior:'smooth', block:'start'});
+    return;
+  }
+
+  // apply edits
+  patient.weight = parseFloat(document.getElementById('epWeight').value);
+  patient.height = parseFloat(document.getElementById('epHeight').value);
+  patient.albumin = parseFloat(document.getElementById('epAlbumin').value);
+  patient.weightLossPercent = parseFloat(document.getElementById('epWL').value);
+  patient.giIssues = document.getElementById('epGi').value === 'true';
+  patient.feedingMethod = document.getElementById('epFeeding').value;
+  patient.cancer = document.getElementById('epCancer').value;
+  patient.regimen = document.getElementById('epRegimen').value;
+
+  updatePatient(patient);
+
+  // regenerate plan as a new version due to input change
+  const engineOutput = generateNutritionPlan(patient);
+  const note = document.getElementById('epNote').value || 'User updated clinical inputs';
+  const newPlan = createOrUpdatePlan(patient, engineOutput, {}, note);
+
+  bind(newPlan);
+  alert('Patient details updated and plan recalculated.');
+}
+
+function approveFromReport(){
+  if(!canEditOrApprove() || me.role === 'ASSISTANT'){
+    alert('Only the assigned doctor can approve this patient.');
+    return;
+  }
+  if(patient.status !== 'CREATED'){
+    alert('Patient is already approved or in production.');
+    return;
+  }
+
+  const storeId = mappingService.getStoreForDoctor(me.id);
+  if(!storeId){
+    alert('Doctor is not mapped to a store. Admin must map doctor → store.');
+    return;
+  }
+
+  patient.status = 'APPROVED';
+  patient.approvedAt = new Date().toISOString();
+  // Persist approver identity for downstream PDF/QR views (static mode friendly)
+  patient.approvedBy = me.id;
+  patient.approvedByName = (me && (me.name || me.username || me.email)) || 'Doctor';
+  // Prefer doctor profile hospital name; fall back to mapped store hospital
+  try{
+    const st = (typeof storeService !== 'undefined' && storeService.getStoreById) ? storeService.getStoreById(storeId) : null;
+    const doctorHospital = (me && me.hospitalName) ? me.hospitalName : '';
+    patient.hospitalName = doctorHospital || ((st && st.hospital) ? st.hospital : (patient.hospitalName || ''));
+  }catch(e){ /* ignore */ }
+  patient.storeId = storeId;
+  updatePatient(patient);
+
+  const existingJob = manufacturingService.getJobByPatient(patient.id);
+  if(!existingJob){
+    manufacturingService.createJob({ patientId: patient.id, storeId: storeId, doctorId: me.id });
+  }
+
+  alert('Patient approved and sent to production.');
+  window.location.href = 'doctor.html';
+}
+
+
+function round1(n){ return Math.round(n*10)/10; }
+
+function computeBMI(){
+  const h = parseFloat(patient.height)/100;
+  return round1(parseFloat(patient.weight)/(h*h));
+}
+
+function recomputeFromDaily(dailyCalories, dailyProtein){
+  const servingsPerDay = (patient.giIssues || dailyCalories >= 1600) ? 4 : 3;
+  const perServingCalories = Math.round(dailyCalories/servingsPerDay);
+  const perServingProtein = Math.round(dailyProtein/servingsPerDay);
+  const proteinCaloriesDaily = dailyProtein * 4;
+  const remainingCalories = Math.max(dailyCalories - proteinCaloriesDaily, 0);
+  const dailyCarbs = Math.round((remainingCalories * 0.45) / 4);
+  const dailyFat = Math.round((remainingCalories * 0.55) / 9);
+  const macroCarbs = Math.round(dailyCarbs / servingsPerDay);
+  const macroFat = Math.round((dailyFat / servingsPerDay) * 10) / 10;
+  return { servingsPerDay, perServingCalories, perServingProtein, macroCarbs, macroFat, dailyCarbs, dailyFat };
+}
+
+function ensurePlan(){
+  const latest = getLatestPlanForPatient(patient.id);
+  if(latest) return latest;
+
+  const engineOutput = generateNutritionPlan(patient);
+  return createOrUpdatePlan(patient, engineOutput, {}, '');
+}
+
+function bind(plan){
+  // Header (doctor/hospital)
+  const st = patient.storeId ? ((typeof storeService !== 'undefined' && storeService.getStoreById) ? storeService.getStoreById(patient.storeId) : null) : null;
+  const hosp = patient.hospitalName || (st && st.hospital) || '-';
+  let approver = patient.approvedByName || '-';
+  if(approver === '-' && patient.approvedBy && typeof userService !== 'undefined' && userService.getUserById){
+    const u = userService.getUserById(patient.approvedBy);
+    if(u && u.name) approver = u.name;
+  }
+  const approvedAt = patient.approvedAt ? new Date(patient.approvedAt).toLocaleString() : '-';
+  const hEl = document.getElementById('pHospital');
+  if(hEl) hEl.innerText = hosp;
+  const abEl = document.getElementById('pApprovedBy');
+  if(abEl) abEl.innerText = approver;
+  const aaEl = document.getElementById('pApprovedAt');
+  if(aaEl) aaEl.innerText = approvedAt;
+
+  // Patient
+  pName.innerText = patient.name;
+  pUHIC.innerText = patient.uhic;
+  pAge.innerText = patient.age + ' years';
+  pSex.innerText = patient.sex;
+  pWeight.innerText = patient.weight + ' kg';
+  pHeight.innerText = patient.height + ' cm';
+  pBMI.innerText = computeBMI();
+  if(document.getElementById('pUW')) document.getElementById('pUW').innerText = (patient.usualWeight ? patient.usualWeight + ' kg' : '-');
+  pWL.innerText = (patient.weightLossPercent ?? '-') + ' %';
+  pCancer.innerText = patient.cancer;
+  pRegimen.innerText = patient.regimen;
+  pFeeding.innerText = patient.feedingMethod;
+  pAlbumin.innerText = patient.albumin + ' g/dL';
+
+  // New Clinical History fields
+  if(document.getElementById('pFoodIntake')) document.getElementById('pFoodIntake').innerText = (patient.reducedFoodIntake || 0) + ' %';
+  document.getElementById('pHxComorbidities').innerText = (Array.isArray(patient.comorbidities) && patient.comorbidities.length) ? patient.comorbidities.join(', ') : 'None Reported';
+  document.getElementById('pHxSideEffects').innerText = (Array.isArray(patient.sideEffects) && patient.sideEffects.length) ? patient.sideEffects.join(', ') : 'None Reported';
+  document.getElementById('pHxAllergies').innerText = patient.allergies || 'None Reported';
+  document.getElementById('pHxNotes').innerText = patient.notes || '-';
+
+  const fp = plan.finalPlan;
+
+  dailyCalories.innerText = fp.dailyCalories + ' kcal';
+  perServingCalories.innerText = fp.perServingCalories + ' kcal';
+  dailyProtein.innerText = fp.dailyProtein + ' g';
+  perServingProtein.innerText = fp.perServingProtein + ' g';
+
+  // carbs/fat show daily totals derived from per-serving
+  dailyCarbs.innerText = ((fp.dailyCarbs != null ? fp.dailyCarbs : fp.macroCarbs * (fp.servingsPerDay || 2))) + ' g';
+  perServingCarbs.innerText = fp.macroCarbs + ' g';
+  dailyFat.innerText = ((fp.dailyFat != null ? fp.dailyFat : (fp.macroFat * (fp.servingsPerDay || 2))).toFixed ? (fp.dailyFat != null ? fp.dailyFat : (fp.macroFat * (fp.servingsPerDay || 2))).toFixed(1) : (fp.macroFat * (fp.servingsPerDay || 2))) + ' g';
+  perServingFat.innerText = fp.macroFat + ' g';
+
+  proteinType.innerText = fp.proteinType;
+
+  vitD.innerText = fp.micronutrients.vitD;
+  vitC.innerText = fp.micronutrients.vitC || '500–1000 mg';
+  zinc.innerText = fp.micronutrients.zinc;
+  omega3.innerText = fp.micronutrients.omega3;
+  if(window.selenium) selenium.innerText = fp.micronutrients.selenium || '-';
+  if(window.magnesium) magnesium.innerText = fp.micronutrients.magnesium || '-';
+  if(window.bComplex) bComplex.innerText = fp.micronutrients.bComplex || '-';
+  if(window.glutamine) glutamine.innerText = fp.micronutrients.glutamine || '-';
+	if (window.epa) epa.innerText = fp.micronutrients.epa || '-';
+	if (window.leucine) leucine.innerText = fp.micronutrients.leucine || '-';
+	if (window.hmb) hmb.innerText = fp.micronutrients.hmb || '-';
+  mCalories.innerText = fp.perServingCalories + ' kcal';
+  mProtein.innerText = fp.perServingProtein + ' g';
+  mCarbs.innerText = fp.macroCarbs + ' g';
+  mFat.innerText = fp.macroFat + ' g';
+  mForm.innerText = (patient.feedingMethod||'').includes('Oral') ? 'Powder' : 'Liquid';
+
+  const bmiVal = fp.bmi != null ? fp.bmi : computeBMI();
+  document.getElementById('riskBmi').innerText = bmiVal < 18.5 ? `Low BMI (${bmiVal})` : `Within range (${bmiVal})`;
+  document.getElementById('riskNutrition').innerText = fp.cachexia ? 'High nutrition risk' : 'Moderate nutrition risk';
+  document.getElementById('riskCachexia').innerText = fp.cachexia ? 'Yes - intensified support used' : 'No major trigger';
+  document.getElementById('riskNote').innerText = fp.cachexia ? 'Weight loss / albumin / BMI pattern suggests need for calorie-dense, high-protein support.' : 'Support plan built to maintain intake during treatment.';
+  document.getElementById('riskMonitor').innerText = 'Reassess intake tolerance, body weight trend, GI symptoms and key labs at follow-up.';
+
+  document.getElementById('servingHeader').innerText = `Per Serving (${fp.servingsPerDay || 2}x Daily)`;
+  document.getElementById('servingsPerDay').innerText = (fp.servingsPerDay || 2) + ' servings/day';
+  document.getElementById('servingCalories').innerText = fp.perServingCalories + ' kcal';
+  document.getElementById('servingProtein').innerText = fp.perServingProtein + ' g';
+  document.getElementById('servingTolerance').innerText = (fp.servingsPerDay || 2) >= 4 ? 'Smaller, more frequent feeds selected to improve tolerance during treatment.' : 'Moderate serving volume selected based on current intake pattern.';
+  document.getElementById('servingReview').innerText = 'If nausea, bloating or poor intake persists, consider smaller feeds, slower escalation and clinician review.';
+
+  // Rationale
+  clinicalRationale.innerHTML = '';
+  (fp.rationale || plan.rationale || []).forEach(r => {
+    clinicalRationale.innerHTML += `<li>${r}</li>`;
+  });
+
+  // Trace
+  const cachexia = fp.cachexia;
+  const kcalPerKg = cachexia ? 35 : 30;
+  const proteinPerKg = cachexia ? 1.8 : 1.4;
+  const trace = [];
+  trace.push(`<b>Inputs used:</b> Weight ${patient.weight} kg, Albumin ${patient.albumin} g/dL, Weight loss ${patient.weightLossPercent}%`);
+  trace.push(`<b>Risk trigger:</b> Cachexia = (albumin &lt; 3.5) OR (weight loss ≥ 10%). Result: <b>${cachexia ? 'YES' : 'NO'}</b>.`);
+  trace.push(`<b>Energy rule applied:</b> ${kcalPerKg} kcal/kg/day → ${patient.weight} × ${kcalPerKg} = <b>${plan.engineOutput.dailyCalories} kcal/day</b>.`);
+  trace.push(`<b>Protein rule applied:</b> ${proteinPerKg} g/kg/day → ${patient.weight} × ${proteinPerKg} = <b>${plan.engineOutput.dailyProtein} g/day</b>.`);
+  trace.push(`<b>Serving pattern:</b> daily target ÷ ${fp.servingsPerDay || 2} servings/day for better tolerance.`);
+  trace.push(`<b>Macros:</b> protein target fixed clinically; remaining calories distributed with moderate carbs and higher fat density.`);
+  trace.push(`<b>Protein type:</b> ${patient.giIssues ? 'Hydrolyzed Whey (GI issues)' : 'Whey (standard)'}.
+  `);
+
+  if(plan.generatedBy === 'DOCTOR_OVERRIDE'){
+    const o = plan.overrides || {};
+    const changes = [];
+    Object.keys(o).forEach(k => changes.push(`${k}: <b>${plan.engineOutput[k]}</b> → <b>${o[k]}</b>`));
+    trace.push(`<b>Doctor override:</b> ${changes.join(', ') || 'Applied'}${plan.overrideNotes ? `<br><b>Note:</b> ${plan.overrideNotes}`:''}`);
+  }
+
+  trace.push(`<div style="margin-top:10px;color:#6b7280;font-size:13px;">Guideline notes: uses weight-loss/albumin to stratify nutritional risk and cachexia-related wasting states.</div>`);
+
+  calcTrace.innerHTML = trace.map(x => `<div>${x}</div>`).join('');
+
+  // Overrides UI only for doctor
+  if(me.role === 'DOCTOR'){
+    document.getElementById('overrideSection').style.display = 'block';
+  }
+}
+
+let currentPlan = ensurePlan();
+bind(currentPlan);
+showEditSectionIfAllowed();
+
+// Print-only mode (opened from dashboards)
+if(params.get('print') === '1'){
+  // Hide interactive elements in print-only view
+  const ov = document.getElementById('overrideSection');
+  if(ov) ov.style.display = 'none';
+  const bar = document.getElementById('doctorReviewBar');
+  if(bar) bar.style.display = 'none';
+  const ep = document.getElementById('editPatientSection');
+  if(ep) ep.style.display = 'none';
+  const top = document.querySelector('.topbar');
+  if(top) top.style.display = 'none';
+
+  // Delay to ensure all DOM bindings are complete, then download PDF directly.
+  setTimeout(() => {
+    downloadNutritionPDF(true);
+  }, 600);
+}
+
+function applyOverride(){
+  const ovC = document.getElementById('ovCalories').value;
+  const ovP = document.getElementById('ovProtein').value;
+  const ovO = document.getElementById('ovOmega').value;
+  const note = document.getElementById('ovNote').value;
+
+  const engineOutput = generateNutritionPlan(patient);
+  const overrides = {};
+
+  let dailyCalories = engineOutput.dailyCalories;
+  let dailyProtein = engineOutput.dailyProtein;
+
+  if(ovC && parseFloat(ovC) > 0){
+    dailyCalories = Math.round(parseFloat(ovC));
+    overrides.dailyCalories = dailyCalories;
+  }
+  if(ovP && parseFloat(ovP) > 0){
+    dailyProtein = Math.round(parseFloat(ovP));
+    overrides.dailyProtein = dailyProtein;
+  }
+
+  // recompute dependent fields if calories/protein changed
+  if(overrides.dailyCalories || overrides.dailyProtein){
+    const d = recomputeFromDaily(dailyCalories, dailyProtein);
+    overrides.perServingCalories = d.perServingCalories;
+    overrides.perServingProtein = d.perServingProtein;
+    overrides.macroCarbs = d.macroCarbs;
+    overrides.macroFat = d.macroFat;
+  }
+
+  if(ovO && ovO.trim()){
+    overrides.micronutrients = Object.assign({}, engineOutput.micronutrients, { omega3: ovO.trim() });
+  }
+
+  const plan = createOrUpdatePlan(patient, engineOutput, overrides, note || '');
+  currentPlan = plan;
+  bind(plan);
+
+  alert('Override applied. PDF will include the calculation + override trace.');
+}
+
+function scrollToSection(id){
+  const el=document.getElementById(id);
+  if(el) el.scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+function sanitizeFilePart(s){
+  return (s || '')
+    .toString()
+    .trim()
+    .replace(/\s+/g, ' ')
+    .replace(/[^a-zA-Z0-9 _-]/g, '')
+    .replace(/\s+/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 80) || 'report';
+}
+
+function buildPdfFileName(){
+  const patientName = sanitizeFilePart(patient?.name || 'patient');
+  const doctorName = sanitizeFilePart(patient?.approvedByName || (me && (me.name || me.username || me.email)) || 'doctor');
+  return `${patientName}_${doctorName}.pdf`;
+}
+
+// Direct-download PDF (no Print dialog). If autoClose=true, tries to close tab after saving.
+function downloadNutritionPDF(autoClose){
+  // If html2pdf isn't available (offline), fall back to Print.
+  if(typeof html2pdf === 'undefined'){
+    window.print();
+    return;
+  }
+
+  // Make sure the export source is visible before rendering.
+  const root = document.getElementById('pdfExportRoot');
+  if(root){ root.style.display = 'block'; }
+
+  const source = document.getElementById('pdfExportRoot') || document.querySelector('.container.page .card') || document.body;
+  const filename = buildPdfFileName();
+
+  const opts = {
+    margin:       [10, 10, 10, 10],
+    filename:     filename,
+    image:        { type: 'jpeg', quality: 0.98 },
+    html2canvas:  { scale: 2, useCORS: true, scrollY: 0 },
+    jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+  };
+
+  // Hide the download button(s) inside the exported PDF.
+  const buttons = Array.from(document.querySelectorAll('button'));
+  const prevDisplay = buttons.map(b => b.style.display);
+  buttons.forEach(b => {
+    const t = (b.innerText || '').toLowerCase();
+    if(t.includes('download pdf')) b.style.display = 'none';
+  });
+
+  html2pdf()
+    .set(opts)
+    .from(source)
+    .save()
+    .then(() => {
+      buttons.forEach((b, i) => b.style.display = prevDisplay[i]);
+      if(autoClose){
+        setTimeout(() => { try { window.close(); } catch(e) {} }, 400);
+      }
+    })
+    .catch(() => {
+      buttons.forEach((b, i) => b.style.display = prevDisplay[i]);
+      window.print();
+    });
+}
+</script>
+
+<script src="js/theme.js"></script>
+</body>
+</html>

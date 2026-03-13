@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Tracking - Onvilox</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">Onvilox Admin</div>
+  <div class="nav">
+    <a href="admin.html">Dashboard</a>
+    <a href="admin-stores.html">Stores</a>
+    <a href="admin-users.html">Create Users</a>
+    <a href="admin-mapping.html">Mapping</a>
+    <a href="admin-tracking.html">Tracking</a>
+    <a href="admin-reports.html">Reports</a>
+    <a href="#" onclick="auth.logout()">Logout</a>
+    <button id="themeToggleBtn" onclick="toggleTheme()" class="btn-secondary btn-sm" style="margin-left: 20px; border-radius: 30px; padding: 6px 14px; cursor: pointer;">🌙 Dark Mode</button>
+  </div>
+</div>
+
+<div class="container page">
+
+  <div class="card">
+    <h2>Tracking</h2>
+    <p style="color:#6b7280;margin-top:-6px;">Search patients and track flow across Doctor → Store.</p>
+
+    <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:end;margin-top:12px;">
+      <div style="flex:1;min-width:220px;">
+        <label style="display:block;color:#6b7280;font-size:13px;margin-bottom:6px;">Search (Patient / UHIC)</label>
+        <input id="qSearch" placeholder="Type patient name or UHIC" style="width:100%;padding:10px;border:1px solid #e5e7eb;border-radius:10px;">
+      </div>
+
+      <div style="min-width:220px;">
+        <label style="display:block;color:#6b7280;font-size:13px;margin-bottom:6px;">Doctor</label>
+        <select id="qDoctor" style="width:100%;padding:10px;border:1px solid #e5e7eb;border-radius:10px;">
+          <option value="">All Doctors</option>
+        </select>
+      </div>
+
+      <div style="min-width:220px;">
+        <label style="display:block;color:#6b7280;font-size:13px;margin-bottom:6px;">Store</label>
+        <select id="qStore" style="width:100%;padding:10px;border:1px solid #e5e7eb;border-radius:10px;">
+          <option value="">All Stores</option>
+        </select>
+      </div>
+
+      <div style="min-width:220px;">
+        <label style="display:block;color:#6b7280;font-size:13px;margin-bottom:6px;">Job Status</label>
+        <select id="qStatus" style="width:100%;padding:10px;border:1px solid #e5e7eb;border-radius:10px;">
+          <option value="">All</option>
+          <option value="APPROVED">APPROVED</option>
+          <option value="PROCESSING">PROCESSING</option>
+          <option value="READY">READY</option>
+          <option value="DISPATCHED">DISPATCHED</option>
+          <option value="DELIVERED">DELIVERED</option>
+        </select>
+      </div>
+    </div>
+
+    <div style="margin-top:14px;color:#6b7280;font-size:13px;" id="meta"></div>
+
+    <div style="overflow:auto;margin-top:10px;">
+      <table>
+        <thead>
+          <tr>
+            <th>Patient</th>
+            <th>UHIC</th>
+            <th>Doctor</th>
+            <th>Store</th>
+            <th>Patient Status</th>
+            <th>Job Status</th>
+            <th>Last Update</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<!-- QR Modal -->
+<div id="qrOverlay" class="modal-overlay" onclick="closeQr()">
+  <div class="modal" onclick="event.stopPropagation();">
+    <div class="modal-header">
+      <h3 class="modal-title" id="qrTitle">Patient QR</h3>
+      <button class="modal-close" aria-label="Close" onclick="closeQr()">×</button>
+    </div>
+    <div class="modal-body">
+      <div id="qrBox" style="display:flex;justify-content:center;padding:10px 0;"></div>
+      <div style="text-align:center;color:#6b7280;font-size:13px;" id="qrHint">Scan to view patient summary</div>
+      <div class="modal-actions" style="justify-content:center;">
+        <button class="btn-secondary" onclick="copyQrLink()">Copy Link</button>
+        <button class="btn-primary" onclick="openQrLink()">Open Link</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="js/storage.js"></script>
+<script src="js/seed.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/users.js"></script>
+<script src="js/stores.js"></script>
+<script src="js/patient-store.js"></script>
+<script src="js/manufacturing.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+<script>
+auth.requireRole(['SUPER_ADMIN']);
+
+const elSearch = document.getElementById('qSearch');
+const elDoctor = document.getElementById('qDoctor');
+const elStore = document.getElementById('qStore');
+const elStatus = document.getElementById('qStatus');
+
+let __qrCurrentLink = '';
+
+function getBaseUrlForQr(){
+  try{
+    const cfg = localStorage.getItem('onvilox_public_base_url');
+    if(cfg && /^https?:\/\//i.test(cfg)) return cfg.replace(/\/$/,'');
+  }catch(e){}
+  if(window.location.origin && window.location.origin !== 'null'){
+    return window.location.origin;
+  }
+  return null;
+}
+
+function buildQrLink(patientId){
+  const base = getBaseUrlForQr();
+  if(base){
+    return `${base}/patient-qr.html?id=${encodeURIComponent(patientId)}`;
+  }
+  // Static file mode: keep the path relative so it opens from the same folder
+  return `./patient-qr.html?id=${encodeURIComponent(patientId)}`;
+}
+
+function showQr(patientId){
+  const p = getPatientById(patientId);
+  document.getElementById('qrTitle').innerText = p ? `QR for ${p.name}` : 'Patient QR';
+  const link = buildQrLink(patientId);
+  __qrCurrentLink = link;
+  const box = document.getElementById('qrBox');
+  box.innerHTML = '';
+  new QRCode(box, { text: link, width: 220, height: 220 });
+  const isFile = (window.location.origin === 'null');
+  if(isFile && !localStorage.getItem('onvilox_public_base_url')){
+    document.getElementById('qrHint').innerText = 'Tip: phone scan needs hosting. For demo, click Open / Copy link. To enable scan: set localStorage key onvilox_public_base_url to your hosted URL (or http://<laptop-ip>:8000).';
+  }else{
+    document.getElementById('qrHint').innerText = 'Scan to view patient report';
+  }
+  document.getElementById('qrOverlay').style.display = 'flex';
+}
+function closeQr(){ document.getElementById('qrOverlay').style.display = 'none'; }
+async function copyQrLink(){
+  if(!__qrCurrentLink) return;
+  try{ await navigator.clipboard.writeText(__qrCurrentLink); document.getElementById('qrHint').innerText='Link copied ✅'; }
+  catch(e){ prompt('Copy this link:', __qrCurrentLink); }
+}
+function openQrLink(){ if(__qrCurrentLink) window.open(__qrCurrentLink,'_blank','noopener'); }
+
+function fillFilters(){
+  const doctors = userService.getUsersByRole('DOCTOR');
+  doctors.sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  doctors.forEach(d=>{
+    const opt = document.createElement('option');
+    opt.value = d.id;
+    opt.textContent = d.name + (d.username ? ` (${d.username})` : '');
+    elDoctor.appendChild(opt);
+  });
+
+  const stores = storeService.getStores();
+  stores.sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  stores.forEach(s=>{
+    const opt = document.createElement('option');
+    opt.value = s.id;
+    opt.textContent = s.name;
+    elStore.appendChild(opt);
+  });
+}
+
+function fmtDate(iso){
+  if(!iso) return '-';
+  try{ return new Date(iso).toLocaleString(); }catch(e){ return iso; }
+}
+
+function render(){
+  const q = (elSearch.value || '').trim().toLowerCase();
+  const doctorId = elDoctor.value || '';
+  const storeId = elStore.value || '';
+  const jobStatus = elStatus.value || '';
+
+  const patients = getPatients();
+  const jobs = manufacturingService.getJobs();
+
+  // quick lookup
+  const jobByPatient = {};
+  jobs.forEach(j=> { jobByPatient[j.patientId] = j; });
+
+  let rows = patients.map(p=>{
+    const j = jobByPatient[p.id] || null;
+    const doc = p.assignedDoctorId ? userService.getUserById(p.assignedDoctorId) : null;
+    const st = p.storeId ? storeService.getStoreById(p.storeId) : null;
+    return { p, j, doc, st };
+  });
+
+  // filters
+  if(q){
+    rows = rows.filter(r=>{
+      const name = (r.p.name || '').toLowerCase();
+      const uhic = (r.p.uhic || '').toLowerCase();
+      return name.includes(q) || uhic.includes(q);
+    });
+  }
+  if(doctorId){
+    rows = rows.filter(r => (r.p.assignedDoctorId || '') === doctorId);
+  }
+  if(storeId){
+    rows = rows.filter(r => (r.p.storeId || '') === storeId);
+  }
+  if(jobStatus){
+    rows = rows.filter(r => (r.j && r.j.status === jobStatus));
+  }
+
+  // sort latest updated first (job updatedAt else patient updatedAt/createdAt)
+  rows.sort((a,b)=>{
+    const ta = (a.j && a.j.updatedAt) || a.p.updatedAt || a.p.createdAt || '';
+    const tb = (b.j && b.j.updatedAt) || b.p.updatedAt || b.p.createdAt || '';
+    return (tb||'').localeCompare(ta||'');
+  });
+
+  document.getElementById('meta').innerText = `Showing ${rows.length} of ${patients.length} patients`;
+
+  const tbody = document.getElementById('rows');
+  tbody.innerHTML = '';
+
+  rows.forEach(r=>{
+    const p = r.p;
+    const j = r.j;
+    const doc = r.doc;
+    const st = r.st;
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><button class="linklike" onclick="showQr('${p.id}');event.stopPropagation();">${p.name}</button></td>
+      <td>${p.uhic || '-'}</td>
+      <td>${doc ? doc.name : '-'}</td>
+      <td>${st ? st.name : '-'}</td>
+      <td><span class="status ${(p.status||'CREATED').toLowerCase()}">${p.status || 'CREATED'}</span></td>
+      <td>${j ? `<span class="status ${String(j.status||'').toLowerCase()}">${j.status}</span>` : '-'}</td>
+      <td>${fmtDate((j && j.updatedAt) || p.updatedAt || p.createdAt)}</td>
+      <td>
+        <a class="btn-secondary" href="patient-profile.html?id=${encodeURIComponent(p.id)}" target="_blank" rel="noopener" style="padding: 6px 10px; border-radius: 6px; display:inline-flex; align-items:center; justify-content:center;" title="Open Profile">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M8.636 3.5a.5.5 0 0 0-.5-.5H1.5A1.5 1.5 0 0 0 0 4.5v10A1.5 1.5 0 0 0 1.5 16h10a1.5 1.5 0 0 0 1.5-1.5V7.864a.5.5 0 0 0-1 0V14.5a.5.5 0 0 1-.5.5h-10a.5.5 0 0 1-.5-.5v-10a.5.5 0 0 1 .5-.5h6.636a.5.5 0 0 0 .5-.5z"/><path fill-rule="evenodd" d="M16 .5a.5.5 0 0 0-.5-.5h-5a.5.5 0 0 0 0 1h3.793L6.146 9.146a.5.5 0 1 0 .708.708L15 1.707V5.5a.5.5 0 0 0 1 0v-5z"/></svg>
+        </a>
+      </td>
+    `;
+    tbody.appendChild(tr);
+
+    // optional history row
+    if(j && j.history && j.history.length){
+      const hist = document.createElement('tr');
+      hist.innerHTML = `
+        <td colspan="8" style="background:#f9fafb;">
+          <div style="display:flex;gap:10px;flex-wrap:wrap;color:#374151;font-size:13px;">
+            ${j.history.slice().reverse().slice(0,6).map(h=>`<span class="status ${String(h.status||'').toLowerCase()}">${h.status}</span><span style="color:#6b7280;">${fmtDate(h.at)}</span>`).join('<span style="color:#d1d5db;">|</span>')}
+          </div>
+        </td>
+      `;
+      tbody.appendChild(hist);
+    }
+  });
+}
+
+fillFilters();
+render();
+[elSearch, elDoctor, elStore, elStatus].forEach(el=>{
+  el.addEventListener('input', render);
+  el.addEventListener('change', render);
+});
+</script>
+
+<script src="js/theme.js"></script>
+</body>
+</html>
