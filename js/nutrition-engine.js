@@ -64,7 +64,7 @@ function generateNutritionPlan(patient) {
   const kcalPerKg = cachexia ? 35 : 30;
   const proteinPerKg = cachexia ? 1.8 : 1.4;
 
-  let baseCalories = Math.round(weight * kcalPerKg);
+  let baseCalories = Math.round(idealWeight * kcalPerKg);
   // Adjust based on food intake %
   if (reducedFoodIntake > 0 && reducedFoodIntake <= 100) {
       const remainingIntakePct = (100 - reducedFoodIntake) / 100;
@@ -74,8 +74,8 @@ function generateNutritionPlan(patient) {
   }
   
   const dailyCalories = baseCalories;
-  // Protein calculation (use actual weight, but this could use IBW in the future if requested)
-  const dailyProtein = Math.round(weight * proteinPerKg);
+  // Protein calculation uses IBW
+  const dailyProtein = Math.round(idealWeight * proteinPerKg);
 
   const servingsPerDay = 3;
   const perServingCalories = Math.round(dailyCalories / servingsPerDay);

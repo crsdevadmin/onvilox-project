@@ -644,10 +644,11 @@ function bind(plan){
   const kcalPerKg = cachexia ? 35 : 30;
   const proteinPerKg = cachexia ? 1.8 : 1.4;
   const trace = [];
-  trace.push(`<b>Inputs used:</b> Weight ${patient.weight} kg, Albumin ${patient.albumin} g/dL, Weight loss ${patient.weightLossPercent}%`);
+  const ibwVal = computeHamwiIBW();
+  trace.push(`<b>Inputs used:</b> Weight ${patient.weight} kg, IBW ${ibwVal} kg, Albumin ${patient.albumin} g/dL, Weight loss ${patient.weightLossPercent}%`);
   trace.push(`<b>Risk trigger:</b> Cachexia = (albumin &lt; 3.5) OR (weight loss ≥ 10%). Result: <b>${cachexia ? 'YES' : 'NO'}</b>.`);
-  trace.push(`<b>Energy rule applied:</b> ${kcalPerKg} kcal/kg/day → ${patient.weight} × ${kcalPerKg} = <b>${plan.engineOutput.dailyCalories} kcal/day</b>.`);
-  trace.push(`<b>Protein rule applied:</b> ${proteinPerKg} g/kg/day → ${patient.weight} × ${proteinPerKg} = <b>${plan.engineOutput.dailyProtein} g/day</b>.`);
+  trace.push(`<b>Energy rule applied:</b> ${kcalPerKg} kcal/kg/day → ${ibwVal} (IBW) × ${kcalPerKg} = <b>${plan.engineOutput.dailyCalories} kcal/day</b>.`);
+  trace.push(`<b>Protein rule applied:</b> ${proteinPerKg} g/kg/day → ${ibwVal} (IBW) × ${proteinPerKg} = <b>${plan.engineOutput.dailyProtein} g/day</b>.`);
   trace.push(`<b>Serving pattern:</b> daily target ÷ ${fp.servingsPerDay || 2} servings/day for better tolerance.`);
   trace.push(`<b>Macros:</b> protein target fixed clinically; remaining calories distributed with moderate carbs and higher fat density.`);
   trace.push(`<b>Protein type:</b> ${patient.giIssues ? 'Hydrolyzed Whey (GI issues)' : 'Whey (standard)'}.
