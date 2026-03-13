@@ -4,7 +4,29 @@ function generateNutritionPlan(patient) {
   const height = parseFloat(patient.height || 0);
   const albumin = parseFloat(patient.albumin || 0);
   const weightLossPercent = parseFloat(patient.weightLossPercent || 0);
+  const reducedFoodIntake = parseFloat(patient.reducedFoodIntake || 0);
   const bmi = height ? (weight / Math.pow(height / 100, 2)) : 0;
+  
+  // Hamwi Idea Body Weight
+  let idealWeight = weight;
+  const gender = (patient.sex || '').toLowerCase();
+  if (height > 0 && (gender === 'male' || gender === 'female')) {
+      const heightInInches = height * 0.393701;
+      if (heightInInches >= 60) {
+          const extraInches = heightInInches - 60;
+          if (gender === 'male') {
+              idealWeight = 48.0 + (2.7 * extraInches);
+          } else {
+              idealWeight = 45.5 + (2.2 * extraInches);
+          }
+      } else {
+           if (gender === 'male') {
+              idealWeight = 48.0;
+           } else {
+              idealWeight = 45.5;
+           }
+      }
+  }
 
   const nutritionRiskReasons = [];
   let riskScore = 0;
@@ -42,21 +64,36 @@ function generateNutritionPlan(patient) {
   const kcalPerKg = cachexia ? 35 : 30;
   const proteinPerKg = cachexia ? 1.8 : 1.4;
 
-  const dailyCalories = Math.round(weight * kcalPerKg);
+  let baseCalories = Math.round(weight * kcalPerKg);
+  // Adjust based on food intake %
+  if (reducedFoodIntake > 0 && reducedFoodIntake <= 100) {
+      const remainingIntakePct = (100 - reducedFoodIntake) / 100;
+      baseCalories = Math.round(baseCalories * remainingIntakePct);
+      // Ensure it doesn't drop below a critical amount maliciously
+      if (baseCalories < 500) baseCalories = 500;
+  }
+  
+  const dailyCalories = baseCalories;
+  // Protein calculation (use actual weight, but this could use IBW in the future if requested)
   const dailyProtein = Math.round(weight * proteinPerKg);
 
   const servingsPerDay = 3;
   const perServingCalories = Math.round(dailyCalories / servingsPerDay);
   const perServingProtein = Math.round(dailyProtein / servingsPerDay);
 
-  const proteinCaloriesFromSplit = dailyCalories * 0.30;
-  const carbCalories = dailyCalories * 0.30;
-  const fatCalories = dailyCalories * 0.40;
-
-  const dailyCarbs = Math.round(carbCalories / 4);
+  // Exact math to make macros = calories
+  const proteinCalories = dailyProtein * 4;
+  const remainingCalories = Math.max(0, dailyCalories - proteinCalories);
+  
+  // Split remaining into approx 45% carbs / 55% fat
+  // We use Math.floor for carbs and force fat to make up the exact difference
+  const dailyCarbs = Math.floor((remainingCalories * 0.45) / 4);
+  const carbCalories = dailyCarbs * 4;
+  
+  const fatCalories = remainingCalories - carbCalories;
   const dailyFat = Math.round((fatCalories / 9) * 10) / 10;
 
-  const macroProtein = Math.round((proteinCaloriesFromSplit / 4) / servingsPerDay);
+  const macroProtein = Math.round(dailyProtein / servingsPerDay);
   const macroCarbs = Math.round(dailyCarbs / servingsPerDay);
   const macroFat = Math.round((dailyFat / servingsPerDay) * 10) / 10;
 

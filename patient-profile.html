@@ -79,6 +79,8 @@
     <tr><th>Weight</th><td id="pWeight"></td></tr>
     <tr><th>Height</th><td id="pHeight"></td></tr>
     <tr><th>BMI</th><td id="pBMI"></td></tr>
+    <tr><th>Asian BMI Category</th><td id="pAsianBMI"></td></tr>
+    <tr><th>Ideal Weight (Hamwi)</th><td id="pIBW"></td></tr>
     <tr><th>Usual Weight</th><td id="pUW"></td></tr>
     <tr><th>Weight Loss %</th><td id="pWL"></td></tr>
     <tr><th>Cancer Type</th><td id="pCancer"></td></tr>
@@ -478,9 +480,42 @@ function approveFromReport(){
 
 function round1(n){ return Math.round(n*10)/10; }
 
+function computeAsianBMI(bmi) {
+  if (bmi < 18.5) return 'Underweight';
+  if (bmi <= 22.9) return 'Normal weight';
+  if (bmi <= 24.9) return 'Overweight';
+  return 'Obese';
+}
+
 function computeBMI(){
   const h = parseFloat(patient.height)/100;
   return round1(parseFloat(patient.weight)/(h*h));
+}
+
+function computeHamwiIBW() {
+  const w = parseFloat(patient.weight || 0);
+  const h = parseFloat(patient.height || 0);
+  const gender = (patient.sex || '').toLowerCase();
+  
+  let idealWeight = w;
+  if (h > 0 && (gender === 'male' || gender === 'female')) {
+      const heightInInches = h * 0.393701;
+      if (heightInInches >= 60) {
+          const extraInches = heightInInches - 60;
+          if (gender === 'male') {
+              idealWeight = 48.0 + (2.7 * extraInches);
+          } else {
+              idealWeight = 45.5 + (2.2 * extraInches);
+          }
+      } else {
+           if (gender === 'male') {
+              idealWeight = 48.0;
+           } else {
+              idealWeight = 45.5;
+           }
+      }
+  }
+  return round1(idealWeight);
 }
 
 function recomputeFromDaily(dailyCalories, dailyProtein){
@@ -528,7 +563,16 @@ function bind(plan){
   pSex.innerText = patient.sex;
   pWeight.innerText = patient.weight + ' kg';
   pHeight.innerText = patient.height + ' cm';
-  pBMI.innerText = computeBMI();
+  
+  const calculatedBMI = computeBMI();
+  pBMI.innerText = calculatedBMI;
+  
+  const asianBmiEl = document.getElementById('pAsianBMI');
+  if(asianBmiEl) asianBmiEl.innerText = computeAsianBMI(calculatedBMI);
+  
+  const ibwEl = document.getElementById('pIBW');
+  if(ibwEl) ibwEl.innerText = computeHamwiIBW() + ' kg';
+
   if(document.getElementById('pUW')) document.getElementById('pUW').innerText = (patient.usualWeight ? patient.usualWeight + ' kg' : '-');
   pWL.innerText = (patient.weightLossPercent ?? '-') + ' %';
   pCancer.innerText = patient.cancer;
