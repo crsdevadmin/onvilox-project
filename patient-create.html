@@ -5,6 +5,9 @@
   <meta charset="UTF-8">
   <title>Create Patient - Onvilox</title>
   <link rel="stylesheet" href="css/app.css">
+  <!-- PDF.js library for client-side extraction -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+  <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';</script>
 </head>
 <body>
 
@@ -22,6 +25,8 @@
     <div class="msg msg-ai">Hi! I'm your Clinical Co-Pilot. You can paste case notes or just tell me about the patient (e.g., "Patient is 65kg with stage 4 lung cancer"). I'll fill in the details for you!</div>
   </div>
   <div class="ai-chat-input-area">
+    <input type="file" id="pdfUpload" accept=".pdf" style="display:none;" onchange="handlePdfUpload(event)">
+    <button class="ai-chat-send" onclick="triggerFileUpload()" title="Upload Medical Report (PDF)" style="background:rgba(255,255,255,0.1); margin-right:5px;">📎</button>
     <input type="text" class="ai-chat-input" id="chatInput" placeholder="Type or paste notes..." onkeypress="if(event.key==='Enter') sendChatMessage()">
     <button class="ai-chat-send" onclick="sendChatMessage()">➤</button>
   </div>
@@ -196,8 +201,21 @@
 </div>
 
 <div class="form-group">
-  <label>Allergies</label>
-  <textarea id="allergies" placeholder="e.g., lactose, soy"></textarea>
+  <label>Genomic Markers</label>
+  <div class="tag-box">
+    <div class="tag-container" id="genomicMarkersTags"></div>
+    <input type="text" placeholder="Search markers (e.g., MTHFR, BRCA)..." onkeyup="filterMultiList(this,'genomicMarkersDropdown')">
+    <div class="dropdown-list" id="genomicMarkersDropdown"></div>
+  </div>
+</div>
+
+<div class="form-group">
+  <label>Genomic Markers</label>
+  <div class="tag-box">
+    <div class="tag-container" id="genomicMarkersTags"></div>
+    <input type="text" placeholder="Search markers (e.g., MTHFR, BRCA)..." onkeyup="filterMultiList(this,'genomicMarkersDropdown')">
+    <div class="dropdown-list" id="genomicMarkersDropdown"></div>
+  </div>
 </div>
 
 <div class="form-group">
@@ -287,6 +305,7 @@ function submitPatient(){
     feedingMethod: feedingMethod.value,
     comorbidities: tagsToArray('comorbidityTags'),
     sideEffects: tagsToArray('sideEffectTags'),
+    genomicMarkers: tagsToArray('genomicMarkersTags'),
     allergies: document.getElementById('allergies').value,
     notes: document.getElementById('notes').value
   };
@@ -425,6 +444,46 @@ function sendChatMessage() {
   }, 1000);
 }
 
+// --- PDF EXTRACTION LOGIC ---
+function triggerFileUpload() {
+  document.getElementById('pdfUpload').click();
+}
+
+async function handlePdfUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  addMessage(`Uploading ${file.name}...`, 'user');
+  const typing = addTyping();
+
+  try {
+    const text = await extractTextFromPdf(file);
+    typing.remove();
+    addMessage(`I've read the report. Extracting clinical data...`, 'ai');
+    
+    // Run extraction on the full text
+    runAiExtraction(text);
+  } catch (error) {
+    typing.remove();
+    addMessage("Sorry, I couldn't read that PDF. Please try pasting the text instead.", 'ai');
+    console.error(error);
+  }
+}
+
+async function extractTextFromPdf(file) {
+  const arrayBuffer = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  let fullText = "";
+
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    const strings = content.items.map(item => item.str);
+    fullText += strings.join(" ") + "\n";
+  }
+  return fullText;
+}
+
 function runAiExtraction(rawText) {
   const text = rawText.toLowerCase();
   // Handle "is", "at", ":", space etc.
@@ -471,6 +530,22 @@ function runAiExtraction(rawText) {
       foundCount++;
       break;
     }
+  }
+
+  // Genomic Markers Extraction
+  const markersFound = [];
+  if (text.includes('mthfr')) markersFound.push('MTHFR Mutation');
+  if (text.includes('brca')) markersFound.push('BRCA1/2 Mutation');
+  if (text.includes('egfr')) markersFound.push('EGFR Mutation');
+  if (text.includes('alk')) markersFound.push('ALK Rearrangement');
+  if (text.includes('kras')) markersFound.push('KRAS Mutation');
+  if (text.includes('her2')) markersFound.push('HER2 Positive');
+  if (text.includes('pd-l1')) markersFound.push('PD-L1 Expression');
+  if (text.includes('msi')) markersFound.push('MSI-High (Microsatellite Instability)');
+
+  if (markersFound.length > 0) {
+    markersFound.forEach(m => addTag(m, 'genomicMarkersTags'));
+    foundCount += markersFound.length;
   }
 
   if(foundCount > 0) {

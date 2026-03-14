@@ -155,3 +155,21 @@ const sideEffectsList = [
   "Muscle Loss",
   "Cachexia"
 ];
+
+// Genomic Markers
+const genomicMarkersList = [
+  "MTHFR Mutation",
+  "BRCA1 Mutation",
+  "BRCA2 Mutation",
+  "EGFR Mutation",
+  "ALK Rearrangement",
+  "KRAS Mutation",
+  "HER2 Positive",
+  "PD-L1 Expression",
+  "MSI-High (Microsatellite Instability)",
+  "PIK3CA Mutation",
+  "BRAF V600E Mutation",
+  "NRAS Mutation",
+  "DPYD Deficiency",
+  "UGT1A1 Polymorphism"
+];

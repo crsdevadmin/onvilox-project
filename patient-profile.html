@@ -100,6 +100,9 @@
     .ai-panel { margin-bottom: 24px; }
     .intake-summary b { color:#0f172a; }
   </style>
+  <link rel="stylesheet" href="css/app.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+  <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';</script>
 </head>
 
 <body>
@@ -118,6 +121,8 @@
     <div class="msg msg-ai">Hi! I'm your Clinical Co-Pilot. You can update patient details just by telling me (e.g., "Weight is now 70kg"). I'll update the form for you!</div>
   </div>
   <div class="ai-chat-input-area">
+    <input type="file" id="pdfUpload" accept=".pdf" style="display:none;" onchange="handlePdfUpload(event)">
+    <button class="ai-chat-send" onclick="triggerFileUpload()" title="Upload Medical Report (PDF)" style="background:rgba(255,255,255,0.1); margin-right:5px;">📎</button>
     <input type="text" class="ai-chat-input" id="chatInput" placeholder="Type or paste notes..." onkeypress="if(event.key==='Enter') sendChatMessage()">
     <button class="ai-chat-send" onclick="sendChatMessage()">➤</button>
   </div>
@@ -192,6 +197,7 @@
         <div class="rf"><div class="rf-lbl">CRP (mg/L)</div><div class="rf-val danger" id="pCRP_val"></div></div>
         <div class="rf sp2"><div class="rf-lbl">Comorbidities</div><div class="rf-val" id="pHxComorbidities"></div></div>
         
+        <div class="rf sp2"><div class="rf-lbl">Genomic Markers</div><div class="rf-val" id="pHxGenomicMarkers"></div></div>
         <div class="rf sp2"><div class="rf-lbl">Side Effects</div><div class="rf-val" id="pHxSideEffects"></div></div>
         <div class="rf sp2"><div class="rf-lbl">Allergies</div><div class="rf-val" id="pHxAllergies"></div></div>
       </div>
@@ -709,6 +715,46 @@ function sendChatMessage() {
   }, 1000);
 }
 
+// --- PDF EXTRACTION LOGIC ---
+function triggerFileUpload() {
+  document.getElementById('pdfUpload').click();
+}
+
+async function handlePdfUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  addMessage(`Uploading ${file.name}...`, 'user');
+  const typing = addTyping();
+
+  try {
+    const text = await extractTextFromPdf(file);
+    typing.remove();
+    addMessage(`I've read the report. Extracting clinical data...`, 'ai');
+    
+    // Run extraction on the full text
+    runAiExtraction(text);
+  } catch (error) {
+    typing.remove();
+    addMessage("Sorry, I couldn't read that PDF. Please try pasting the text instead.", 'ai');
+    console.error(error);
+  }
+}
+
+async function extractTextFromPdf(file) {
+  const arrayBuffer = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  let fullText = "";
+
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    const strings = content.items.map(item => item.str);
+    fullText += strings.join(" ") + "\n";
+  }
+  return fullText;
+}
+
 function runAiExtraction(rawText) {
   const text = rawText.toLowerCase();
   // Handle "is", "at", ":", space etc.
@@ -754,6 +800,31 @@ function runAiExtraction(rawText) {
       foundCount++;
       break;
     }
+  }
+
+  // Genomic Markers Extraction
+  const markersFound = [];
+  if (text.includes('mthfr')) markersFound.push('MTHFR Mutation');
+  if (text.includes('brca')) markersFound.push('BRCA1/2 Mutation');
+  if (text.includes('egfr')) markersFound.push('EGFR Mutation');
+  if (text.includes('alk')) markersFound.push('ALK Rearrangement');
+  if (text.includes('kras')) markersFound.push('KRAS Mutation');
+  if (text.includes('her2')) markersFound.push('HER2 Positive');
+  if (text.includes('pd-l1')) markersFound.push('PD-L1 Expression');
+  if (text.includes('msi')) markersFound.push('MSI-High (Microsatellite Instability)');
+
+  if (markersFound.length > 0) {
+    if(!patient.genomicMarkers) patient.genomicMarkers = [];
+    markersFound.forEach(m => {
+      if(!patient.genomicMarkers.includes(m)) patient.genomicMarkers.push(m);
+    });
+    
+    // Auto-save this particular field to patient and re-render the view
+    savePatient(patient);
+    renderPatient();
+    
+    foundCount += markersFound.length;
+    highlight('pHxGenomicMarkers');
   }
 
   if(foundCount > 0) {
@@ -970,6 +1041,7 @@ function bind(plan){
   const actualIntakePct = 100 - (patient.reducedFoodIntake || 0);
   setVal('pFoodIntake', actualIntakePct + ' %');
   setVal('pHxComorbidities', (Array.isArray(patient.comorbidities) && patient.comorbidities.length) ? patient.comorbidities.join(', ') : 'None Reported');
+  setVal('pHxGenomicMarkers', (Array.isArray(patient.genomicMarkers) && patient.genomicMarkers.length) ? patient.genomicMarkers.join(', ') : 'None Reported');
   setVal('pHxSideEffects', (Array.isArray(patient.sideEffects) && patient.sideEffects.length) ? patient.sideEffects.join(', ') : 'None Reported');
   setVal('pHxAllergies', patient.allergies || 'None Reported');
   setVal('pHxNotes', patient.notes || '-');

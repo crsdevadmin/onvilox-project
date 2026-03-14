@@ -6,6 +6,7 @@ window.onload = function () {
   loadFeedingMethods();
   loadMultiSelect("comorbidityDropdown", comorbiditiesList, "comorbidityTags");
   loadMultiSelect("sideEffectDropdown", sideEffectsList, "sideEffectTags");
+  loadMultiSelect("genomicMarkersDropdown", genomicMarkersList, "genomicMarkersTags");
 };
 
 // ---------- CANCER ----------
@@ -127,7 +128,9 @@ function filterMultiList(input, dropdownId) {
   dropdown.style.display = "block";
   dropdown.innerHTML = "";
 
-  const list = dropdownId.includes("comorbidity") ? comorbiditiesList : sideEffectsList;
+  let list = sideEffectsList;
+  if (dropdownId.includes("comorbidity")) list = comorbiditiesList;
+  else if (dropdownId.includes("genomic")) list = genomicMarkersList;
 
   list.forEach(item => {
     if (item.toLowerCase().includes(filter)) {
