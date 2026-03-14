@@ -45,8 +45,8 @@ body.light-theme {
   --success-glass: rgba(16, 185, 129, 0.1);
   --warning-glass: rgba(245, 158, 11, 0.1);
   --info-glass: rgba(14, 165, 233, 0.1);
-  --input-bg: #ffffff;
-  --placeholder-color: #94a3b8;
+  --input-bg: #f8fafc;
+  --placeholder-color: #64748b;
   --modal-bg: #ffffff;
   --title-gradient: linear-gradient(to right, #0f172a, #334155);
   --kpi-color: #0f172a;
@@ -413,8 +413,8 @@ input, select, textarea {
 body.light-theme input, 
 body.light-theme select, 
 body.light-theme textarea {
-  border: 1.5px solid #cbd5e1 !important;
-  background: #ffffff !important;
+  border: 1px solid #94a3b8 !important;
+  background-color: #f1f5f9 !important;
 }
 
 /* Prevent white background on autofill in dark mode */
