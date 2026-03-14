@@ -65,17 +65,20 @@ function generateNutritionPlan(patient) {
   const proteinPerKg = cachexia ? 1.8 : 1.4;
 
   let baseCalories = Math.round(idealWeight * kcalPerKg);
-  // Adjust based on food intake %
+  let dailyProtein = Math.round(idealWeight * proteinPerKg);
+
+  // Adjust based on food intake % to calculate the DEFICIT
+  // If input is "40%" reduced, the product should cover that 40% deficit.
   if (reducedFoodIntake > 0 && reducedFoodIntake <= 100) {
-      const remainingIntakePct = (100 - reducedFoodIntake) / 100;
-      baseCalories = Math.round(baseCalories * remainingIntakePct);
+      const deficitPct = reducedFoodIntake / 100;
+      baseCalories = Math.round(baseCalories * deficitPct);
+      dailyProtein = Math.round(dailyProtein * deficitPct);
+      
       // Ensure it doesn't drop below a critical amount maliciously
-      if (baseCalories < 500) baseCalories = 500;
+      if (baseCalories < 500 && reducedFoodIntake < 100) baseCalories = 500;
   }
   
   const dailyCalories = baseCalories;
-  // Protein calculation uses IBW
-  const dailyProtein = Math.round(idealWeight * proteinPerKg);
 
   const servingsPerDay = 3;
   const perServingCalories = Math.round(dailyCalories / servingsPerDay);
