@@ -243,7 +243,7 @@ function buildFormulationOptions(targets) {
   const manufacturingAlerts = [
     "Aseptic Preparation: Mandatory for immunocompromised oncology patients.",
     "Homogeneous Mix: Ensure all powders are fully blended before packaging.",
-    patient.feedingMethod.toLowerCase().includes('enteral') ? "Tube Compatibility: Ensure osmolality and viscosity are suitable for the prescribed tube size." : "Labeling: Clearly mark expiry and storage instructions."
+    (patient.feedingMethod || '').toLowerCase().includes('enteral') ? "Tube Compatibility: Ensure osmolality and viscosity are suitable for the prescribed tube size." : "Labeling: Clearly mark expiry and storage instructions."
   ];
 
   const feasibilityScore = computeFeasibilityScore();

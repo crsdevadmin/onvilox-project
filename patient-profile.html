@@ -801,68 +801,71 @@ function bind(plan){
   if(aaEl) aaEl.innerText = approvedAt;
 
   // Patient
-  pName.innerText = patient.name;
-  pUHIC.innerText = patient.uhic;
-  pAge.innerText = patient.age + ' years';
-  pSex.innerText = patient.sex;
-  pWeight.innerText = patient.weight + ' kg';
-  pHeight.innerText = patient.height + ' cm';
+  function setVal(id, val) {
+    const el = document.getElementById(id);
+    if(el) el.innerText = val ?? '-';
+  }
+
+  setVal('pName', patient.name);
+  setVal('pUHIC', patient.uhic);
+  setVal('pAge', patient.age + ' years');
+  setVal('pSex', patient.sex);
+  setVal('pWeight', patient.weight + ' kg');
+  setVal('pHeight', patient.height + ' cm');
   
   const calculatedBMI = computeBMI();
-  pBMI.innerText = calculatedBMI;
-  
-  const asianBmiEl = document.getElementById('pAsianBMI');
-  if(asianBmiEl) asianBmiEl.innerText = computeAsianBMI(calculatedBMI);
-  
-  const ibwEl = document.getElementById('pIBW');
-  if(ibwEl) ibwEl.innerText = computeHamwiIBW() + ' kg';
-
-  if(document.getElementById('pUW')) document.getElementById('pUW').innerText = (patient.usualWeight ? patient.usualWeight + ' kg' : '-');
-  pWL.innerText = (patient.weightLossPercent ?? '-') + ' %';
-  pCancer.innerText = patient.cancer;
-  pRegimen.innerText = patient.regimen;
-  pFeeding.innerText = patient.feedingMethod;
-  pAlbumin.innerText = patient.albumin + ' g/dL';
-  if(document.getElementById('pCRP_val')) document.getElementById('pCRP_val').innerText = (patient.crp || 0) + ' mg/L';
+  setVal('pBMI', calculatedBMI);
+  setVal('pAsianBMI', computeAsianBMI(calculatedBMI));
+  setVal('pIBW', computeHamwiIBW() + ' kg');
+  setVal('pUW', (patient.usualWeight ? patient.usualWeight + ' kg' : '-'));
+  setVal('pWL', (patient.weightLossPercent ?? '-') + ' %');
+  setVal('pCancer', patient.cancer);
+  setVal('pRegimen', patient.regimen);
+  setVal('pFeeding', patient.feedingMethod);
+  setVal('pAlbumin', patient.albumin + ' g/dL');
+  setVal('pCRP_val', (patient.crp || 0) + ' mg/L');
 
   // New Clinical History fields
-  if(document.getElementById('pFoodIntake')) document.getElementById('pFoodIntake').innerText = (patient.reducedFoodIntake || 0) + ' %';
-  document.getElementById('pHxComorbidities').innerText = (Array.isArray(patient.comorbidities) && patient.comorbidities.length) ? patient.comorbidities.join(', ') : 'None Reported';
-  document.getElementById('pHxSideEffects').innerText = (Array.isArray(patient.sideEffects) && patient.sideEffects.length) ? patient.sideEffects.join(', ') : 'None Reported';
-  document.getElementById('pHxAllergies').innerText = patient.allergies || 'None Reported';
-  document.getElementById('pHxNotes').innerText = patient.notes || '-';
+  setVal('pFoodIntake', (patient.reducedFoodIntake || 0) + ' %');
+  setVal('pHxComorbidities', (Array.isArray(patient.comorbidities) && patient.comorbidities.length) ? patient.comorbidities.join(', ') : 'None Reported');
+  setVal('pHxSideEffects', (Array.isArray(patient.sideEffects) && patient.sideEffects.length) ? patient.sideEffects.join(', ') : 'None Reported');
+  setVal('pHxAllergies', patient.allergies || 'None Reported');
+  setVal('pHxNotes', patient.notes || '-');
 
   const fp = plan.finalPlan;
 
-  dailyCalories.innerText = fp.dailyCalories + ' kcal';
-  perServingCalories.innerText = fp.perServingCalories + ' kcal';
-  dailyProtein.innerText = fp.dailyProtein + ' g';
-  perServingProtein.innerText = fp.perServingProtein + ' g';
+  setVal('dailyCalories', fp.dailyCalories + ' kcal');
+  setVal('perServingCalories', fp.perServingCalories + ' kcal');
+  setVal('dailyProtein', fp.dailyProtein + ' g');
+  setVal('perServingProtein', fp.perServingProtein + ' g');
 
   // carbs/fat show daily totals derived from per-serving
-  dailyCarbs.innerText = ((fp.dailyCarbs != null ? fp.dailyCarbs : fp.macroCarbs * (fp.servingsPerDay || 2))) + ' g';
-  perServingCarbs.innerText = fp.macroCarbs + ' g';
-  dailyFat.innerText = ((fp.dailyFat != null ? fp.dailyFat : (fp.macroFat * (fp.servingsPerDay || 2))).toFixed ? (fp.dailyFat != null ? fp.dailyFat : (fp.macroFat * (fp.servingsPerDay || 2))).toFixed(1) : (fp.macroFat * (fp.servingsPerDay || 2))) + ' g';
-  perServingFat.innerText = fp.macroFat + ' g';
+  setVal('dailyCarbs', ((fp.dailyCarbs != null ? fp.dailyCarbs : fp.macroCarbs * (fp.servingsPerDay || 2))) + ' g');
+  setVal('perServingCarbs', fp.macroCarbs + ' g');
+  
+  const dailyFatVal = (fp.dailyFat != null ? fp.dailyFat : (fp.macroFat * (fp.servingsPerDay || 2)));
+  setVal('dailyFat', (typeof dailyFatVal === 'number' ? dailyFatVal.toFixed(1) : dailyFatVal) + ' g');
+  setVal('perServingFat', fp.macroFat + ' g');
 
-  proteinType.innerText = fp.proteinType;
+  setVal('proteinType', fp.proteinType);
 
-  vitD.innerText = fp.micronutrients.vitD;
-  vitC.innerText = fp.micronutrients.vitC || '500–1000 mg';
-  zinc.innerText = fp.micronutrients.zinc;
-  omega3.innerText = fp.micronutrients.omega3;
-  if(window.selenium) selenium.innerText = fp.micronutrients.selenium || '-';
-  if(window.magnesium) magnesium.innerText = fp.micronutrients.magnesium || '-';
-  if(window.bComplex) bComplex.innerText = fp.micronutrients.bComplex || '-';
-  if(window.glutamine) glutamine.innerText = fp.micronutrients.glutamine || '-';
-	if (window.epa) epa.innerText = fp.micronutrients.epa || '-';
-	if (window.leucine) leucine.innerText = fp.micronutrients.leucine || '-';
-	if (window.hmb) hmb.innerText = fp.micronutrients.hmb || '-';
-  mCalories.innerText = fp.perServingCalories + ' kcal';
-  mProtein.innerText = fp.perServingProtein + ' g';
-  mCarbs.innerText = fp.macroCarbs + ' g';
-  mFat.innerText = fp.macroFat + ' g';
-  mForm.innerText = (patient.feedingMethod||'').includes('Oral') ? 'Powder' : 'Liquid';
+  setVal('vitD', fp.micronutrients.vitD);
+  setVal('vitC', fp.micronutrients.vitC || '500–1000 mg');
+  setVal('zinc', fp.micronutrients.zinc);
+  setVal('omega3', fp.micronutrients.omega3);
+  setVal('selenium', fp.micronutrients.selenium);
+  setVal('magnesium', fp.micronutrients.magnesium);
+  setVal('bComplex', fp.micronutrients.bComplex);
+  setVal('glutamine', fp.micronutrients.glutamine);
+  setVal('epa', fp.micronutrients.epa);
+  setVal('leucine', fp.micronutrients.leucine);
+  setVal('hmb', fp.micronutrients.hmb);
+
+  setVal('mCalories', fp.perServingCalories + ' kcal');
+  setVal('mProtein', fp.perServingProtein + ' g');
+  setVal('mCarbs', fp.macroCarbs + ' g');
+  setVal('mFat', fp.macroFat + ' g');
+  setVal('mForm', (patient.feedingMethod||'').includes('Oral') ? 'Powder' : 'Liquid');
   
   // Recipe Binding
   const rb = document.getElementById('recipeBody');
@@ -901,25 +904,28 @@ function bind(plan){
   }
 
   const bmiVal = fp.bmi != null ? fp.bmi : computeBMI();
-  document.getElementById('riskBmi').innerText = bmiVal < 18.5 ? `Low BMI (${bmiVal})` : `Within range (${bmiVal})`;
-  document.getElementById('pFitScore').innerText = fp.feasibilityScore != null ? fp.feasibilityScore : '100';
-  document.getElementById('riskNutrition').innerText = fp.cachexia ? 'High nutrition risk' : 'Moderate nutrition risk';
-  document.getElementById('riskCachexia').innerText = fp.cachexia ? 'Yes - intensified support used' : 'No major trigger';
-  document.getElementById('riskNote').innerText = fp.cachexia ? 'Weight loss / albumin / BMI pattern suggests need for calorie-dense, high-protein support.' : 'Support plan built to maintain intake during treatment.';
-  document.getElementById('riskMonitor').innerText = 'Reassess intake tolerance, body weight trend, GI symptoms and key labs at follow-up.';
+  setVal('riskBmi', bmiVal < 18.5 ? `Low BMI (${bmiVal})` : `Within range (${bmiVal})`);
+  setVal('pFitScore', fp.feasibilityScore != null ? fp.feasibilityScore : '100');
+  setVal('riskNutrition', fp.cachexia ? 'High nutrition risk' : 'Moderate nutrition risk');
+  setVal('riskCachexia', fp.cachexia ? 'Yes - intensified support used' : 'No major trigger');
+  setVal('riskNote', fp.cachexia ? 'Weight loss / albumin / BMI pattern suggests need for calorie-dense, high-protein support.' : 'Support plan built to maintain intake during treatment.');
+  setVal('riskMonitor', 'Reassess intake tolerance, body weight trend, GI symptoms and key labs at follow-up.');
 
-  document.getElementById('servingHeader').innerText = `Per Serving (${fp.servingsPerDay || 2}x Daily)`;
-  document.getElementById('servingsPerDay').innerText = (fp.servingsPerDay || 2) + ' servings/day';
-  document.getElementById('servingCalories').innerText = fp.perServingCalories + ' kcal';
-  document.getElementById('servingProtein').innerText = fp.perServingProtein + ' g';
-  document.getElementById('servingTolerance').innerText = (fp.servingsPerDay || 2) >= 4 ? 'Smaller, more frequent feeds selected to improve tolerance during treatment.' : 'Moderate serving volume selected based on current intake pattern.';
-  document.getElementById('servingReview').innerText = 'If nausea, bloating or poor intake persists, consider smaller feeds, slower escalation and clinician review.';
+  setVal('servingHeader', `Per Serving (${fp.servingsPerDay || 2}x Daily)`);
+  setVal('servingsPerDay', (fp.servingsPerDay || 2) + ' servings/day');
+  setVal('servingCalories', fp.perServingCalories + ' kcal');
+  setVal('servingProtein', fp.perServingProtein + ' g');
+  setVal('servingTolerance', (fp.servingsPerDay || 2) >= 4 ? 'Smaller, more frequent feeds selected to improve tolerance during treatment.' : 'Moderate serving volume selected based on current intake pattern.');
+  setVal('servingReview', 'If nausea, bloating or poor intake persists, consider smaller feeds, slower escalation and clinician review.');
 
   // Rationale
-  clinicalRationale.innerHTML = '';
-  (fp.rationale || plan.rationale || []).forEach(r => {
-    clinicalRationale.innerHTML += `<li>${r}</li>`;
-  });
+  const crEl = document.getElementById('clinicalRationale');
+  if(crEl){
+      crEl.innerHTML = '';
+      (fp.rationale || plan.rationale || []).forEach(r => {
+        crEl.innerHTML += `<li>${r}</li>`;
+      });
+  }
 
   // Trace
   const cachexia = fp.cachexia;
@@ -944,8 +950,7 @@ function bind(plan){
   trace.push(`<b>Protein rule applied:</b> ${proteinPerKg} g/kg/day → ${ibwVal} (IBW) × ${proteinPerKg} = ${baseProt} g/day.${intakeDeficit > 0 ? ` (Reduced to <b>${plan.engineOutput.dailyProtein} g/day</b> for ${intakeDeficit}% deficit)` : ` Result: <b>${plan.engineOutput.dailyProtein} g/day</b>.`}`);
   trace.push(`<b>Serving pattern:</b> daily target ÷ ${fp.servingsPerDay || 2} servings/day for better tolerance.`);
   trace.push(`<b>Macros:</b> protein target fixed clinically; remaining calories distributed with moderate carbs and higher fat density.`);
-  trace.push(`<b>Protein type:</b> ${patient.giIssues ? 'Hydrolyzed Whey (GI issues)' : 'Whey (standard)'}.
-  `);
+  trace.push(`<b>Protein type:</b> ${patient.giIssues ? 'Hydrolyzed Whey (GI issues)' : 'Whey (standard)'}.`);
 
   if(plan.generatedBy === 'DOCTOR_OVERRIDE'){
     const o = plan.overrides || {};
@@ -956,7 +961,8 @@ function bind(plan){
 
   trace.push(`<div style="margin-top:10px;color:#6b7280;font-size:13px;">Guideline notes: uses weight-loss/albumin to stratify nutritional risk and cachexia-related wasting states.</div>`);
 
-  calcTrace.innerHTML = trace.map(x => `<div>${x}</div>`).join('');
+  const ctEl = document.getElementById('calcTrace');
+  if(ctEl) ctEl.innerHTML = trace.map(x => `<div>${x}</div>`).join('');
 
   // Overrides UI only for doctor
   if(me.role === 'DOCTOR'){
