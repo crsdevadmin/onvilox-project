@@ -146,6 +146,41 @@
 
 </div>
 
+<!-- INTAKE ASSESSMENT CALCULATOR (ADDED) -->
+<div class="ai-panel" style="background:white; border:1px solid #e2e8f0; margin-top:0;">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+    <h4 style="margin:0; font-size:14px; text-transform:uppercase; letter-spacing:0.03em; color:#0f172a;">Dietary Intake Assessment</h4>
+    <div class="ai-badge" style="background:#0f172a;">CALCULATOR</div>
+  </div>
+  <p style="font-size:12px; color:#64748b; margin-top:0;">Estimate patient's actual food intake to calculate the nutritional gap for Onvilox.</p>
+  
+  <div id="intakeRows">
+    <div class="intake-row" style="display:grid; grid-template-columns: 2fr 1fr; gap:10px; margin-bottom:10px; align-items:center;">
+      <select class="intake-food" onchange="updateIntakeCalc()" style="padding:8px; font-size:13px;">
+        <option value="">Select Food Item...</option>
+      </select>
+      <input type="number" class="intake-qty" placeholder="Qty" min="0" step="0.5" value="1" oninput="updateIntakeCalc()" style="padding:8px; font-size:13px; text-align:center;">
+    </div>
+  </div>
+  
+  <button type="button" class="btn-secondary btn-sm" onclick="addIntakeRow()" style="padding:4px 10px; font-size:11px;">+ Add Food Item</button>
+
+  <div id="intakeSummaryUI" style="background:#f8fafc; padding:15px; border-radius:8px; margin-top:15px; border:1px dashed #cbd5e1;">
+    <div style="font-size:13px; display:flex; justify-content:space-between;">
+      <span>Estimated Actual Intake:</span><b id="calcActualKcal">0 kcal</b>
+    </div>
+    <div style="font-size:13px; display:flex; justify-content:space-between; margin-top:4px;">
+      <span>Nutritional Gap:</span><b id="calcGapKcal" style="color:#ef4444;">0 kcal</b>
+    </div>
+    <div style="font-size:15px; display:flex; justify-content:space-between; margin-top:10px; padding-top:10px; border-top:1px solid #e2e8f0; font-weight:700;">
+      <span>Food Intake Coverage:</span><span id="calcIntakePct">0%</span>
+    </div>
+    <div style="margin-top:12px; text-align:right;">
+      <button type="button" class="btn-primary btn-sm" onclick="applyIntakeToForm()" style="background:#0f172a; border-radius:8px;">Apply to Formulation</button>
+    </div>
+  </div>
+</div>
+
 <div class="form-group">
   <label>Comorbidities</label>
   <div class="tag-box">
@@ -190,6 +225,7 @@
 <script src="js/master-data.js"></script>
 <script src="js/form-loader.js"></script>
 <script src="js/patient-store.js"></script>
+<script src="js/intake-calculator.js"></script>
 
 <script>
 auth.requireRole(['DOCTOR','ASSISTANT']);
@@ -266,20 +302,88 @@ function submitPatient(){
 function calculateWeightLoss(){
   const uw = parseFloat(document.getElementById('usualWeight').value);
   const cw = parseFloat(document.getElementById('weight').value);
-  const wL = document.getElementById('weightLossPercent');
-  
+  // weightLossPercent input removed from UI
   if(uw > 0 && cw > 0){
-    if(cw > uw){
-      wL.value = "0"; // No loss if current > usual
-    } else {
-      const loss = ((uw - cw) / uw) * 100;
-      wL.value = loss.toFixed(1);
-    }
-    validateField(wL, 'Weight Loss %');
-  } else {
-    wL.value = "";
+    // Validation handled by internal state logic during submit
   }
 }
+
+function addIntakeRow() {
+  const container = document.getElementById('intakeRows');
+  if(!container) return;
+  const row = document.createElement('div');
+  row.className = 'intake-row';
+  row.style.display = 'grid';
+  row.style.gridTemplateColumns = '2fr 1fr';
+  row.style.gap = '10px';
+  row.style.marginBottom = '10px';
+  row.style.alignItems = 'center';
+  
+  const options = FoodLibrary.map(f => `<option value="${f.id}">${f.name} (${f.avgKcal} kcal)</option>`).join('');
+  
+  row.innerHTML = `
+    <select class="intake-food" onchange="updateIntakeCalc()" style="padding:8px; font-size:13px;">
+      <option value="">Select Food Item...</option>
+      ${options}
+    </select>
+    <input type="number" class="intake-qty" placeholder="Qty" min="0" step="0.5" value="1" oninput="updateIntakeCalc()" style="padding:8px; font-size:13px; text-align:center;">
+  `;
+  container.appendChild(row);
+}
+
+function updateIntakeCalc() {
+  const rows = document.querySelectorAll('.intake-row');
+  const meals = [];
+  rows.forEach(r => {
+    const foodId = r.querySelector('.intake-food').value;
+    const qty = parseFloat(r.querySelector('.intake-qty').value) || 0;
+    if(foodId) meals.push({ foodId, portions: qty });
+  });
+
+  const h = parseFloat(document.getElementById('height').value || 0);
+  const w = parseFloat(document.getElementById('weight').value || 0);
+  const sexVal = (document.getElementById('sex').value || '').toLowerCase();
+  
+  // Minimal IBW for creation panel
+  let ibw = w;
+  if (h > 60) {
+      const extra = (h * 0.393701) - 60;
+      ibw = (sexVal === 'male' ? 48.0 + (2.7 * extra) : 45.5 + (2.2 * extra));
+  }
+  
+  const alb = parseFloat(document.getElementById('albumin').value || 4);
+  const cachexia = (alb < 3.5); // Simplified for creation
+  const targetKcal = Math.round(ibw * (cachexia ? 35 : 30));
+
+  const res = calculateIntakeGap(targetKcal, meals);
+  document.getElementById('calcActualKcal').innerText = `${res.actualIntake} kcal`;
+  document.getElementById('calcGapKcal').innerText = `${res.deficitKcal} kcal`;
+  document.getElementById('calcIntakePct').innerText = `${res.intakePercent}%`;
+  window.lastCalculatedIntakeRes = res;
+}
+
+function applyIntakeToForm() {
+    if(!window.lastCalculatedIntakeRes) updateIntakeCalc();
+    const res = window.lastCalculatedIntakeRes;
+    const epFI = document.getElementById('reducedFoodIntake');
+    if(epFI) {
+      epFI.value = res.deficitPercent;
+      epFI.classList.add('ai-filled');
+      setTimeout(() => epFI.classList.remove('ai-filled'), 2000);
+    }
+}
+
+function initIntakeCalc() {
+  const selects = document.querySelectorAll('.intake-food');
+  const options = FoodLibrary.map(f => `<option value="${f.id}">${f.name} (${f.avgKcal} kcal)</option>`).join('');
+  selects.forEach(s => {
+    s.innerHTML = `<option value="">Select Food Item...</option>${options}`;
+  });
+}
+
+function round1(n){ return Math.round(n*10)/10; }
+
+initIntakeCalc();
 
 function runAiIntake() {
   const text = document.getElementById('aiIntakeText').value.toLowerCase();

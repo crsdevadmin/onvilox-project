@@ -641,7 +641,7 @@ function showEditSectionIfAllowed(){
     document.getElementById('epHeight').value = patient.height ?? '';
     document.getElementById('epAlbumin').value = patient.albumin ?? '';
     document.getElementById('epUW').value = patient.usualWeight ?? '';
-    document.getElementById('epWL').value = patient.weightLossPercent ?? 0;
+    // epWL removed from UI
     document.getElementById('epCRP').value = patient.crp ?? 0;
     document.getElementById('epGi').value = String(!!patient.giIssues);
     document.getElementById('epFeeding').value = patient.feedingMethod ?? '';
