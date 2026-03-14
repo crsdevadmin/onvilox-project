@@ -497,21 +497,23 @@ function runAiExtraction(rawText) {
   };
 
   let foundCount = 0;
-  const highlight = (id) => {
+  const foundItems = [];
+  const highlight = (id, label, val) => {
     const el = document.getElementById(id);
     if(!el) return;
     el.classList.add('ai-filled');
     setTimeout(() => el.classList.remove('ai-filled'), 3000);
+    if(label && val) foundItems.push(`${label}: ${val}`);
   };
 
-  if (extractions.weight) { document.getElementById('weight').value = extractions.weight; highlight('weight'); foundCount++; }
-  if (extractions.uw) { document.getElementById('usualWeight').value = extractions.uw; highlight('usualWeight'); foundCount++; }
-  if (extractions.albumin) { document.getElementById('albumin').value = extractions.albumin; highlight('albumin'); foundCount++; }
+  if (extractions.weight) { document.getElementById('weight').value = extractions.weight; highlight('weight', 'Weight', extractions.weight); foundCount++; }
+  if (extractions.uw) { document.getElementById('usualWeight').value = extractions.uw; highlight('usualWeight', 'Usual Weight', extractions.uw); foundCount++; }
+  if (extractions.albumin) { document.getElementById('albumin').value = extractions.albumin; highlight('albumin', 'Albumin', extractions.albumin); foundCount++; }
   if (extractions.crp) { 
     const crpEl = document.getElementById('epCRP') || document.getElementById('crp'); 
-    if(crpEl) { crpEl.value = extractions.crp; highlight(crpEl.id); foundCount++; }
+    if(crpEl) { crpEl.value = extractions.crp; highlight(crpEl.id, 'CRP', extractions.crp); foundCount++; }
   }
-  if (extractions.gi) { document.getElementById('giIssues').value = "true"; highlight('giIssues'); foundCount++; }
+  if (extractions.gi) { document.getElementById('giIssues').value = "true"; highlight('giIssues', 'GI Issues', 'Yes'); foundCount++; }
 
   const cancers = {
     'lung': 'Lung Cancer – NSCLC', 'head': 'Head & Neck Cancer', 'neck': 'Head & Neck Cancer',
@@ -526,7 +528,7 @@ function runAiExtraction(rawText) {
       if(typeof selectCancer === 'function') selectCancer(val);
       else document.getElementById('cancerInput').value = val;
       
-      highlight('cancerInput');
+      highlight('cancerInput', 'Cancer', val);
       foundCount++;
       break;
     }
@@ -545,11 +547,12 @@ function runAiExtraction(rawText) {
 
   if (markersFound.length > 0) {
     markersFound.forEach(m => addTag(m, 'genomicMarkersTags'));
+    foundItems.push(`Genomic Markers: ${markersFound.join(', ')}`);
     foundCount += markersFound.length;
   }
 
   if(foundCount > 0) {
-    addMessage(`I've updated ${foundCount} field(s) based on your notes. Anything else?`, 'ai');
+    addMessage(`I've extracted ${foundCount} item(s):\n• ${foundItems.join('\n• ')}\n\nAnything else?`, 'ai');
     if(typeof calculateWeightLoss === 'function') calculateWeightLoss();
   } else {
     addMessage("I couldn't find specific clinical markers in that. Could you provide a weight, albumin level, or cancer type?", 'ai');
