@@ -484,7 +484,19 @@ function runAiExtraction(rawText) {
   const reverseAlbuminPattern = /(\d+\.?\d*)\s*(?:g\/dl)?\s*(?:as|is|for)?\s*(?:the|new\s*)?(?:albumin|alb)/;
   const reverseCrpPattern = /(\d+\.?\d*)\s*(?:mg\/l)?\s*(?:as|is|for)?\s*(?:the|new\s*)?crp/;
 
+  // Name, Age, Sex, Height, UHIC extraction
+  const nameMatch = rawText.match(/(?:name\s*(?:is|:)?|patient\s*(?:is|:)?|this\s*is\s*)\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)/);
+  const ageMatch = text.match(/(\d+)\s*(?:years|yrs|yo|age)/) || text.match(/(?:age\s*(?:is|:)?\s*)(\d+)/);
+  const sexMatch = text.match(/\b(male|female|man|woman|boy|girl)\b/i);
+  const heightMatch = text.match(new RegExp('height' + numPattern)) || text.match(/(\d+)\s*cm/);
+  const uhicMatch = text.match(/(?:uhic|id|code)\s*(?:is|:)?\s*([a-z0-9-]+)/i);
+
   const extractions = {
+    name: nameMatch ? nameMatch[1] : null,
+    age: ageMatch ? ageMatch[1] : null,
+    sex: sexMatch ? (['male','man','boy'].includes(sexMatch[1].toLowerCase()) ? 'Male' : 'Female') : null,
+    uhic: uhicMatch ? uhicMatch[1].toUpperCase() : null,
+    height: heightMatch ? heightMatch[1] : null,
     weight: text.match(new RegExp('weight' + numPattern))?.[1] || text.match(reverseWeightPattern)?.[1] || text.match(/(\d+\.?\d*)\s*kg/)?.[1],
     uw: text.match(new RegExp('usual weight' + numPattern))?.[1] || text.match(new RegExp('uw' + numPattern))?.[1],
     albumin: text.match(new RegExp('albumin' + numPattern))?.[1] || text.match(new RegExp('alb' + numPattern))?.[1] || text.match(reverseAlbuminPattern)?.[1],
@@ -502,6 +514,11 @@ function runAiExtraction(rawText) {
     if(label && val) foundItems.push(`${label}: ${val}`);
   };
 
+  if (extractions.name) { document.getElementById('patientName').value = extractions.name; highlight('patientName', 'Name', extractions.name); foundCount++; }
+  if (extractions.uhic) { document.getElementById('uhic').value = extractions.uhic; highlight('uhic', 'UHIC', extractions.uhic); foundCount++; }
+  if (extractions.age) { document.getElementById('age').value = extractions.age; highlight('age', 'Age', extractions.age); foundCount++; }
+  if (extractions.sex) { document.getElementById('sex').value = extractions.sex; highlight('sex', 'Sex', extractions.sex); foundCount++; }
+  if (extractions.height) { document.getElementById('height').value = extractions.height; highlight('height', 'Height', extractions.height); foundCount++; }
   if (extractions.weight) { document.getElementById('weight').value = extractions.weight; highlight('weight', 'Weight', extractions.weight); foundCount++; }
   if (extractions.uw) { document.getElementById('usualWeight').value = extractions.uw; highlight('usualWeight', 'Usual Weight', extractions.uw); foundCount++; }
   if (extractions.albumin) { document.getElementById('albumin').value = extractions.albumin; highlight('albumin', 'Albumin', extractions.albumin); foundCount++; }

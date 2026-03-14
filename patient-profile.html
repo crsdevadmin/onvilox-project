@@ -347,6 +347,22 @@
 
     <div class="form-grid">
       <div class="form-group">
+        <label class="required">Patient Name</label>
+        <input id="epName" type="text" placeholder="Full Name">
+      </div>
+      <div class="form-group">
+        <label class="required">Age</label>
+        <input id="epAge" type="number" min="1" max="120">
+      </div>
+      <div class="form-group">
+        <label class="required">Sex</label>
+        <select id="epSex">
+          <option value="">Select</option>
+          <option value="Male">Male</option>
+          <option value="Female">Female</option>
+        </select>
+      </div>
+      <div class="form-group">
         <label class="required">Weight (kg)</label>
         <input id="epWeight" type="number" min="25" max="300" step="0.1">
         <div class="validation-msg" id="epWeight_msg"></div>
@@ -782,7 +798,15 @@ function runAiExtraction(rawText) {
   const reverseAlbuminPattern = /(\d+\.?\d*)\s*(?:g\/dl)?\s*(?:as|is|for)?\s*(?:the|new\s*)?(?:albumin|alb)/;
   const reverseCrpPattern = /(\d+\.?\d*)\s*(?:mg\/l)?\s*(?:as|is|for)?\s*(?:the|new\s*)?crp/;
 
+  // Name, Age, Sex extraction
+  const nameMatch = rawText.match(/(?:name\s*(?:is|:)?|patient\s*(?:is|:)?|this\s*is\s*)\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)/);
+  const ageMatch = text.match(/(\d+)\s*(?:years|yrs|yo|age)/) || text.match(/(?:age\s*(?:is|:)?\s*)(\d+)/);
+  const sexMatch = text.match(/\b(male|female|man|woman|boy|girl)\b/i);
+
   const extractions = {
+    name: nameMatch ? nameMatch[1] : null,
+    age: ageMatch ? ageMatch[1] : null,
+    sex: sexMatch ? (['male','man','boy'].includes(sexMatch[1].toLowerCase()) ? 'Male' : 'Female') : null,
     weight: text.match(new RegExp('weight' + numPattern))?.[1] || text.match(reverseWeightPattern)?.[1] || text.match(/(\d+\.?\d*)\s*kg/)?.[1],
     uw: text.match(new RegExp('usual weight' + numPattern))?.[1] || text.match(new RegExp('uw' + numPattern))?.[1],
     albumin: text.match(new RegExp('albumin' + numPattern))?.[1] || text.match(new RegExp('alb' + numPattern))?.[1] || text.match(reverseAlbuminPattern)?.[1],
@@ -824,6 +848,9 @@ function runAiExtraction(rawText) {
     if(label && val) foundItems.push(`${label}: ${val}`);
   };
 
+  if (extractions.name) { document.getElementById('epName').value = extractions.name; highlight('epName', 'Name', extractions.name); foundCount++; }
+  if (extractions.age) { document.getElementById('epAge').value = extractions.age; highlight('epAge', 'Age', extractions.age); foundCount++; }
+  if (extractions.sex) { document.getElementById('epSex').value = extractions.sex; highlight('epSex', 'Sex', extractions.sex); foundCount++; }
   if (extractions.weight) { document.getElementById('epWeight').value = extractions.weight; highlight('epWeight', 'Weight', extractions.weight); foundCount++; }
   if (extractions.uw) { document.getElementById('epUW').value = extractions.uw; highlight('epUW', 'Usual Weight', extractions.uw); foundCount++; }
   if (extractions.albumin) { document.getElementById('epAlbumin').value = extractions.albumin; highlight('epAlbumin', 'Albumin', extractions.albumin); foundCount++; }
@@ -831,6 +858,11 @@ function runAiExtraction(rawText) {
     document.getElementById('epCRP').value = extractions.crp; highlight('epCRP', 'CRP', extractions.crp); foundCount++;
   }
   if (extractions.gi) { document.getElementById('epGi').value = "true"; highlight('epGi', 'GI Issues', 'Yes'); foundCount++; }
+
+  // Auto-show edit section if anything extracted
+  if(!window.isFollowUpMode && foundCount > 0) {
+    document.getElementById('editPatientSection').style.display = 'block';
+  }
 
   const cancers = {
     'cholangiocarcinoma': 'Cholangiocarcinoma (Bile Duct Cancer)',
@@ -887,8 +919,8 @@ function runAiExtraction(rawText) {
     });
     
     // Auto-save this particular field to patient and re-render the view
-    savePatient(patient);
-    renderPatient();
+    updatePatient(patient);
+    setTimeout(() => window.location.reload(), 2000);
     
     foundItems.push(`Genomic Markers: ${markersFound.join(', ')}`);
     foundCount += markersFound.length;
@@ -920,12 +952,21 @@ function savePatientEdits(){
     validateSelect('epCancer','Cancer Type') &
     validateSelect('epRegimen','Chemo Regimen');
 
+  const nameVal = document.getElementById('epName').value.trim();
+  if(!nameVal) {
+    document.getElementById('epName').style.border = '2px solid #dc2626';
+    return;
+  }
+
   if(!ok){
     document.getElementById('editPatientSection').scrollIntoView({behavior:'smooth', block:'start'});
     return;
   }
 
   // apply edits
+  patient.name = document.getElementById('epName').value.trim();
+  patient.age = parseInt(document.getElementById('epAge').value);
+  patient.sex = document.getElementById('epSex').value;
   patient.weight = parseFloat(document.getElementById('epWeight').value);
   patient.height = parseFloat(document.getElementById('epHeight').value);
   patient.albumin = parseFloat(document.getElementById('epAlbumin').value);
@@ -1102,6 +1143,17 @@ function bind(plan){
   setVal('pSex', patient.sex);
   setVal('pWeight', patient.weight + ' kg');
   setVal('pHeight', patient.height + ' cm');
+
+  // Fill Edit section too
+  const epN = document.getElementById('epName'); if(epN) epN.value = patient.name || '';
+  const epA = document.getElementById('epAge'); if(epA) epA.value = patient.age || '';
+  const epS = document.getElementById('epSex'); if(epS) epS.value = patient.sex || '';
+  const epW = document.getElementById('epWeight'); if(epW) epW.value = patient.weight || '';
+  const epH = document.getElementById('epHeight'); if(epH) epH.value = patient.height || '';
+  const epAlb = document.getElementById('epAlbumin'); if(epAlb) epAlb.value = patient.albumin || '';
+  const epUw = document.getElementById('epUW'); if(epUw) epUw.value = patient.usualWeight || '';
+  const epCrp = document.getElementById('epCRP'); if(epCrp) epCrp.value = patient.crp || 0;
+  const epG = document.getElementById('epGi'); if(epG) epG.value = (patient.giIssues||false).toString();
   
   const calculatedBMI = computeBMI();
   setVal('pBMI', calculatedBMI);
