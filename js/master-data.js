@@ -101,10 +101,57 @@ const cancerRegimenMap = {
     "Durvalumab Combination",
     "Pembrolizumab"
   ],
+  "Gallbladder Cancer": [
+    "Gemcitabine + Cisplatin",
+    "5-FU Combination"
+  ],
+  "Neuroendocrine Tumors (NETs)": [
+    "Octreotide / Lanreotide",
+    "Everolimus",
+    "Sunitinib",
+    "PRRT (Lutetium-177)"
+  ],
   "Thyroid Cancer": [
     "Radioactive Iodine Therapy",
     "Lenvatinib",
     "Sorafenib"
+  ],
+  "Melanoma (Skin Cancer)": [
+    "Pembrolizumab (Keytruda)",
+    "Nivolumab (Opdivo)",
+    "Dabrafenib + Trametinib",
+    "Ipilimumab + Nivolumab"
+  ],
+  "Basal / Squamous Cell Carcinoma (Skin)": [
+    "Cemiplimab",
+    "Pembrolizumab"
+  ],
+  "Glioblastoma (Brain Cancer)": [
+    "Temozolomide + Radiation",
+    "Bevacizumab"
+  ],
+  "Sarcoma (Bone / Soft Tissue)": [
+    "Doxorubicin",
+    "Ifosfamide",
+    "Gemcitabine + Docetaxel"
+  ],
+  "Cervical Cancer": [
+    "Cisplatin + Paclitaxel + Bevacizumab",
+    "Pembrolizumab Combination",
+    "Cisplatin-based Chemoradiation"
+  ],
+  "Endometrial / Uterine Cancer": [
+    "Carboplatin + Paclitaxel",
+    "Pembrolizumab + Lenvatinib"
+  ],
+  "Multiple Myeloma": [
+    "VRd (Bortezomib + Lenalidomide + Dexamethasone)",
+    "Daratumumab Combinations",
+    "Carfilzomib Combinations"
+  ],
+  "Mesothelioma (Pleural)": [
+    "Pemetrexed + Cisplatin",
+    "Ipilimumab + Nivolumab"
   ]
 };
 
