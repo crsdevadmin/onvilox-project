@@ -96,6 +96,15 @@
       .topbar,.rpt-actions-bar,.rpt-panel,.no-print { display:none !important; }
       #reportDoc { box-shadow:none; border:none; margin:0; max-width:none; }
     }
+    /* AI ASSISTANT */
+    .ai-panel { background:linear-gradient(135deg,#f8faff 0%,#eef2ff 100%); border:1px solid #c7d2fe; border-radius:12px; padding:20px; margin-bottom:24px; box-shadow:0 4px 20px rgba(99,102,241,0.08); }
+    .ai-header { display:flex; align-items:center; gap:10px; margin-bottom:12px; color:#4338ca; }
+    .ai-header h4 { margin:0; font-size:15px; font-weight:800; text-transform:uppercase; letter-spacing:0.05em; }
+    .ai-badge { background:#4338ca; color:white; padding:3px 8px; border-radius:4px; font-size:9px; font-weight:800; }
+    .ai-textarea { width:100%; border:1px solid #c7d2fe; border-radius:8px; padding:12px; font-size:13.5px; font-family:inherit; min-height:80px; resize:vertical; margin-bottom:12px; background:white; }
+    .ai-textarea:focus { outline:none; border-color:#6366f1; box-shadow:0 0 0 3px rgba(99,102,241,0.1); }
+    .ai-actions { display:flex; gap:10px; align-items:center; }
+    .ai-status { font-size:11.5px; color:#6366f1; font-weight:600; display:none; }
   </style>
   </style>
 </head>
@@ -297,6 +306,21 @@
     <div style="color:#6b7280;font-size:13px;margin-bottom:14px;">
       Update clinical inputs (weight/albumin/weight loss etc.). The plan will be recalculated and versioned.
     </div>
+
+    <!-- AI ASSISTANT PANEL -->
+    <div class="ai-panel">
+      <div class="ai-header">
+        <div class="ai-badge">BETA</div>
+        <h4>AI Clinical Assistant</h4>
+      </div>
+      <p style="font-size:12.5px; color:#475569; margin-top:0; margin-bottom:12px;">Paste hospital case notes or describe patient symptoms. The AI will instantly map clinical details to the form below.</p>
+      <textarea id="aiIntakeText" class="ai-textarea" placeholder="e.g. Patient has stage 4 GE junction cancer, reporting regular vomiting and 6kg weight loss over the last month. Albumin is 2.9..."></textarea>
+      <div class="ai-actions">
+        <button type="button" class="btn-primary" onclick="runAiIntake()" style="background:#4338ca; border-color:#4338ca;">✨ Analyze Case Notes</button>
+        <span id="aiStatus" class="ai-status">AI is analyzing clinical markers...</span>
+      </div>
+    </div>
+
     <div class="form-grid">
       <div class="form-group">
         <label class="required">Weight (kg)</label>
@@ -551,6 +575,71 @@ function showEditSectionIfAllowed(){
 
     if(reviewMode && shouldShow){
       section.scrollIntoView({behavior:'smooth', block:'start'});
+    }
+
+    function runAiIntake() {
+      const text = document.getElementById('aiIntakeText').value.toLowerCase();
+      const status = document.getElementById('aiStatus');
+      if (!text) return;
+
+      status.style.display = 'inline';
+      
+      setTimeout(() => {
+        // Simulate extraction with regex
+        const extractions = {
+          weight: text.match(/weight:?\s*(\d+\.?\d*)/)?.[1] || text.match(/(\d+\.?\d*)\s*kg/)?.[1],
+          uw: text.match(/usual weight:?\s*(\d+\.?\d*)/)?.[1] || text.match(/uw:?\s*(\d+\.?\d*)/)?.[1],
+          albumin: text.match(/albumin:?\s*(\d+\.?\d*)/)?.[1] || text.match(/alb:?\s*(\d+\.?\d*)/)?.[1],
+          wl: text.match(/weight loss:?\s*(\d+\.?\d*)/)?.[1] || text.match(/wl:?\s*(\d+\.?\d*)/)?.[1],
+          crp: text.match(/crp:?\s*(\d+\.?\d*)/)?.[1],
+          gi: text.includes('vomiting') || text.includes('nausea') || text.includes('diarrhea') || text.includes('bloating')
+        };
+
+        let count = 0;
+        const highlight = (id) => {
+          const el = document.getElementById(id);
+          if(!el) return;
+          el.style.backgroundColor = '#ecfdf5';
+          el.style.borderColor = '#10b981';
+          el.style.transition = 'all 0.4s ease';
+          setTimeout(() => {
+            el.style.backgroundColor = '';
+            el.style.borderColor = '';
+          }, 4000);
+        };
+
+        if (extractions.weight) { document.getElementById('epWeight').value = extractions.weight; highlight('epWeight'); count++; }
+        if (extractions.uw) { document.getElementById('epUW').value = extractions.uw; highlight('epUW'); count++; }
+        if (extractions.albumin) { document.getElementById('epAlbumin').value = extractions.albumin; highlight('epAlbumin'); count++; }
+        if (extractions.wl) { document.getElementById('epWL').value = extractions.wl; highlight('epWL'); count++; }
+        if (extractions.crp) { document.getElementById('epCRP').value = extractions.crp; highlight('epCRP'); count++; }
+        if (extractions.gi) { document.getElementById('epGi').value = "true"; highlight('epGi'); count++; }
+
+        const cancers = {
+          'lung': 'Lung_SCLC_NSCLC', 'head': 'Head_Neck_Squamous', 'neck': 'Head_Neck_Squamous',
+          'colon': 'Colorectal_Adeno', 'gastric': 'Gastric_Oesophageal', 'oesophageal': 'Gastric_Oesophageal',
+          'breast': 'Breast_Cancer', 'prostate': 'Prostate_Cancer', 'leukemia': 'Hematologic_Leukemia',
+          'pancreatic': 'Pancreatic_Adeno'
+        };
+
+        for (const [key, val] of Object.entries(cancers)) {
+          if (text.includes(key)) {
+            document.getElementById('epCancer').value = val;
+            highlight('epCancer');
+            count++;
+            break;
+          }
+        }
+
+        status.innerText = `✨ AI successfully extracted ${count} clinical markers.`;
+        setTimeout(() => { 
+          status.style.display = 'none'; 
+          status.innerText = 'AI is analyzing clinical markers...'; 
+        }, 6000);
+        
+        if(typeof autoCalcWL === 'function') autoCalcWL();
+
+      }, 1500);
     }
   }
 
