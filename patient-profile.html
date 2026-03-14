@@ -379,7 +379,7 @@
     </div>
 
     <!-- INTAKE ASSESSMENT CALCULATOR -->
-    <div class="ai-panel">
+    <div class="ai-panel" id="editIntakePanel" style="display:none;">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
         <h4 style="margin:0; font-size:14px; text-transform:uppercase; letter-spacing:0.03em;">Dietary Intake Assessment</h4>
         <div class="ai-badge" >CALCULATOR</div>
@@ -562,6 +562,11 @@ function loadEditSelects(){
     const o=document.createElement('option'); o.value=m; o.text=m; feedingSel.appendChild(o);
   });
 
+  feedingSel.onchange = () => {
+    validateSelect('epFeeding','Feeding Method');
+    toggleEditIntakeUI();
+  };
+
   const cancerSel = document.getElementById('epCancer');
   cancerSel.innerHTML = '<option value="">Select</option>';
   Object.keys(typeof cancerRegimenMap !== 'undefined' ? cancerRegimenMap : {}).forEach(c=>{
@@ -639,6 +644,7 @@ function showEditSectionIfAllowed(){
     document.getElementById('epCRP').value = patient.crp ?? 0;
     document.getElementById('epGi').value = String(!!patient.giIssues);
     document.getElementById('epFeeding').value = patient.feedingMethod ?? '';
+    toggleEditIntakeUI();
     document.getElementById('epCancer').value = patient.cancer ?? '';
     loadRegimensForCancer(patient.cancer);
     document.getElementById('epRegimen').value = patient.regimen ?? '';
@@ -741,7 +747,9 @@ function runAiExtraction(rawText) {
 
   for (const [key, val] of Object.entries(cancers)) {
     if (text.includes(key)) {
-      document.getElementById('epCancer').value = val;
+      const el = document.getElementById('epCancer');
+      el.value = val;
+      el.dispatchEvent(new Event('change'));
       highlight('epCancer');
       foundCount++;
       break;
@@ -753,6 +761,14 @@ function runAiExtraction(rawText) {
   } else {
     addMessage("I couldn't find specific clinical markers in that. Could you provide a weight, albumin level, or cancer type?", 'ai');
   }
+}
+
+function toggleEditIntakeUI() {
+  const method = document.getElementById('epFeeding').value;
+  const panel = document.getElementById('editIntakePanel');
+  if(!panel) return;
+  // Show only if "Oral Feeding (Normal Diet)"
+  panel.style.display = (method === 'Oral Feeding (Normal Diet)') ? 'block' : 'none';
 }
 
 function savePatientEdits(){

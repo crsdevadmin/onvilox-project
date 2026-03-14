@@ -135,14 +135,14 @@
 
   <div class="form-group">
     <label class="required">Feeding Method</label>
-    <select id="feedingMethod" onchange="validateField(this,'Feeding Method')"></select>
+    <select id="feedingMethod" onchange="validateField(this,'Feeding Method'); toggleIntakeUI()"></select>
     <div class="validation-msg" id="feedingMethod_msg"></div>
   </div>
 
 </div>
 
 <!-- INTAKE ASSESSMENT CALCULATOR (ADDED) -->
-<div class="ai-panel">
+<div class="ai-panel" id="intakeAssessmentPanel" style="display:none;">
   <div class="ai-header">
     <div class="ai-badge">CALCULATOR</div>
     <h4>Dietary Intake Assessment</h4>
@@ -464,7 +464,9 @@ function runAiExtraction(rawText) {
 
   for (const [key, val] of Object.entries(cancers)) {
     if (text.includes(key)) {
-      document.getElementById('cancerInput').value = val;
+      if(typeof selectCancer === 'function') selectCancer(val);
+      else document.getElementById('cancerInput').value = val;
+      
       highlight('cancerInput');
       foundCount++;
       break;
@@ -477,6 +479,14 @@ function runAiExtraction(rawText) {
   } else {
     addMessage("I couldn't find specific clinical markers in that. Could you provide a weight, albumin level, or cancer type?", 'ai');
   }
+}
+
+function toggleIntakeUI() {
+  const method = document.getElementById('feedingMethod').value;
+  const panel = document.getElementById('intakeAssessmentPanel');
+  if(!panel) return;
+  // Show only if "Oral Feeding (Normal Diet)"
+  panel.style.display = (method === 'Oral Feeding (Normal Diet)') ? 'block' : 'none';
 }
 </script>
 
