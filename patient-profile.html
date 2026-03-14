@@ -786,15 +786,24 @@ function runAiExtraction(rawText) {
   if (extractions.gi) { document.getElementById('epGi').value = "true"; highlight('epGi', 'GI Issues', 'Yes'); foundCount++; }
 
   const cancers = {
-    'lung': 'Lung Cancer – NSCLC', 'head': 'Head & Neck Cancer', 'neck': 'Head & Neck Cancer',
+    'cholangiocarcinoma': 'Liver (Hepatocellular) Cancer',
+    'cholongiocarcinoma': 'Liver (Hepatocellular) Cancer', // common misspelling
+    'hepatocellular': 'Liver (Hepatocellular) Cancer',
+    'liver': 'Liver (Hepatocellular) Cancer',
+    'lung': 'Lung Cancer – NSCLC', 'nsclc': 'Lung Cancer – NSCLC',
+    'head': 'Head & Neck Cancer', 'neck': 'Head & Neck Cancer',
     'colon': 'Colorectal Cancer', 'colorectal': 'Colorectal Cancer', 'breast': 'Breast Cancer – Invasive Ductal Carcinoma (IDC)',
-    'prostate': 'Prostate Cancer', 'leukemia': 'Hematological Malignancy', 'pancreatic': 'Pancreatic Cancer',
+    'prostate': 'Prostate Cancer', 'leukemia': 'Hematological Malignancy', 'lymphoma': 'Hematological Malignancy',
+    'pancreatic': 'Pancreatic Cancer', 'pancreas': 'Pancreatic Cancer',
     'gastric': 'Gastric / Stomach Cancer', 'stomach': 'Gastric / Stomach Cancer', 'esophageal': 'Esophageal Cancer',
-    'bladder': 'Bladder / Urothelial Cancer', 'kidney': 'Kidney (Renal Cell) Cancer', 'liver': 'Liver (Hepatocellular) Cancer', 'thyroid': 'Thyroid Cancer'
+    'bladder': 'Bladder / Urothelial Cancer', 'urothelial': 'Bladder / Urothelial Cancer',
+    'kidney': 'Kidney (Renal Cell) Cancer', 'renal': 'Kidney (Renal Cell) Cancer', 'thyroid': 'Thyroid Cancer'
   };
 
   for (const [key, val] of Object.entries(cancers)) {
-    if (text.includes(key)) {
+    // using word boundaries (\b) so "cholongiocarcinoma" does not match "lung"
+    const regex = new RegExp('\\b' + key + '\\b', 'i');
+    if (regex.test(text)) {
       const el = document.getElementById('epCancer');
       el.value = val;
       el.dispatchEvent(new Event('change'));
