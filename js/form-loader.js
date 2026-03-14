@@ -28,12 +28,18 @@ function openCancerDropdown() {
 }
 
 function filterCancerList() {
-  const input = document.getElementById("cancerInput").value.toLowerCase();
+  let input = document.getElementById("cancerInput").value.toLowerCase();
+  // Handle common typos for better UX
+  input = input.replace('cholung', 'cholang')
+               .replace('colorectal', 'colon');
+               
   const dropdown = document.getElementById("cancerDropdown");
   dropdown.innerHTML = "";
 
   Object.keys(cancerRegimenMap).forEach(cancer => {
-    if (cancer.toLowerCase().includes(input)) {
+    let matchString = cancer.toLowerCase();
+    
+    if (matchString.includes(input)) {
       const div = document.createElement("div");
       div.innerText = cancer;
       div.onclick = () => selectCancer(cancer);
