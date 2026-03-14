@@ -156,8 +156,8 @@
       <div class="rmg">
         <div class="rmi"><div class="rmi-n">Name</div><div class="rmi-v" id="pName"></div></div>
         <div class="rmi"><div class="rmi-n">Age / Sex</div><div class="rmi-v"><span id="pAge"></span> / <span id="pSex"></span></div></div>
-        <div class="rmi"><div class="rmi-n">Weight</div><div class="rmi-v" id="pWeight"></div></div>
         <div class="rmi"><div class="rmi-n">Height</div><div class="rmi-v" id="pHeight"></div></div>
+        <div class="rmi"><div class="rmi-n">BMI (Current)</div><div class="rmi-v" id="pBMI_top"></div></div>
       </div>
     </div>
   
@@ -172,8 +172,9 @@
         <div class="rb rb-i">Clinical Fit: <span id="pFitScore"></span>%</div>
       </div>
   
-      <div class="rg rg4">
+      <div class="rg">
         <div class="rf"><div class="rf-lbl">Ideal Weight (Hamwi)</div><div class="rf-val" style="font-weight:800; color:#0e2247;" id="pIBW"></div></div>
+        <div class="rf"><div class="rf-lbl">Current Weight</div><div class="rf-val" id="pWeight"></div></div>
         <div class="rf"><div class="rf-lbl">Usual Weight</div><div class="rf-val" id="pUW"></div></div>
         <div class="rf"><div class="rf-lbl">Weight Loss (last 6 months)</div><div class="rf-val danger" id="pWL"></div></div>
         <div class="rf"><div class="rf-lbl">Actual Food Intake (%)</div><div class="rf-val warn" id="pFoodIntake"></div></div>
@@ -907,6 +908,7 @@ function bind(plan){
   
   const calculatedBMI = computeBMI();
   setVal('pBMI', calculatedBMI);
+  setVal('pBMI_top', calculatedBMI);
   const asianBmiCat = computeAsianBMI(calculatedBMI);
   setVal('pAsianBMI', `BMI (Asian): ${asianBmiCat}`);
   
