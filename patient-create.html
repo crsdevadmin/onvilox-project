@@ -5,6 +5,18 @@
   <meta charset="UTF-8">
   <title>Create Patient - Onvilox</title>
   <link rel="stylesheet" href="css/app.css">
+  <style>
+    /* AI ASSISTANT STYLES */
+    .ai-panel { background:linear-gradient(135deg,#f8faff 0%,#eef2ff 100%); border:1px solid #c7d2fe; border-radius:12px; padding:20px; margin-bottom:24px; box-shadow:0 4px 20px rgba(99,102,241,0.08); }
+    .ai-header { display:flex; align-items:center; gap:10px; margin-bottom:12px; color:#4338ca; }
+    .ai-header h4 { margin:0; font-size:15px; font-weight:800; text-transform:uppercase; letter-spacing:0.05em; }
+    .ai-badge { background:#4338ca; color:white; padding:3px 8px; border-radius:4px; font-size:9px; font-weight:800; }
+    .ai-textarea { width:100%; border:1px solid #c7d2fe; border-radius:8px; padding:12px; font-size:13.5px; font-family:inherit; min-height:80px; resize:vertical; margin-bottom:12px; background:white; }
+    .ai-textarea:focus { outline:none; border-color:#6366f1; box-shadow:0 0 0 3px rgba(99,102,241,0.1); }
+    .ai-actions { display:flex; gap:10px; align-items:center; }
+    .ai-status { font-size:11.5px; color:#6366f1; font-weight:600; display:none; }
+    .ai-filled { background-color: #ecfdf5 !important; border-color: #10b981 !important; transition: all 0.4s ease; }
+  </style>
 </head>
 <body>
 
@@ -21,6 +33,20 @@
 <div class="card">
 
 <h2>Create New Patient</h2>
+
+<!-- AI ASSISTANT PANEL -->
+<div class="ai-panel">
+  <div class="ai-header">
+    <div class="ai-badge">BETA</div>
+    <h4>AI Clinical Assistant</h4>
+  </div>
+  <p style="font-size:12.5px; color:#475569; margin-top:0; margin-bottom:12px;">Paste hospital case notes or describe patient symptoms. The AI will instantly map clinical details to the form below.</p>
+  <textarea id="aiIntakeText" class="ai-textarea" placeholder="e.g. Patient has stage 4 GE junction cancer, reporting regular vomiting and 6kg weight loss over the last month. Albumin is 2.9..."></textarea>
+  <div class="ai-actions">
+    <button type="button" class="btn-primary" onclick="runAiIntake()" style="background:#4338ca; border-color:#4338ca;">✨ Analyze Case Notes</button>
+    <span id="aiStatus" class="ai-status">AI is analyzing clinical markers...</span>
+  </div>
+</div>
 
 <div class="form-grid">
 
@@ -253,6 +279,69 @@ function calculateWeightLoss(){
   } else {
     wL.value = "";
   }
+}
+
+function runAiIntake() {
+  const text = document.getElementById('aiIntakeText').value.toLowerCase();
+  const status = document.getElementById('aiStatus');
+  if (!text) return;
+
+  status.style.display = 'inline';
+  
+  setTimeout(() => {
+    // Handle "is", "at", ":", space etc.
+    const numPattern = '(?:is|at|was|of|recorded at)?\\s*:?\\s*(\\d+\\.?\\d*)';
+    const extractions = {
+      weight: text.match(new RegExp('weight' + numPattern))?.[1] || text.match(/(\d+\.?\d*)\s*kg/)?.[1],
+      uw: text.match(new RegExp('usual weight' + numPattern))?.[1] || text.match(new RegExp('uw' + numPattern))?.[1],
+      albumin: text.match(new RegExp('albumin' + numPattern))?.[1] || text.match(new RegExp('alb' + numPattern))?.[1],
+      crp: text.match(new RegExp('crp' + numPattern))?.[1],
+      gi: text.includes('vomiting') || text.includes('nausea') || text.includes('diarrhea') || text.includes('bloating') || text.includes('gastric issues')
+    };
+
+    let count = 0;
+    const highlight = (id) => {
+      const el = document.getElementById(id);
+      if(!el) return;
+      el.classList.add('ai-filled');
+      setTimeout(() => el.classList.remove('ai-filled'), 4000);
+    };
+
+    if (extractions.weight) { document.getElementById('weight').value = extractions.weight; highlight('weight'); count++; }
+    if (extractions.uw) { document.getElementById('usualWeight').value = extractions.uw; highlight('usualWeight'); count++; }
+    if (extractions.albumin) { document.getElementById('albumin').value = extractions.albumin; highlight('albumin'); count++; }
+    if (extractions.crp) { 
+      // check if field exists, current V2 might have added it
+      const crpEl = document.getElementById('epCRP') || document.getElementById('crp'); 
+      if(crpEl) { crpEl.value = extractions.crp; highlight(crpEl.id); count++; }
+    }
+    if (extractions.gi) { document.getElementById('giIssues').value = "true"; highlight('giIssues'); count++; }
+
+    const cancers = {
+      'lung': 'Lung Cancer – NSCLC', 'head': 'Head & Neck Cancer', 'neck': 'Head & Neck Cancer',
+      'colon': 'Colorectal Cancer', 'colorectal': 'Colorectal Cancer', 'breast': 'Breast Cancer – Invasive Ductal Carcinoma (IDC)',
+      'prostate': 'Prostate Cancer', 'leukemia': 'Hematological Malignancy', 'pancreatic': 'Pancreatic Cancer'
+    };
+
+    for (const [key, val] of Object.entries(cancers)) {
+      if (text.includes(key)) {
+        document.getElementById('cancerInput').value = val;
+        highlight('cancerInput');
+        count++;
+        break;
+      }
+    }
+
+    status.innerText = `✨ AI successfully extracted ${count} clinical markers.`;
+    setTimeout(() => { 
+      status.style.display = 'none'; 
+      status.innerText = 'AI is analyzing clinical markers...'; 
+    }, 6000);
+    
+    // Auto-calculate weight loss if possible
+    if(typeof calculateWeightLoss === 'function') calculateWeightLoss();
+
+  }, 1200);
 }
 </script>
 

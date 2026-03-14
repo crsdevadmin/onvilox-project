@@ -674,14 +674,14 @@ function showEditSectionIfAllowed(){
       status.style.display = 'inline';
       
       setTimeout(() => {
-        // Simulate extraction with regex
+        // Simulate extraction with regex - handle "is", "at", ":", space etc.
+        const numPattern = '(?:is|at|was|of|recorded at)?\\s*:?\\s*(\\d+\\.?\\d*)';
         const extractions = {
-          weight: text.match(/weight:?\s*(\d+\.?\d*)/)?.[1] || text.match(/(\d+\.?\d*)\s*kg/)?.[1],
-          uw: text.match(/usual weight:?\s*(\d+\.?\d*)/)?.[1] || text.match(/uw:?\s*(\d+\.?\d*)/)?.[1],
-          albumin: text.match(/albumin:?\s*(\d+\.?\d*)/)?.[1] || text.match(/alb:?\s*(\d+\.?\d*)/)?.[1],
-          wl: text.match(/weight loss:?\s*(\d+\.?\d*)/)?.[1] || text.match(/wl:?\s*(\d+\.?\d*)/)?.[1],
-          crp: text.match(/crp:?\s*(\d+\.?\d*)/)?.[1],
-          gi: text.includes('vomiting') || text.includes('nausea') || text.includes('diarrhea') || text.includes('bloating')
+          weight: text.match(new RegExp('weight' + numPattern))?.[1] || text.match(/(\d+\.?\d*)\s*kg/)?.[1],
+          uw: text.match(new RegExp('usual weight' + numPattern))?.[1] || text.match(new RegExp('uw' + numPattern))?.[1],
+          albumin: text.match(new RegExp('albumin' + numPattern))?.[1] || text.match(new RegExp('alb' + numPattern))?.[1],
+          crp: text.match(new RegExp('crp' + numPattern))?.[1],
+          gi: text.includes('vomiting') || text.includes('nausea') || text.includes('diarrhea') || text.includes('bloating') || text.includes('gastric issues')
         };
 
         let count = 0;
@@ -704,10 +704,16 @@ function showEditSectionIfAllowed(){
         if (extractions.gi) { document.getElementById('epGi').value = "true"; highlight('epGi'); count++; }
 
         const cancers = {
-          'lung': 'Lung_SCLC_NSCLC', 'head': 'Head_Neck_Squamous', 'neck': 'Head_Neck_Squamous',
-          'colon': 'Colorectal_Adeno', 'gastric': 'Gastric_Oesophageal', 'oesophageal': 'Gastric_Oesophageal',
-          'breast': 'Breast_Cancer', 'prostate': 'Prostate_Cancer', 'leukemia': 'Hematologic_Leukemia',
-          'pancreatic': 'Pancreatic_Adeno'
+          'lung': 'Lung Cancer – NSCLC', 
+          'head': 'Head & Neck Cancer', 
+          'neck': 'Head & Neck Cancer',
+          'colon': 'Colorectal Cancer',
+          'colorectal': 'Colorectal Cancer',
+          'breast': 'Breast Cancer – Invasive Ductal Carcinoma (IDC)',
+          'prostate': 'Prostate Cancer',
+          'leukemia': 'Hematological Malignancy',
+          'lymphoma': 'Hematological Malignancy',
+          'pancreatic': 'Pancreatic Cancer'
         };
 
         for (const [key, val] of Object.entries(cancers)) {
@@ -725,7 +731,12 @@ function showEditSectionIfAllowed(){
           status.innerText = 'AI is analyzing clinical markers...'; 
         }, 6000);
         
-        if(typeof autoCalcWL === 'function') autoCalcWL();
+        if(extractions.gi) {
+           const epGi = document.getElementById('epGi');
+           if(epGi) epGi.value = "true";
+           highlight('epGi');
+           count++;
+        }
 
       }, 1500);
     }
