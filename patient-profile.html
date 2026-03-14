@@ -7,46 +7,96 @@
   <link rel="stylesheet" href="css/app.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
   <style>
-    /* Hospital Report Override Styles */
-    .hospital-report {
-      background-color: #ffffff !important;
-      color: #000000 !important;
-      font-family: 'Times New Roman', Times, serif !important;
-      padding: 40px !important;
-      border: 1px solid #ccc !important;
-      box-shadow: none !important;
-      border-radius: 0 !important;
+    #reportDoc {
+      background:#fff; color:#111827;
+      font-family:'Manrope',sans-serif;
+      max-width:860px; margin:28px auto;
+      border:1px solid #c8d6ea;
+      overflow:hidden;
+      box-shadow:0 6px 40px rgba(0,0,0,0.22);
     }
-    
-    .hospital-report h2, .hospital-report h3 {
-      color: #000000 !important;
-      border-bottom: 2px solid #000000 !important;
-      padding-bottom: 5px !important;
-      margin-top: 20px !important;
-      font-family: Arial, sans-serif !important;
+    /* LETTERHEAD */
+    .rlt { background:linear-gradient(135deg,#0a1628 0%,#0e2247 55%,#0a3060 100%); padding:24px 34px 20px; display:flex; align-items:flex-start; justify-content:space-between; gap:16px; }
+    .rlt-brand-name { font-family:'Outfit',sans-serif; font-size:24px; font-weight:900; letter-spacing:-0.03em; color:#fff; display:flex; align-items:center; gap:9px; }
+    .rlt-brand-name::before { content:''; width:9px; height:9px; border-radius:50%; background:#22d3ee; box-shadow:0 0 10px #22d3ee; flex-shrink:0; }
+    .rlt-brand-sub { font-size:10px; font-weight:600; color:rgba(255,255,255,0.45); letter-spacing:0.12em; text-transform:uppercase; margin-top:4px; margin-left:18px; }
+    .rlt-doc-info { text-align:right; }
+    .rlt-doc-title { font-size:12.5px; font-weight:800; color:#22d3ee; letter-spacing:0.1em; text-transform:uppercase; }
+    .rlt-doc-sub { font-size:11px; color:rgba(255,255,255,0.55); margin-top:4px; }
+    .rlt-doc-id { font-size:10px; color:rgba(255,255,255,0.35); margin-top:6px; font-family:monospace; }
+    /* HOSPITAL BAR */
+    .rhb { background:#eef4ff; border-bottom:3px solid #0e2247; padding:9px 34px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; }
+    .rhb-name { font-size:14px; font-weight:800; color:#0e2247; }
+    .rhb-right { font-size:11.5px; color:#475569; font-weight:600; }
+    .rhb-right span { color:#0e2247; font-weight:800; }
+    /* SECTION */
+    .rs { padding:0 34px; margin-top:20px; }
+    .rs:last-of-type { padding-bottom:28px; }
+    .rs-title { font-size:10px; font-weight:800; letter-spacing:0.14em; text-transform:uppercase; color:#0e2247; border-bottom:2px solid #0e2247; padding-bottom:5px; margin-bottom:12px; display:flex; align-items:center; gap:7px; }
+    .rs-title::before { content:''; width:3px; height:13px; background:#22d3ee; border-radius:2px; }
+    /* FIELD GRID */
+    .rg { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+    .rg4 { grid-template-columns:repeat(4,1fr); }
+    .rg2 { grid-template-columns:repeat(2,1fr); }
+    .rf { background:#f7faff; border:1px solid #dde8f5; border-radius:5px; padding:9px 12px; }
+    .rf.full { grid-column:1/-1; }
+    .rf.sp2 { grid-column:span 2; }
+    .rf-lbl { font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:0.1em; color:#94a3b8; margin-bottom:3px; }
+    .rf-val { font-size:13.5px; font-weight:700; color:#0f172a; word-break:break-word; }
+    .rf-val.big { font-family:'Outfit',sans-serif; font-size:20px; font-weight:800; color:#0e2247; }
+    .rf-val.accent { color:#0284c7; }
+    .rf-val.warn { color:#d97706; }
+    .rf-val.danger { color:#dc2626; }
+    .rf.alert-red { background:#fff5f5; border-color:#fca5a5; }
+    .rf.alert-red .rf-val { color:#dc2626; }
+    .rf.alert-amber { background:#fffbeb; border-color:#fcd34d; }
+    .rf.alert-amber .rf-val { color:#b45309; }
+    .rf.alert-green { background:#f0fdf4; border-color:#86efac; }
+    .rf.alert-green .rf-val { color:#16a34a; }
+    /* TABLE */
+    .rt { width:100%; border-collapse:collapse; font-size:12.5px; }
+    .rt thead th { background:#0e2247; color:#fff; padding:9px 13px; text-align:left; font-size:10.5px; font-weight:700; letter-spacing:0.07em; text-transform:uppercase; }
+    .rt tbody tr:nth-child(even) { background:#f7faff; }
+    .rt tbody td { padding:9px 13px; border-bottom:1px solid #e2e8f4; color:#1e293b; vertical-align:top; }
+    .rt tbody td:first-child { font-weight:700; color:#334155; width:38%; }
+    .rt .vbig { font-weight:800; font-size:14px; color:#0e2247; }
+    /* MICRO GRID */
+    .rmg { display:grid; grid-template-columns:repeat(4,1fr); gap:7px; }
+    .rmi { background:#f7faff; border:1px solid #dde8f5; border-radius:5px; padding:8px 10px; text-align:center; }
+    .rmi-n { font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:0.08em; color:#94a3b8; margin-bottom:3px; }
+    .rmi-v { font-size:11.5px; font-weight:700; color:#0f172a; }
+    /* RISK BADGES */
+    .rrisk { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
+    .rb { display:inline-flex; align-items:center; gap:5px; padding:5px 12px; border-radius:999px; font-size:11.5px; font-weight:700; }
+    .rb::before { content:''; width:6px; height:6px; border-radius:50%; }
+    .rb-h { background:#fff5f5; color:#dc2626; border:1px solid #fca5a5; } .rb-h::before { background:#dc2626; }
+    .rb-m { background:#fffbeb; color:#b45309; border:1px solid #fcd34d; } .rb-m::before { background:#f59e0b; }
+    .rb-l { background:#f0fdf4; color:#16a34a; border:1px solid #86efac; } .rb-l::before { background:#22c55e; }
+    .rb-i { background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; } .rb-i::before { background:#3b82f6; }
+    /* TRACE */
+    .rtrace { font-size:12px; color:#475569; line-height:1.8; background:#f7faff; border:1px solid #dde8f5; border-radius:5px; padding:12px 15px; }
+    .rtrace b { color:#0e2247; }
+    /* RATIONALE */
+    .rrat { margin:0; padding-left:16px; font-size:12.5px; color:#334155; line-height:1.8; }
+    /* FOOTER */
+    .rftr { background:#0a1628; padding:14px 34px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; }
+    .rftr-note { font-size:10.5px; color:rgba(255,255,255,0.38); max-width:560px; line-height:1.5; }
+    .rftr-sig { text-align:right; }
+    .rftr-sigline { width:140px; border-top:1px solid rgba(255,255,255,0.25); margin-bottom:4px; margin-left:auto; }
+    .rftr-siglbl { font-size:9.5px; color:rgba(255,255,255,0.38); font-weight:600; letter-spacing:0.06em; }
+    /* DIVIDER */
+    .rdiv { height:1px; background:linear-gradient(90deg,transparent,#dde8f5,transparent); margin:0 34px; }
+    /* ACTIONS BAR */
+    .rpt-actions-bar { max-width:860px; margin:14px auto 0; display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+    /* PANELS */
+    .rpt-panel { max-width:860px; margin:16px auto; background:var(--surface); border:1px solid var(--border-2); border-radius:16px; padding:22px 26px; }
+    .rpt-panel h3 { font-family:'Outfit',sans-serif; font-size:16px; font-weight:700; color:var(--text); margin-bottom:14px; letter-spacing:-0.02em; }
+    @media print {
+      body { background:#fff !important; }
+      .topbar,.rpt-actions-bar,.rpt-panel,.no-print { display:none !important; }
+      #reportDoc { box-shadow:none; border:none; margin:0; max-width:none; }
     }
-    
-    .hospital-report .report-table {
-      width: 100% !important;
-      border-collapse: collapse !important;
-      margin-bottom: 20px !important;
-      background: #ffffff !important;
-    }
-    
-    .hospital-report .report-table th, .hospital-report .report-table td {
-      border: 1px solid #000000 !important;
-      padding: 8px 12px !important;
-      color: #000000 !important;
-      background: #ffffff !important;
-      text-align: left !important;
-      font-size: 14px !important;
-    }
-    
-    .hospital-report .report-table th {
-      background-color: #f0f0f0 !important;
-      font-weight: bold !important;
-      width: 35% !important;
-    }
+  </style>
   </style>
 </head>
 
@@ -64,103 +114,162 @@
 <div class="container page">
 <div class="hospital-report" id="pdfExportRoot">
 
-  <h2 style="text-align: center;">ONVILOX CLINICAL NUTRITION REPORT</h2>
-  <h3 style="text-align: center; border: none !important; margin-top: 0 !important;">Personalized Oncology Nutrition Support Plan</h3>
-  <div style="text-align: center; font-style: italic; margin-bottom: 20px;">System-generated recommendation for clinician review.</div>
-
-  <table class="report-table">
-    <tr><th>Hospital</th><td id="pHospital"></td></tr>
-    <tr><th>Approved By</th><td id="pApprovedBy"></td></tr>
-    <tr><th>Approved At</th><td id="pApprovedAt"></td></tr>
-    <tr><th>Patient Name</th><td id="pName"></td></tr>
-    <tr><th>UHIC Code</th><td id="pUHIC"></td></tr>
-    <tr><th>Age</th><td id="pAge"></td></tr>
-    <tr><th>Sex</th><td id="pSex"></td></tr>
-    <tr><th>Weight</th><td id="pWeight"></td></tr>
-    <tr><th>Height</th><td id="pHeight"></td></tr>
-    <tr><th>BMI</th><td id="pBMI"></td></tr>
-    <tr><th>Asian BMI Category</th><td id="pAsianBMI"></td></tr>
-    <tr><th>Ideal Weight (Hamwi)</th><td id="pIBW"></td></tr>
-    <tr><th>Usual Weight</th><td id="pUW"></td></tr>
-    <tr><th>Weight Loss %</th><td id="pWL"></td></tr>
-    <tr><th>Cancer Type</th><td id="pCancer"></td></tr>
-    <tr><th>Chemo Regimen</th><td id="pRegimen"></td></tr>
-    <tr><th>Feeding Method</th><td id="pFeeding"></td></tr>
-    <tr><th>Serum Albumin</th><td id="pAlbumin"></td></tr>
-  </table>
-
-  <h3>PATIENT HISTORY & CLINICAL RISK</h3>
-  <table class="report-table">
-    <tr><th>Reduced Food Intake</th><td id="pFoodIntake"></td></tr>
-    <tr><th>Comorbidities</th><td id="pHxComorbidities"></td></tr>
-    <tr><th>Side Effects</th><td id="pHxSideEffects"></td></tr>
-    <tr><th>Allergies</th><td id="pHxAllergies"></td></tr>
-    <tr><th>Clinical Notes</th><td id="pHxNotes"></td></tr>
-    <tr><th>BMI Category</th><td id="riskBmi"></td></tr>
-    <tr><th>Nutrition Risk</th><td id="riskNutrition"></td></tr>
-    <tr><th>Cachexia Trigger</th><td id="riskCachexia"></td></tr>
-    <tr><th>Assessment Note</th><td id="riskNote"></td></tr>
-    <tr><th>Monitoring Recommendation</th><td id="riskMonitor"></td></tr>
-  </table>
-
-  <h3>PERSONALIZED NUTRITION PLAN</h3>
-
-  <table class="report-table">
-    <tr>
-      <th>Parameter</th>
-      <th>Daily Total</th>
-      <th id="servingHeader">Per Serving</th>
-    </tr>
-    <tr><td>Total Calories</td><td id="dailyCalories"></td><td id="perServingCalories"></td></tr>
-    <tr><td>Protein</td><td id="dailyProtein"></td><td id="perServingProtein"></td></tr>
-    <tr><td>Carbohydrates</td><td id="dailyCarbs"></td><td id="perServingCarbs"></td></tr>
-    <tr><td>Fat</td><td id="dailyFat"></td><td id="perServingFat"></td></tr>
-    <tr><td>Protein Type</td><td id="proteinType"></td><td>-</td></tr>
-  </table>
-
-  <h3>SUGGESTED FEEDING PATTERN</h3>
-  <table class="report-table">
-    <tr><th>Servings Per Day</th><td id="servingsPerDay"></td></tr>
-    <tr><th>Per Serving Calories</th><td id="servingCalories"></td></tr>
-    <tr><th>Per Serving Protein</th><td id="servingProtein"></td></tr>
-    <tr><th>Tolerance Note</th><td id="servingTolerance"></td></tr>
-    <tr><th>Review Advice</th><td id="servingReview"></td></tr>
-  </table>
-
-  <h3>MICRONUTRIENT & FUNCTIONAL SUPPORT</h3>
-
-  <table class="report-table">
-    <tr><th>Nutrient</th><th>Recommended Dose</th></tr>
-    <tr><td>Vitamin D</td><td id="vitD"></td></tr>
-    <tr><td>Vitamin C</td><td id="vitC"></td></tr>
-    <tr><td>Zinc</td><td id="zinc"></td></tr>
-    <tr><td>Omega-3 / EPA+DHA</td><td id="omega3"></td></tr>
-	<tr><td>EPA</td><td id="epa"></td></tr>
-	<tr><td>Leucine</td><td id="leucine"></td></tr>
-	<tr><td>HMB</td><td id="hmb"></td></tr>
-    <tr><td>Selenium</td><td id="selenium"></td></tr>
-    <tr><td>Magnesium</td><td id="magnesium"></td></tr>
-    <tr><td>B-Complex</td><td id="bComplex"></td></tr>
-    <tr><td>Glutamine</td><td id="glutamine"></td></tr>
-  </table>
-
-  <h3>HOW THE VALUES WERE DERIVED</h3>
-  <div id="calcTrace" style="line-height:1.6;"></div>
-
-  <h3>CLINICAL RATIONALE</h3>
-  <ul id="clinicalRationale"></ul>
-  <div style="color:#6b7280;font-size:13px;margin-top:8px;">Suggested monitoring: reassess oral intake, GI tolerance, body weight, and biochemical markers at follow-up.</div>
-
-  <h3>FORMULATION SPECIFICATIONS</h3>
-
-  <table class="report-table">
-    <tr><th>Specification</th><th>Value</th></tr>
-    <tr><td>Calories per Serving</td><td id="mCalories"></td></tr>
-    <tr><td>Protein per Serving</td><td id="mProtein"></td></tr>
-    <tr><td>Carbs per Serving</td><td id="mCarbs"></td></tr>
-    <tr><td>Fat per Serving</td><td id="mFat"></td></tr>
-    <tr><td>Recommended Form</td><td id="mForm"></td></tr>
-  </table>
+<div id="reportDoc">
+    <!-- LETTERHEAD -->
+    <div class="rlt">
+      <div>
+        <div class="rlt-brand-name">ONVILOX</div>
+        <div class="rlt-brand-sub">Clinical Nutrition Systems</div>
+      </div>
+      <div class="rlt-doc-info">
+        <div class="rlt-doc-title">Nutrition Support Plan</div>
+        <div class="rlt-doc-sub">System-generated recommendation</div>
+        <div class="rlt-doc-id" id="pUHIC_header">UHIC: <span id="pUHIC"></span></div>
+      </div>
+    </div>
+  
+    <!-- HOSPITAL BAR -->
+    <div class="rhb">
+      <div class="rhb-name" id="pHospital"></div>
+      <div class="rhb-right">Approved by <span id="pApprovedBy"></span> on <span id="pApprovedAt"></span></div>
+    </div>
+  
+    <!-- PATIENT SUMMARY (Micro Grid) -->
+    <div class="rs">
+      <div class="rs-title">Patient Profile</div>
+      <div class="rmg">
+        <div class="rmi"><div class="rmi-n">Name</div><div class="rmi-v" id="pName"></div></div>
+        <div class="rmi"><div class="rmi-n">Age / Sex</div><div class="rmi-v"><span id="pAge"></span> / <span id="pSex"></span></div></div>
+        <div class="rmi"><div class="rmi-n">Weight</div><div class="rmi-v" id="pWeight"></div></div>
+        <div class="rmi"><div class="rmi-n">Height</div><div class="rmi-v" id="pHeight"></div></div>
+      </div>
+    </div>
+  
+    <!-- CLINICAL DETAILS -->
+    <div class="rs">
+      <div class="rs-title">Clinical Assessment</div>
+      
+      <div class="rrisk">
+        <div class="rb rb-i" id="catBmi">BMI <span id="pBMI"></span></div>
+        <div class="rb rb-h" id="catAsianBmi"><span id="pAsianBMI"></span></div>
+        <div class="rb rb-m" id="catNutrition">High Risk</div>
+      </div>
+  
+      <div class="rg rg4">
+        <div class="rf"><div class="rf-lbl">Ideal Weight (Hamwi)</div><div class="rf-val" id="pIBW"></div></div>
+        <div class="rf"><div class="rf-lbl">Usual Weight</div><div class="rf-val" id="pUW"></div></div>
+        <div class="rf"><div class="rf-lbl">Weight Loss %</div><div class="rf-val danger" id="pWL"></div></div>
+        <div class="rf"><div class="rf-lbl">Reduced Intake</div><div class="rf-val warn" id="pFoodIntake"></div></div>
+        
+        <div class="rf sp2"><div class="rf-lbl">Cancer Type</div><div class="rf-val" id="pCancer"></div></div>
+        <div class="rf sp2"><div class="rf-lbl">Chemo Regimen</div><div class="rf-val" id="pRegimen"></div></div>
+        
+        <div class="rf"><div class="rf-lbl">Feeding Method</div><div class="rf-val" id="pFeeding"></div></div>
+        <div class="rf"><div class="rf-lbl">Serum Albumin</div><div class="rf-val warn" id="pAlbumin"></div></div>
+        <div class="rf sp2"><div class="rf-lbl">Comorbidities</div><div class="rf-val" id="pHxComorbidities"></div></div>
+        
+        <div class="rf sp2"><div class="rf-lbl">Side Effects</div><div class="rf-val" id="pHxSideEffects"></div></div>
+        <div class="rf sp2"><div class="rf-lbl">Allergies</div><div class="rf-val" id="pHxAllergies"></div></div>
+      </div>
+    </div>
+  
+    <!-- NUTRITION RX -->
+    <div class="rs">
+      <div class="rs-title">Prescription Target</div>
+      <div class="rg">
+        <div class="rf full alert-amber" id="cachexiaAlertBox" style="display:none;">
+          <div class="rf-lbl" style="color:#b45309;">Cachexia Trigger Detected</div>
+          <div class="rf-val" style="font-size:12px; font-weight:600;" id="riskCachexia"></div>
+        </div>
+        
+        <div class="rf"><div class="rf-lbl">Daily Target Calories</div><div class="rf-val big accent" id="dailyCalories"></div></div>
+        <div class="rf"><div class="rf-lbl">Daily Protein</div><div class="rf-val big" id="dailyProtein"></div></div>
+        <div class="rf"><div class="rf-lbl">Protein Formulation Type</div><div class="rf-val" id="proteinType"></div></div>
+  
+        <div class="rf full" style="margin-top:4px;">
+          <table class="rt">
+            <thead>
+              <tr><th>Macro Distribution</th><th>Daily Total</th><th id="servingHeader">Per Serving</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Carbohydrates</td><td id="dailyCarbs" class="vbig"></td><td id="perServingCarbs"></td></tr>
+              <tr><td>Fat</td><td id="dailyFat" class="vbig"></td><td id="perServingFat"></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  
+    <!-- FEEDING PATTERN -->
+    <div class="rs">
+      <div class="rs-title">Servings & Administration</div>
+      <div class="rg">
+        <div class="rf"><div class="rf-lbl">Frequency</div><div class="rf-val big accent" id="servingsPerDay"></div></div>
+        <div class="rf"><div class="rf-lbl">Per Serving Energy</div><div class="rf-val big" id="servingCalories"></div></div>
+        <div class="rf"><div class="rf-lbl">Per Serving Protein</div><div class="rf-val big" id="servingProtein"></div></div>
+        <div class="rf full"><div class="rf-lbl">Tolerance Note</div><div class="rf-val" style="font-weight:600; font-size:12.5px;" id="servingTolerance"></div></div>
+        <div class="rf full"><div class="rf-lbl">Clinical Review Advice</div><div class="rf-val" style="font-weight:600; font-size:12.5px;" id="servingReview"></div></div>
+      </div>
+    </div>
+  
+    <!-- MICROS -->
+    <div class="rs">
+      <div class="rs-title">Micronutrient & Functional Support</div>
+      <table class="rt">
+        <thead><tr><th>Nutrient</th><th>Recommended Dose</th></tr></thead>
+        <tbody>
+          <tr><td>Vitamin D</td><td id="vitD"></td></tr>
+          <tr><td>Vitamin C</td><td id="vitC"></td></tr>
+          <tr><td>Zinc</td><td id="zinc"></td></tr>
+          <tr><td>Omega-3 / EPA+DHA</td><td id="omega3"></td></tr>
+          <tr><td>EPA</td><td id="epa"></td></tr>
+          <tr><td>Leucine</td><td id="leucine"></td></tr>
+          <tr><td>HMB</td><td id="hmb"></td></tr>
+          <tr><td>Glutamine</td><td id="glutamine"></td></tr>
+          <tr><td>Selenium & Magnesium</td><td><span id="selenium"></span> / <span id="magnesium"></span></td></tr>
+          <tr><td>B-Complex</td><td id="bComplex"></td></tr>
+        </tbody>
+      </table>
+    </div>
+  
+    <!-- MANUFACTURING -->
+    <div class="rs">
+      <div class="rs-title">Production Specifications</div>
+      <div class="rg rg4">
+        <div class="rf"><div class="rf-lbl">Format</div><div class="rf-val" id="mForm"></div></div>
+        <div class="rf"><div class="rf-lbl">Per Dose Cals</div><div class="rf-val" id="mCalories"></div></div>
+        <div class="rf"><div class="rf-lbl">Per Dose Prot</div><div class="rf-val" id="mProtein"></div></div>
+        <div class="rf"><div class="rf-lbl">Per Dose Fat/Carb</div><div class="rf-val"><span id="mFat"></span> / <span id="mCarbs"></span></div></div>
+      </div>
+    </div>
+  
+    <div class="rdiv"></div>
+    
+    <!-- TRACE & RATIONALE -->
+    <div class="rs" style="margin-top:24px;">
+      <div class="rg rg2">
+        <div>
+          <div class="rs-title" style="font-size:9.5px;">Calculation Trace</div>
+          <div class="rtrace" id="calcTrace"></div>
+        </div>
+        <div>
+          <div class="rs-title" style="font-size:9.5px;">Clinical Rationale</div>
+          <ul class="rrat" id="clinicalRationale"></ul>
+          <div style="font-size:11px; color:#64748b; margin-top:10px; padding-left:14px; font-style:italic;" id="riskMonitor"></div>
+          <div style="font-size:11px; color:#64748b; margin-top:4px; padding-left:14px; font-style:italic;" id="riskNote"></div>
+        </div>
+      </div>
+    </div>
+  
+    <!-- SIG FOOTER -->
+    <div class="rftr">
+      <div class="rftr-note">This is a system-generated individualized formulation calculation. Needs clinical approval prior to compounding/dispensing. Note: <span id="pHxNotes"></span></div>
+      <div class="rftr-sig">
+        <div class="rftr-sigline"></div>
+        <div class="rftr-siglbl">CLINICIAN SIGNATURE</div>
+      </div>
+    </div>
+  </div>
 
   
   <div id="editPatientSection" style="margin-top:28px;display:none;">
