@@ -508,8 +508,8 @@ function runAiExtraction(rawText) {
   if (extractions.gi) { document.getElementById('giIssues').value = "true"; highlight('giIssues', 'GI Issues', 'Yes'); foundCount++; }
 
   const cancers = {
-    'cholangiocarcinoma': 'Liver (Hepatocellular) Cancer',
-    'cholongiocarcinoma': 'Liver (Hepatocellular) Cancer', // common misspelling
+    'cholangiocarcinoma': 'Cholangiocarcinoma (Bile Duct Cancer)',
+    'cholongiocarcinoma': 'Cholangiocarcinoma (Bile Duct Cancer)', // common misspelling
     'hepatocellular': 'Liver (Hepatocellular) Cancer',
     'liver': 'Liver (Hepatocellular) Cancer',
     'lung': 'Lung Cancer – NSCLC', 'nsclc': 'Lung Cancer – NSCLC',

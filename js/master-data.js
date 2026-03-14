@@ -95,6 +95,12 @@ const cancerRegimenMap = {
     "Lenvatinib",
     "Atezolizumab + Bevacizumab"
   ],
+  "Cholangiocarcinoma (Bile Duct Cancer)": [
+    "Gemcitabine + Cisplatin",
+    "FOLFOX",
+    "Durvalumab Combination",
+    "Pembrolizumab"
+  ],
   "Thyroid Cancer": [
     "Radioactive Iodine Therapy",
     "Lenvatinib",
