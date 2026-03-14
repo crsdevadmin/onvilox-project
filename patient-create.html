@@ -480,11 +480,15 @@ function runAiExtraction(rawText) {
   const text = rawText.toLowerCase();
   // Handle "is", "at", ":", space etc.
   const numPattern = '(?:is|at|was|of|recorded at)?\\s*:?\\s*(\\d+\\.?\\d*)';
+  const reverseWeightPattern = /(\d+\.?\d*)\s*(?:kg|kilos?)?\s*(?:as|is|for)?\s*(?:the|my|his|her)?\s*(?:new\s*)?weight/;
+  const reverseAlbuminPattern = /(\d+\.?\d*)\s*(?:g\/dl)?\s*(?:as|is|for)?\s*(?:the|new\s*)?(?:albumin|alb)/;
+  const reverseCrpPattern = /(\d+\.?\d*)\s*(?:mg\/l)?\s*(?:as|is|for)?\s*(?:the|new\s*)?crp/;
+
   const extractions = {
-    weight: text.match(new RegExp('weight' + numPattern))?.[1] || text.match(/(\d+\.?\d*)\s*kg/)?.[1],
+    weight: text.match(new RegExp('weight' + numPattern))?.[1] || text.match(reverseWeightPattern)?.[1] || text.match(/(\d+\.?\d*)\s*kg/)?.[1],
     uw: text.match(new RegExp('usual weight' + numPattern))?.[1] || text.match(new RegExp('uw' + numPattern))?.[1],
-    albumin: text.match(new RegExp('albumin' + numPattern))?.[1] || text.match(new RegExp('alb' + numPattern))?.[1],
-    crp: text.match(new RegExp('crp' + numPattern))?.[1],
+    albumin: text.match(new RegExp('albumin' + numPattern))?.[1] || text.match(new RegExp('alb' + numPattern))?.[1] || text.match(reverseAlbuminPattern)?.[1],
+    crp: text.match(new RegExp('crp' + numPattern))?.[1] || text.match(reverseCrpPattern)?.[1],
     gi: text.includes('vomiting') || text.includes('nausea') || text.includes('diarrhea') || text.includes('bloating') || text.includes('gastric issues')
   };
 
