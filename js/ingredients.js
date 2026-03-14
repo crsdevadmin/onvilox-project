@@ -13,9 +13,10 @@ const IngredientLibrary = [
     pPerGram: 0.9,
     fPerGram: 0.01,
     cPerGram: 0.02,
-    costPerGram: 0.05, // Placeholder cost
+    costPerGram: 0.05,
     inStock: true,
-    tags: ['HighLeucine', 'Animal-based']
+    tags: ['HighLeucine', 'Animal-based'],
+    healingRationale: "High Leucine content to stimulate muscle protein synthesis during treatment."
   },
   {
     id: 'whey_hydrolyzed',
@@ -27,7 +28,8 @@ const IngredientLibrary = [
     cPerGram: 0.02,
     costPerGram: 0.08, 
     inStock: true,
-    tags: ['Peptide', 'LowOsmolality', 'GI-Friendly']
+    tags: ['Peptide', 'LowOsmolality', 'GI-Friendly'],
+    healingRationale: "Hydrolyzed peptides for rapid absorption and reduced osmotic load in patients with GI toxicity."
   },
   {
     id: 'pea_protein',
@@ -39,7 +41,8 @@ const IngredientLibrary = [
     cPerGram: 0.02,
     costPerGram: 0.04,
     inStock: true,
-    tags: ['LactoseFree', 'Plant-based', 'Vegan']
+    tags: ['LactoseFree', 'Plant-based', 'Vegan'],
+    healingRationale: "Plant-based isolate for patients with lactose intolerance or specific dietary preferences."
   },
 
   // FATS
@@ -53,7 +56,8 @@ const IngredientLibrary = [
     cPerGram: 0,
     costPerGram: 0.03,
     inStock: true,
-    tags: ['QuickEnergy', 'Liquid']
+    tags: ['QuickEnergy', 'Liquid'],
+    healingRationale: "Medium-chain triglycerides for rapid energy bypass and absorption in cases of malabsorption."
   },
   {
     id: 'mct_powder',
@@ -65,7 +69,8 @@ const IngredientLibrary = [
     cPerGram: 0.3,
     costPerGram: 0.04,
     inStock: true,
-    tags: ['Powder', 'EasyMix']
+    tags: ['Powder', 'EasyMix'],
+    healingRationale: "Easily mixable fat source to maintain caloric density without increasing intake volume."
   },
   {
     id: 'omega3_powder',
@@ -77,7 +82,8 @@ const IngredientLibrary = [
     cPerGram: 0.5,
     costPerGram: 0.12,
     inStock: true,
-    tags: ['AntiInflammatory', 'EPA']
+    tags: ['AntiInflammatory', 'EPA'],
+    healingRationale: "High EPA content to downregulate pro-inflammatory cytokines and help stabilize lean body mass."
   },
 
   // CARBOHYDRATES
@@ -91,7 +97,8 @@ const IngredientLibrary = [
     cPerGram: 0.95,
     costPerGram: 0.01,
     inStock: true,
-    tags: ['ComplexCarb', 'EasyAbsorption']
+    tags: ['ComplexCarb', 'EasyAbsorption'],
+    healingRationale: "Complex carbohydrate with low osmolality for sustained energy release and GI comfort."
   },
   {
     id: 'palatinose',
@@ -103,7 +110,8 @@ const IngredientLibrary = [
     cPerGram: 1.0,
     costPerGram: 0.03,
     inStock: true,
-    tags: ['LowGlycemic', 'SlowEnergy']
+    tags: ['LowGlycemic', 'SlowEnergy'],
+    healingRationale: "Slow-release carbohydrate to maintain stable blood glucose levels in diabetic oncology patients."
   },
 
   // ADDITIVES / FUNCTIONAL
@@ -117,7 +125,8 @@ const IngredientLibrary = [
     cPerGram: 0,
     costPerGram: 0.05,
     inStock: true,
-    tags: ['Immunonutrition', 'MucositisSupport']
+    tags: ['Immunonutrition', 'MucositisSupport'],
+    healingRationale: "Amino acid support for intestinal mucosal integrity and reduction of mucositis symptoms."
   }
 ];
 

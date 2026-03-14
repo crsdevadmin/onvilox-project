@@ -189,11 +189,8 @@ function buildFormulationOptions(targets) {
   const selectedCarb = IngredientLibrary.find(i => i.id === 'maltodextrin');
   const selectedFat = IngredientLibrary.find(i => i.id === 'mct_powder');
 
-  // Grams per serving calculation (Simplified approach)
-  // protein_grams = target_protein / pPerGram
+  // Grams per serving calculation
   const pGrams = Math.round(macroProtein / (selectedProtein.pPerGram || 1));
-  
-  // Calculate how many carbs/fats the protein choice already contributed
   const carbsFromProtein = pGrams * (selectedProtein.cPerGram || 0);
   const fatFromProtein = pGrams * (selectedProtein.fPerGram || 0);
 
@@ -204,9 +201,24 @@ function buildFormulationOptions(targets) {
   const fGrams = Math.round(neededFat / (selectedFat.fPerGram || 1));
 
   return {
-    protein: { id: selectedProtein.id, name: selectedProtein.name, grams: pGrams },
-    carb: { id: selectedCarb.id, name: selectedCarb.name, grams: cGrams },
-    fat: { id: selectedFat.id, name: selectedFat.name, grams: fGrams }
+    protein: { 
+      id: selectedProtein.id, 
+      name: selectedProtein.name, 
+      grams: pGrams, 
+      rationale: selectedProtein.healingRationale 
+    },
+    carb: { 
+      id: selectedCarb.id, 
+      name: selectedCarb.name, 
+      grams: cGrams, 
+      rationale: selectedCarb.healingRationale 
+    },
+    fat: { 
+      id: selectedFat.id, 
+      name: selectedFat.name, 
+      grams: fGrams, 
+      rationale: selectedFat.healingRationale 
+    }
   };
 }
 
@@ -220,6 +232,19 @@ function buildFormulationOptions(targets) {
     if (bmi < 17) score -= 5;
     return Math.max(0, score);
   }
+
+  const patientInstructions = [
+    "Mix powder thoroughly with 200-250ml of water or preferred liquid.",
+    "Consume slowly over 20-30 minutes to improve absorption.",
+    patient.giIssues ? "If bloating occurs, reduce serving size and increase frequency." : "Best taken between major meals as a nutritional supplement.",
+    "Store in a cool, dry place."
+  ];
+
+  const manufacturingAlerts = [
+    "Aseptic Preparation: Mandatory for immunocompromised oncology patients.",
+    "Homogeneous Mix: Ensure all powders are fully blended before packaging.",
+    patient.feedingMethod.toLowerCase().includes('enteral') ? "Tube Compatibility: Ensure osmolality and viscosity are suitable for the prescribed tube size." : "Labeling: Clearly mark expiry and storage instructions."
+  ];
 
   const feasibilityScore = computeFeasibilityScore();
 
@@ -245,6 +270,8 @@ function buildFormulationOptions(targets) {
     nutritionRiskScore: riskScore,
     nutritionRiskReasons,
     feasibilityScore,
+    patientInstructions,
+    manufacturingAlerts,
     recipe: buildFormulationOptions({ macroProtein, macroCarbs, macroFat, proteinType }),
     reportNotes: {
       nutritionRiskBasis: 'Nutrition risk is estimated from serum albumin, recent weight loss, BMI, CRP, and GI issues.',
