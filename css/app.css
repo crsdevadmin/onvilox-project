@@ -836,9 +836,9 @@ body.dark-theme .kpi-value { text-shadow: 0 0 20px rgba(255,255,255,0.2); }
 
 /* -------------------- AI CHATBOT CO-PILOT -------------------- */
 .ai-chat-launcher {
-    position: fixed;
-    bottom: 30px;
-    right: 30px;
+    position: fixed !important;
+    bottom: 30px !important;
+    right: 30px !important;
     width: 60px;
     height: 60px;
     background: var(--accent-gradient);
@@ -848,16 +848,16 @@ body.dark-theme .kpi-value { text-shadow: 0 0 20px rgba(255,255,255,0.2); }
     justify-content: center;
     box-shadow: 0 10px 25px rgba(59, 130, 246, 0.4);
     cursor: pointer;
-    z-index: 2000;
+    z-index: 9999 !important;
     transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 .ai-chat-launcher:hover { transform: scale(1.1) rotate(5deg); }
 .ai-chat-launcher svg { width: 28px; height: 28px; fill: white; }
 
 .ai-chat-window {
-    position: fixed;
-    bottom: 100px;
-    right: 30px;
+    position: fixed !important;
+    bottom: 100px !important;
+    right: 30px !important;
     width: 380px;
     height: 500px;
     background: var(--modal-bg);
@@ -866,7 +866,7 @@ body.dark-theme .kpi-value { text-shadow: 0 0 20px rgba(255,255,255,0.2); }
     display: none;
     flex-direction: column;
     box-shadow: 0 20px 50px rgba(0,0,0,0.5);
-    z-index: 2000;
+    z-index: 9999 !important;
     overflow: hidden;
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
