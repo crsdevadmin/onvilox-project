@@ -68,6 +68,37 @@ const cancerRegimenMap = {
     "R-CHOP",
     "ABVD",
     "Stem Cell Transplant"
+  ],
+  "Gastric / Stomach Cancer": [
+    "FLOT (5-FU + Leucovorin + Oxaliplatin + Docetaxel)",
+    "ECF (Epirubicin + Cisplatin + 5-FU)",
+    "Ramucirumab + Paclitaxel"
+  ],
+  "Esophageal Cancer": [
+    "Carboplatin + Paclitaxel (CROSS Regimen)",
+    "5-FU + Cisplatin",
+    "Pembrolizumab"
+  ],
+  "Bladder / Urothelial Cancer": [
+    "Gemcitabine + Cisplatin",
+    "MVAC (Methotrexate + Vinblastine + Doxorubicin + Cisplatin)",
+    "Pembrolizumab"
+  ],
+  "Kidney (Renal Cell) Cancer": [
+    "Pazopanib",
+    "Sunitinib",
+    "Nivolumab + Ipimumab",
+    "Axutinib + Pembrolizumab"
+  ],
+  "Liver (Hepatocellular) Cancer": [
+    "Sorafenib",
+    "Lenvatinib",
+    "Atezolizumab + Bevacizumab"
+  ],
+  "Thyroid Cancer": [
+    "Radioactive Iodine Therapy",
+    "Lenvatinib",
+    "Sorafenib"
   ]
 };
 

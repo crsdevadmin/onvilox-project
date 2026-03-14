@@ -97,20 +97,7 @@
       #reportDoc { box-shadow:none; border:none; margin:0; max-width:none; }
     }
     /* AI ASSISTANT */
-    .ai-panel { background:linear-gradient(135deg,#f8faff 0%,#eef2ff 100%); border:1px solid #c7d2fe; border-radius:12px; padding:20px; margin-bottom:24px; box-shadow:0 4px 20px rgba(99,102,241,0.08); }
-    .ai-header { display:flex; align-items:center; gap:10px; margin-bottom:12px; color:#4338ca; }
-    .ai-header h4 { margin:0; font-size:15px; font-weight:800; text-transform:uppercase; letter-spacing:0.05em; }
-    .ai-badge { background:#4338ca; color:white; padding:3px 8px; border-radius:4px; font-size:9px; font-weight:800; }
-    .ai-textarea { width:100%; border:1px solid #c7d2fe; border-radius:8px; padding:12px; font-size:13.5px; font-family:inherit; min-height:80px; resize:vertical; margin-bottom:12px; background:white; }
-    .ai-textarea:focus { outline:none; border-color:#6366f1; box-shadow:0 0 0 3px rgba(99,102,241,0.1); }
-    .ai-actions { display:flex; gap:10px; align-items:center; }
-    .ai-status { font-size:11.5px; color:#6366f1; font-weight:600; display:none; }
-    /* INTAKE CALCULATOR */
-    .intake-panel { background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:20px; margin-top:20px; }
-    .intake-row { display:grid; grid-template-columns: 2fr 1fr; gap:10px; margin-bottom:10px; align-items:center; }
-    .intake-row select { padding:8px; font-size:13px; }
-    .intake-row input { padding:8px; font-size:13px; text-align:center; }
-    .intake-summary { background:#f8fafc; padding:15px; border-radius:8px; margin-top:15px; border:1px dashed #cbd5e1; }
+    .ai-panel { margin-bottom: 24px; }
     .intake-summary b { color:#0f172a; }
   </style>
   </style>
@@ -386,10 +373,10 @@
     </div>
 
     <!-- INTAKE ASSESSMENT CALCULATOR -->
-    <div class="intake-panel">
+    <div class="ai-panel">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
         <h4 style="margin:0; font-size:14px; text-transform:uppercase; letter-spacing:0.03em;">Dietary Intake Assessment</h4>
-        <div class="ai-badge" style="background:#0f172a;">CALCULATOR</div>
+        <div class="ai-badge" >CALCULATOR</div>
       </div>
       <p style="font-size:12px; color:#64748b; margin-top:0;">Estimate patient's actual food intake to calculate the nutritional gap for Onvilox.</p>
       
@@ -402,20 +389,20 @@
         </div>
       </div>
       
-      <button type="button" class="btn-secondary btn-sm" onclick="addIntakeRow()" style="padding:4px 10px; font-size:11px;">+ Add Food Item</button>
+      <button type="button" class="btn-secondary btn-sm" onclick="addIntakeRow()" >+ Add Food Item</button>
 
       <div class="intake-summary" id="intakeSummaryUI">
         <div style="font-size:13px; display:flex; justify-content:space-between;">
           <span>Estimated Actual Intake:</span><b id="calcActualKcal">0 kcal</b>
         </div>
         <div style="font-size:13px; display:flex; justify-content:space-between; margin-top:4px;">
-          <span>Nutritional Gap:</span><b id="calcGapKcal" style="color:#ef4444;">0 kcal</b>
+          <span>Nutritional Gap:</span><b id="calcGapKcal" >0 kcal</b>
         </div>
         <div style="font-size:15px; display:flex; justify-content:space-between; margin-top:10px; padding-top:10px; border-top:1px solid #e2e8f0; font-weight:700;">
           <span>Food Intake Coverage:</span><span id="calcIntakePct">0%</span>
         </div>
         <div style="margin-top:12px; text-align:right;">
-          <button type="button" class="btn-primary btn-sm" onclick="applyIntakeToForm()" style="background:#0f172a; border-radius:8px;">Apply to Formulation</button>
+          <button type="button" class="btn-primary btn-sm" onclick="applyIntakeToForm()" >Apply to Formulation</button>
         </div>
       </div>
     </div>
