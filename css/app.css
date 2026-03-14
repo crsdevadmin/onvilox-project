@@ -31,23 +31,23 @@
 }
 
 body.light-theme {
-  --bg-color: #f8fafc;
-  --glass-bg: rgba(255, 255, 255, 0.6);
-  --glass-border: rgba(255, 255, 255, 0.8);
-  --glass-shadow: 0 10px 40px -10px rgba(59, 130, 246, 0.15), 0 0 20px rgba(255, 255, 255, 0.8) inset;
-  --topbar-bg: rgba(255, 255, 255, 0.7);
-  --card-bg: rgba(255, 255, 255, 0.6);
-  --table-row-bg: rgba(255, 255, 255, 0.5);
-  --table-row-hover: #ffffff;
+  --bg-color: #f1f5f9;
+  --glass-bg: rgba(255, 255, 255, 0.9);
+  --glass-border: #cbd5e1;
+  --glass-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --topbar-bg: rgba(255, 255, 255, 0.9);
+  --card-bg: #ffffff;
+  --table-row-bg: #f8fafc;
+  --table-row-hover: #f1f5f9;
   --text-primary: #0f172a;
   --text-secondary: #475569;
-  --danger-glass: rgba(239, 68, 68, 0.15);
-  --success-glass: rgba(16, 185, 129, 0.15);
-  --warning-glass: rgba(245, 158, 11, 0.15);
-  --info-glass: rgba(14, 165, 233, 0.15);
-  --input-bg: rgba(255, 255, 255, 0.8);
-  --placeholder-color: rgba(15, 23, 42, 0.4);
-  --modal-bg: rgba(255, 255, 255, 0.9);
+  --danger-glass: rgba(239, 68, 68, 0.1);
+  --success-glass: rgba(16, 185, 129, 0.1);
+  --warning-glass: rgba(245, 158, 11, 0.1);
+  --info-glass: rgba(14, 165, 233, 0.1);
+  --input-bg: #ffffff;
+  --placeholder-color: #94a3b8;
+  --modal-bg: #ffffff;
   --title-gradient: linear-gradient(to right, #0f172a, #334155);
   --kpi-color: #0f172a;
 }
@@ -408,6 +408,13 @@ input, select, textarea {
   font-size: 15px;
   transition: all 0.3s ease;
   backdrop-filter: blur(10px);
+}
+
+body.light-theme input, 
+body.light-theme select, 
+body.light-theme textarea {
+  border: 1.5px solid #cbd5e1 !important;
+  background: #ffffff !important;
 }
 
 /* Prevent white background on autofill in dark mode */

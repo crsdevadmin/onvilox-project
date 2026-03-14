@@ -11,8 +11,6 @@ window.onload = function () {
 // ---------- CANCER ----------
 function loadCancerDropdown() {
   const dropdown = document.getElementById("cancerDropdown");
-
-  dropdown.style.display = "block";
   dropdown.innerHTML = "";
 
   Object.keys(cancerRegimenMap).forEach(cancer => {
@@ -62,8 +60,6 @@ function openRegimenDropdown() {
 
 function loadRegimenDropdown() {
   const dropdown = document.getElementById("regimenDropdown");
-
-  dropdown.style.display = "block";
   dropdown.innerHTML = "";
 
   if (!selectedCancer) return;
