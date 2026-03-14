@@ -105,6 +105,13 @@
     .ai-textarea:focus { outline:none; border-color:#6366f1; box-shadow:0 0 0 3px rgba(99,102,241,0.1); }
     .ai-actions { display:flex; gap:10px; align-items:center; }
     .ai-status { font-size:11.5px; color:#6366f1; font-weight:600; display:none; }
+    /* INTAKE CALCULATOR */
+    .intake-panel { background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:20px; margin-top:20px; }
+    .intake-row { display:grid; grid-template-columns: 2fr 1fr; gap:10px; margin-bottom:10px; align-items:center; }
+    .intake-row select { padding:8px; font-size:13px; }
+    .intake-row input { padding:8px; font-size:13px; text-align:center; }
+    .intake-summary { background:#f8fafc; padding:15px; border-radius:8px; margin-top:15px; border:1px dashed #cbd5e1; }
+    .intake-summary b { color:#0f172a; }
   </style>
   </style>
 </head>
@@ -166,10 +173,10 @@
       </div>
   
       <div class="rg rg4">
-        <div class="rf"><div class="rf-lbl">Ideal Weight (Hamwi)</div><div class="rf-val" id="pIBW"></div></div>
+        <div class="rf"><div class="rf-lbl">Ideal Weight (Hamwi)</div><div class="rf-val" style="font-weight:800; color:#0e2247;" id="pIBW"></div></div>
         <div class="rf"><div class="rf-lbl">Usual Weight</div><div class="rf-val" id="pUW"></div></div>
-        <div class="rf"><div class="rf-lbl">Weight Loss %</div><div class="rf-val danger" id="pWL"></div></div>
-        <div class="rf"><div class="rf-lbl">Reduced Intake</div><div class="rf-val warn" id="pFoodIntake"></div></div>
+        <div class="rf"><div class="rf-lbl">Weight Loss (last 6 months)</div><div class="rf-val danger" id="pWL"></div></div>
+        <div class="rf"><div class="rf-lbl">Actual Food Intake (%)</div><div class="rf-val warn" id="pFoodIntake"></div></div>
         
         <div class="rf sp2"><div class="rf-lbl">Cancer Type</div><div class="rf-val" id="pCancer"></div></div>
         <div class="rf sp2"><div class="rf-lbl">Chemo Regimen</div><div class="rf-val" id="pRegimen"></div></div>
@@ -381,6 +388,41 @@
       </div>
     </div>
 
+    <!-- INTAKE ASSESSMENT CALCULATOR -->
+    <div class="intake-panel">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+        <h4 style="margin:0; font-size:14px; text-transform:uppercase; letter-spacing:0.03em;">Dietary Intake Assessment</h4>
+        <div class="ai-badge" style="background:#0f172a;">CALCULATOR</div>
+      </div>
+      <p style="font-size:12px; color:#64748b; margin-top:0;">Estimate patient's actual food intake to calculate the nutritional gap for Onvilox.</p>
+      
+      <div id="intakeRows">
+        <div class="intake-row">
+          <select class="intake-food" onchange="updateIntakeCalc()">
+            <option value="">Select Food Item...</option>
+          </select>
+          <input type="number" class="intake-qty" placeholder="Qty" min="0" step="0.5" value="1" oninput="updateIntakeCalc()">
+        </div>
+      </div>
+      
+      <button type="button" class="btn-secondary btn-sm" onclick="addIntakeRow()" style="padding:4px 10px; font-size:11px;">+ Add Food Item</button>
+
+      <div class="intake-summary" id="intakeSummaryUI">
+        <div style="font-size:13px; display:flex; justify-content:space-between;">
+          <span>Estimated Actual Intake:</span><b id="calcActualKcal">0 kcal</b>
+        </div>
+        <div style="font-size:13px; display:flex; justify-content:space-between; margin-top:4px;">
+          <span>Nutritional Gap:</span><b id="calcGapKcal" style="color:#ef4444;">0 kcal</b>
+        </div>
+        <div style="font-size:15px; display:flex; justify-content:space-between; margin-top:10px; padding-top:10px; border-top:1px solid #e2e8f0; font-weight:700;">
+          <span>Food Intake Coverage:</span><span id="calcIntakePct">0%</span>
+        </div>
+        <div style="margin-top:12px; text-align:right;">
+          <button type="button" class="btn-primary btn-sm" onclick="applyIntakeToForm()" style="background:#0f172a; border-radius:8px;">Apply to Formulation</button>
+        </div>
+      </div>
+    </div>
+
     <div style="display:flex; gap:12px; flex-wrap:wrap; margin-top:14px;">
       <button class="btn-warning" type="button" onclick="savePatientEdits()">Save Changes & Recalculate</button>
       <button id="approveBtn" class="btn-primary" type="button" onclick="approveFromReport()">Approve Patient</button>
@@ -426,8 +468,73 @@
 <script src="js/ingredients.js"></script>
 <script src="js/patient-store.js"></script>
 <script src="js/nutrition-engine.js"></script>
+<script src="js/intake-calculator.js"></script>
 
 <script>
+// INTAKE CALCULATOR LOGIC
+function addIntakeRow() {
+  const container = document.getElementById('intakeRows');
+  const row = document.createElement('div');
+  row.className = 'intake-row';
+  
+  const options = FoodLibrary.map(f => `<option value="${f.id}">${f.name} (${f.avgKcal} kcal)</option>`).join('');
+  
+  row.innerHTML = `
+    <select class="intake-food" onchange="updateIntakeCalc()">
+      <option value="">Select Food Item...</option>
+      ${options}
+    </select>
+    <input type="number" class="intake-qty" placeholder="Qty" min="0" step="0.5" value="1" oninput="updateIntakeCalc()">
+  `;
+  container.appendChild(row);
+}
+
+function updateIntakeCalc() {
+  const rows = document.querySelectorAll('.intake-row');
+  const meals = [];
+  rows.forEach(r => {
+    const foodId = r.querySelector('.intake-food').value;
+    const qty = parseFloat(r.querySelector('.intake-qty').value) || 0;
+    if(foodId) meals.push({ foodId, portions: qty });
+  });
+
+  const ibwVal = computeHamwiIBW();
+  const cachexia = (patient.crp > 10 || patient.albumin < 3.5 || (patient.weightLossPercent || 0) >= 10);
+  const kcalPerKg = cachexia ? 35 : 30;
+  const targetKcal = Math.round(ibwVal * kcalPerKg);
+
+  const res = calculateIntakeGap(targetKcal, meals);
+  
+  document.getElementById('calcActualKcal').innerText = `${res.actualIntake} kcal`;
+  document.getElementById('calcGapKcal').innerText = `${res.deficitKcal} kcal`;
+  document.getElementById('calcIntakePct').innerText = `${res.intakePercent}%`;
+  
+  window.lastCalculatedIntakeRes = res;
+}
+
+function applyIntakeToForm() {
+  if(!window.lastCalculatedIntakeRes) {
+    updateIntakeCalc();
+  }
+  const res = window.lastCalculatedIntakeRes;
+  // epWL is labeled actual intake in UI but stores deficit internally? No, epWL is weight loss.
+  // reducedFoodIntake (epFoodIntake in form) stores the GAP percentage.
+  const epFI = document.getElementById('epFoodIntake');
+  if(epFI) {
+    epFI.value = res.deficitPercent;
+    epFI.classList.add('ai-filled');
+    setTimeout(() => epFI.classList.remove('ai-filled'), 2000);
+  }
+}
+
+function initIntakeCalc() {
+  const selects = document.querySelectorAll('.intake-food');
+  const options = FoodLibrary.map(f => `<option value="${f.id}">${f.name} (${f.avgKcal} kcal)</option>`).join('');
+  selects.forEach(s => {
+    s.innerHTML = `<option value="">Select Food Item...</option>${options}`;
+  });
+}
+
 auth.requireRole(['DOCTOR','ASSISTANT','STORE']);
 
 const me = auth.getCurrentUser();
@@ -810,7 +917,15 @@ function bind(plan){
   
   const calculatedBMI = computeBMI();
   setVal('pBMI', calculatedBMI);
-  setVal('pAsianBMI', computeAsianBMI(calculatedBMI));
+  const asianBmiCat = computeAsianBMI(calculatedBMI);
+  setVal('pAsianBMI', `BMI (Asian): ${asianBmiCat}`);
+  
+  // Highlight Asian BMI if problematic
+  const catAsian = document.getElementById('catAsianBmi');
+  if(catAsian) {
+    catAsian.className = 'rb ' + (['Overweight', 'Obese'].includes(asianBmiCat) ? 'rb-h' : 'rb-i');
+  }
+
   setVal('pIBW', computeHamwiIBW() + ' kg');
   setVal('pUW', (patient.usualWeight ? patient.usualWeight + ' kg' : '-'));
   setVal('pWL', (patient.weightLossPercent ?? '-') + ' %');
@@ -821,7 +936,8 @@ function bind(plan){
   setVal('pCRP_val', (patient.crp || 0) + ' mg/L');
 
   // New Clinical History fields
-  setVal('pFoodIntake', (patient.reducedFoodIntake || 0) + ' %');
+  const actualIntakePct = 100 - (patient.reducedFoodIntake || 0);
+  setVal('pFoodIntake', actualIntakePct + ' %');
   setVal('pHxComorbidities', (Array.isArray(patient.comorbidities) && patient.comorbidities.length) ? patient.comorbidities.join(', ') : 'None Reported');
   setVal('pHxSideEffects', (Array.isArray(patient.sideEffects) && patient.sideEffects.length) ? patient.sideEffects.join(', ') : 'None Reported');
   setVal('pHxAllergies', patient.allergies || 'None Reported');
@@ -968,6 +1084,7 @@ function bind(plan){
 let currentPlan = ensurePlan();
 bind(currentPlan);
 showEditSectionIfAllowed();
+initIntakeCalc();
 
 // Print-only mode (opened from dashboards)
 if(params.get('print') === '1'){
