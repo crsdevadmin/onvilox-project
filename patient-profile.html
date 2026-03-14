@@ -645,10 +645,20 @@ function bind(plan){
   const proteinPerKg = cachexia ? 1.8 : 1.4;
   const trace = [];
   const ibwVal = computeHamwiIBW();
-  trace.push(`<b>Inputs used:</b> Weight ${patient.weight} kg, IBW ${ibwVal} kg, Albumin ${patient.albumin} g/dL, Weight loss ${patient.weightLossPercent}%`);
+  const uwStr = patient.usualWeight ? `, Usual Weight ${patient.usualWeight} kg` : '';
+  trace.push(`<b>Inputs used:</b> Current Weight ${patient.weight} kg${uwStr}, IBW ${ibwVal} kg, Albumin ${patient.albumin} g/dL, Weight loss ${patient.weightLossPercent}%`);
   trace.push(`<b>Risk trigger:</b> Cachexia = (albumin &lt; 3.5) OR (weight loss ≥ 10%). Result: <b>${cachexia ? 'YES' : 'NO'}</b>.`);
-  trace.push(`<b>Energy rule applied:</b> ${kcalPerKg} kcal/kg/day → ${ibwVal} (IBW) × ${kcalPerKg} = <b>${plan.engineOutput.dailyCalories} kcal/day</b>.`);
-  trace.push(`<b>Protein rule applied:</b> ${proteinPerKg} g/kg/day → ${ibwVal} (IBW) × ${proteinPerKg} = <b>${plan.engineOutput.dailyProtein} g/day</b>.`);
+  
+  const baseCal = Math.round(ibwVal * kcalPerKg);
+  trace.push(`<b>Base Energy Required:</b> ${kcalPerKg} kcal/kg/day → ${ibwVal} (IBW) × ${kcalPerKg} = <b>${baseCal} kcal/day</b>.`);
+  
+  const intakeDeficit = patient.reducedFoodIntake || 0;
+  if (intakeDeficit > 0) {
+     trace.push(`<b>Deficit Adjustment:</b> Patient food intake is reduced by ${intakeDeficit}%. Onvilox plan designed to fulfill the <b>${intakeDeficit}% deficit</b> → ${baseCal} × ${intakeDeficit}% = <b>${plan.engineOutput.dailyCalories} kcal/day target</b>.`);
+  }
+
+  const baseProt = Math.round(ibwVal * proteinPerKg);
+  trace.push(`<b>Protein rule applied:</b> ${proteinPerKg} g/kg/day → ${ibwVal} (IBW) × ${proteinPerKg} = ${baseProt} g/day.${intakeDeficit > 0 ? ` (Reduced to <b>${plan.engineOutput.dailyProtein} g/day</b> for ${intakeDeficit}% deficit)` : ` Result: <b>${plan.engineOutput.dailyProtein} g/day</b>.`}`);
   trace.push(`<b>Serving pattern:</b> daily target ÷ ${fp.servingsPerDay || 2} servings/day for better tolerance.`);
   trace.push(`<b>Macros:</b> protein target fixed clinically; remaining calories distributed with moderate carbs and higher fat density.`);
   trace.push(`<b>Protein type:</b> ${patient.giIssues ? 'Hydrolyzed Whey (GI issues)' : 'Whey (standard)'}.
