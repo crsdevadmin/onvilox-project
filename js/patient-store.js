@@ -62,6 +62,10 @@ function addAssessment(patientId, formData) {
     notes: formData.notes || ""
   };
   
+  if (formData.weight) patient.weight = formData.weight;
+  if (formData.albumin) patient.albumin = formData.albumin;
+  if (formData.crp) patient.crp = formData.crp;
+  
   patient.assessments.push(assessment);
   updatePatient(patient);
   return patient;

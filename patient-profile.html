@@ -807,7 +807,7 @@ function runAiExtraction(rawText) {
       });
       addMessage(`Logged Follow-up Assessment:\n• ${foundItems.join('\n• ')}`, 'ai');
       window.isFollowUpMode = false;
-      renderPatient();
+      setTimeout(() => window.location.reload(), 2000);
     } else {
       addMessage("I couldn't find weight, albumin, or CRP in this follow-up note. Please try again.", 'ai');
     }
