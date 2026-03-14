@@ -123,14 +123,38 @@ function generateNutritionPlan(patient) {
     iron: 'When anemia is present'
   };
 
-  const rationale = [
-    `Energy: ${kcalPerKg} kcal/kg/day based on oncology nutrition support`,
-    `Protein: ${proteinPerKg} g/kg/day to support lean body mass`,
-    cachexia ? 'Higher nutritional risk / cachexia tendency detected' : 'No major cachexia trigger detected',
-    '3 servings/day selected for better tolerance and intake feasibility',
-    'Macro split set to Protein 30% / Carbohydrate 30% / Fat 40%',
-    'Use supplementation when normal oral intake is inadequate'
-  ];
+  const rationale = [];
+  
+  // Energy Guideline
+  if (cachexia) {
+    rationale.push(`<b>ESPEN Guideline (Energy):</b> Target increased to 30-35 kcal/kg/day due to hypermetabolic state, severe weight loss, or cachexia to prevent further nutritional deterioration.`);
+  } else {
+    rationale.push(`<b>ESPEN Guideline (Energy):</b> Target set to 25-30 kcal/kg/day for ambulating oncology patients for weight maintenance.`);
+  }
+
+  // Protein Guideline
+  if (proteinPerKg >= 1.5) {
+    rationale.push(`<b>ESPEN Guideline (Protein):</b> Elevated target of 1.5 - 2.0 g/kg/day prescribed. Indicated for cancer patients in advanced cachexia or severe depletion to actively support lean body mass.`);
+  } else {
+    rationale.push(`<b>ESPEN Guideline (Protein):</b> Target of >1.0 to 1.5 g/kg/day prescribed to maintain muscle mass during active oncology treatment.`);
+  }
+
+  // ASCO screening/assessment
+  if (patient.weightLossPercent >= 10 || patient.albumin < 3.5 || patient.reducedFoodIntake > 20) {
+    rationale.push(`<b>ASCO Practice Guideline:</b> Patient triggered high nutritional risk alert (Severe weight loss, Hypoalbuminemia, or Reduced Intake). Early targeted nutritional intervention is strongly recommended to improve tolerance to oncology therapy.`);
+  }
+
+  // Immunonutrition / EPA
+  if (cachexia || patient.weightLossPercent >= 5) {
+    rationale.push(`<b>ESPEN Guideline (Omega-3/EPA):</b> Supplementation with 1.5-2g/day of EPA/DHA is recommended in advanced cancer patients undergoing chemotherapy at risk of weight loss, to help stabilize weight, preserve lean body mass, and improve appetite.`);
+  }
+
+  // Protein source / GI
+  if (patient.giIssues || (patient.proteinTolerance || '').toLowerCase() === 'gi') {
+    rationale.push(`<b>Clinical Formulation:</b> Hydrolyzed protein / peptide-based formula prescribed due to reported GI issues or mucositis, to improve absorption and reduce osmotic diarrhea compared to intact proteins.`);
+  } else {
+    rationale.push(`<b>Clinical Formulation:</b> Standard high-biological-value protein (e.g. Whey isolate) utilized for optimal leucine content to stimulate muscle protein synthesis.`);
+  }
 
   return {
     cachexia,
