@@ -298,9 +298,8 @@
         <div class="rftr-siglbl">CLINICIAN SIGNATURE</div>
       </div>
     </div>
-  </div>
-
-  
+  </div> <!-- end #reportDoc -->
+</div> <!-- end #pdfExportRoot -->
   <div id="editPatientSection" style="margin-top:28px;display:none;">
     <h3>Edit Patient Details</h3>
     <div style="color:#6b7280;font-size:13px;margin-bottom:14px;">
@@ -411,14 +410,10 @@
     </div>
     <button class="btn-warning" onclick="applyOverride()">Apply Override & Regenerate</button>
   </div>
-
   <br>
-  <div style="text-align: center; margin-top: 20px;">
+  <div style="text-align: center; margin-top: 20px;" class="no-print">
     <button class="btn-primary" onclick="downloadNutritionPDF()">Download PDF</button>
   </div>
-
-</div>
-</div>
 
 <script src="js/storage.js"></script>
 <script src="js/seed.js"></script>
