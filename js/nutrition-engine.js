@@ -5,6 +5,7 @@ function generateNutritionPlan(patient) {
   const albumin = parseFloat(patient.albumin || 0);
   const weightLossPercent = parseFloat(patient.weightLossPercent || 0);
   const reducedFoodIntake = parseFloat(patient.reducedFoodIntake || 0);
+  const crp = parseFloat(patient.crp || 0);
   const bmi = height ? (weight / Math.pow(height / 100, 2)) : 0;
   
   // Hamwi Idea Body Weight
@@ -54,12 +55,16 @@ function generateNutritionPlan(patient) {
     riskScore += 1;
     nutritionRiskReasons.push('Mucositis tolerance issue');
   }
+  if (crp > 10) {
+    riskScore += 1;
+    nutritionRiskReasons.push('Systemic Inflammation (High CRP)');
+  }
 
   let nutritionRisk = 'Low';
   if (riskScore >= 4) nutritionRisk = 'High';
   else if (riskScore >= 2) nutritionRisk = 'Moderate';
 
-  const cachexia = albumin < 3.5 || weightLossPercent >= 10 || bmi < 18.5;
+  const cachexia = albumin < 3.5 || weightLossPercent >= 10 || bmi < 18.5 || crp > 10;
 
   const kcalPerKg = cachexia ? 35 : 30;
   const proteinPerKg = cachexia ? 1.8 : 1.4;
@@ -140,8 +145,19 @@ function generateNutritionPlan(patient) {
   }
 
   // ASCO screening/assessment
-  if (patient.weightLossPercent >= 10 || patient.albumin < 3.5 || patient.reducedFoodIntake > 20) {
-    rationale.push(`<b>ASCO Practice Guideline:</b> Patient triggered high nutritional risk alert (Severe weight loss, Hypoalbuminemia, or Reduced Intake). Early targeted nutritional intervention is strongly recommended to improve tolerance to oncology therapy.`);
+  if (patient.weightLossPercent >= 10 || patient.albumin < 3.5 || patient.reducedFoodIntake > 20 || crp > 10) {
+    let reasons = [];
+    if (patient.weightLossPercent >= 10) reasons.push('Severe weight loss');
+    if (patient.albumin < 3.5) reasons.push('Hypoalbuminemia');
+    if (patient.reducedFoodIntake > 20) reasons.push('Reduced Intake');
+    if (crp > 10) reasons.push('Systemic Inflammation');
+    
+    rationale.push(`<b>ASCO Practice Guideline:</b> Patient triggered high nutritional risk alert (${reasons.join(', ')}). Early targeted nutritional intervention is strongly recommended to improve tolerance to oncology therapy.`);
+  }
+
+  // Systemic Inflammation (CRP)
+  if (crp > 10) {
+    rationale.push(`<b>ESPEN Guideline (Systemic Inflammation):</b> Elevated CRP (>10 mg/L) indicates a state of systemic inflammation which is a key component of cancer cachexia. Metabolism is altered, prioritizing nutrient repartitioning towards inflammatory processes rather than muscle maintenance.`);
   }
 
   // Immunonutrition / EPA

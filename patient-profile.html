@@ -166,6 +166,7 @@
         
         <div class="rf"><div class="rf-lbl">Feeding Method</div><div class="rf-val" id="pFeeding"></div></div>
         <div class="rf"><div class="rf-lbl">Serum Albumin</div><div class="rf-val warn" id="pAlbumin"></div></div>
+        <div class="rf"><div class="rf-lbl">CRP (mg/L)</div><div class="rf-val danger" id="pCRP_val"></div></div>
         <div class="rf sp2"><div class="rf-lbl">Comorbidities</div><div class="rf-val" id="pHxComorbidities"></div></div>
         
         <div class="rf sp2"><div class="rf-lbl">Side Effects</div><div class="rf-val" id="pHxSideEffects"></div></div>
@@ -294,9 +295,19 @@
         <div class="validation-msg" id="epAlbumin_msg"></div>
       </div>
       <div class="form-group">
+        <label>Usual Weight (kg)</label>
+        <input id="epUW" type="number" min="25" max="300" step="0.1">
+        <div class="validation-msg" id="epUW_msg"></div>
+      </div>
+      <div class="form-group">
         <label class="required">Weight Loss % (last 6 months)</label>
         <input id="epWL" type="number" min="0" max="60" step="0.1">
         <div class="validation-msg" id="epWL_msg"></div>
+      </div>
+      <div class="form-group">
+        <label>CRP (mg/L)</label>
+        <input id="epCRP" type="number" min="0" max="500" step="0.1">
+        <div class="validation-msg" id="epCRP_msg"></div>
       </div>
       <div class="form-group">
         <label class="required">Feeding Method</label>
@@ -486,7 +497,9 @@ function showEditSectionIfAllowed(){
     document.getElementById('epWeight').value = patient.weight ?? '';
     document.getElementById('epHeight').value = patient.height ?? '';
     document.getElementById('epAlbumin').value = patient.albumin ?? '';
+    document.getElementById('epUW').value = patient.usualWeight ?? '';
     document.getElementById('epWL').value = patient.weightLossPercent ?? 0;
+    document.getElementById('epCRP').value = patient.crp ?? 0;
     document.getElementById('epGi').value = String(!!patient.giIssues);
     document.getElementById('epFeeding').value = patient.feedingMethod ?? '';
     document.getElementById('epCancer').value = patient.cancer ?? '';
@@ -505,10 +518,21 @@ function showEditSectionIfAllowed(){
     document.getElementById('epFeeding').addEventListener('change', ()=>validateSelect('epFeeding','Feeding Method'));
   }
 
-  if(reviewMode && shouldShow){
-    section.scrollIntoView({behavior:'smooth', block:'start'});
+    function autoCalcWL() {
+      const cw = parseFloat(document.getElementById('epWeight').value || 0);
+      const uw = parseFloat(document.getElementById('epUW').value || 0);
+      if (uw > 0 && cw > 0) {
+        const wl = Math.max(0, round1(((uw - cw) / uw) * 100));
+        document.getElementById('epWL').value = wl;
+      }
+    }
+    document.getElementById('epWeight').addEventListener('input', autoCalcWL);
+    document.getElementById('epUW').addEventListener('input', autoCalcWL);
+
+    if(reviewMode && shouldShow){
+      section.scrollIntoView({behavior:'smooth', block:'start'});
+    }
   }
-}
 
 function savePatientEdits(){
   // validate
@@ -530,7 +554,9 @@ function savePatientEdits(){
   patient.weight = parseFloat(document.getElementById('epWeight').value);
   patient.height = parseFloat(document.getElementById('epHeight').value);
   patient.albumin = parseFloat(document.getElementById('epAlbumin').value);
+  patient.usualWeight = parseFloat(document.getElementById('epUW').value || 0);
   patient.weightLossPercent = parseFloat(document.getElementById('epWL').value);
+  patient.crp = parseFloat(document.getElementById('epCRP').value || 0);
   patient.giIssues = document.getElementById('epGi').value === 'true';
   patient.feedingMethod = document.getElementById('epFeeding').value;
   patient.cancer = document.getElementById('epCancer').value;
@@ -688,6 +714,7 @@ function bind(plan){
   pRegimen.innerText = patient.regimen;
   pFeeding.innerText = patient.feedingMethod;
   pAlbumin.innerText = patient.albumin + ' g/dL';
+  if(document.getElementById('pCRP_val')) document.getElementById('pCRP_val').innerText = (patient.crp || 0) + ' mg/L';
 
   // New Clinical History fields
   if(document.getElementById('pFoodIntake')) document.getElementById('pFoodIntake').innerText = (patient.reducedFoodIntake || 0) + ' %';
@@ -755,8 +782,9 @@ function bind(plan){
   const trace = [];
   const ibwVal = computeHamwiIBW();
   const uwStr = patient.usualWeight ? `, Usual Weight ${patient.usualWeight} kg` : '';
-  trace.push(`<b>Inputs used:</b> Current Weight ${patient.weight} kg${uwStr}, IBW ${ibwVal} kg, Albumin ${patient.albumin} g/dL, Weight loss ${patient.weightLossPercent}%`);
-  trace.push(`<b>Risk trigger:</b> Cachexia = (albumin &lt; 3.5) OR (weight loss ≥ 10%). Result: <b>${cachexia ? 'YES' : 'NO'}</b>.`);
+  const crpStr = patient.crp ? `, CRP ${patient.crp} mg/L` : '';
+  trace.push(`<b>Inputs used:</b> Current Weight ${patient.weight} kg${uwStr}, IBW ${ibwVal} kg, Albumin ${patient.albumin} g/dL, Weight loss ${patient.weightLossPercent}%${crpStr}`);
+  trace.push(`<b>Risk trigger:</b> Cachexia = (albumin &lt; 3.5) OR (weight loss ≥ 10%) OR (CRP > 10). Result: <b>${cachexia ? 'YES' : 'NO'}</b>.`);
   
   const baseCal = Math.round(ibwVal * kcalPerKg);
   trace.push(`<b>Base Energy Required:</b> ${kcalPerKg} kcal/kg/day → ${ibwVal} (IBW) × ${kcalPerKg} = <b>${baseCal} kcal/day</b>.`);
