@@ -300,6 +300,23 @@
         </table>
         <div style="font-size:9.5px; color:#64748b; margin-top:8px;">* Batch scaling: Multiply grams by servings required for production run.</div>
       </div>
+
+      <!-- SPECIFICATION HISTORY (NEW) -->
+      <div id="specsHistory" style="margin-top:15px; border-top:1px dashed #e2e8f0; padding-top:10px; display:none;">
+        <div style="font-size:10px; color:#64748b; font-weight:700; margin-bottom:5px; text-transform:uppercase;">Previous Specification Versions</div>
+        <table class="rt" style="font-size:10px;">
+          <thead>
+            <tr>
+              <th>Ver</th>
+              <th>Date</th>
+              <th>Reason/Note</th>
+              <th>Calories</th>
+              <th>Protein</th>
+            </tr>
+          </thead>
+          <tbody id="specsHistoryBody"></tbody>
+        </table>
+      </div>
     </div>
   
     <div class="rdiv"></div>
@@ -1089,10 +1106,23 @@ function recomputeFromDaily(dailyCalories, dailyProtein){
 
 function ensurePlan(){
   const latest = getLatestPlanForPatient(patient.id);
-  if(latest) return latest;
+  
+  if(latest) {
+    // Check if vitals have shifted significantly since this plan was generated
+    const s = latest.inputsSnapshot || {};
+    const weightChanged = Math.abs((patient.weight || 0) - (s.weight || 0)) > 0.1;
+    const albuminChanged = Math.abs((patient.albumin || 0) - (s.albumin || 0)) > 0.05;
+    const feedingChanged = (patient.feedingMethod || '') !== (s.feedingMethod || '');
+    const giChanged = !!patient.giIssues !== !!s.giIssues;
+
+    if (!weightChanged && !albuminChanged && !feedingChanged && !giChanged) {
+      return latest;
+    }
+    // Else fall through to generate new version
+  }
 
   const engineOutput = generateNutritionPlan(patient);
-  return createOrUpdatePlan(patient, engineOutput, {}, '');
+  return createOrUpdatePlan(patient, engineOutput, {}, latest ? 'Automatic update due to clinical input change' : '');
 }
 
 function bind(plan){
@@ -1135,6 +1165,27 @@ function bind(plan){
     `).join('');
   } else {
     progSec.style.display = 'none';
+  }
+
+  // Bind Production Specifications History
+  const allPlans = getPlans().filter(p => p.patientId === patient.id).sort((a,b) => (b.version||0) - (a.version||0));
+  const histSec = document.getElementById('specsHistory');
+  const histBody = document.getElementById('specsHistoryBody');
+  
+  if (allPlans.length > 1) {
+    histSec.style.display = 'block';
+    // Show all except the current (first) one
+    histBody.innerHTML = allPlans.slice(1).map(p => `
+      <tr>
+        <td>V${p.version}</td>
+        <td>${new Date(p.generatedAt).toLocaleDateString()}</td>
+        <td style="color:#64748b; font-style:italic;">${p.overrideNotes || p.generatedBy || ''}</td>
+        <td>${p.finalPlan.dailyCalories} kcal</td>
+        <td>${p.finalPlan.dailyProtein} g</td>
+      </tr>
+    `).join('');
+  } else {
+    histSec.style.display = 'none';
   }
 
   setVal('pName', patient.name);
