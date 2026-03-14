@@ -153,6 +153,7 @@
         <div class="rb rb-i" id="catBmi">BMI <span id="pBMI"></span></div>
         <div class="rb rb-h" id="catAsianBmi"><span id="pAsianBMI"></span></div>
         <div class="rb rb-m" id="catNutrition">High Risk</div>
+        <div class="rb rb-i">Clinical Fit: <span id="pFitScore"></span>%</div>
       </div>
   
       <div class="rg rg4">
@@ -238,9 +239,20 @@
       <div class="rs-title">Production Specifications</div>
       <div class="rg rg4">
         <div class="rf"><div class="rf-lbl">Format</div><div class="rf-val" id="mForm"></div></div>
-        <div class="rf"><div class="rf-lbl">Per Dose Cals</div><div class="rf-val" id="mCalories"></div></div>
-        <div class="rf"><div class="rf-lbl">Per Dose Prot</div><div class="rf-val" id="mProtein"></div></div>
-        <div class="rf"><div class="rf-lbl">Per Dose Fat/Carb</div><div class="rf-val"><span id="mFat"></span> / <span id="mCarbs"></span></div></div>
+        <div class="rf"><div class="rf-lbl">Per Serving Energy</div><div class="rf-val" id="mCalories"></div></div>
+        <div class="rf"><div class="rf-lbl">Per Serving Protein</div><div class="rf-val" id="mProtein"></div></div>
+        <div class="rf"><div class="rf-lbl">Macro Ratio (P/C/F)</div><div class="rf-val">30% / 30% / 40%</div></div>
+      </div>
+      
+      <div style="margin-top:12px; border:1px solid #dde8f5; border-radius:5px; background:#f7faff; padding:12px;">
+        <div style="font-size:10px; font-weight:800; text-transform:uppercase; color:#94a3b8; margin-bottom:8px;">Store Formulation (Per Serving Recipe)</div>
+        <table class="rt" style="font-size:11.5px; background:white; border:1px solid #dde8f5;">
+          <thead style="display:none;"><tr><th>Ingredient</th><th>Grams</th></tr></thead>
+          <tbody id="recipeBody">
+            <!-- Dynamic Recipe -->
+          </tbody>
+        </table>
+        <div style="font-size:9.5px; color:#64748b; margin-top:8px;">* Batch scaling: Multiply grams by servings required for production run.</div>
       </div>
     </div>
   
@@ -385,6 +397,7 @@
 <script src="js/mappings.js"></script>
 <script src="js/manufacturing.js"></script>
 <script src="js/master-data.js"></script>
+<script src="js/ingredients.js"></script>
 <script src="js/patient-store.js"></script>
 <script src="js/nutrition-engine.js"></script>
 
@@ -754,9 +767,23 @@ function bind(plan){
   mCarbs.innerText = fp.macroCarbs + ' g';
   mFat.innerText = fp.macroFat + ' g';
   mForm.innerText = (patient.feedingMethod||'').includes('Oral') ? 'Powder' : 'Liquid';
+  
+  // Recipe Binding
+  const rb = document.getElementById('recipeBody');
+  if (rb && fp.recipe) {
+    rb.innerHTML = '';
+    const r = fp.recipe;
+    [r.protein, r.carb, r.fat].forEach(ing => {
+      if (!ing || !ing.grams) return;
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td style="font-weight:700; color:#334155;">${ing.name}</td><td style="text-align:right; font-weight:800; color:#0e2247;">${ing.grams} g</td>`;
+      rb.appendChild(tr);
+    });
+  }
 
   const bmiVal = fp.bmi != null ? fp.bmi : computeBMI();
   document.getElementById('riskBmi').innerText = bmiVal < 18.5 ? `Low BMI (${bmiVal})` : `Within range (${bmiVal})`;
+  document.getElementById('pFitScore').innerText = fp.feasibilityScore != null ? fp.feasibilityScore : '100';
   document.getElementById('riskNutrition').innerText = fp.cachexia ? 'High nutrition risk' : 'Moderate nutrition risk';
   document.getElementById('riskCachexia').innerText = fp.cachexia ? 'Yes - intensified support used' : 'No major trigger';
   document.getElementById('riskNote').innerText = fp.cachexia ? 'Weight loss / albumin / BMI pattern suggests need for calorie-dense, high-protein support.' : 'Support plan built to maintain intake during treatment.';

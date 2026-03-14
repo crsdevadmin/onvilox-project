@@ -172,6 +172,57 @@ function generateNutritionPlan(patient) {
     rationale.push(`<b>Clinical Formulation:</b> Standard high-biological-value protein (e.g. Whey isolate) utilized for optimal leucine content to stimulate muscle protein synthesis.`);
   }
 
+function buildFormulationOptions(targets) {
+  if (typeof IngredientLibrary === 'undefined') return null;
+
+  const { macroProtein, macroCarbs, macroFat, proteinType } = targets;
+
+  // 1. Find the best protein match
+  let selectedProtein = IngredientLibrary.find(i => i.id === 'whey_isolate');
+  if (proteinType.toLowerCase().includes('hydrolyzed') || proteinType.toLowerCase().includes('peptide')) {
+    selectedProtein = IngredientLibrary.find(i => i.id === 'whey_hydrolyzed');
+  } else if (proteinType.toLowerCase().includes('plant')) {
+    selectedProtein = IngredientLibrary.find(i => i.id === 'pea_protein');
+  }
+
+  // 2. Find carbs and fat
+  const selectedCarb = IngredientLibrary.find(i => i.id === 'maltodextrin');
+  const selectedFat = IngredientLibrary.find(i => i.id === 'mct_powder');
+
+  // Grams per serving calculation (Simplified approach)
+  // protein_grams = target_protein / pPerGram
+  const pGrams = Math.round(macroProtein / (selectedProtein.pPerGram || 1));
+  
+  // Calculate how many carbs/fats the protein choice already contributed
+  const carbsFromProtein = pGrams * (selectedProtein.cPerGram || 0);
+  const fatFromProtein = pGrams * (selectedProtein.fPerGram || 0);
+
+  const neededCarbs = Math.max(0, macroCarbs - carbsFromProtein);
+  const neededFat = Math.max(0, macroFat - fatFromProtein);
+
+  const cGrams = Math.round(neededCarbs / (selectedCarb.cPerGram || 1));
+  const fGrams = Math.round(neededFat / (selectedFat.fPerGram || 1));
+
+  return {
+    protein: { id: selectedProtein.id, name: selectedProtein.name, grams: pGrams },
+    carb: { id: selectedCarb.id, name: selectedCarb.name, grams: cGrams },
+    fat: { id: selectedFat.id, name: selectedFat.name, grams: fGrams }
+  };
+}
+
+  function computeFeasibilityScore() {
+    let score = 100;
+    if (albumin < 3.0) score -= 10;
+    if (weightLossPercent > 10) score -= 10;
+    if (reducedFoodIntake > 50) score -= 10;
+    if (patient.giIssues) score -= 5;
+    if (crp > 30) score -= 5;
+    if (bmi < 17) score -= 5;
+    return Math.max(0, score);
+  }
+
+  const feasibilityScore = computeFeasibilityScore();
+
   return {
     cachexia,
     bmi: Math.round(bmi * 10) / 10,
@@ -193,9 +244,11 @@ function generateNutritionPlan(patient) {
     nutritionRisk,
     nutritionRiskScore: riskScore,
     nutritionRiskReasons,
+    feasibilityScore,
+    recipe: buildFormulationOptions({ macroProtein, macroCarbs, macroFat, proteinType }),
     reportNotes: {
-      nutritionRiskBasis: 'Nutrition risk is estimated from serum albumin, recent weight loss, BMI, and GI/tolerance issues.',
-      proteinValueBasis: 'Protein value varies based on body weight, nutrition risk, cachexia tendency, recent weight loss, and tolerance status.'
+      nutritionRiskBasis: 'Nutrition risk is estimated from serum albumin, recent weight loss, BMI, CRP, and GI issues.',
+      proteinValueBasis: 'Protein value varies based on body weight, inflammation (CRP), cachexia tendency, and tolerance status.'
     }
   };
 }
