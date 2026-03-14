@@ -15,6 +15,7 @@ function savePatient(patient) {
   patient.createdAt = new Date().toISOString();
   patient.status = 'CREATED';
   patient.createdByUserId = me ? me.id : null;
+  patient.assessments = []; // Initialize empty assessments history
 
   // ownership rules
   if(me && me.role === 'DOCTOR'){
@@ -41,6 +42,29 @@ function updatePatient(updated) {
 function getPatientById(id) {
   const patients = getPatients();
   return patients.find(p => p.id == id);
+}
+
+function addAssessment(patientId, formData) {
+  const patient = getPatientById(patientId);
+  if (!patient) return null;
+  
+  if (!patient.assessments) patient.assessments = [];
+  
+  const assessment = {
+    id: db.uid('assess'),
+    date: new Date().toLocaleDateString(),
+    timestamp: new Date().toISOString(),
+    weight: formData.weight,
+    albumin: formData.albumin,
+    crp: formData.crp,
+    giIssues: formData.giIssues || false,
+    reducedFoodIntake: formData.reducedFoodIntake,
+    notes: formData.notes || ""
+  };
+  
+  patient.assessments.push(assessment);
+  updatePatient(patient);
+  return patient;
 }
 
 // Nutrition plan versioning

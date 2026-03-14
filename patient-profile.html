@@ -203,6 +203,24 @@
       </div>
     </div>
   
+    <!-- PROGRESS TRACKING -->
+    <div class="rs" id="progressSection" style="display:none;">
+      <div class="rs-title">Assessments History</div>
+      <table class="rt">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Weight (kg)</th>
+            <th>Albumin (g/dL)</th>
+            <th>CRP (mg/L)</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody id="progressBody">
+        </tbody>
+      </table>
+    </div>
+  
     <!-- NUTRITION RX -->
     <div class="rs">
       <div class="rs-title">Prescription Target</div>
@@ -450,7 +468,8 @@
   </div>
   </div> <!-- end .container.page -->
 
-  <div style="text-align: center; margin-top: 20px;" class="no-print">
+  <div style="text-align: center; margin-top: 20px; display:flex; gap:12px; justify-content:center;" class="no-print">
+    <button class="btn-warning" onclick="enableFollowUpMode()">Log Follow-up</button>
     <button class="btn-primary" onclick="downloadNutritionPDF()">Download PDF</button>
   </div>
 
@@ -767,6 +786,30 @@ function runAiExtraction(rawText) {
     gi: text.includes('vomiting') || text.includes('nausea') || text.includes('diarrhea') || text.includes('bloating') || text.includes('gastric issues')
   };
 
+  if (window.isFollowUpMode) {
+    let foundCount = 0;
+    const foundItems = [];
+    if (extractions.weight) { foundCount++; foundItems.push(`Weight: ${extractions.weight} kg`); }
+    if (extractions.albumin) { foundCount++; foundItems.push(`Albumin: ${extractions.albumin} g/dL`); }
+    if (extractions.crp) { foundCount++; foundItems.push(`CRP: ${extractions.crp} mg/L`); }
+    
+    if (foundCount > 0) {
+      addAssessment(patient.id, {
+        weight: extractions.weight || '',
+        albumin: extractions.albumin || '',
+        crp: extractions.crp || '',
+        giIssues: extractions.gi,
+        notes: rawText.substring(0, 100) + (rawText.length > 100 ? '...' : '')
+      });
+      addMessage(`Logged Follow-up Assessment:\n• ${foundItems.join('\n• ')}`, 'ai');
+      window.isFollowUpMode = false;
+      renderPatient();
+    } else {
+      addMessage("I couldn't find weight, albumin, or CRP in this follow-up note. Please try again.", 'ai');
+    }
+    return;
+  }
+
   let foundCount = 0;
   const foundItems = [];
   const highlight = (id, label, val) => {
@@ -1028,6 +1071,25 @@ function bind(plan){
   function setVal(id, val) {
     const el = document.getElementById(id);
     if(el) el.innerText = val ?? '-';
+  }
+
+  // Bind History Assessments
+  const assessments = patient.assessments || [];
+  const progSec = document.getElementById('progressSection');
+  const progBody = document.getElementById('progressBody');
+  if (assessments.length > 0) {
+    progSec.style.display = 'block';
+    progBody.innerHTML = assessments.map(a => `
+      <tr>
+        <td>${a.date}</td>
+        <td>${a.weight || '-'}</td>
+        <td class="${a.albumin && a.albumin < 3.5 ? 'danger' : ''}">${a.albumin || '-'}</td>
+        <td class="${a.crp && a.crp > 10 ? 'danger' : ''}">${a.crp || '-'}</td>
+        <td style="font-size:11px; color:#64748b;">${a.notes || ''}</td>
+      </tr>
+    `).join('');
+  } else {
+    progSec.style.display = 'none';
   }
 
   setVal('pName', patient.name);
@@ -1293,6 +1355,17 @@ function buildPdfFileName(){
 }
 
 // Direct-download PDF (no Print dialog). If autoClose=true, tries to close tab after saving.
+window.isFollowUpMode = false;
+function enableFollowUpMode() {
+  window.isFollowUpMode = true;
+  toggleChat();
+  
+  // Wait a moment for chat to open, then add context message
+  setTimeout(() => {
+    addMessage("You are now in Follow-Up mode. Upload a new PDF report or type the patient's new weight and labs. I will append this directly to their Assessments History.", "ai");
+  }, 300);
+}
+
 function downloadNutritionPDF(autoClose){
   // If html2pdf isn't available (offline), fall back to Print.
   if(typeof html2pdf === 'undefined'){
