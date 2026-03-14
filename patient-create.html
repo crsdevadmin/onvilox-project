@@ -70,11 +70,7 @@
     <div class="validation-msg" id="height_msg"></div>
   </div>
 
-  <div class="form-group">
-    <label class="required">Weight Loss % (last 6 months)</label>
-    <input type="number" id="weightLossPercent" step="0.1" min="0" max="50" onkeyup="validateField(this,'Weight Loss %')" readonly style="background:var(--bg-card); cursor:not-allowed;">
-    <div class="validation-msg" id="weightLossPercent_msg"></div>
-  </div>
+  <!-- Removed Weight Loss % input per user request - now calculated automatically -->
 
   <div class="form-group">
     <label>GI Issues (diarrhea/malabsorption)</label>
@@ -185,7 +181,7 @@ function submitPatient(){
     { id: "sex", name: "Sex" },
     { id: "weight", name: "Current Weight" },
     { id: "height", name: "Height" },
-    { id: "weightLossPercent", name: "Weight Loss %" },
+    { id: "reducedFoodIntake", name: "Reduced Food Intake %" },
     { id: "reducedFoodIntake", name: "Reduced Food Intake %" },
     { id: "cancerInput", name: "Cancer Type" },
     { id: "regimenInput", name: "Chemo Regimen" },
@@ -219,7 +215,12 @@ function submitPatient(){
     usualWeight: parseFloat(usualWeight.value),
     weight: parseFloat(weight.value),
     height: parseFloat(height.value),
-    weightLossPercent: parseFloat(weightLossPercent.value),
+    weightLossPercent: (() => {
+      const uw = parseFloat(usualWeight.value);
+      const cw = parseFloat(weight.value);
+      if(uw > 0 && cw > 0 && cw < uw) return round1(((uw - cw) / uw) * 100);
+      return 0;
+    })(),
     reducedFoodIntake: parseFloat(document.getElementById('reducedFoodIntake').value) || 0,
     giIssues: (giIssues.value === 'true'),
     cancer: cancerInput.value,

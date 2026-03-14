@@ -348,11 +348,7 @@
         <input id="epUW" type="number" min="25" max="300" step="0.1">
         <div class="validation-msg" id="epUW_msg"></div>
       </div>
-      <div class="form-group">
-        <label class="required">Weight Loss % (last 6 months)</label>
-        <input id="epWL" type="number" min="0" max="60" step="0.1">
-        <div class="validation-msg" id="epWL_msg"></div>
-      </div>
+      <!-- Removed Weight Loss % input per user request - now calculated automatically -->
       <div class="form-group">
         <label>CRP (mg/L)</label>
         <input id="epCRP" type="number" min="0" max="500" step="0.1">
@@ -653,27 +649,17 @@ function showEditSectionIfAllowed(){
     document.getElementById('epRegimen').value = patient.regimen ?? '';
 
     // validate on blur
-    ['epWeight','epHeight','epAlbumin','epWL'].forEach(id=>{
+    ['epWeight','epHeight','epAlbumin'].forEach(id=>{
       document.getElementById(id).addEventListener('blur', ()=>{
         if(id==='epWeight') validateNumber(id,'Weight',25,300);
         if(id==='epHeight') validateNumber(id,'Height',30,250);
         if(id==='epAlbumin') validateNumber(id,'Serum Albumin',1,6);
-        if(id==='epWL') validateNumber(id,'Weight Loss %',0,60);
       });
     });
     document.getElementById('epFeeding').addEventListener('change', ()=>validateSelect('epFeeding','Feeding Method'));
   }
 
-    function autoCalcWL() {
-      const cw = parseFloat(document.getElementById('epWeight').value || 0);
-      const uw = parseFloat(document.getElementById('epUW').value || 0);
-      if (uw > 0 && cw > 0) {
-        const wl = Math.max(0, round1(((uw - cw) / uw) * 100));
-        document.getElementById('epWL').value = wl;
-      }
-    }
-    document.getElementById('epWeight').addEventListener('input', autoCalcWL);
-    document.getElementById('epUW').addEventListener('input', autoCalcWL);
+    // autoCalcWL removed from UI, we calculate on save
 
     if(reviewMode && shouldShow){
       section.scrollIntoView({behavior:'smooth', block:'start'});
@@ -751,7 +737,6 @@ function savePatientEdits(){
     validateNumber('epWeight','Weight',25,300) &
     validateNumber('epHeight','Height',30,250) &
     validateNumber('epAlbumin','Serum Albumin',1,6) &
-    validateNumber('epWL','Weight Loss %',0,60) &
     validateSelect('epFeeding','Feeding Method') &
     validateSelect('epCancer','Cancer Type') &
     validateSelect('epRegimen','Chemo Regimen');
@@ -766,7 +751,12 @@ function savePatientEdits(){
   patient.height = parseFloat(document.getElementById('epHeight').value);
   patient.albumin = parseFloat(document.getElementById('epAlbumin').value);
   patient.usualWeight = parseFloat(document.getElementById('epUW').value || 0);
-  patient.weightLossPercent = parseFloat(document.getElementById('epWL').value);
+  patient.weightLossPercent = (() => {
+    const uw = patient.usualWeight;
+    const cw = patient.weight;
+    if(uw > 0 && cw > 0 && cw < uw) return round1(((uw - cw) / uw) * 100);
+    return 0;
+  })();
   patient.crp = parseFloat(document.getElementById('epCRP').value || 0);
   patient.giIssues = document.getElementById('epGi').value === 'true';
   patient.feedingMethod = document.getElementById('epFeeding').value;
