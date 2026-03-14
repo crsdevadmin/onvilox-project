@@ -22,17 +22,22 @@
 
 <h2>Create New Patient</h2>
 
-<!-- AI ASSISTANT PANEL -->
-<div class="ai-panel">
-  <div class="ai-header">
-    <div class="ai-badge">BETA</div>
-    <h4>AI Clinical Assistant</h4>
+<!-- INTERACTIVE AI CO-PILOT CHATBOT -->
+<div class="ai-chat-launcher" onclick="toggleChat()">
+  <svg viewBox="0 0 24 24"><path d="M12,2A10,10 0 0,1 22,12A10,10 0 0,1 12,22A10,10 0 0,1 2,12A10,10 0 0,1 12,2M12,4A8,8 0 0,0 4,12C4,14.39 5,16.5 6.74,18L7,17.27C7.3,16.27 8.23,15.5 9.35,15.5H10.5V14.5A0.5,0.5 0 0,1 11,14H13A0.5,0.5 0 0,1 13.5,14.5V15.5H14.65C15.77,15.5 16.7,16.27 17,17.27L17.26,18C19,16.5 20,14.39 20,12A8,8 0 0,0 12,4M12.5,7A1.5,1.5 0 0,1 14,8.5A1.5,1.5 0 0,1 12.5,10A1.5,1.5 0 0,1 11,8.5A1.5,1.5 0 0,1 12.5,7M11,14.5A0.5,0.5 0 0,0 10.5,14H9A0.5,0.5 0 0,1 8.5,14.5V15.5H9.35C10.1,15.5 10.74,15.04 11,14.41V14.5M15.5,14.5A0.5,0.5 0 0,0 15,14H13.5A0.5,0.5 0 0,1 13,14.5V15.5H14.65C15,15.5 15.29,15.4 15.5,15.24V14.5Z"/></svg>
+</div>
+
+<div class="ai-chat-window" id="aiChatWindow">
+  <div class="ai-chat-header">
+    <h4><svg style="width:16px; height:16px; fill:currentColor;" viewBox="0 0 24 24"><path d="M12,2A10,10 0 0,1 22,12A10,10 0 0,1 12,22A10,10 0 0,1 2,12A10,10 0 0,1 12,2M12,4A8,8 0 0,0 4,12C4,14.39 5,16.5 6.74,18L7,17.27C7.3,16.27 8.23,15.5 9.35,15.5H10.5V14.5A0.5,0.5 0 0,1 11,14H13A0.5,0.5 0 0,1 13.5,14.5V15.5H14.65C15.77,15.5 16.7,16.27 17,17.27L17.26,18C19,16.5 20,14.39 20,12A8,8 0 0,0 12,4M12.5,7A1.5,1.5 0 0,1 14,8.5A1.5,1.5 0 0,1 12.5,10A1.5,1.5 0 0,1 11,8.5A1.5,1.5 0 0,1 12.5,7M11,14.5A0.5,0.5 0 0,0 10.5,14H9A0.5,0.5 0 0,1 8.5,14.5V15.5H9.35C10.1,15.5 10.74,15.04 11,14.41V14.5M15.5,14.5A0.5,0.5 0 0,0 15,14H13.5A0.5,0.5 0 0,1 13,14.5V15.5H14.65C15,15.5 15.29,15.4 15.5,15.24V14.5Z"/></svg> Onvilox Co-Pilot</h4>
+    <div class="close-chat" onclick="toggleChat()">✕</div>
   </div>
-  <p style="font-size:12.5px; color:#475569; margin-top:0; margin-bottom:12px;">Paste hospital case notes or describe patient symptoms. The AI will instantly map clinical details to the form below.</p>
-  <textarea id="aiIntakeText" class="ai-textarea" placeholder="e.g. Patient has stage 4 GE junction cancer, reporting regular vomiting and 6kg weight loss over the last month. Albumin is 2.9..."></textarea>
-  <div class="ai-actions">
-    <button type="button" class="btn-primary" onclick="runAiIntake()" style="background:#4338ca; border-color:#4338ca;">✨ Analyze Case Notes</button>
-    <span id="aiStatus" class="ai-status">AI is analyzing clinical markers...</span>
+  <div class="ai-chat-messages" id="chatMsgs">
+    <div class="msg msg-ai">Hi! I'm your Clinical Co-Pilot. You can paste case notes or just tell me about the patient (e.g., "Patient is 65kg with stage 4 lung cancer"). I'll fill in the details for you!</div>
+  </div>
+  <div class="ai-chat-input-area">
+    <input type="text" class="ai-chat-input" id="chatInput" placeholder="Type or paste notes..." onkeypress="if(event.key==='Enter') sendChatMessage()">
+    <button class="ai-chat-send" onclick="sendChatMessage()">➤</button>
   </div>
 </div>
 
@@ -374,67 +379,102 @@ function round1(n){ return Math.round(n*10)/10; }
 
 initIntakeCalc();
 
-function runAiIntake() {
-  const text = document.getElementById('aiIntakeText').value.toLowerCase();
-  const status = document.getElementById('aiStatus');
-  if (!text) return;
+// --- CHATBOT LOGIC ---
+function toggleChat() {
+  const win = document.getElementById('aiChatWindow');
+  const isOpening = win.style.display !== 'flex';
+  win.style.display = isOpening ? 'flex' : 'none';
+  if(isOpening) document.getElementById('chatInput').focus();
+}
 
-  status.style.display = 'inline';
-  
+function addMessage(text, type) {
+  const container = document.getElementById('chatMsgs');
+  const msg = document.createElement('div');
+  msg.className = `msg msg-${type}`;
+  msg.innerText = text;
+  container.appendChild(msg);
+  container.scrollTop = container.scrollHeight;
+  return msg;
+}
+
+function addTyping() {
+  const container = document.getElementById('chatMsgs');
+  const typing = document.createElement('div');
+  typing.className = 'msg msg-ai ai-typing';
+  typing.innerHTML = '<span></span><span></span><span></span>';
+  container.appendChild(typing);
+  container.scrollTop = container.scrollHeight;
+  return typing;
+}
+
+function sendChatMessage() {
+  const input = document.getElementById('chatInput');
+  const text = input.value.trim();
+  if(!text) return;
+
+  addMessage(text, 'user');
+  input.value = '';
+
+  const typing = addTyping();
+
   setTimeout(() => {
-    // Handle "is", "at", ":", space etc.
-    const numPattern = '(?:is|at|was|of|recorded at)?\\s*:?\\s*(\\d+\\.?\\d*)';
-    const extractions = {
-      weight: text.match(new RegExp('weight' + numPattern))?.[1] || text.match(/(\d+\.?\d*)\s*kg/)?.[1],
-      uw: text.match(new RegExp('usual weight' + numPattern))?.[1] || text.match(new RegExp('uw' + numPattern))?.[1],
-      albumin: text.match(new RegExp('albumin' + numPattern))?.[1] || text.match(new RegExp('alb' + numPattern))?.[1],
-      crp: text.match(new RegExp('crp' + numPattern))?.[1],
-      gi: text.includes('vomiting') || text.includes('nausea') || text.includes('diarrhea') || text.includes('bloating') || text.includes('gastric issues')
-    };
+    typing.remove();
+    runAiExtraction(text);
+  }, 1000);
+}
 
-    let count = 0;
-    const highlight = (id) => {
-      const el = document.getElementById(id);
-      if(!el) return;
-      el.classList.add('ai-filled');
-      setTimeout(() => el.classList.remove('ai-filled'), 4000);
-    };
+function runAiExtraction(rawText) {
+  const text = rawText.toLowerCase();
+  // Handle "is", "at", ":", space etc.
+  const numPattern = '(?:is|at|was|of|recorded at)?\\s*:?\\s*(\\d+\\.?\\d*)';
+  const extractions = {
+    weight: text.match(new RegExp('weight' + numPattern))?.[1] || text.match(/(\d+\.?\d*)\s*kg/)?.[1],
+    uw: text.match(new RegExp('usual weight' + numPattern))?.[1] || text.match(new RegExp('uw' + numPattern))?.[1],
+    albumin: text.match(new RegExp('albumin' + numPattern))?.[1] || text.match(new RegExp('alb' + numPattern))?.[1],
+    crp: text.match(new RegExp('crp' + numPattern))?.[1],
+    gi: text.includes('vomiting') || text.includes('nausea') || text.includes('diarrhea') || text.includes('bloating') || text.includes('gastric issues')
+  };
 
-    if (extractions.weight) { document.getElementById('weight').value = extractions.weight; highlight('weight'); count++; }
-    if (extractions.uw) { document.getElementById('usualWeight').value = extractions.uw; highlight('usualWeight'); count++; }
-    if (extractions.albumin) { document.getElementById('albumin').value = extractions.albumin; highlight('albumin'); count++; }
-    if (extractions.crp) { 
-      // check if field exists, current V2 might have added it
-      const crpEl = document.getElementById('epCRP') || document.getElementById('crp'); 
-      if(crpEl) { crpEl.value = extractions.crp; highlight(crpEl.id); count++; }
+  let foundCount = 0;
+  const highlight = (id) => {
+    const el = document.getElementById(id);
+    if(!el) return;
+    el.classList.add('ai-filled');
+    setTimeout(() => el.classList.remove('ai-filled'), 3000);
+  };
+
+  if (extractions.weight) { document.getElementById('weight').value = extractions.weight; highlight('weight'); foundCount++; }
+  if (extractions.uw) { document.getElementById('usualWeight').value = extractions.uw; highlight('usualWeight'); foundCount++; }
+  if (extractions.albumin) { document.getElementById('albumin').value = extractions.albumin; highlight('albumin'); foundCount++; }
+  if (extractions.crp) { 
+    const crpEl = document.getElementById('epCRP') || document.getElementById('crp'); 
+    if(crpEl) { crpEl.value = extractions.crp; highlight(crpEl.id); foundCount++; }
+  }
+  if (extractions.gi) { document.getElementById('giIssues').value = "true"; highlight('giIssues'); foundCount++; }
+
+  const cancers = {
+    'lung': 'Lung Cancer – NSCLC', 'head': 'Head & Neck Cancer', 'neck': 'Head & Neck Cancer',
+    'colon': 'Colorectal Cancer', 'colorectal': 'Colorectal Cancer', 'breast': 'Breast Cancer – Invasive Ductal Carcinoma (IDC)',
+    'prostate': 'Prostate Cancer', 'leukemia': 'Hematological Malignancy', 'pancreatic': 'Pancreatic Cancer',
+    'gastric': 'Gastric / Stomach Cancer', 'stomach': 'Gastric / Stomach Cancer', 'esophageal': 'Esophageal Cancer',
+    'bladder': 'Bladder / Urothelial Cancer', 'kidney': 'Kidney (Renal Cell) Cancer', 'liver': 'Liver (Hepatocellular) Cancer', 'thyroid': 'Thyroid Cancer'
+  };
+
+  for (const [key, val] of Object.entries(cancers)) {
+    if (text.includes(key)) {
+      document.getElementById('cancerInput').value = val;
+      highlight('cancerInput');
+      foundCount++;
+      break;
     }
-    if (extractions.gi) { document.getElementById('giIssues').value = "true"; highlight('giIssues'); count++; }
+  }
 
-    const cancers = {
-      'lung': 'Lung Cancer – NSCLC', 'head': 'Head & Neck Cancer', 'neck': 'Head & Neck Cancer',
-      'colon': 'Colorectal Cancer', 'colorectal': 'Colorectal Cancer', 'breast': 'Breast Cancer – Invasive Ductal Carcinoma (IDC)',
-      'prostate': 'Prostate Cancer', 'leukemia': 'Hematological Malignancy', 'pancreatic': 'Pancreatic Cancer'
-    };
-
-    for (const [key, val] of Object.entries(cancers)) {
-      if (text.includes(key)) {
-        document.getElementById('cancerInput').value = val;
-        highlight('cancerInput');
-        count++;
-        break;
-      }
-    }
-
-    status.innerText = `✨ AI successfully extracted ${count} clinical markers.`;
-    setTimeout(() => { 
-      status.style.display = 'none'; 
-      status.innerText = 'AI is analyzing clinical markers...'; 
-    }, 6000);
-    
-    // Auto-calculate weight loss if possible
+  if(foundCount > 0) {
+    addMessage(`I've updated ${foundCount} field(s) based on your notes. Anything else?`, 'ai');
     if(typeof calculateWeightLoss === 'function') calculateWeightLoss();
-
-  }, 1200);
+  } else {
+    addMessage("I couldn't find specific clinical markers in that. Could you provide a weight, albumin level, or cancer type?", 'ai');
+  }
 }
 </script>
 
