@@ -69,8 +69,8 @@ function generateNutritionPlan(patient) {
   const kcalPerKg = cachexia ? 35 : 30;
   const proteinPerKg = cachexia ? 1.8 : 1.4;
 
-  let baseCalories = Math.round(idealWeight * kcalPerKg);
-  let dailyProtein = Math.round(idealWeight * proteinPerKg);
+  let baseCalories = Math.round(weight * kcalPerKg);
+  let dailyProtein = Math.round(weight * proteinPerKg);
 
   // Adjust based on food intake % to calculate the DEFICIT
   // If input is "40%" reduced, the product should cover that 40% deficit.
