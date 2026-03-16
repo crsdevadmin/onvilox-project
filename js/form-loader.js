@@ -7,6 +7,10 @@ window.onload = function () {
   loadMultiSelect("comorbidityDropdown", comorbiditiesList, "comorbidityTags");
   loadMultiSelect("sideEffectDropdown", sideEffectsList, "sideEffectTags");
   loadMultiSelect("genomicMarkersDropdown", genomicMarkersList, "genomicMarkersTags");
+  loadMultiSelect("treatmentDropdown", treatmentsList, "treatmentTags");
+  loadMultiSelect("allergyDropdown", allergiesList, "allergyTags");
+  loadMultiSelect("supplementDropdown", supplementsList, "supplementTags");
+  loadMultiSelect("metastasisDropdown", metastaticSitesList, "metastasisTags");
 };
 
 // ---------- CANCER ----------
@@ -134,9 +138,14 @@ function filterMultiList(input, dropdownId) {
   dropdown.style.display = "block";
   dropdown.innerHTML = "";
 
-  let list = sideEffectsList;
+  let list = [];
   if (dropdownId.includes("comorbidity")) list = comorbiditiesList;
+  else if (dropdownId.includes("sideEffect")) list = sideEffectsList;
   else if (dropdownId.includes("genomic")) list = genomicMarkersList;
+  else if (dropdownId.includes("treatment")) list = treatmentsList;
+  else if (dropdownId.includes("allergy")) list = allergiesList;
+  else if (dropdownId.includes("supplement")) list = supplementsList;
+  else if (dropdownId.includes("metastasis")) list = metastaticSitesList;
 
   list.forEach(item => {
     if (item.toLowerCase().includes(filter)) {
@@ -146,6 +155,22 @@ function filterMultiList(input, dropdownId) {
       dropdown.appendChild(div);
     }
   });
+}
+
+function handleTagInput(event, containerId) {
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    const text = event.target.value.trim();
+    if (text) {
+      addTag(text, containerId);
+      event.target.value = '';
+      
+      // Also hide the dropdown
+      const dropdownId = containerId.replace('Tags', 'Dropdown');
+      const dropdown = document.getElementById(dropdownId);
+      if(dropdown) dropdown.style.display = 'none';
+    }
+  }
 }
 
 function addTag(text, containerId) {

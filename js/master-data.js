@@ -226,3 +226,56 @@ const genomicMarkersList = [
   "DPYD Deficiency",
   "UGT1A1 Polymorphism"
 ];
+
+// Treatment Modalities
+const treatmentsList = [
+  "Chemotherapy",
+  "Radiotherapy",
+  "Immunotherapy",
+  "Targeted Therapy",
+  "Hormonal Therapy",
+  "Surgery",
+  "Palliative Care"
+];
+
+// Allergies
+const allergiesList = [
+  "Lactose",
+  "Soy",
+  "Nuts",
+  "Peanuts",
+  "Gluten",
+  "Eggs",
+  "Shellfish",
+  "Latex",
+  "Sulfa Drugs",
+  "Penicillin"
+];
+
+// Supplements
+const supplementsList = [
+  "Multivitamin",
+  "Vitamin C",
+  "Vitamin D",
+  "Calcium",
+  "Iron",
+  "Omega-3 / Fish Oil",
+  "Probiotics",
+  "B-Complex",
+  "Zinc",
+  "Magnesium",
+  "Whey Protein",
+  "Plant Protein"
+];
+
+// Metastatic Sites
+const metastaticSitesList = [
+  "Bone",
+  "Liver",
+  "Lung",
+  "Brain",
+  "Lymph Nodes",
+  "Peritoneum",
+  "Pleura",
+  "Adrenal Glands"
+];

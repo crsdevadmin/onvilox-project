@@ -574,12 +574,69 @@
       </div>
       <div class="form-group" style="grid-column:1 / -1;">
         <label>Metastatic Sites</label>
-        <input id="epMetastasis" type="text" placeholder="e.g. Bone, Liver, Lung">
+        <div class="tag-box">
+          <div class="tag-container" id="epMetastasisTags"></div>
+          <input type="text" placeholder="Search sites or type and Enter..." onkeyup="filterMultiList(this,'epMetastasisDropdown')" onkeydown="handleTagInput(event, 'epMetastasisTags')">
+          <div class="dropdown-list" id="epMetastasisDropdown"></div>
+        </div>
       </div>
 
       <div class="form-group" style="grid-column:1 / -1;">
         <label>Allergies</label>
-        <textarea id="epAllergies" placeholder="Known allergies (e.g. lactose, specific drugs)"></textarea>
+        <div class="tag-box">
+          <div class="tag-container" id="epAllergyTags"></div>
+          <input type="text" placeholder="Search allergies or type and Enter..." onkeyup="filterMultiList(this,'epAllergyDropdown')" onkeydown="handleTagInput(event, 'epAllergyTags')">
+          <div class="dropdown-list" id="epAllergyDropdown"></div>
+        </div>
+      </div>
+
+      <div class="form-group" style="grid-column:1 / -1;">
+        <label>Comorbidities</label>
+        <div class="tag-box">
+          <div class="tag-container" id="epComorbidityTags"></div>
+          <input type="text" placeholder="Search comorbidities..." onkeyup="filterMultiList(this,'epComorbidityDropdown')" onkeydown="handleTagInput(event, 'epComorbidityTags')">
+          <div class="dropdown-list" id="epComorbidityDropdown"></div>
+        </div>
+      </div>
+
+      <div class="form-group" style="grid-column:1 / -1;">
+        <label>Side Effects</label>
+        <div class="tag-box">
+          <div class="tag-container" id="epSideEffectTags"></div>
+          <input type="text" placeholder="Search side effects..." onkeyup="filterMultiList(this,'epSideEffectDropdown')" onkeydown="handleTagInput(event, 'epSideEffectTags')">
+          <div class="dropdown-list" id="epSideEffectDropdown"></div>
+        </div>
+      </div>
+
+      <div class="form-group" style="grid-column:1 / -1;">
+        <label>Genomic Markers</label>
+        <div class="tag-box">
+          <div class="tag-container" id="epGenomicMarkersTags"></div>
+          <input type="text" placeholder="Search markers..." onkeyup="filterMultiList(this,'epGenomicMarkersDropdown')" onkeydown="handleTagInput(event, 'epGenomicMarkersTags')">
+          <div class="dropdown-list" id="epGenomicMarkersDropdown"></div>
+        </div>
+      </div>
+
+      <div class="form-group" style="grid-column:1 / -1;">
+        <label>Treatment Modalities</label>
+        <div class="tag-box">
+          <div class="tag-container" id="epTreatmentTags"></div>
+          <input type="text" placeholder="Search treatments..." onkeyup="filterMultiList(this,'epTreatmentDropdown')" onkeydown="handleTagInput(event, 'epTreatmentTags')">
+          <div class="dropdown-list" id="epTreatmentDropdown"></div>
+        </div>
+      </div>
+      
+      <div class="form-group" style="grid-column:1 / -1;">
+        <label>Existing Supplements</label>
+        <div class="tag-box">
+          <div class="tag-container" id="epSupplementTags"></div>
+          <input type="text" placeholder="Search supplements or type and Enter..." onkeyup="filterMultiList(this,'epSupplementDropdown')" onkeydown="handleTagInput(event, 'epSupplementTags')">
+          <div class="dropdown-list" id="epSupplementDropdown"></div>
+        </div>
+      </div>
+      <div class="form-group" style="grid-column:1 / -1;">
+        <label>Cultural/Dietary Preferences</label>
+        <textarea id="epCulturalPref" placeholder="e.g. Halal, Kosher, Diabetic-friendly, No spices"></textarea>
       </div>
       <div class="form-group" style="grid-column:1 / -1;">
         <label>Doctor Note (optional)</label>
@@ -867,6 +924,35 @@ function showEditSectionIfAllowed(){
         if(id==='epAlbumin') validateNumber(id,'Serum Albumin',1,6);
       });
     });
+
+    // Populate searchable tags
+    const tagMapping = {
+      'epMetastasisTags': patient.metastasisSites,
+      'epAllergyTags': patient.allergies,
+      'epSupplementTags': patient.existingSupplements,
+      'epComorbidityTags': patient.comorbidities, // verify these IDs are in HTML
+      'epSideEffectTags': patient.sideEffects,
+      'epGenomicMarkersTags': patient.genomicMarkers,
+      'epTreatmentTags': patient.treatmentTypes
+    };
+
+    Object.keys(tagMapping).forEach(containerId => {
+      const tags = tagMapping[containerId] || [];
+      const container = document.getElementById(containerId);
+      if(container) {
+        container.innerHTML = '';
+        if(Array.isArray(tags)) {
+          tags.forEach(t => addTag(t, containerId));
+        } else if (typeof tags === 'string' && tags) {
+          // Fallback for older legacy data stored as strings
+          tags.split(',').forEach(t => addTag(t.trim(), containerId));
+        }
+      }
+    });
+
+    if(document.getElementById('epCulturalPref')) {
+      document.getElementById('epCulturalPref').value = patient.culturalPreferences || '';
+    }
     document.getElementById('epFeeding').addEventListener('change', ()=>validateSelect('epFeeding','Feeding Method'));
 
     if(reviewMode && shouldShow){
@@ -1198,14 +1284,19 @@ function savePatientEdits(){
   patient.sarcopeniaStatus = document.getElementById('epSarcopenia').value;
   patient.ecogStatus = parseInt(document.getElementById('epECOG').value || 0);
   patient.cancerStage = document.getElementById('epStage').value;
-  patient.metastasisSites = document.getElementById('epMetastasis').value;
-  patient.allergies = document.getElementById('epAllergies').value;
+  patient.metastasisSites = tagsToArray('epMetastasisTags');
+  patient.allergies = tagsToArray('epAllergyTags');
+  patient.existingSupplements = tagsToArray('epSupplementTags');
+  patient.comorbidities = tagsToArray('epComorbidityTags');
+  patient.sideEffects = tagsToArray('epSideEffectTags');
+  patient.genomicMarkers = tagsToArray('epGenomicMarkersTags');
+  patient.treatmentTypes = tagsToArray('epTreatmentTags');
   
   patient.giIssues = document.getElementById('epGi').value === 'true';
   patient.feedingMethod = document.getElementById('epFeeding').value;
   patient.cancer = document.getElementById('epCancer').value;
   patient.regimen = document.getElementById('epRegimen').value;
-  patient.allergies = document.getElementById('epAllergies').value;
+  patient.culturalPreferences = document.getElementById('epCulturalPref')?.value || '';
 
   updatePatient(patient);
 
@@ -1466,10 +1557,14 @@ function bind(plan){
   // New Clinical History fields
   const actualIntakePct = 100 - (patient.reducedFoodIntake || 0);
   setVal('pFoodIntake', actualIntakePct + ' %');
-  setVal('pHxComorbidities', (Array.isArray(patient.comorbidities) && patient.comorbidities.length) ? patient.comorbidities.join(', ') : 'None Reported');
-  setVal('pHxGenomicMarkers', (Array.isArray(patient.genomicMarkers) && patient.genomicMarkers.length) ? patient.genomicMarkers.join(', ') : 'None Reported');
-  setVal('pHxSideEffects', (Array.isArray(patient.sideEffects) && patient.sideEffects.length) ? patient.sideEffects.join(', ') : 'None Reported');
-  setVal('pHxAllergies', patient.allergies || 'None Reported');
+  setVal('pHxAllergies', Array.isArray(patient.allergies) ? patient.allergies.join(', ') : (patient.allergies || 'None reported'));
+  setVal('pSupplements', Array.isArray(patient.existingSupplements) ? patient.existingSupplements.join(', ') : (patient.existingSupplements || 'None'));
+  setVal('pMetastasis', Array.isArray(patient.metastasisSites) ? patient.metastasisSites.join(', ') : (patient.metastasisSites || 'None reported'));
+  setVal('pTreatments', Array.isArray(patient.treatmentTypes) ? patient.treatmentTypes.join(', ') : (patient.treatmentTypes || 'Standard'));
+  setVal('pHxComorbidities', Array.isArray(patient.comorbidities) ? patient.comorbidities.join(', ') : (patient.comorbidities || 'None reported'));
+  setVal('pHxSideEffects', Array.isArray(patient.sideEffects) ? patient.sideEffects.join(', ') : (patient.sideEffects || 'None reported'));
+  setVal('pHxGenomicMarkers', Array.isArray(patient.genomicMarkers) ? patient.genomicMarkers.join(', ') : (patient.genomicMarkers || 'Not tested'));
+  setVal('pCultural', patient.culturalPreferences || 'Standard');
   setVal('pHxNotes', patient.notes || '-');
 
   const fp = plan.finalPlan;
@@ -1772,6 +1867,76 @@ function updateLabStatus(id, val) {
   } else {
     badge.style.display = 'none';
   }
+}
+
+function tagsToArray(containerId){
+  const c = document.getElementById(containerId);
+  if(!c) return [];
+  return [...c.children].map(el => el.dataset.value);
+}
+
+function handleTagInput(event, containerId) {
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    const text = event.target.value.trim();
+    if (text) {
+      addTag(text, containerId);
+      event.target.value = '';
+      
+      const dropdownId = containerId.replace('Tags', 'Dropdown');
+      const dropdown = document.getElementById(dropdownId);
+      if(dropdown) dropdown.style.display = 'none';
+    }
+  }
+}
+
+function addTag(text, containerId) {
+  const container = document.getElementById(containerId);
+  if (!container || [...container.children].some(tag => tag.dataset.value === text)) return;
+
+  const tag = document.createElement("div");
+  tag.className = "tag";
+  tag.dataset.value = text;
+  tag.innerHTML = `${text} <span onclick="removeTag(this)">×</span>`;
+  container.appendChild(tag);
+  
+  const dropdownId = containerId.replace("Tags", "Dropdown");
+  const dropdown = document.getElementById(dropdownId);
+  if(dropdown) {
+     dropdown.style.display = "none";
+     const input = dropdown.previousElementSibling;
+     if(input && input.tagName === 'INPUT') input.value = "";
+  }
+}
+
+function removeTag(el) {
+  el.parentElement.remove();
+}
+
+function filterMultiList(input, dropdownId) {
+  const filter = input.value.toLowerCase();
+  const dropdown = document.getElementById(dropdownId);
+  if(!dropdown) return;
+  dropdown.style.display = "block";
+  dropdown.innerHTML = "";
+
+  let list = [];
+  if (dropdownId.toLowerCase().includes("comorbidity")) list = comorbiditiesList;
+  else if (dropdownId.toLowerCase().includes("sideeffect")) list = sideEffectsList;
+  else if (dropdownId.toLowerCase().includes("genomic")) list = genomicMarkersList;
+  else if (dropdownId.toLowerCase().includes("treatment")) list = treatmentsList;
+  else if (dropdownId.toLowerCase().includes("allergy") || dropdownId.toLowerCase().includes("epallergy")) list = allergiesList;
+  else if (dropdownId.toLowerCase().includes("supplement") || dropdownId.toLowerCase().includes("epsupplement")) list = supplementsList;
+  else if (dropdownId.toLowerCase().includes("metastasis") || dropdownId.toLowerCase().includes("epmetastasis")) list = metastaticSitesList;
+
+  list.forEach(item => {
+    if (item.toLowerCase().includes(filter)) {
+      const div = document.createElement("div");
+      div.innerText = item;
+      div.onclick = () => addTag(item, dropdownId.replace("Dropdown","Tags"));
+      dropdown.appendChild(div);
+    }
+  });
 }
 
 function sanitizeFilePart(s){
