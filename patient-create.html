@@ -179,8 +179,9 @@
   </div>
 
   <div class="form-group">
-    <label>MUAC (cm)</label>
-    <input type="number" id="muac" step="0.1" placeholder="e.g. 24.5">
+    <label>MUAC (cm) <span id="muac_status" class="status-badge"></span></label>
+    <input type="number" id="muac" step="0.1" placeholder="e.g. 24.5" oninput="updateLabStatus('muac', this.value)">
+    <div class="range-hint">Normal: &ge; 23 cm</div>
     <div class="validation-msg" id="muac_msg"></div>
   </div>
 
@@ -192,256 +193,246 @@
 
 </div>
 
-<!-- ADVANCED CLINICAL DATA: SECTION 1 (METABOLIC & RENAL) -->
-<div class="ai-panel card-cyan">
-  <div class="ai-header">
-    <div class="ai-badge">METABOLIC & RENAL</div>
-    <h4>Organ Function & Labs</h4>
-  </div>
-  <div class="form-grid">
-    <div class="form-group">
-      <label>Creatinine (mg/dL) <span id="creatinine_status" class="status-badge"></span></label>
-      <input type="number" id="creatinine" step="0.01" placeholder="e.g. 0.9" oninput="updateLabStatus('creatinine', this.value)">
-      <div class="range-hint">Normal: 0.7 – 1.3 mg/dL</div>
-    </div>
-    <div class="form-group">
-      <label>ALT (U/L) <span id="alt_status" class="status-badge"></span></label>
-      <input type="number" id="alt" step="1" placeholder="e.g. 30" oninput="updateLabStatus('alt', this.value)">
-      <div class="range-hint">Normal: 7 – 56 U/L</div>
-    </div>
-    <div class="form-group">
-      <label>AST (U/L) <span id="ast_status" class="status-badge"></span></label>
-      <input type="number" id="ast" step="1" placeholder="e.g. 28" oninput="updateLabStatus('ast', this.value)">
-      <div class="range-hint">Normal: 5 – 40 U/L</div>
-    </div>
-    <div class="form-group">
-      <label>Bilirubin (mg/dL) <span id="bilirubin_status" class="status-badge"></span></label>
-      <input type="number" id="bilirubin" step="0.1" placeholder="e.g. 0.8" oninput="updateLabStatus('bilirubin', this.value)">
-      <div class="range-hint">Normal: 0.1 – 1.2 mg/dL</div>
-    </div>
-    <div class="form-group">
-      <label>Blood Sugar (mg/dL) <span id="blood_sugar_status" class="status-badge"></span></label>
-      <input type="number" id="bloodSugar" step="1" oninput="updateLabStatus('bloodSugar', this.value)">
-      <div class="range-hint">Normal: 70 – 126 mg/dL</div>
-    </div>
-    <div class="form-group">
-      <label>TSH (mIU/L) <span id="tsh_status" class="status-badge"></span></label>
-      <input type="number" id="tsh" step="0.01" oninput="updateLabStatus('tsh', this.value)">
-      <div class="range-hint">Normal: 0.4 – 4.0 mIU/L</div>
-    </div>
-  </div>
-</div>
+<!-- CLINICAL ASSESSMENT CARDS RESTRUCTURED -->
+<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(400px, 1fr)); gap:20px; margin-top:24px;">
 
-<!-- ADVANCED CLINICAL DATA: SECTION 2 (MICRONUTRIENTS) -->
-<div class="ai-panel card-violet">
-  <div class="ai-header">
-    <div class="ai-badge">MICRONUTRIENTS</div>
-    <h4>Nutritional Profile</h4>
-  </div>
-  <div class="form-grid">
-    <div class="form-group">
-      <label>Prealbumin (mg/dL) <span id="prealbumin_status" class="status-badge"></span></label>
-      <input type="number" id="prealbumin" step="1" oninput="updateLabStatus('prealbumin', this.value)">
-      <div class="range-hint">Normal: 15 – 36 mg/dL</div>
+  <!-- SECTION 1 (METABOLIC & RENAL) -->
+  <div class="ai-panel card-cyan" style="margin:0;">
+    <div class="ai-header">
+      <div class="ai-badge">METABOLIC & RENAL</div>
+      <h4>Organ Function & Labs</h4>
     </div>
-    <div class="form-group">
-      <label>Hemoglobin (g/dL) <span id="hemoglobin_status" class="status-badge"></span></label>
-      <input type="number" id="hemoglobin" step="0.1" oninput="updateLabStatus('hemoglobin', this.value)">
-      <div class="range-hint">Normal: 12 – 16 g/dL</div>
-    </div>
-    <div class="form-group">
-      <label>Vitamin D (ng/mL) <span id="vit_d_status" class="status-badge"></span></label>
-      <input type="number" id="vitD" step="1" oninput="updateLabStatus('vitD', this.value)">
-      <div class="range-hint">Normal: 30 – 100 ng/mL</div>
-    </div>
-    <div class="form-group">
-      <label>Vitamin B12 (pg/mL) <span id="vit_b12_status" class="status-badge"></span></label>
-      <input type="number" id="vitB12" step="1" oninput="updateLabStatus('vitB12', this.value)">
-      <div class="range-hint">Normal: 200 – 900 pg/mL</div>
-    </div>
-    <div class="form-group">
-      <label>Folate (ng/mL) <span id="folate_status" class="status-badge"></span></label>
-      <input type="number" id="folate" step="1" oninput="updateLabStatus('folate', this.value)">
-      <div class="range-hint">Normal: 2 – 20 ng/mL</div>
-    </div>
-    <div class="form-group">
-      <label>Zinc (mcg/dL) <span id="zinc_status" class="status-badge"></span></label>
-      <input type="number" id="zinc" step="1" oninput="updateLabStatus('zinc', this.value)">
-      <div class="range-hint">Normal: 60 – 120 mcg/dL</div>
-    </div>
-    <div class="form-group">
-      <label>Magnesium (mg/dL) <span id="magnesium_status" class="status-badge"></span></label>
-      <input type="number" id="magnesium" step="0.1" oninput="updateLabStatus('magnesium', this.value)">
-      <div class="range-hint">Normal: 1.7 – 2.2 mg/dL</div>
+    <div class="form-grid" style="grid-template-columns: repeat(2, 1fr);">
+      <div class="form-group">
+        <label>Creatinine (mg/dL) <span id="creatinine_status" class="status-badge"></span></label>
+        <input type="number" id="creatinine" step="0.01" placeholder="e.g. 0.9" oninput="updateLabStatus('creatinine', this.value)">
+        <div class="range-hint">Normal: 0.7 – 1.3 mg/dL</div>
+      </div>
+      <div class="form-group">
+        <label>ALT (U/L) <span id="alt_status" class="status-badge"></span></label>
+        <input type="number" id="alt" step="1" placeholder="e.g. 30" oninput="updateLabStatus('alt', this.value)">
+        <div class="range-hint">Normal: 7 – 56 U/L</div>
+      </div>
+      <div class="form-group">
+        <label>AST (U/L) <span id="ast_status" class="status-badge"></span></label>
+        <input type="number" id="ast" step="1" placeholder="e.g. 28" oninput="updateLabStatus('ast', this.value)">
+        <div class="range-hint">Normal: 5 – 40 U/L</div>
+      </div>
+      <div class="form-group">
+        <label>Bilirubin (mg/dL) <span id="bilirubin_status" class="status-badge"></span></label>
+        <input type="number" id="bilirubin" step="0.1" placeholder="e.g. 0.8" oninput="updateLabStatus('bilirubin', this.value)">
+        <div class="range-hint">Normal: 0.1 – 1.2 mg/dL</div>
+      </div>
+      <div class="form-group">
+        <label>Blood Sugar (mg/dL) <span id="blood_sugar_status" class="status-badge"></span></label>
+        <input type="number" id="bloodSugar" step="1" oninput="updateLabStatus('bloodSugar', this.value)">
+        <div class="range-hint">Normal: 70 – 126 mg/dL</div>
+      </div>
+      <div class="form-group">
+        <label>TSH (mIU/L) <span id="tsh_status" class="status-badge"></span></label>
+        <input type="number" id="tsh" step="0.01" oninput="updateLabStatus('tsh', this.value)">
+        <div class="range-hint">Normal: 0.4 – 4.0 mIU/L</div>
+      </div>
     </div>
   </div>
-</div>
 
-<!-- ADVANCED CLINICAL DATA: SECTION 3 (ONCOLOGY DYNAMICS) -->
-<div class="ai-panel card-amber">
-  <div class="ai-header">
-    <div class="ai-badge">ONCOLOGY</div>
-    <h4>Cancer Dynamics & Treatment</h4>
-  </div>
-  <div class="form-grid">
-    <div class="form-group">
-      <label>Cancer Stage</label>
-      <select id="cancerStage">
-        <option value="">Select Stage...</option>
-        <option value="Stage I">Stage I</option>
-        <option value="Stage II">Stage II</option>
-        <option value="Stage III">Stage III</option>
-        <option value="Stage IV">Stage IV</option>
-        <option value="Recurrent">Recurrent</option>
-      </select>
+  <!-- SECTION 2 (MICRONUTRIENTS) -->
+  <div class="ai-panel card-violet" style="margin:0;">
+    <div class="ai-header">
+      <div class="ai-badge">MICRONUTRIENTS</div>
+      <h4>Nutritional Profile</h4>
     </div>
-    <div class="form-group">
-      <label>Tumor Burden</label>
-      <select id="tumorBurden">
-        <option value="">Select...</option>
-        <option value="Low">Low</option>
-        <option value="Moderate">Moderate</option>
-        <option value="High (Bulky)">High (Bulky)</option>
-      </select>
-    </div>
-    <div class="form-group">
-      <label>Palliative Stage</label>
-      <select id="palliativeStage">
-        <option value="">N/A</option>
-        <option value="Early">Early Palliative</option>
-        <option value="Late">Late Palliative</option>
-        <option value="End-of-Life">End-of-Life Care</option>
-      </select>
-    </div>
-    <div class="form-group" style="grid-column:1 / -1;">
-      <label>Metastatic Sites</label>
-      <div class="tag-box">
-        <div class="tag-container" id="metastasisTags"></div>
-        <input type="text" placeholder="Search sites (e.g., Bone, Liver)..." onkeyup="filterMultiList(this,'metastasisDropdown')" onkeydown="handleTagInput(event, 'metastasisTags')">
-        <div class="dropdown-list" id="metastasisDropdown"></div>
+    <div class="form-grid" style="grid-template-columns: repeat(2, 1fr);">
+      <div class="form-group">
+        <label>Prealbumin (mg/dL) <span id="prealbumin_status" class="status-badge"></span></label>
+        <input type="number" id="prealbumin" step="1" oninput="updateLabStatus('prealbumin', this.value)">
+        <div class="range-hint">Normal: 15 – 36 mg/dL</div>
       </div>
-    </div>
-    <div class="form-group" style="grid-column:1 / -1;">
-      <label>Genomic Markers</label>
-      <div class="tag-box">
-        <div class="tag-container" id="genomicMarkersTags"></div>
-        <input type="text" placeholder="Search markers (e.g., EGFR, KRAS)..." onkeyup="filterMultiList(this,'genomicMarkersDropdown')" onkeydown="handleTagInput(event, 'genomicMarkersTags')">
-        <div class="dropdown-list" id="genomicMarkersDropdown"></div>
+      <div class="form-group">
+        <label>Hemoglobin (g/dL) <span id="hemoglobin_status" class="status-badge"></span></label>
+        <input type="number" id="hemoglobin" step="0.1" oninput="updateLabStatus('hemoglobin', this.value)">
+        <div class="range-hint">Normal: 12 – 16 g/dL</div>
       </div>
-    </div>
-    <div class="form-group" style="grid-column:1 / -1;">
-      <label>Treatment Modalities</label>
-      <div class="tag-box">
-        <div class="tag-container" id="treatmentTags"></div>
-        <input type="text" placeholder="Search treatments..." onkeyup="filterMultiList(this,'treatmentDropdown')" onkeydown="handleTagInput(event, 'treatmentTags')">
-        <div class="dropdown-list" id="treatmentDropdown"></div>
+      <div class="form-group">
+        <label>Vitamin D (ng/mL) <span id="vit_d_status" class="status-badge"></span></label>
+        <input type="number" id="vitD" step="1" oninput="updateLabStatus('vitD', this.value)">
+        <div class="range-hint">Normal: 30 – 100 ng/mL</div>
+      </div>
+      <div class="form-group">
+        <label>Vitamin B12 (pg/mL) <span id="vit_b12_status" class="status-badge"></span></label>
+        <input type="number" id="vitB12" step="1" oninput="updateLabStatus('vitB12', this.value)">
+        <div class="range-hint">Normal: 200 – 900 pg/mL</div>
+      </div>
+      <div class="form-group">
+        <label>Folate (ng/mL) <span id="folate_status" class="status-badge"></span></label>
+        <input type="number" id="folate" step="1" oninput="updateLabStatus('folate', this.value)">
+        <div class="range-hint">Normal: 2 – 20 ng/mL</div>
+      </div>
+      <div class="form-group">
+        <label>Zinc (mcg/dL) <span id="zinc_status" class="status-badge"></span></label>
+        <input type="number" id="zinc" step="1" oninput="updateLabStatus('zinc', this.value)">
+        <div class="range-hint">Normal: 60 – 120 mcg/dL</div>
+      </div>
+      <div class="form-group">
+        <label>Magnesium (mg/dL) <span id="magnesium_status" class="status-badge"></span></label>
+        <input type="number" id="magnesium" step="0.1" oninput="updateLabStatus('magnesium', this.value)">
+        <div class="range-hint">Normal: 1.7 – 2.2 mg/dL</div>
       </div>
     </div>
   </div>
-</div>
 
-<!-- ADVANCED CLINICAL DATA: SECTION 4 (FUNCTIONAL & BODY COMP) -->
-<div class="ai-panel card-green">
-  <div class="ai-header">
-    <div class="ai-badge">FUNCTIONAL</div>
-    <h4>Physical Status & Composition</h4>
+  <!-- SECTION 3 (ONCOLOGY DYNAMICS) -->
+  <div class="ai-panel card-amber" style="margin:0;">
+    <div class="ai-header">
+      <div class="ai-badge">ONCOLOGY</div>
+      <h4>Cancer Dynamics & Treatment</h4>
+    </div>
+    <div class="form-grid" style="grid-template-columns: 1fr 1fr;">
+      <div class="form-group">
+        <label>Cancer Stage</label>
+        <select id="cancerStage">
+          <option value="">Select Stage...</option>
+          <option value="Stage I">Stage I</option>
+          <option value="Stage II">Stage II</option>
+          <option value="Stage III">Stage III</option>
+          <option value="Stage IV">Stage IV</option>
+          <option value="Recurrent">Recurrent</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Tumor Burden</label>
+        <select id="tumorBurden">
+          <option value="">Select...</option>
+          <option value="Low">Low</option>
+          <option value="Moderate">Moderate</option>
+          <option value="High (Bulky)">High (Bulky)</option>
+        </select>
+      </div>
+      <div class="form-group" style="grid-column:1 / -1; display:none;">
+          <label>Palliative Stage (Disabled for brevity)</label>
+          <select id="palliativeStage"><option value="">N/A</option></select>
+      </div>
+      <div class="form-group" style="grid-column:1 / -1;">
+        <label>Metastatic Sites</label>
+        <div class="tag-box">
+          <div class="tag-container" id="metastasisTags"></div>
+          <input type="text" placeholder="Search sites..." onkeyup="filterMultiList(this,'metastasisDropdown')" onkeydown="handleTagInput(event, 'metastasisTags')">
+          <div class="dropdown-list" id="metastasisDropdown"></div>
+        </div>
+      </div>
+      <div class="form-group" style="grid-column:1 / -1;">
+        <label>Genomic Markers</label>
+        <div class="tag-box">
+          <div class="tag-container" id="genomicMarkersTags"></div>
+          <input type="text" placeholder="Search markers..." onkeyup="filterMultiList(this,'genomicMarkersDropdown')" onkeydown="handleTagInput(event, 'genomicMarkersTags')">
+          <div class="dropdown-list" id="genomicMarkersDropdown"></div>
+        </div>
+      </div>
+    </div>
   </div>
-  <div class="form-grid">
-    <div class="form-group">
-      <label>ECOG Performance Status</label>
-      <select id="ecogStatus">
-        <option value="0">0 - Fully Active</option>
-        <option value="1">1 - Restricted Strenuous Activity</option>
-        <option value="2">2 - Ambulatory, Capable of Self-care</option>
-        <option value="3">3 - Limited Self-care, 50% Bed/Chair</option>
-        <option value="4">4 - Completely Disabled</option>
-      </select>
-    </div>
-    <div class="form-group">
-      <label>Activity Level</label>
-      <select id="activityLevel">
-        <option value="Ambulatory">Ambulatory (Active)</option>
-        <option value="Bedridden">Bedridden (Limited)</option>
-      </select>
-    </div>
-    <div class="form-group">
-      <label>Sarcopenia Status</label>
-      <select id="sarcopeniaStatus">
-        <option value="None">No Sarcopenia</option>
-        <option value="At Risk">At Risk</option>
-        <option value="Sarcopenic">Confirmed Sarcopenia</option>
-      </select>
-    </div>
-    <div class="form-group">
-      <label>Lean Body Mass (kg)</label>
-      <input type="number" id="leanBodyMass" step="0.1">
-    </div>
-    <div class="form-group">
-      <label>Fat Percentage (%)</label>
-      <input type="number" id="fatPercent" step="0.1" placeholder="e.g. 25">
-    </div>
-    <div class="form-group">
-      <label>BSA (m²) - Auto</label>
-      <input type="number" id="bsa" readonly style="background:var(--bg-2); color:var(--text-3) !important;">
-    </div>
-  </div>
-</div>
 
-<!-- ADVANCED CLINICAL DATA: SECTION 5 (DIETARY & PREFERENCES) -->
-<div class="ai-panel card-sky">
-  <div class="ai-header">
-    <div class="ai-badge">DIETARY</div>
-    <h4>Lifestyle & Metadata</h4>
-  </div>
-  <div class="form-grid">
-    <div class="form-group">
-      <label>Dietary preference</label>
-      <select id="isVegetarian">
-        <option value="false">Non-Vegetarian</option>
-        <option value="true">Vegetarian</option>
-      </select>
+  <!-- SECTION 4 (FUNCTIONAL & BODY COMP) -->
+  <div class="ai-panel card-green" style="margin:0;">
+    <div class="ai-header">
+      <div class="ai-badge">FUNCTIONAL</div>
+      <h4>Physical Status & Composition</h4>
     </div>
-    <div class="form-group">
-      <label>Cultural Preferences</label>
-      <input type="text" id="culturalPreferences" placeholder="e.g. Halal, No spices">
-    </div>
-    <div class="form-group" style="grid-column:1 / -1;">
-      <label>Allergies</label>
-      <div class="tag-box">
-        <div class="tag-container" id="allergyTags"></div>
-        <input type="text" placeholder="Search allergies or type and Enter..." onkeyup="filterMultiList(this,'allergyDropdown')" onkeydown="handleTagInput(event, 'allergyTags')">
-        <div class="dropdown-list" id="allergyDropdown"></div>
+    <div class="form-grid" style="grid-template-columns: 1fr 1fr;">
+      <div class="form-group">
+        <label>ECOG Performance Status</label>
+        <select id="ecogStatus">
+          <option value="0">0 - Fully Active</option>
+          <option value="1">1 - Restricted Strenuous Activity</option>
+          <option value="2">2 - Ambulatory, Capable of Self-care</option>
+          <option value="3">3 - Limited Self-care, 50% Bed/Chair</option>
+          <option value="4">4 - Completely Disabled</option>
+        </select>
       </div>
-    </div>
-    <div class="form-group" style="grid-column:1 / -1;">
-      <label>Existing Supplements</label>
-      <div class="tag-box">
-        <div class="tag-container" id="supplementTags"></div>
-        <input type="text" placeholder="Search supplements or type and Enter..." onkeyup="filterMultiList(this,'supplementDropdown')" onkeydown="handleTagInput(event, 'supplementTags')">
-        <div class="dropdown-list" id="supplementDropdown"></div>
+      <div class="form-group">
+        <label>Activity Level</label>
+        <select id="activityLevel">
+          <option value="Ambulatory">Ambulatory (Active)</option>
+          <option value="Bedridden">Bedridden (Limited)</option>
+        </select>
       </div>
-    </div>
-    <div class="form-group" style="grid-column:1 / -1;">
-      <label>Comorbidities</label>
-      <div class="tag-box">
-        <div class="tag-container" id="comorbidityTags"></div>
-        <input type="text" placeholder="Search comorbidities..." onkeyup="filterMultiList(this,'comorbidityDropdown')">
-        <div class="dropdown-list" id="comorbidityDropdown"></div>
+      <div class="form-group">
+        <label>Sarcopenia Status</label>
+        <select id="sarcopeniaStatus">
+          <option value="None">No Sarcopenia</option>
+          <option value="At Risk">At Risk</option>
+          <option value="Sarcopenic">Confirmed Sarcopenia</option>
+        </select>
       </div>
-    </div>
-    <div class="form-group" style="grid-column:1 / -1;">
-      <label>Side Effects</label>
-      <div class="tag-box">
-        <div class="tag-container" id="sideEffectTags"></div>
-        <input type="text" placeholder="Search side effects..." onkeyup="filterMultiList(this,'sideEffectDropdown')">
-        <div class="dropdown-list" id="sideEffectDropdown"></div>
+      <div class="form-group">
+        <label>Lean Body Mass (kg)</label>
+        <input type="number" id="leanBodyMass" step="0.1">
       </div>
-    </div>
-    <div class="form-group" style="grid-column:1 / -1;">
-      <label>Additional Notes</label>
-      <textarea id="notes" placeholder="Clinical notes, other observations..."></textarea>
+      <div class="form-group">
+        <label>Fat Percentage (%)</label>
+        <input type="number" id="fatPercent" step="0.1" placeholder="e.g. 25">
+      </div>
+      <div class="form-group">
+        <label>BSA (m²) - Auto</label>
+        <input type="number" id="bsa" readonly style="background:var(--bg-2); color:var(--text-3) !important;">
+      </div>
     </div>
   </div>
+
+  <!-- SECTION 5 (LIFESTYLE & PREFERENCES) - FULL WIDTH -->
+  <div class="ai-panel card-sky" style="margin:0; grid-column:1 / -1;">
+    <div class="ai-header">
+      <div class="ai-badge">LIFESTYLE</div>
+      <h4>Dietary & Metadata</h4>
+    </div>
+    <div class="form-grid" style="grid-template-columns: repeat(2, 1fr);">
+      <div class="form-group">
+        <label>Dietary preference</label>
+        <select id="isVegetarian">
+          <option value="false">Non-Vegetarian</option>
+          <option value="true">Vegetarian</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Cultural Preferences</label>
+        <input type="text" id="culturalPreferences" placeholder="e.g. Halal, No spices">
+      </div>
+      <div class="form-group" style="grid-column:1 / span 1;">
+        <label>Allergies</label>
+        <div class="tag-box">
+          <div class="tag-container" id="allergyTags"></div>
+          <input type="text" placeholder="Search allergies..." onkeyup="filterMultiList(this,'allergyDropdown')" onkeydown="handleTagInput(event, 'allergyTags')">
+          <div class="dropdown-list" id="allergyDropdown"></div>
+        </div>
+      </div>
+      <div class="form-group" style="grid-column:span 1;">
+        <label>Existing Supplements</label>
+        <div class="tag-box">
+          <div class="tag-container" id="supplementTags"></div>
+          <input type="text" placeholder="Search supplements..." onkeyup="filterMultiList(this,'supplementDropdown')" onkeydown="handleTagInput(event, 'supplementTags')">
+          <div class="dropdown-list" id="supplementDropdown"></div>
+        </div>
+      </div>
+      <div class="form-group" style="grid-column:1 / -1;">
+        <label>Comorbidities</label>
+        <div class="tag-box">
+          <div class="tag-container" id="comorbidityTags"></div>
+          <input type="text" placeholder="Search comorbidities..." onkeyup="filterMultiList(this,'comorbidityDropdown')">
+          <div class="dropdown-list" id="comorbidityDropdown"></div>
+        </div>
+      </div>
+      <div class="form-group" style="grid-column:1 / -1; display:none;">
+        <label>Treatment Modalities (Moved to Oncology)</label>
+        <div class="tag-box">
+          <div class="tag-container" id="treatmentTags"></div>
+        </div>
+      </div>
+      <div class="form-group" style="grid-column:1 / -1;">
+        <label>Additional Notes</label>
+        <textarea id="notes" placeholder="Clinical notes..." rows="2"></textarea>
+      </div>
+    </div>
+  </div>
+
 </div>
 
 <!-- INTAKE ASSESSMENT CALCULATOR (ADDED) -->
@@ -718,6 +709,9 @@ function updateLabStatus(id, val) {
     const max = (id === 'zinc') ? 120 : 2.2;
     if(num < min) { status = 'Low'; cls = 'status-danger'; }
     else if(num > max) { status = 'High'; cls = 'status-warn'; }
+    else { status = 'Normal'; cls = 'status-normal'; }
+  } else if(id === 'muac') {
+    if(num < 23) { status = 'Low'; cls = 'status-danger'; }
     else { status = 'Normal'; cls = 'status-normal'; }
   }
 
