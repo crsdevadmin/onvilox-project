@@ -8,6 +8,36 @@
   <!-- PDF.js library for client-side extraction -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
   <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';</script>
+  <style>
+    .range-hint {
+      font-size: 11px;
+      color: var(--text-secondary);
+      margin-top: 4px;
+      font-weight: 500;
+      display: block;
+    }
+    .status-badge {
+      font-size: 10px;
+      font-weight: 800;
+      padding: 2px 8px;
+      border-radius: 12px;
+      text-transform: uppercase;
+      margin-left: 8px;
+      display: none;
+    }
+    .status-normal { background: #dcfce7; color: #166534; display: inline-block; }
+    .status-warn { background: #fef9c3; color: #854d0e; display: inline-block; }
+    .status-danger { background: #fee2e2; color: #991b1b; display: inline-block; }
+    
+    .ai-filled {
+      animation: highlight-pulse 2s ease;
+    }
+    @keyframes highlight-pulse {
+      0% { border-color: var(--primary); box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.2); }
+      50% { border-color: #22c55e; box-shadow: 0 0 0 6px rgba(34, 197, 94, 0.3); }
+      100% { border-color: var(--border); box-shadow: none; }
+    }
+  </style>
 </head>
 <body>
 
@@ -133,14 +163,16 @@
   </div>
 
   <div class="form-group">
-    <label class="required">Serum Albumin (g/dL)</label>
-    <input type="number" id="albumin" step="0.1" onkeyup="validateField(this,'Serum Albumin')">
+    <label class="required">Serum Albumin (g/dL) <span id="albumin_status" class="status-badge"></span></label>
+    <input type="number" id="albumin" step="0.1" onkeyup="validateField(this,'Serum Albumin'); updateLabStatus('albumin', this.value)">
+    <div class="range-hint">Normal Range: 3.5 – 5.5 g/dL</div>
     <div class="validation-msg" id="albumin_msg"></div>
   </div>
 
   <div class="form-group">
-    <label>CRP (mg/L)</label>
-    <input type="number" id="crp" step="0.1" placeholder="e.g. 5.0">
+    <label>CRP (mg/L) <span id="crp_status" class="status-badge"></span></label>
+    <input type="number" id="crp" step="0.1" placeholder="e.g. 5.0" onkeyup="updateLabStatus('crp', this.value)">
+    <div class="range-hint">Normal Range: &lt; 10 mg/L</div>
     <div class="validation-msg" id="crp_msg"></div>
   </div>
 
@@ -187,24 +219,118 @@
       </select>
     </div>
     <div class="form-group">
-      <label>Creatinine (mg/dL)</label>
-      <input type="number" id="creatinine" step="0.01" placeholder="e.g. 0.9">
+      <label>Creatinine (mg/dL) <span id="creatinine_status" class="status-badge"></span></label>
+      <input type="number" id="creatinine" step="0.01" placeholder="e.g. 0.9" onkeyup="updateLabStatus('creatinine', this.value)">
+      <div class="range-hint">Normal: 0.7 – 1.3 mg/dL</div>
     </div>
     <div class="form-group">
-      <label>ALT (U/L)</label>
-      <input type="number" id="alt" step="1" placeholder="e.g. 30">
+      <label>ALT (U/L) <span id="alt_status" class="status-badge"></span></label>
+      <input type="number" id="alt" step="1" placeholder="e.g. 30" onkeyup="updateLabStatus('alt', this.value)">
+      <div class="range-hint">Normal: 7 – 56 U/L</div>
     </div>
     <div class="form-group">
-      <label>AST (U/L)</label>
-      <input type="number" id="ast" step="1" placeholder="e.g. 28">
+      <label>AST (U/L) <span id="ast_status" class="status-badge"></span></label>
+      <input type="number" id="ast" step="1" placeholder="e.g. 28" onkeyup="updateLabStatus('ast', this.value)">
+      <div class="range-hint">Normal: 5 – 40 U/L</div>
     </div>
     <div class="form-group">
-      <label>Bilirubin (mg/dL)</label>
-      <input type="number" id="bilirubin" step="0.1" placeholder="e.g. 0.8">
+      <label>Bilirubin (mg/dL) <span id="bilirubin_status" class="status-badge"></span></label>
+      <input type="number" id="bilirubin" step="0.1" placeholder="e.g. 0.8" onkeyup="updateLabStatus('bilirubin', this.value)">
+      <div class="range-hint">Normal: 0.1 – 1.2 mg/dL</div>
+    </div>
+    <div class="form-group">
+      <label>Blood Sugar (mg/dL) <span id="blood_sugar_status" class="status-badge"></span></label>
+      <input type="number" id="bloodSugar" step="1" onkeyup="updateLabStatus('bloodSugar', this.value)">
+      <div class="range-hint">Normal: 70 – 126 mg/dL</div>
+    </div>
+    <div class="form-group">
+      <label>TSH (mIU/L) <span id="tsh_status" class="status-badge"></span></label>
+      <input type="number" id="tsh" step="0.01" onkeyup="updateLabStatus('tsh', this.value)">
+      <div class="range-hint">Normal: 0.4 – 4.0 mIU/L</div>
+    </div>
+    <div class="form-group">
+      <label>Hemoglobin (g/dL) <span id="hemoglobin_status" class="status-badge"></span></label>
+      <input type="number" id="hemoglobin" step="0.1" onkeyup="updateLabStatus('hemoglobin', this.value)">
+      <div class="range-hint">Normal: 12 – 16 g/dL</div>
+    </div>
+    <div class="form-group">
+      <label>Prealbumin (mg/dL) <span id="prealbumin_status" class="status-badge"></span></label>
+      <input type="number" id="prealbumin" step="1" onkeyup="updateLabStatus('prealbumin', this.value)">
+      <div class="range-hint">Normal: 15 – 36 mg/dL</div>
+    </div>
+    <div class="form-group">
+      <label>Vitamin D (ng/mL) <span id="vit_d_status" class="status-badge"></span></label>
+      <input type="number" id="vitD" step="1" onkeyup="updateLabStatus('vitD', this.value)">
+      <div class="range-hint">Normal: 30 – 100 ng/mL</div>
+    </div>
+    <div class="form-group">
+      <label>Vitamin B12 (pg/mL) <span id="vit_b12_status" class="status-badge"></span></label>
+      <input type="number" id="vitB12" step="1" onkeyup="updateLabStatus('vitB12', this.value)">
+      <div class="range-hint">Normal: 200 – 900 pg/mL</div>
+    </div>
+    <div class="form-group">
+      <label>Folate (ng/mL) <span id="folate_status" class="status-badge"></span></label>
+      <input type="number" id="folate" step="1" onkeyup="updateLabStatus('folate', this.value)">
+      <div class="range-hint">Normal: 2 – 20 ng/mL</div>
+    </div>
+    <div class="form-group">
+      <label>Zinc (mcg/dL) <span id="zinc_status" class="status-badge"></span></label>
+      <input type="number" id="zinc" step="1" onkeyup="updateLabStatus('zinc', this.value)">
+      <div class="range-hint">Normal: 60 – 120 mcg/dL</div>
+    </div>
+    <div class="form-group">
+      <label>Magnesium (mg/dL) <span id="magnesium_status" class="status-badge"></span></label>
+      <input type="number" id="magnesium" step="0.1" onkeyup="updateLabStatus('magnesium', this.value)">
+      <div class="range-hint">Normal: 1.7 – 2.2 mg/dL</div>
     </div>
     <div class="form-group" style="grid-column: 1 / -1;">
       <label>Metastatic Sites</label>
       <input type="text" id="metastasisSites" placeholder="e.g. Bone, Liver, Lung">
+    </div>
+    <div class="form-group">
+      <label>Tumor Burden</label>
+      <select id="tumorBurden">
+        <option value="">Select...</option>
+        <option value="Low">Low</option>
+        <option value="Moderate">Moderate</option>
+        <option value="High (Bulky)">High (Bulky)</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Palliative Stage</label>
+      <select id="palliativeStage">
+        <option value="">N/A</option>
+        <option value="Early">Early Palliative</option>
+        <option value="Late">Late Palliative</option>
+        <option value="End-of-Life">End-of-Life Care</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Activity Level</label>
+      <select id="activityLevel">
+        <option value="Ambulatory">Ambulatory (Active)</option>
+        <option value="Bedridden">Bedridden (Limited)</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Sarcopenia Status</label>
+      <select id="sarcopeniaStatus">
+        <option value="None">No Sarcopenia</option>
+        <option value="At Risk">At Risk</option>
+        <option value="Sarcopenic">Confirmed Sarcopenia</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Fat Percentage (%)</label>
+      <input type="number" id="fatPercent" step="0.1" placeholder="e.g. 25">
+    </div>
+    <div class="form-group">
+      <label>Lean Body Mass (kg)</label>
+      <input type="number" id="leanBodyMass" step="0.1">
+    </div>
+    <div class="form-group">
+      <label>BSA (m²) - Auto</label>
+      <input type="number" id="bsa" readonly style="background:#f1f5f9;">
     </div>
     <div class="form-group">
       <label>Dietary preference</label>
@@ -271,14 +397,23 @@
 </div>
 
 <div class="form-group">
-  <label>Genomic Markers</label>
+  <label>Treatment Modalities</label>
   <div class="tag-box">
-    <div class="tag-container" id="genomicMarkersTags"></div>
-    <input type="text" placeholder="Search markers (e.g., MTHFR, BRCA)..." onkeyup="filterMultiList(this,'genomicMarkersDropdown')">
-    <div class="dropdown-list" id="genomicMarkersDropdown"></div>
+    <div class="tag-container" id="treatmentTags"></div>
+    <input type="text" placeholder="Search treatments..." onkeyup="filterMultiList(this,'treatmentDropdown')">
+    <div class="dropdown-list" id="treatmentDropdown"></div>
   </div>
 </div>
 
+<div class="form-group">
+  <label>Cultural/Dietary Preferences</label>
+  <textarea id="culturalPreferences" placeholder="e.g. Halal, Kosher, Diabetic-friendly, No spices"></textarea>
+</div>
+
+<div class="form-group">
+  <label>Existing Supplements</label>
+  <textarea id="existingSupplements" placeholder="Patient's current vitamins or herbals"></textarea>
+</div>
 
 <div class="form-group">
   <label>Allergies</label>
@@ -310,6 +445,19 @@
 
 <script>
 auth.requireRole(['DOCTOR','ASSISTANT']);
+
+// BSA Auto-calc (DuBois formula)
+function updateBSA() {
+  const w = parseFloat(document.getElementById('weight').value);
+  const h = parseFloat(document.getElementById('height').value);
+  if (w > 0 && h > 0) {
+    // 0.007184 * W^0.425 * H^0.725
+    const bsa = 0.007184 * Math.pow(w, 0.425) * Math.pow(h, 0.725);
+    document.getElementById('bsa').value = bsa.toFixed(2);
+  }
+}
+document.getElementById('weight').addEventListener('input', updateBSA);
+document.getElementById('height').addEventListener('input', updateBSA);
 
 function tagsToArray(containerId){
   const c = document.getElementById(containerId);
@@ -387,6 +535,11 @@ function submitPatient(){
     usualWeight: parseFloat(usualWeightEl.value),
     weight: parseFloat(weightEl.value),
     height: parseFloat(heightEl.value),
+    bsa: parseFloat(document.getElementById('bsa').value || 0),
+    leanBodyMass: parseFloat(document.getElementById('leanBodyMass').value || 0),
+    fatPercent: parseFloat(document.getElementById('fatPercent').value || 0),
+    sarcopeniaStatus: document.getElementById('sarcopeniaStatus').value,
+    activityLevel: document.getElementById('activityLevel').value,
     weightLossPercent: (() => {
       const uw = parseFloat(usualWeightEl.value);
       const cw = parseFloat(weightEl.value);
@@ -400,20 +553,32 @@ function submitPatient(){
     albumin: parseFloat(albuminEl.value),
     crp: parseFloat(crpEl.value || 0),
     muac: parseFloat(muacEl.value || 0),
-    feedingMethod: feedingMethodEl.value,
-    comorbidities: tagsToArray('comorbidityTags'),
-    sideEffects: tagsToArray('sideEffectTags'),
-    genomicMarkers: tagsToArray('genomicMarkerTags'),
-    allergies: allergiesEl.value,
-    notes: notesEl.value,
-    
-    // Save advanced fields
-    cancerStage: cancerStageEl.value,
-    ecogStatus: parseInt(ecogStatusEl.value || 0),
     creatinine: parseFloat(creatinineEl.value || 0),
     alt: parseFloat(altEl.value || 0),
     ast: parseFloat(astEl.value || 0),
     bilirubin: parseFloat(bilirubinEl.value || 0),
+    bloodSugar: parseFloat(document.getElementById('bloodSugar').value || 0),
+    tsh: parseFloat(document.getElementById('tsh').value || 0),
+    hemoglobin: parseFloat(document.getElementById('hemoglobin').value || 0),
+    prealbumin: parseFloat(document.getElementById('prealbumin').value || 0),
+    vitD: parseFloat(document.getElementById('vitD').value || 0),
+    vitB12: parseFloat(document.getElementById('vitB12').value || 0),
+    folate: parseFloat(document.getElementById('folate').value || 0),
+    zinc: parseFloat(document.getElementById('zinc').value || 0),
+    magnesium: parseFloat(document.getElementById('magnesium').value || 0),
+    feedingMethod: feedingMethodEl.value,
+    treatmentTypes: tagsToArray('treatmentTags'),
+    comorbidities: tagsToArray('comorbidityTags'),
+    sideEffects: tagsToArray('sideEffectTags'),
+    genomicMarkers: tagsToArray('genomicMarkerTags'),
+    allergies: allergiesEl.value,
+    culturalPreferences: document.getElementById('culturalPreferences').value,
+    existingSupplements: document.getElementById('existingSupplements').value,
+    notes: notesEl.value,
+    cancerStage: cancerStageEl.value,
+    ecogStatus: parseInt(ecogStatusEl.value || 0),
+    tumorBurden: document.getElementById('tumorBurden').value,
+    palliativeStage: document.getElementById('palliativeStage').value,
     metastasisSites: metastasisSitesEl.value,
     isVegetarian: isVegetarianEl.value === 'true'
   };
@@ -428,6 +593,75 @@ function calculateWeightLoss(){
   // weightLossPercent input removed from UI
   if(uw > 0 && cw > 0){
     // Validation handled by internal state logic during submit
+  }
+}
+
+function updateLabStatus(id, val) {
+  const badge = document.getElementById(id + '_status');
+  if(!badge) return;
+  const num = parseFloat(val);
+  if(isNaN(num)) { badge.style.display = 'none'; return; }
+
+  let status = '', label = '', cls = '';
+  
+  if(id === 'albumin') {
+    if(num < 3.5) { status = 'Low'; cls = 'status-danger'; }
+    else if(num > 5.5) { status = 'High'; cls = 'status-warn'; }
+    else { status = 'Normal'; cls = 'status-normal'; }
+  } else if(id === 'crp') {
+    if(num >= 10) { status = 'High'; cls = 'status-danger'; }
+    else if(num > 3) { status = 'Elevated'; cls = 'status-warn'; }
+    else { status = 'Normal'; cls = 'status-normal'; }
+  } else if(id === 'creatinine') {
+    if(num > 1.3) { status = 'High'; cls = 'status-danger'; }
+    else if(num < 0.6) { status = 'Low'; cls = 'status-warn'; }
+    else { status = 'Normal'; cls = 'status-normal'; }
+  } else if(id === 'alt' || id === 'ast') {
+    const limit = (id === 'alt') ? 56 : 40;
+    if(num > limit) { status = 'High'; cls = 'status-danger'; }
+    else { status = 'Normal'; cls = 'status-normal'; }
+  } else if(id === 'bilirubin') {
+    if(num > 1.2) { status = 'High'; cls = 'status-danger'; }
+    else if(num < 0.1) { status = 'Low'; cls = 'status-warn'; }
+    else { status = 'Normal'; cls = 'status-normal'; }
+  } else if(id === 'bloodSugar') {
+    if(num > 126) { status = 'High'; cls = 'status-danger'; }
+    else if(num < 70) { status = 'Low'; cls = 'status-danger'; }
+    else if(num > 100) { status = 'Elevated'; cls = 'status-warn'; }
+    else { status = 'Normal'; cls = 'status-normal'; }
+  } else if(id === 'tsh') {
+    if(num > 4.0) { status = 'High'; cls = 'status-warn'; }
+    else if(num < 0.4) { status = 'Low'; cls = 'status-warn'; }
+    else { status = 'Normal'; cls = 'status-normal'; }
+  } else if(id === 'hemoglobin') {
+    if(num < 12) { status = 'Low'; cls = 'status-danger'; }
+    else if(num > 18) { status = 'High'; cls = 'status-warn'; }
+    else { status = 'Normal'; cls = 'status-normal'; }
+  } else if(id === 'prealbumin') {
+    if(num < 15) { status = 'Low'; cls = 'status-danger'; }
+    else { status = 'Normal'; cls = 'status-normal'; }
+  } else if(id === 'vitD') {
+    if(num < 20) { status = 'Deficiency'; cls = 'status-danger'; }
+    else if(num < 30) { status = 'Insuff.'; cls = 'status-warn'; }
+    else { status = 'Normal'; cls = 'status-normal'; }
+  } else if(id === 'vitB12') {
+    if(num < 200) { status = 'Low'; cls = 'status-danger'; }
+    else { status = 'Normal'; cls = 'status-normal'; }
+  } else if(id === 'folate') {
+    if(num < 3) { status = 'Low'; cls = 'status-danger'; }
+    else { status = 'Normal'; cls = 'status-normal'; }
+  } else if(id === 'zinc' || id === 'magnesium') {
+    const min = (id === 'zinc') ? 60 : 1.7;
+    if(num < min) { status = 'Low'; cls = 'status-danger'; }
+    else { status = 'Normal'; cls = 'status-normal'; }
+  }
+
+  if(status) {
+    badge.innerText = status;
+    badge.className = 'status-badge ' + cls;
+    badge.style.display = 'inline-block';
+  } else {
+    badge.style.display = 'none';
   }
 }
 
@@ -617,6 +851,10 @@ function runAiExtraction(rawText) {
     uw: text.match(new RegExp('usual weight' + numPattern))?.[1] || text.match(new RegExp('uw' + numPattern))?.[1],
     albumin: text.match(new RegExp('albumin' + numPattern))?.[1] || text.match(new RegExp('alb' + numPattern))?.[1] || text.match(reverseAlbuminPattern)?.[1],
     crp: text.match(new RegExp('crp' + numPattern))?.[1] || text.match(reverseCrpPattern)?.[1],
+    creatinine: text.match(new RegExp('creatinine' + numPattern))?.[1] || text.match(new RegExp('cr' + numPattern))?.[1],
+    alt: text.match(new RegExp('alt' + numPattern))?.[1] || text.match(new RegExp('sgpt' + numPattern))?.[1],
+    ast: text.match(new RegExp('ast' + numPattern))?.[1] || text.match(new RegExp('sgot' + numPattern))?.[1],
+    bilirubin: text.match(new RegExp('bilirubin' + numPattern))?.[1] || text.match(new RegExp('bil' + numPattern))?.[1],
     gi: text.includes('vomiting') || text.includes('nausea') || text.includes('diarrhea') || text.includes('bloating') || text.includes('gastric issues')
   };
 
@@ -637,10 +875,41 @@ function runAiExtraction(rawText) {
   if (extractions.height) { document.getElementById('height').value = extractions.height; highlight('height', 'Height', extractions.height); foundCount++; }
   if (extractions.weight) { document.getElementById('weight').value = extractions.weight; highlight('weight', 'Weight', extractions.weight); foundCount++; }
   if (extractions.uw) { document.getElementById('usualWeight').value = extractions.uw; highlight('usualWeight', 'Usual Weight', extractions.uw); foundCount++; }
-  if (extractions.albumin) { document.getElementById('albumin').value = extractions.albumin; highlight('albumin', 'Albumin', extractions.albumin); foundCount++; }
+  if (extractions.albumin) { 
+    document.getElementById('albumin').value = extractions.albumin; 
+    highlight('albumin', 'Albumin', extractions.albumin); 
+    updateLabStatus('albumin', extractions.albumin);
+    foundCount++; 
+  }
   if (extractions.crp) { 
-    const crpEl = document.getElementById('epCRP') || document.getElementById('crp'); 
-    if(crpEl) { crpEl.value = extractions.crp; highlight(crpEl.id, 'CRP', extractions.crp); foundCount++; }
+    document.getElementById('crp').value = extractions.crp; 
+    highlight('crp', 'CRP', extractions.crp); 
+    updateLabStatus('crp', extractions.crp);
+    foundCount++; 
+  }
+  if (extractions.creatinine) {
+    document.getElementById('creatinine').value = extractions.creatinine;
+    highlight('creatinine', 'Creatinine', extractions.creatinine);
+    updateLabStatus('creatinine', extractions.creatinine);
+    foundCount++;
+  }
+  if (extractions.alt) {
+    document.getElementById('alt').value = extractions.alt;
+    highlight('alt', 'ALT', extractions.alt);
+    updateLabStatus('alt', extractions.alt);
+    foundCount++;
+  }
+  if (extractions.ast) {
+    document.getElementById('ast').value = extractions.ast;
+    highlight('ast', 'AST', extractions.ast);
+    updateLabStatus('ast', extractions.ast);
+    foundCount++;
+  }
+  if (extractions.bilirubin) {
+    document.getElementById('bilirubin').value = extractions.bilirubin;
+    highlight('bilirubin', 'Bilirubin', extractions.bilirubin);
+    updateLabStatus('bilirubin', extractions.bilirubin);
+    foundCount++;
   }
   if (extractions.gi) { document.getElementById('giIssues').value = "true"; highlight('giIssues', 'GI Issues', 'Yes'); foundCount++; }
 

@@ -10,7 +10,15 @@ function generateNutritionPlan(patient) {
   const alt = parseFloat(patient.alt || 0);
   const ast = parseFloat(patient.ast || 0);
   const bilirubin = parseFloat(patient.bilirubin || 0);
+  const bloodSugar = parseFloat(patient.bloodSugar || 0);
+  const tsh = parseFloat(patient.tsh || 0);
+  const hemoglobin = parseFloat(patient.hemoglobin || 0);
+  const vitD = parseFloat(patient.vitD || 0);
+  const zinc = parseFloat(patient.zinc || 0);
+  const prealbumin = parseFloat(patient.prealbumin || 0);
   const ecog = parseInt(patient.ecogStatus || 0);
+  const sarcopenia = patient.sarcopeniaStatus === 'Sarcopenic';
+  const tumorBurden = patient.tumorBurden === 'High (Bulky)';
   
   const bmi = height ? (weight / Math.pow(height / 100, 2)) : 0;
   
@@ -77,15 +85,27 @@ function generateNutritionPlan(patient) {
     riskScore += 1;
     nutritionRiskReasons.push('Reduced physical performance (ECOG ≥ 2)');
   }
+  if (bloodSugar > 126) {
+    riskScore += 1;
+    nutritionRiskReasons.push('Hyperglycemia / Diabetes risk');
+  }
+  if (hemoglobin > 0 && hemoglobin < 12) {
+    riskScore += 1;
+    nutritionRiskReasons.push('Anemia (Low Hemoglobin)');
+  }
+  if (sarcopenia) {
+    riskScore += 2;
+    nutritionRiskReasons.push('Confirmed Sarcopenia');
+  }
 
   let nutritionRisk = 'Low';
   if (riskScore >= 4) nutritionRisk = 'High';
   else if (riskScore >= 2) nutritionRisk = 'Moderate';
 
-  const cachexia = albumin < 3.5 || weightLossPercent >= 10 || bmi < 18.5 || crp > 10;
+  const cachexia = albumin < 3.5 || weightLossPercent >= 10 || bmi < 18.5 || crp > 10 || sarcopenia;
 
   const kcalPerKg = cachexia ? 35 : 30;
-  const proteinPerKg = cachexia ? 1.8 : 1.4;
+  const proteinPerKg = (cachexia || tumorBurden) ? 1.8 : 1.4;
 
   let baseCalories = Math.round(weight * kcalPerKg);
   let dailyProtein = Math.round(weight * proteinPerKg);
@@ -132,20 +152,28 @@ function generateNutritionPlan(patient) {
   else if ((patient.feedingMethod || '').toLowerCase().includes('enteral')) proteinType = 'Peptide formulas';
 
   const micronutrients = {
-    vitD: '1000–2000 IU/day',
+    vitD: vitD > 0 && vitD < 30 ? '2000–4000 IU/day (Correction Dose)' : '1000–2000 IU/day (Maintenance)',
     vitC: '500–1000 mg/day',
-    zinc: '8–15 mg/day',
+    zinc: zinc > 0 && zinc < 60 ? '30–50 mg/day (Replacement)' : '8–15 mg/day',
     omega3: '1.5–2 g/day',
     epa: 'Around 2 g EPA/day for cachexia support',
-    leucine: '2–3 g/day or as clinically indicated',
-    hmb: 'Around 3 g/day when muscle preservation is needed',
-    glutamine: patient.giIssues ? '5–10 g/day as tolerated' : 'Consider if mucositis / GI toxicity',
-    selenium: 'Add as clinically indicated',
-    magnesium: 'Add as clinically indicated',
-    bComplex: 'Daily supportive supplementation',
-    iron: 'When anemia is present',
-    bcaa: (alt > 50 || ast > 50 || bilirubin > 1.2) ? '10–20 g/day Branched-Chain Amino Acids (BCAA) recommended for liver support' : null
+    leucine: (sarcopenia || tumorBurden) ? '3–5 g/day (Enhanced MPS Support)' : '2–3 g/day',
+    glutamine: (patient.giIssues || (patient.sideEffects && patient.sideEffects.includes('Mucositis'))) ? '10–20 g/day for mucosal recovery' : 'Consider if mucositis / GI toxicity',
+    bcaa: (alt > 50 || ast > 50 || bilirubin > 1.2) ? '15–20 g/day Branched-Chain Amino Acids (BCAA)' : (sarcopenia ? '5–10 g/day additional BCAA' : null),
+    magnesium: patient.magnesium > 0 && patient.magnesium < 1.7 ? '250–500 mg/day supplemental Mg' : 'Daily supportive dose',
+    bComplex: 'High-potency daily supportive dose',
+    folate: patient.folate > 0 && patient.folate < 3 ? '1–5 mg/day' : 'Daily maintenance'
   };
+
+  const flavorProfile = (() => {
+    if (patient.sideEffects && (patient.sideEffects.includes('Nausea') || patient.sideEffects.includes('Taste alteration'))) {
+      return { recommendation: "Tart / Citrus / Neutral (Avoid strong chocolate/vanilla)", logic: "Citrus flavors are better tolerated during nausea and help mask metallic taste from chemotherapy." };
+    }
+    if (patient.sideEffects && patient.sideEffects.includes('Dysphagia')) {
+      return { recommendation: "Mild Honey / Smooth Cream", logic: "Low-acid, soothing flavors for delicate throat tissues." };
+    }
+    return { recommendation: "Flavor Choice: Customizable", logic: "Patient-led preference for adherence." };
+  })();
 
   const rationale = [];
   
