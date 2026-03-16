@@ -67,7 +67,9 @@
   <div class="nav">
     <a href="doctor.html">Dashboard</a>
     <a href="#" onclick="auth.logout()">Logout</a>
-    <button id="themeToggleBtn" onclick="toggleTheme()" class="btn-secondary btn-sm" style="margin-left: 20px; border-radius: 30px; padding: 6px 14px; cursor: pointer;">🌙 Dark Mode</button>
+    <button id="themeToggleBtn" onclick="toggleTheme()" class="theme-toggle-btn" style="margin-left: 20px;">
+      <span id="themeIcon">🌙</span> <span id="themeLabel">Dark</span>
+    </button>
   </div>
 </div>
 
@@ -109,14 +111,14 @@
   </div>
 
   <div class="form-group">
-    <label class="required">Usual Weight (kg) - before illness</label>
-    <input type="number" id="usualWeight" onkeyup="calculateWeightLoss(); validateField(this,'Usual Weight')" min="25" max="300">
+    <label class="required">Usual Weight (kg)</label>
+    <input type="number" id="usualWeight" oninput="syncWeightLossFromForm(); validateField(this,'Usual Weight')" min="25" max="300" step="0.1">
     <div class="validation-msg" id="usualWeight_msg"></div>
   </div>
 
   <div class="form-group">
     <label class="required">Current Weight (kg)</label>
-    <input type="number" id="weight" onkeyup="calculateWeightLoss(); validateField(this,'Current Weight')" min="25" max="300">
+    <input type="number" id="weight" oninput="syncWeightLossFromForm(); validateField(this,'Weight')" min="25" max="300" step="0.1">
     <div class="validation-msg" id="weight_msg"></div>
   </div>
 
@@ -334,7 +336,7 @@
     </div>
     <div class="form-group">
       <label>BSA (m²) - Auto</label>
-      <input type="number" id="bsa" readonly style="background:#f1f5f9;">
+      <input type="number" id="bsa" readonly style="background:var(--bg-2); color:var(--text-3) !important;">
     </div>
     <div class="form-group">
       <label>Dietary preference</label>
@@ -599,13 +601,17 @@ function submitPatient(){
   window.location.href = 'doctor.html';
 }
 
-function calculateWeightLoss(){
-  const uw = parseFloat(document.getElementById('usualWeight').value);
-  const cw = parseFloat(document.getElementById('weight').value);
-  // weightLossPercent input removed from UI
-  if(uw > 0 && cw > 0){
-    // Validation handled by internal state logic during submit
-  }
+function syncWeightLossFromForm(){
+  // Auto-calculated during submission, but we can trigger BSA update here
+  updateBSA();
+}
+
+function toggleIntakeUI() {
+  const method = document.getElementById('feedingMethod').value;
+  const panel = document.getElementById('intakeAssessmentPanel');
+  if(!panel) return;
+  // Show only if "Oral Feeding (Normal Diet)"
+  panel.style.display = (method === 'Oral Feeding (Normal Diet)') ? 'block' : 'none';
 }
 
 function updateLabStatus(id, val) {
@@ -759,6 +765,7 @@ function initIntakeCalc() {
 function round1(n){ return Math.round(n*10)/10; }
 
 initIntakeCalc();
+toggleIntakeUI();
 
 // --- CHATBOT LOGIC ---
 function toggleChat() {
@@ -988,19 +995,28 @@ function runAiExtraction(rawText) {
 
   if(foundCount > 0) {
     addMessage(`I've extracted ${foundCount} item(s):\n• ${foundItems.join('\n• ')}\n\nAnything else?`, 'ai');
-    if(typeof calculateWeightLoss === 'function') calculateWeightLoss();
+    if(typeof syncWeightLossFromForm === 'function') syncWeightLossFromForm();
   } else {
     addMessage("I couldn't find specific clinical markers in that. Could you provide a weight, albumin level, or cancer type?", 'ai');
   }
 }
 
-function toggleIntakeUI() {
-  const method = document.getElementById('feedingMethod').value;
-  const panel = document.getElementById('intakeAssessmentPanel');
-  if(!panel) return;
-  // Show only if "Oral Feeding (Normal Diet)"
-  panel.style.display = (method === 'Oral Feeding (Normal Diet)') ? 'block' : 'none';
+function toggleTheme(){
+  document.body.classList.toggle('light');
+  const isLight = document.body.classList.contains('light');
+  localStorage.setItem('onvilox_theme', isLight ? 'light' : 'dark');
+  updateThemeUI();
 }
+function updateThemeUI(){
+  const isLight = document.body.classList.contains('light');
+  document.getElementById('themeLabel').textContent = isLight ? 'Light' : 'Dark';
+  document.getElementById('themeIcon').textContent = isLight ? '☀️' : '🌙';
+}
+(function(){
+  const saved = localStorage.getItem('onvilox_theme') || 'dark';
+  if(saved === 'light') document.body.classList.add('light');
+  updateThemeUI();
+})();
 </script>
 
 
