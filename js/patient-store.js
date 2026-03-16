@@ -57,6 +57,7 @@ function addAssessment(patientId, formData) {
     weight: formData.weight,
     albumin: formData.albumin,
     crp: formData.crp,
+    muac: formData.muac,
     giIssues: formData.giIssues || false,
     reducedFoodIntake: formData.reducedFoodIntake,
     notes: formData.notes || ""
@@ -65,6 +66,7 @@ function addAssessment(patientId, formData) {
   if (formData.weight) patient.weight = formData.weight;
   if (formData.albumin) patient.albumin = formData.albumin;
   if (formData.crp) patient.crp = formData.crp;
+  if (formData.muac) patient.muac = formData.muac;
   
   patient.assessments.push(assessment);
   updatePatient(patient);
@@ -95,6 +97,8 @@ function createOrUpdatePlan(patient, engineOutput, overrides, overrideNotes){
     weight: patient.weight,
     height: patient.height,
     albumin: patient.albumin,
+    crp: patient.crp,
+    muac: patient.muac,
     weightLossPercent: patient.weightLossPercent,
     feedingMethod: patient.feedingMethod,
     giIssues: !!patient.giIssues
