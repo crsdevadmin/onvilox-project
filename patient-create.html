@@ -158,6 +158,64 @@
 
 </div>
 
+<!-- ADVANCED CLINICAL DATA -->
+<div class="ai-panel">
+  <div class="ai-header">
+    <div class="ai-badge">ADVANCED</div>
+    <h4>Extended Clinical Assessment</h4>
+  </div>
+  <div class="form-grid">
+    <div class="form-group">
+      <label>Cancer Stage</label>
+      <select id="cancerStage">
+        <option value="">Select Stage...</option>
+        <option value="Stage I">Stage I</option>
+        <option value="Stage II">Stage II</option>
+        <option value="Stage III">Stage III</option>
+        <option value="Stage IV">Stage IV</option>
+        <option value="Recurrent">Recurrent</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>ECOG Performance Status</label>
+      <select id="ecogStatus">
+        <option value="0">0 - Fully Active</option>
+        <option value="1">1 - Restricted Strenuous Activity</option>
+        <option value="2">2 - Ambulatory, Capable of Self-care</option>
+        <option value="3">3 - Limited Self-care, 50% Bed/Chair</option>
+        <option value="4">4 - Completely Disabled</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Creatinine (mg/dL)</label>
+      <input type="number" id="creatinine" step="0.01" placeholder="e.g. 0.9">
+    </div>
+    <div class="form-group">
+      <label>ALT (U/L)</label>
+      <input type="number" id="alt" step="1" placeholder="e.g. 30">
+    </div>
+    <div class="form-group">
+      <label>AST (U/L)</label>
+      <input type="number" id="ast" step="1" placeholder="e.g. 28">
+    </div>
+    <div class="form-group">
+      <label>Bilirubin (mg/dL)</label>
+      <input type="number" id="bilirubin" step="0.1" placeholder="e.g. 0.8">
+    </div>
+    <div class="form-group" style="grid-column: 1 / -1;">
+      <label>Metastatic Sites</label>
+      <input type="text" id="metastasisSites" placeholder="e.g. Bone, Liver, Lung">
+    </div>
+    <div class="form-group">
+      <label>Dietary preference</label>
+      <select id="isVegetarian">
+        <option value="false">Non-Vegetarian</option>
+        <option value="true">Vegetarian</option>
+      </select>
+    </div>
+  </div>
+</div>
+
 <!-- INTAKE ASSESSMENT CALCULATOR (ADDED) -->
 <div class="ai-panel" id="intakeAssessmentPanel" style="display:none;">
   <div class="ai-header">
@@ -310,6 +368,16 @@ function submitPatient(){
   const feedingMethodEl = document.getElementById('feedingMethod');
   const allergiesEl = document.getElementById('allergies');
   const notesEl = document.getElementById('notes');
+  
+  // Advanced fields
+  const cancerStageEl = document.getElementById('cancerStage');
+  const ecogStatusEl = document.getElementById('ecogStatus');
+  const creatinineEl = document.getElementById('creatinine');
+  const altEl = document.getElementById('alt');
+  const astEl = document.getElementById('ast');
+  const bilirubinEl = document.getElementById('bilirubin');
+  const metastasisSitesEl = document.getElementById('metastasisSites');
+  const isVegetarianEl = document.getElementById('isVegetarian');
 
   const patient = {
     name: patientNameEl.value,
@@ -335,9 +403,19 @@ function submitPatient(){
     feedingMethod: feedingMethodEl.value,
     comorbidities: tagsToArray('comorbidityTags'),
     sideEffects: tagsToArray('sideEffectTags'),
-    genomicMarkers: tagsToArray('genomicMarkersTags'),
+    genomicMarkers: tagsToArray('genomicMarkerTags'),
     allergies: allergiesEl.value,
-    notes: notesEl.value
+    notes: notesEl.value,
+    
+    // Save advanced fields
+    cancerStage: cancerStageEl.value,
+    ecogStatus: parseInt(ecogStatusEl.value || 0),
+    creatinine: parseFloat(creatinineEl.value || 0),
+    alt: parseFloat(altEl.value || 0),
+    ast: parseFloat(astEl.value || 0),
+    bilirubin: parseFloat(bilirubinEl.value || 0),
+    metastasisSites: metastasisSitesEl.value,
+    isVegetarian: isVegetarianEl.value === 'true'
   };
 
   savePatient(patient);

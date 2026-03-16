@@ -194,8 +194,15 @@
         <div class="rf sp2"><div class="rf-lbl">Chemo Regimen</div><div class="rf-val" id="pRegimen"></div></div>
         
         <div class="rf"><div class="rf-lbl">Feeding Method</div><div class="rf-val" id="pFeeding"></div></div>
+        <div class="rf"><div class="rf-lbl">ECOG Status</div><div class="rf-val" id="pECOG"></div></div>
+        <div class="rf"><div class="rf-lbl">Cancer Stage</div><div class="rf-val" id="pStage"></div></div>
+        <div class="rf"><div class="rf-lbl">Metastasis</div><div class="rf-val" id="pMetastasis"></div></div>
+        
         <div class="rf"><div class="rf-lbl">Serum Albumin</div><div class="rf-val warn" id="pAlbumin"></div></div>
         <div class="rf"><div class="rf-lbl">CRP (mg/L)</div><div class="rf-val danger" id="pCRP_val"></div></div>
+        <div class="rf"><div class="rf-lbl">Creatinine</div><div class="rf-val" id="pCreatinine"></div></div>
+        <div class="rf"><div class="rf-lbl">ALT / AST</div><div class="rf-val" id="pLiver"></div></div>
+        <div class="rf"><div class="rf-lbl">Bilirubin</div><div class="rf-val" id="pBilirubin"></div></div>
         <div class="rf sp2"><div class="rf-lbl">Comorbidities</div><div class="rf-val" id="pHxComorbidities"></div></div>
         
         <div class="rf sp2"><div class="rf-lbl">Genomic Markers</div><div class="rf-val" id="pHxGenomicMarkers"></div></div>
@@ -277,6 +284,7 @@
           <tr><td>Glutamine</td><td id="glutamine"></td></tr>
           <tr><td>Selenium & Magnesium</td><td><span id="selenium"></span> / <span id="magnesium"></span></td></tr>
           <tr><td>B-Complex</td><td id="bComplex"></td></tr>
+          <tr id="bcaaRow" style="display:none;"><td>BCAA (Branched-Chain Amino Acids)</td><td id="bcaa"></td></tr>
         </tbody>
       </table>
     </div>
@@ -430,9 +438,51 @@
         <div class="validation-msg" id="epCancer_msg"></div>
       </div>
       <div class="form-group">
-        <label class="required">Chemo Regimen</label>
+        <label>Chemo Regimen</label>
         <select id="epRegimen"></select>
         <div class="validation-msg" id="epRegimen_msg"></div>
+      </div>
+      
+      <div class="form-group">
+        <label>Cancer Stage</label>
+        <select id="epStage">
+            <option value="">Select Stage...</option>
+            <option value="Stage I">Stage I</option>
+            <option value="Stage II">Stage II</option>
+            <option value="Stage III">Stage III</option>
+            <option value="Stage IV">Stage IV</option>
+            <option value="Recurrent">Recurrent</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>ECOG Status</label>
+        <select id="epECOG">
+            <option value="0">0 - Fully Active</option>
+            <option value="1">1 - Restricted Strenuous Activity</option>
+            <option value="2">2 - Ambulatory, Capable of Self-care</option>
+            <option value="3">3 - Limited Self-care, 50% Bed/Chair</option>
+            <option value="4">4 - Completely Disabled</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Creatinine (mg/dL)</label>
+        <input id="epCreatinine" type="number" step="0.01">
+      </div>
+      <div class="form-group">
+        <label>ALT (U/L)</label>
+        <input id="epALT" type="number" step="1">
+      </div>
+      <div class="form-group">
+        <label>AST (U/L)</label>
+        <input id="epAST" type="number" step="1">
+      </div>
+      <div class="form-group">
+        <label>Bilirubin (mg/dL)</label>
+        <input id="epBilirubin" type="number" step="0.1">
+      </div>
+      <div class="form-group" style="grid-column:1 / -1;">
+        <label>Metastatic Sites</label>
+        <input id="epMetastasis" type="text" placeholder="e.g. Bone, Liver, Lung">
       </div>
 
       <div class="form-group" style="grid-column:1 / -1;">
@@ -838,6 +888,12 @@ function runAiExtraction(rawText) {
     uw: text.match(new RegExp('usual weight' + numPattern))?.[1] || text.match(new RegExp('uw' + numPattern))?.[1],
     albumin: text.match(new RegExp('albumin' + numPattern))?.[1] || text.match(new RegExp('alb' + numPattern))?.[1] || text.match(reverseAlbuminPattern)?.[1],
     crp: text.match(new RegExp('crp' + numPattern))?.[1] || text.match(reverseCrpPattern)?.[1],
+    creatinine: text.match(new RegExp('creatinine' + numPattern))?.[1] || text.match(new RegExp('cr' + numPattern))?.[1],
+    alt: text.match(new RegExp('alt' + numPattern))?.[1] || text.match(new RegExp('sgpt' + numPattern))?.[1],
+    ast: text.match(new RegExp('ast' + numPattern))?.[1] || text.match(new RegExp('sgot' + numPattern))?.[1],
+    bilirubin: text.match(new RegExp('bilirubin' + numPattern))?.[1] || text.match(new RegExp('bil' + numPattern))?.[1],
+    stage: text.match(/stage\s+([iv]+|1|2|3|4)/i)?.[1],
+    ecog: text.match(/ecog\s*(?:status|is|at|:)?\s*(\d)/i)?.[1],
     gi: text.includes('vomiting') || text.includes('nausea') || text.includes('diarrhea') || text.includes('bloating') || text.includes('gastric issues')
   };
 
@@ -847,12 +903,17 @@ function runAiExtraction(rawText) {
     if (extractions.weight) { foundCount++; foundItems.push(`Weight: ${extractions.weight} kg`); }
     if (extractions.albumin) { foundCount++; foundItems.push(`Albumin: ${extractions.albumin} g/dL`); }
     if (extractions.crp) { foundCount++; foundItems.push(`CRP: ${extractions.crp} mg/L`); }
+    if (extractions.alt) { foundCount++; foundItems.push(`ALT: ${extractions.alt} U/L`); }
+    if (extractions.creatinine) { foundCount++; foundItems.push(`Creatinine: ${extractions.creatinine} mg/dL`); }
     
     if (foundCount > 0) {
       addAssessment(patient.id, {
         weight: extractions.weight || '',
         albumin: extractions.albumin || '',
         crp: extractions.crp || '',
+        alt: extractions.alt || '',
+        creatinine: extractions.creatinine || '',
+        bilirubin: extractions.bilirubin || '',
         giIssues: extractions.gi,
         notes: rawText.substring(0, 100) + (rawText.length > 100 ? '...' : '')
       });
@@ -860,7 +921,7 @@ function runAiExtraction(rawText) {
       window.isFollowUpMode = false;
       setTimeout(() => window.location.reload(), 2000);
     } else {
-      addMessage("I couldn't find weight, albumin, or CRP in this follow-up note. Please try again.", 'ai');
+      addMessage("I couldn't find clinical markers in this follow-up note. Please try again.", 'ai');
     }
     return;
   }
@@ -884,6 +945,28 @@ function runAiExtraction(rawText) {
   if (extractions.crp) { 
     document.getElementById('epCRP').value = extractions.crp; highlight('epCRP', 'CRP', extractions.crp); foundCount++;
   }
+  if (extractions.creatinine) { document.getElementById('epCreatinine').value = extractions.creatinine; highlight('epCreatinine', 'Creatinine', extractions.creatinine); foundCount++; }
+  if (extractions.alt) { document.getElementById('epALT').value = extractions.alt; highlight('epALT', 'ALT', extractions.alt); foundCount++; }
+  if (extractions.ast) { document.getElementById('epAST').value = extractions.ast; highlight('epAST', 'AST', extractions.ast); foundCount++; }
+  if (extractions.bilirubin) { document.getElementById('epBilirubin').value = extractions.bilirubin; highlight('epBilirubin', 'Bilirubin', extractions.bilirubin); foundCount++; }
+  
+  if (extractions.stage) {
+    let s = extractions.stage.toUpperCase();
+    if(s === '1') s = 'STAGE I';
+    if(s === '2') s = 'STAGE II';
+    if(s === '3') s = 'STAGE III';
+    if(s === '4') s = 'STAGE IV';
+    if(!s.startsWith('STAGE')) s = 'STAGE ' + s;
+    document.getElementById('epStage').value = s;
+    highlight('epStage', 'Stage', s);
+    foundCount++;
+  }
+  if (extractions.ecog) {
+    document.getElementById('epECOG').value = extractions.ecog;
+    highlight('epECOG', 'ECOG', extractions.ecog);
+    foundCount++;
+  }
+
   if (extractions.gi) { document.getElementById('epGi').value = "true"; highlight('epGi', 'GI Issues', 'Yes'); foundCount++; }
 
   // Auto-show edit section if anything extracted
@@ -1006,6 +1089,14 @@ function savePatientEdits(){
   })();
   patient.crp = parseFloat(document.getElementById('epCRP').value || 0);
   patient.muac = parseFloat(document.getElementById('epMUAC').value || 0);
+  patient.creatinine = parseFloat(document.getElementById('epCreatinine').value || 0);
+  patient.alt = parseFloat(document.getElementById('epALT').value || 0);
+  patient.ast = parseFloat(document.getElementById('epAST').value || 0);
+  patient.bilirubin = parseFloat(document.getElementById('epBilirubin').value || 0);
+  patient.ecogStatus = parseInt(document.getElementById('epECOG').value || 0);
+  patient.cancerStage = document.getElementById('epStage').value;
+  patient.metastasisSites = document.getElementById('epMetastasis').value;
+  
   patient.giIssues = document.getElementById('epGi').value === 'true';
   patient.feedingMethod = document.getElementById('epFeeding').value;
   patient.cancer = document.getElementById('epCancer').value;
@@ -1207,6 +1298,12 @@ function bind(plan){
   setVal('pWeight', patient.weight + ' kg');
   setVal('pHeight', patient.height + ' cm');
   setVal('pMUAC', (patient.muac ? patient.muac + ' cm' : '-'));
+  setVal('pCreatinine', (patient.creatinine ? patient.creatinine + ' mg/dL' : '-'));
+  setVal('pLiver', (patient.alt || patient.ast) ? `${patient.alt || '-'}/${patient.ast || '-'} U/L` : '-');
+  setVal('pBilirubin', (patient.bilirubin ? patient.bilirubin + ' mg/dL' : '-'));
+  setVal('pStage', patient.cancerStage || '-');
+  setVal('pECOG', patient.ecogStatus || '0');
+  setVal('pMetastasis', patient.metastasisSites || 'None reported');
 
   // Fill Edit section too
   const epN = document.getElementById('epName'); if(epN) epN.value = patient.name || '';
@@ -1218,6 +1315,14 @@ function bind(plan){
   const epUw = document.getElementById('epUW'); if(epUw) epUw.value = patient.usualWeight || '';
   const epCrp = document.getElementById('epCRP'); if(epCrp) epCrp.value = patient.crp || 0;
   const epMuac = document.getElementById('epMUAC'); if(epMuac) epMuac.value = patient.muac || 0;
+  const epCr = document.getElementById('epCreatinine'); if(epCr) epCr.value = patient.creatinine || '';
+  const epAlt = document.getElementById('epALT'); if(epAlt) epAlt.value = patient.alt || '';
+  const epAst = document.getElementById('epAST'); if(epAst) epAst.value = patient.ast || '';
+  const epBil = document.getElementById('epBilirubin'); if(epBil) epBil.value = patient.bilirubin || '';
+  const epStg = document.getElementById('epStage'); if(epStg) epStg.value = patient.cancerStage || '';
+  const epEcog = document.getElementById('epECOG'); if(epEcog) epEcog.value = patient.ecogStatus || 0;
+  const epMet = document.getElementById('epMetastasis'); if(epMet) epMet.value = patient.metastasisSites || '';
+
   const epG = document.getElementById('epGi'); if(epG) epG.value = (patient.giIssues||false).toString();
   const epAller = document.getElementById('epAllergies'); if(epAller) epAller.value = patient.allergies || '';
   
@@ -1279,6 +1384,13 @@ function bind(plan){
   setVal('epa', fp.micronutrients.epa);
   setVal('leucine', fp.micronutrients.leucine);
   setVal('hmb', fp.micronutrients.hmb);
+  
+  if (fp.micronutrients.bcaa) {
+    setVal('bcaa', fp.micronutrients.bcaa);
+    document.getElementById('bcaaRow').style.display = 'table-row';
+  } else {
+    document.getElementById('bcaaRow').style.display = 'none';
+  }
 
   setVal('mCalories', fp.perServingCalories + ' kcal');
   setVal('mProtein', fp.perServingProtein + ' g');
@@ -1291,7 +1403,7 @@ function bind(plan){
   if (rb && fp.recipe) {
     rb.innerHTML = '';
     const r = fp.recipe;
-    [r.protein, r.carb, r.fat].forEach(ing => {
+    [r.protein, r.carb, r.fat, r.bcaa].forEach(ing => {
       if (!ing || !ing.grams) return;
       const tr = document.createElement('tr');
       tr.innerHTML = `

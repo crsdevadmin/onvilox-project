@@ -6,6 +6,12 @@ function generateNutritionPlan(patient) {
   const weightLossPercent = parseFloat(patient.weightLossPercent || 0);
   const reducedFoodIntake = parseFloat(patient.reducedFoodIntake || 0);
   const crp = parseFloat(patient.crp || 0);
+  const creatinine = parseFloat(patient.creatinine || 0);
+  const alt = parseFloat(patient.alt || 0);
+  const ast = parseFloat(patient.ast || 0);
+  const bilirubin = parseFloat(patient.bilirubin || 0);
+  const ecog = parseInt(patient.ecogStatus || 0);
+  
   const bmi = height ? (weight / Math.pow(height / 100, 2)) : 0;
   
   // Hamwi Idea Body Weight
@@ -58,6 +64,18 @@ function generateNutritionPlan(patient) {
   if (crp > 10) {
     riskScore += 1;
     nutritionRiskReasons.push('Systemic Inflammation (High CRP)');
+  }
+  if (creatinine > 1.2) {
+    riskScore += 1;
+    nutritionRiskReasons.push('Kidney function compromised (High Creatinine)');
+  }
+  if (alt > 50 || ast > 50 || bilirubin > 1.2) {
+    riskScore += 2;
+    nutritionRiskReasons.push('Liver function compromised');
+  }
+  if (ecog >= 2) {
+    riskScore += 1;
+    nutritionRiskReasons.push('Reduced physical performance (ECOG ≥ 2)');
   }
 
   let nutritionRisk = 'Low';
@@ -125,7 +143,8 @@ function generateNutritionPlan(patient) {
     selenium: 'Add as clinically indicated',
     magnesium: 'Add as clinically indicated',
     bComplex: 'Daily supportive supplementation',
-    iron: 'When anemia is present'
+    iron: 'When anemia is present',
+    bcaa: (alt > 50 || ast > 50 || bilirubin > 1.2) ? '10–20 g/day Branched-Chain Amino Acids (BCAA) recommended for liver support' : null
   };
 
   const rationale = [];
@@ -218,7 +237,13 @@ function buildFormulationOptions(targets) {
       name: selectedFat.name, 
       grams: fGrams, 
       rationale: selectedFat.healingRationale 
-    }
+    },
+    bcaa: (patient.alt > 50 || patient.ast > 50 || patient.bilirubin > 1.2) ? {
+      id: 'bcaa_powder',
+      name: 'BCAA (2:1:1 Mix)',
+      grams: 15,
+      rationale: "Included for liver support and to help maintain nitrogen balance in patients with elevated liver enzymes."
+    } : null
   };
 }
 

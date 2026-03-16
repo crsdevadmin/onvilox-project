@@ -127,6 +127,19 @@ const IngredientLibrary = [
     inStock: true,
     tags: ['Immunonutrition', 'MucositisSupport'],
     healingRationale: "Amino acid support for intestinal mucosal integrity and reduction of mucositis symptoms."
+  },
+  {
+    id: 'bcaa_powder',
+    name: 'BCAA (2:1:1 Mix)',
+    category: 'AMINO',
+    kcalPerGram: 4.0,
+    pPerGram: 1.0,
+    fPerGram: 0,
+    cPerGram: 0,
+    costPerGram: 0.10,
+    inStock: true,
+    tags: ['LiverSupport', 'MusclePreservation'],
+    healingRationale: "Branched-Chain Amino Acids to support protein synthesis and nitrogen balance, specifically indicated in liver dysfunction."
   }
 ];
 
