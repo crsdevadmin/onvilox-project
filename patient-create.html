@@ -639,6 +639,7 @@ function updateLabStatus(id, val) {
     else { status = 'Normal'; cls = 'status-normal'; }
   } else if(id === 'prealbumin') {
     if(num < 15) { status = 'Low'; cls = 'status-danger'; }
+    else if(num > 36) { status = 'High'; cls = 'status-warn'; }
     else { status = 'Normal'; cls = 'status-normal'; }
   } else if(id === 'vitD') {
     if(num < 20) { status = 'Deficiency'; cls = 'status-danger'; }

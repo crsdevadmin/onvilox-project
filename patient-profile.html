@@ -1744,6 +1744,10 @@ function updateLabStatus(id, val) {
     if(num < 20) { status = 'Deficiency'; cls = 'status-danger'; }
     else if(num < 30) { status = 'Insuff.'; cls = 'status-warn'; }
     else { status = 'Normal'; cls = 'status-normal'; }
+  } else if(key === 'prealbumin') {
+    if(num < 15) { status = 'Low'; cls = 'status-danger'; }
+    else if(num > 36) { status = 'High'; cls = 'status-warn'; }
+    else { status = 'Normal'; cls = 'status-normal'; }
   } else if(key === 'vitb12') {
     if(num < 200) { status = 'Low'; cls = 'status-danger'; }
     else { status = 'Normal'; cls = 'status-normal'; }
