@@ -139,6 +139,12 @@
   </div>
 
   <div class="form-group">
+    <label>CRP (mg/L)</label>
+    <input type="number" id="crp" step="0.1" placeholder="e.g. 5.0">
+    <div class="validation-msg" id="crp_msg"></div>
+  </div>
+
+  <div class="form-group">
     <label class="required">Feeding Method</label>
     <select id="feedingMethod" onchange="validateField(this,'Feeding Method'); toggleIntakeUI()"></select>
     <div class="validation-msg" id="feedingMethod_msg"></div>
@@ -259,6 +265,7 @@ function submitPatient(){
     { id: "cancerInput", name: "Cancer Type" },
     { id: "regimenInput", name: "Chemo Regimen" },
     { id: "albumin", name: "Serum Albumin" },
+    { id: "crp", name: "CRP (mg/L)" },
     { id: "feedingMethod", name: "Feeding Method" }
   ];
 
@@ -291,6 +298,7 @@ function submitPatient(){
   const cancerInputEl = document.getElementById('cancerInput');
   const regimenInputEl = document.getElementById('regimenInput');
   const albuminEl = document.getElementById('albumin');
+  const crpEl = document.getElementById('crp');
   const feedingMethodEl = document.getElementById('feedingMethod');
   const allergiesEl = document.getElementById('allergies');
   const notesEl = document.getElementById('notes');
@@ -314,6 +322,7 @@ function submitPatient(){
     cancer: cancerInputEl.value,
     regimen: regimenInputEl.value,
     albumin: parseFloat(albuminEl.value),
+    crp: parseFloat(crpEl.value || 0),
     feedingMethod: feedingMethodEl.value,
     comorbidities: tagsToArray('comorbidityTags'),
     sideEffects: tagsToArray('sideEffectTags'),
