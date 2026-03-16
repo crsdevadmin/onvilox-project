@@ -470,179 +470,253 @@
         <div class="validation-msg" id="epRegimen_msg"></div>
       </div>
       
-      <div class="form-group">
-        <label>Cancer Stage</label>
-        <select id="epStage">
+    <!-- ADVANCED CLINICAL DATA: SECTION 1 (METABOLIC & RENAL) -->
+    <div class="ai-panel card-cyan" style="margin-top:20px;">
+      <div class="ai-header">
+        <div class="ai-badge">METABOLIC & RENAL</div>
+        <h4>Organ Function & Labs</h4>
+      </div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Creatinine (mg/dL) <span id="epCreatinine_status" class="status-badge"></span></label>
+          <input id="epCreatinine" type="number" step="0.01" oninput="updateLabStatus('epCreatinine', this.value)">
+          <div class="range-hint">Normal: 0.7 – 1.3 mg/dL</div>
+        </div>
+        <div class="form-group">
+          <label>ALT (U/L) <span id="epALT_status" class="status-badge"></span></label>
+          <input id="epALT" type="number" step="1" oninput="updateLabStatus('epALT', this.value)">
+          <div class="range-hint">Normal: 7 – 56 U/L</div>
+        </div>
+        <div class="form-group">
+          <label>AST (U/L) <span id="epAST_status" class="status-badge"></span></label>
+          <input id="epAST" type="number" step="1" oninput="updateLabStatus('epAST', this.value)">
+          <div class="range-hint">Normal: 5 – 40 U/L</div>
+        </div>
+        <div class="form-group">
+          <label>Bilirubin (mg/dL) <span id="epBilirubin_status" class="status-badge"></span></label>
+          <input id="epBilirubin" type="number" step="0.1" oninput="updateLabStatus('epBilirubin', this.value)">
+          <div class="range-hint">Normal: 0.1 – 1.2 mg/dL</div>
+        </div>
+        <div class="form-group">
+          <label>Blood Sugar (mg/dL) <span id="epBloodSugar_status" class="status-badge"></span></label>
+          <input id="epBloodSugar" type="number" step="1" oninput="updateLabStatus('epBloodSugar', this.value)">
+          <div class="range-hint">Normal: 70 – 126 mg/dL</div>
+        </div>
+        <div class="form-group">
+          <label>TSH (mIU/L) <span id="epTSH_status" class="status-badge"></span></label>
+          <input id="epTSH" type="number" step="0.01" oninput="updateLabStatus('epTSH', this.value)">
+          <div class="range-hint">Normal: 0.4 – 4.0 mIU/L</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ADVANCED CLINICAL DATA: SECTION 2 (MICRONUTRIENTS) -->
+    <div class="ai-panel card-violet" style="margin-top:20px;">
+      <div class="ai-header">
+        <div class="ai-badge">MICRONUTRIENTS</div>
+        <h4>Nutritional Profile</h4>
+      </div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Prealbumin (mg/dL) <span id="epPrealbumin_status" class="status-badge"></span></label>
+          <input id="epPrealbumin" type="number" step="0.1" oninput="updateLabStatus('epPrealbumin', this.value)">
+          <div class="range-hint">Normal: 15 – 36 mg/dL</div>
+        </div>
+        <div class="form-group">
+          <label>Hemoglobin (g/dL) <span id="epHemoglobin_status" class="status-badge"></span></label>
+          <input id="epHemoglobin" type="number" step="0.1" oninput="updateLabStatus('epHemoglobin', this.value)">
+          <div class="range-hint">Normal: 12 – 16 g/dL</div>
+        </div>
+        <div class="form-group">
+          <label>Vitamin D (ng/mL) <span id="epVitD_status" class="status-badge"></span></label>
+          <input id="epVitD" type="number" step="1" oninput="updateLabStatus('epVitD', this.value)">
+          <div class="range-hint">Normal: 30 – 100 ng/mL</div>
+        </div>
+        <div class="form-group">
+          <label>Vitamin B12 (pg/mL) <span id="epVitB12_status" class="status-badge"></span></label>
+          <input id="epVitB12" type="number" step="1" oninput="updateLabStatus('epVitB12', this.value)">
+          <div class="range-hint">Normal: 200 – 900 pg/mL</div>
+        </div>
+        <div class="form-group">
+          <label>Folate (ng/mL) <span id="epFolate_status" class="status-badge"></span></label>
+          <input id="epFolate" type="number" step="0.1" oninput="updateLabStatus('epFolate', this.value)">
+          <div class="range-hint">Normal: 3.1 – 17.5 ng/mL</div>
+        </div>
+        <div class="form-group">
+          <label>Zinc (μg/dL) <span id="epZinc_status" class="status-badge"></span></label>
+          <input id="epZinc" type="number" step="1" oninput="updateLabStatus('epZinc', this.value)">
+          <div class="range-hint">Normal: 60 – 120 μg/dL</div>
+        </div>
+        <div class="form-group">
+          <label>Magnesium (mg/dL) <span id="epMagnesium_status" class="status-badge"></span></label>
+          <input id="epMagnesium" type="number" step="0.1" oninput="updateLabStatus('epMagnesium', this.value)">
+          <div class="range-hint">Normal: 1.7 – 2.2 mg/dL</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ADVANCED CLINICAL DATA: SECTION 3 (ONCOLOGY DYNAMICS) -->
+    <div class="ai-panel card-amber" style="margin-top:20px;">
+      <div class="ai-header">
+        <div class="ai-badge">ONCOLOGY</div>
+        <h4>Cancer Dynamics & Treatment</h4>
+      </div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Cancer Stage</label>
+          <select id="epStage">
             <option value="">Select Stage...</option>
             <option value="Stage I">Stage I</option>
             <option value="Stage II">Stage II</option>
             <option value="Stage III">Stage III</option>
             <option value="Stage IV">Stage IV</option>
             <option value="Recurrent">Recurrent</option>
-        </select>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Tumor Burden</label>
+          <select id="epTumorBurden">
+            <option value="">Select...</option>
+            <option value="Low">Low</option>
+            <option value="Moderate">Moderate</option>
+            <option value="High (Bulky)">High (Bulky)</option>
+          </select>
+        </div>
+        <div class="form-group" style="grid-column:1 / -1;">
+          <label>Metastatic Sites</label>
+          <div class="tag-box">
+            <div class="tag-container" id="epMetastasisTags"></div>
+            <input type="text" placeholder="Search sites or type and Enter..." onkeyup="filterMultiList(this,'epMetastasisDropdown')" onkeydown="handleTagInput(event, 'epMetastasisTags')">
+            <div class="dropdown-list" id="epMetastasisDropdown"></div>
+          </div>
+        </div>
+        <div class="form-group" style="grid-column:1 / -1;">
+          <label>Genomic Markers</label>
+          <div class="tag-box">
+            <div class="tag-container" id="epGenomicMarkersTags"></div>
+            <input type="text" placeholder="Search markers..." onkeyup="filterMultiList(this,'epGenomicMarkersDropdown')" onkeydown="handleTagInput(event, 'epGenomicMarkersTags')">
+            <div class="dropdown-list" id="epGenomicMarkersDropdown"></div>
+          </div>
+        </div>
+        <div class="form-group" style="grid-column:1 / -1;">
+          <label>Treatment Modalities</label>
+          <div class="tag-box">
+            <div class="tag-container" id="epTreatmentTags"></div>
+            <input type="text" placeholder="Search treatments..." onkeyup="filterMultiList(this,'epTreatmentDropdown')" onkeydown="handleTagInput(event, 'epTreatmentTags')">
+            <div class="dropdown-list" id="epTreatmentDropdown"></div>
+          </div>
+        </div>
       </div>
-      <div class="form-group">
-        <label>ECOG Status</label>
-        <select id="epECOG">
+    </div>
+
+    <!-- ADVANCED CLINICAL DATA: SECTION 4 (FUNCTIONAL & BODY COMP) -->
+    <div class="ai-panel card-green" style="margin-top:20px;">
+      <div class="ai-header">
+        <div class="ai-badge">FUNCTIONAL</div>
+        <h4>Physical Status & Composition</h4>
+      </div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>ECOG Status</label>
+          <select id="epECOG">
             <option value="0">0 - Fully Active</option>
             <option value="1">1 - Restricted Strenuous Activity</option>
             <option value="2">2 - Ambulatory, Capable of Self-care</option>
             <option value="3">3 - Limited Self-care, 50% Bed/Chair</option>
             <option value="4">4 - Completely Disabled</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label>Creatinine (mg/dL) <span id="epCreatinine_status" class="status-badge"></span></label>
-        <input id="epCreatinine" type="number" step="0.01" onkeyup="updateLabStatus('epCreatinine', this.value)">
-        <div class="range-hint">Normal: 0.7 – 1.3 mg/dL</div>
-      </div>
-      <div class="form-group">
-        <label>ALT (U/L) <span id="epALT_status" class="status-badge"></span></label>
-        <input id="epALT" type="number" step="1" onkeyup="updateLabStatus('epALT', this.value)">
-        <div class="range-hint">Normal: 7 – 56 U/L</div>
-      </div>
-      <div class="form-group">
-        <label>AST (U/L) <span id="epAST_status" class="status-badge"></span></label>
-        <input id="epAST" type="number" step="1" onkeyup="updateLabStatus('epAST', this.value)">
-        <div class="range-hint">Normal: 5 – 40 U/L</div>
-      </div>
-      <div class="form-group">
-        <label>Bilirubin (mg/dL) <span id="epBilirubin_status" class="status-badge"></span></label>
-        <input id="epBilirubin" type="number" step="0.1" onkeyup="updateLabStatus('epBilirubin', this.value)">
-        <div class="range-hint">Normal: 0.1 – 1.2 mg/dL</div>
-      </div>
-      <div class="form-group">
-        <label>Blood Sugar (mg/dL) <span id="epBloodSugar_status" class="status-badge"></span></label>
-        <input id="epBloodSugar" type="number" step="1" onkeyup="updateLabStatus('epBloodSugar', this.value)">
-        <div class="range-hint">Normal: 70 – 126 mg/dL</div>
-      </div>
-      <div class="form-group">
-        <label>Hemoglobin (g/dL) <span id="epHemoglobin_status" class="status-badge"></span></label>
-        <input id="epHemoglobin" type="number" step="0.1" onkeyup="updateLabStatus('epHemoglobin', this.value)">
-        <div class="range-hint">Normal: 12 – 16 g/dL</div>
-      </div>
-      <div class="form-group">
-        <label>Prealbumin (mg/dL) <span id="epPrealbumin_status" class="status-badge"></span></label>
-        <input id="epPrealbumin" type="number" step="0.1" onkeyup="updateLabStatus('epPrealbumin', this.value)">
-        <div class="range-hint">Normal: 15 – 36 mg/dL</div>
-      </div>
-      <div class="form-group">
-        <label>Vitamin D (ng/mL) <span id="epVitD_status" class="status-badge"></span></label>
-        <input id="epVitD" type="number" step="1" onkeyup="updateLabStatus('epVitD', this.value)">
-        <div class="range-hint">Normal: 30 – 100 ng/mL</div>
-      </div>
-      <div class="form-group">
-        <label>Vitamin B12 (pg/mL) <span id="epVitB12_status" class="status-badge"></span></label>
-        <input id="epVitB12" type="number" step="1" onkeyup="updateLabStatus('epVitB12', this.value)">
-        <div class="range-hint">Normal: 200 – 900 pg/mL</div>
-      </div>
-      <div class="form-group">
-        <label>Folate (ng/mL) <span id="epFolate_status" class="status-badge"></span></label>
-        <input id="epFolate" type="number" step="0.1" onkeyup="updateLabStatus('epFolate', this.value)">
-        <div class="range-hint">Normal: 3.1 – 17.5 ng/mL</div>
-      </div>
-      <div class="form-group">
-        <label>Zinc (μg/dL) <span id="epZinc_status" class="status-badge"></span></label>
-        <input id="epZinc" type="number" step="1" onkeyup="updateLabStatus('epZinc', this.value)">
-        <div class="range-hint">Normal: 60 – 120 μg/dL</div>
-      </div>
-      <div class="form-group">
-        <label>Magnesium (mg/dL) <span id="epMagnesium_status" class="status-badge"></span></label>
-        <input id="epMagnesium" type="number" step="0.1" onkeyup="updateLabStatus('epMagnesium', this.value)">
-        <div class="range-hint">Normal: 1.7 – 2.2 mg/dL</div>
-      </div>
-      <div class="form-group">
-        <label>TSH (mIU/L) <span id="epTSH_status" class="status-badge"></span></label>
-        <input id="epTSH" type="number" step="0.01" onkeyup="updateLabStatus('epTSH', this.value)">
-        <div class="range-hint">Normal: 0.4 – 4.0 mIU/L</div>
-      </div>
-      <div class="form-group">
-        <label>Tumor Burden</label>
-        <select id="epTumorBurden">
-          <option value="">Select...</option>
-          <option value="Low">Low</option>
-          <option value="Moderate">Moderate</option>
-          <option value="High (Bulky)">High (Bulky)</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label>Sarcopenia Status</label>
-        <select id="epSarcopenia">
-          <option value="None">No Sarcopenia</option>
-          <option value="At Risk">At Risk</option>
-          <option value="Sarcopenic">Confirmed Sarcopenia</option>
-        </select>
-      </div>
-      <div class="form-group" style="grid-column:1 / -1;">
-        <label>Metastatic Sites</label>
-        <div class="tag-box">
-          <div class="tag-container" id="epMetastasisTags"></div>
-          <input type="text" placeholder="Search sites or type and Enter..." onkeyup="filterMultiList(this,'epMetastasisDropdown')" onkeydown="handleTagInput(event, 'epMetastasisTags')">
-          <div class="dropdown-list" id="epMetastasisDropdown"></div>
+          </select>
         </div>
+        <div class="form-group">
+          <label>Activity Level</label>
+          <select id="epActivityLevel">
+            <option value="Ambulatory">Ambulatory (Active)</option>
+            <option value="Bedridden">Bedridden (Limited)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Sarcopenia Status</label>
+          <select id="epSarcopenia">
+            <option value="None">No Sarcopenia</option>
+            <option value="At Risk">At Risk</option>
+            <option value="Sarcopenic">Confirmed Sarcopenia</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Lean Body Mass (kg)</label>
+          <input id="epLeanBodyMass" type="number" step="0.1">
+        </div>
+        <div class="form-group">
+          <label>Fat Percentage (%)</label>
+          <input id="epFatPercent" type="number" step="0.1">
+        </div>
+        <div class="form-group">
+          <label>BSA (m²) - Auto</label>
+          <input id="epBSA" type="number" readonly style="background:var(--bg-2); color:var(--text-3) !important;">
+        </div>
+      </div>
+    </div>
+
+    <!-- ADVANCED CLINICAL DATA: SECTION 5 (DIETARY & PREFERENCES) -->
+    <div class="ai-panel card-sky" style="margin-top:20px;">
+      <div class="ai-header">
+        <div class="ai-badge">DIETARY</div>
+        <h4>Lifestyle & Metadata</h4>
+      </div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Dietary preference</label>
+          <select id="epVegetarian">
+            <option value="false">Non-Vegetarian</option>
+            <option value="true">Vegetarian</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Cultural Preferences</label>
+          <input type="text" id="epCultural" placeholder="e.g. Halal, No spices">
+        </div>
+        <div class="form-group" style="grid-column:1 / -1;">
+          <label>Allergies</label>
+          <div class="tag-box">
+            <div class="tag-container" id="epAllergyTags"></div>
+            <input type="text" placeholder="Search allergies or type and Enter..." onkeyup="filterMultiList(this,'epAllergyDropdown')" onkeydown="handleTagInput(event, 'epAllergyTags')">
+            <div class="dropdown-list" id="epAllergyDropdown"></div>
+          </div>
+        </div>
+        <div class="form-group" style="grid-column:1 / -1;">
+          <label>Existing Supplements</label>
+          <div class="tag-box">
+            <div class="tag-container" id="epSupplementTags"></div>
+            <input type="text" placeholder="Search supplements or type and Enter..." onkeyup="filterMultiList(this,'epSupplementDropdown')" onkeydown="handleTagInput(event, 'epSupplementTags')">
+            <div class="dropdown-list" id="epSupplementDropdown"></div>
+          </div>
+        </div>
+        <div class="form-group" style="grid-column:1 / -1;">
+          <label>Comorbidities</label>
+          <div class="tag-box">
+            <div class="tag-container" id="epComorbidityTags"></div>
+            <input type="text" placeholder="Search comorbidities..." onkeyup="filterMultiList(this,'epComorbidityDropdown')" onkeydown="handleTagInput(event, 'epComorbidityTags')">
+            <div class="dropdown-list" id="epComorbidityDropdown"></div>
+          </div>
+        </div>
+        <div class="form-group" style="grid-column:1 / -1;">
+          <label>Side Effects</label>
+          <div class="tag-box">
+            <div class="tag-container" id="epSideEffectTags"></div>
+            <input type="text" placeholder="Search side effects..." onkeyup="filterMultiList(this,'epSideEffectDropdown')" onkeydown="handleTagInput(event, 'epSideEffectTags')">
+            <div class="dropdown-list" id="epSideEffectDropdown"></div>
+          </div>
+        </div>
+        <div class="form-group" style="grid-column:1 / -1;">
+          <label>Additional Notes</label>
+          <textarea id="epNotes" placeholder="Clinical notes..."></textarea>
+        </div>
+      </div>
+    </div>
       </div>
 
-      <div class="form-group" style="grid-column:1 / -1;">
-        <label>Allergies</label>
-        <div class="tag-box">
-          <div class="tag-container" id="epAllergyTags"></div>
-          <input type="text" placeholder="Search allergies or type and Enter..." onkeyup="filterMultiList(this,'epAllergyDropdown')" onkeydown="handleTagInput(event, 'epAllergyTags')">
-          <div class="dropdown-list" id="epAllergyDropdown"></div>
-        </div>
-      </div>
-
-      <div class="form-group" style="grid-column:1 / -1;">
-        <label>Comorbidities</label>
-        <div class="tag-box">
-          <div class="tag-container" id="epComorbidityTags"></div>
-          <input type="text" placeholder="Search comorbidities..." onkeyup="filterMultiList(this,'epComorbidityDropdown')" onkeydown="handleTagInput(event, 'epComorbidityTags')">
-          <div class="dropdown-list" id="epComorbidityDropdown"></div>
-        </div>
-      </div>
-
-      <div class="form-group" style="grid-column:1 / -1;">
-        <label>Side Effects</label>
-        <div class="tag-box">
-          <div class="tag-container" id="epSideEffectTags"></div>
-          <input type="text" placeholder="Search side effects..." onkeyup="filterMultiList(this,'epSideEffectDropdown')" onkeydown="handleTagInput(event, 'epSideEffectTags')">
-          <div class="dropdown-list" id="epSideEffectDropdown"></div>
-        </div>
-      </div>
-
-      <div class="form-group" style="grid-column:1 / -1;">
-        <label>Genomic Markers</label>
-        <div class="tag-box">
-          <div class="tag-container" id="epGenomicMarkersTags"></div>
-          <input type="text" placeholder="Search markers..." onkeyup="filterMultiList(this,'epGenomicMarkersDropdown')" onkeydown="handleTagInput(event, 'epGenomicMarkersTags')">
-          <div class="dropdown-list" id="epGenomicMarkersDropdown"></div>
-        </div>
-      </div>
-
-      <div class="form-group" style="grid-column:1 / -1;">
-        <label>Treatment Modalities</label>
-        <div class="tag-box">
-          <div class="tag-container" id="epTreatmentTags"></div>
-          <input type="text" placeholder="Search treatments..." onkeyup="filterMultiList(this,'epTreatmentDropdown')" onkeydown="handleTagInput(event, 'epTreatmentTags')">
-          <div class="dropdown-list" id="epTreatmentDropdown"></div>
-        </div>
-      </div>
-      
-      <div class="form-group" style="grid-column:1 / -1;">
-        <label>Existing Supplements</label>
-        <div class="tag-box">
-          <div class="tag-container" id="epSupplementTags"></div>
-          <input type="text" placeholder="Search supplements or type and Enter..." onkeyup="filterMultiList(this,'epSupplementDropdown')" onkeydown="handleTagInput(event, 'epSupplementTags')">
-          <div class="dropdown-list" id="epSupplementDropdown"></div>
-        </div>
-      </div>
-      <div class="form-group" style="grid-column:1 / -1;">
-        <label>Cultural/Dietary Preferences</label>
-        <textarea id="epCulturalPref" placeholder="e.g. Halal, Kosher, Diabetic-friendly, No spices"></textarea>
-      </div>
-      <div class="form-group" style="grid-column:1 / -1;">
-        <label>Doctor Note (optional)</label>
-        <input id="epNote" type="text" placeholder="Reason for input correction (e.g., updated lab / corrected weight)">
-      </div>
+    <div style="display:flex; gap:12px; flex-wrap:wrap; margin-top:14px;">
+      <button class="btn-warning" type="button" onclick="savePatientEdits()">Save Changes & Recalculate</button>
+      <button id="approveBtn" class="btn-primary" type="button" onclick="approveFromReport()">Approve Patient</button>
     </div>
 
     <!-- INTAKE ASSESSMENT CALCULATOR -->
@@ -926,12 +1000,45 @@ function showEditSectionIfAllowed(){
       });
     });
 
-    // Populate searchable tags
+    // Advanced Labs
+    document.getElementById('epCreatinine').value = patient.creatinine ?? '';
+    document.getElementById('epALT').value = patient.alt ?? '';
+    document.getElementById('epAST').value = patient.ast ?? '';
+    document.getElementById('epBilirubin').value = patient.bilirubin ?? '';
+    document.getElementById('epBloodSugar').value = patient.bloodSugar ?? '';
+    document.getElementById('epTSH').value = patient.tsh ?? '';
+
+    // Micronutrients
+    document.getElementById('epPrealbumin').value = patient.prealbumin ?? '';
+    document.getElementById('epHemoglobin').value = patient.hemoglobin ?? '';
+    document.getElementById('epVitD').value = patient.vitD ?? '';
+    document.getElementById('epVitB12').value = patient.vitB12 ?? '';
+    document.getElementById('epFolate').value = patient.folate ?? '';
+    document.getElementById('epZinc').value = patient.zinc ?? '';
+    document.getElementById('epMagnesium').value = patient.magnesium ?? '';
+
+    // Oncology
+    document.getElementById('epTumorBurden').value = patient.tumorBurden ?? '';
+    document.getElementById('epStage').value = patient.cancerStage ?? '';
+    document.getElementById('epECOG').value = patient.ecogStatus ?? 0;
+
+    // Functional & Body Comp
+    document.getElementById('epActivityLevel').value = patient.activityLevel ?? 'Ambulatory';
+    document.getElementById('epSarcopenia').value = patient.sarcopeniaStatus ?? 'None';
+    document.getElementById('epLeanBodyMass').value = patient.leanBodyMass ?? '';
+    document.getElementById('epFatPercent').value = patient.fatPercent ?? '';
+    document.getElementById('epBSA').value = patient.bsa ?? '';
+
+    // Dietary
+    document.getElementById('epVegetarian').value = String(!!patient.vegetarian);
+    document.getElementById('epCultural').value = patient.culturalPreferences ?? '';
+
+    // Tags
     const tagMapping = {
       'epMetastasisTags': patient.metastasisSites,
       'epAllergyTags': patient.allergies,
       'epSupplementTags': patient.existingSupplements,
-      'epComorbidityTags': patient.comorbidities, // verify these IDs are in HTML
+      'epComorbidityTags': patient.comorbidities,
       'epSideEffectTags': patient.sideEffects,
       'epGenomicMarkersTags': patient.genomicMarkers,
       'epTreatmentTags': patient.treatmentTypes
@@ -945,14 +1052,13 @@ function showEditSectionIfAllowed(){
         if(Array.isArray(tags)) {
           tags.forEach(t => addTag(t, containerId));
         } else if (typeof tags === 'string' && tags) {
-          // Fallback for older legacy data stored as strings
           tags.split(',').forEach(t => addTag(t.trim(), containerId));
         }
       }
     });
 
-    if(document.getElementById('epCulturalPref')) {
-      document.getElementById('epCulturalPref').value = patient.culturalPreferences || '';
+    if(document.getElementById('epNotes')) {
+      document.getElementById('epNotes').value = patient.notes || '';
     }
     document.getElementById('epFeeding').addEventListener('change', ()=>validateSelect('epFeeding','Feeding Method'));
 
@@ -1297,7 +1403,14 @@ function savePatientEdits(){
   patient.feedingMethod = document.getElementById('epFeeding').value;
   patient.cancer = document.getElementById('epCancer').value;
   patient.regimen = document.getElementById('epRegimen').value;
-  patient.culturalPreferences = document.getElementById('epCulturalPref')?.value || '';
+  
+  patient.activityLevel = document.getElementById('epActivityLevel').value;
+  patient.leanBodyMass = parseFloat(document.getElementById('epLeanBodyMass').value || 0);
+  patient.fatPercent = parseFloat(document.getElementById('epFatPercent').value || 0);
+  patient.bsa = parseFloat(document.getElementById('epBSA').value || 0);
+  patient.vegetarian = document.getElementById('epVegetarian').value === 'true';
+  patient.culturalPreferences = document.getElementById('epCultural').value.trim();
+  patient.notes = document.getElementById('epNotes').value.trim();
 
   updatePatient(patient);
 

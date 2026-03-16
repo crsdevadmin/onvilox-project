@@ -144,6 +144,22 @@ body::before {
   overflow: hidden;
 }
 
+/* COLORED CARD VARIANTS */
+.card-cyan { border-color: var(--cyan-glow); }
+.card-cyan::before { background: linear-gradient(90deg, var(--cyan), transparent); }
+
+.card-violet { border-color: var(--violet-dim); }
+.card-violet::before { background: linear-gradient(90deg, var(--violet), transparent); }
+
+.card-amber { border-color: var(--amber-dim); }
+.card-amber::before { background: linear-gradient(90deg, var(--amber), transparent); }
+
+.card-green { border-color: var(--green-dim); }
+.card-green::before { background: linear-gradient(90deg, var(--green), transparent); }
+
+.card-sky { border-color: rgba(56,189,248,0.2); }
+.card-sky::before { background: linear-gradient(90deg, var(--sky), transparent); }
+
 .card::before {
   content: '';
   position: absolute;
@@ -561,6 +577,13 @@ body.light .card {
 body.light .card:hover {
   box-shadow: 0 0 0 1px rgba(2,132,199,0.1), 0 8px 32px rgba(0,0,0,0.1);
 }
+
+/* LIGHT THEME COLORED CARD ADJUSTMENTS */
+body.light .card-cyan { border-color: rgba(3,105,161,0.2); }
+body.light .card-violet { border-color: rgba(109,40,217,0.2); }
+body.light .card-amber { border-color: rgba(180,83,9,0.2); }
+body.light .card-green { border-color: rgba(4,120,87,0.2); }
+body.light .card-sky { border-color: rgba(2,132,199,0.2); }
 
 /* THEME TOGGLE BUTTON (Custom for Onvilox) */
 .theme-toggle-btn {
