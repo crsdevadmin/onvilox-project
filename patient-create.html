@@ -644,16 +644,21 @@ function updateLabStatus(id, val) {
   } else if(id === 'vitD') {
     if(num < 20) { status = 'Deficiency'; cls = 'status-danger'; }
     else if(num < 30) { status = 'Insuff.'; cls = 'status-warn'; }
+    else if(num > 100) { status = 'High'; cls = 'status-warn'; }
     else { status = 'Normal'; cls = 'status-normal'; }
   } else if(id === 'vitB12') {
     if(num < 200) { status = 'Low'; cls = 'status-danger'; }
+    else if(num > 900) { status = 'High'; cls = 'status-warn'; }
     else { status = 'Normal'; cls = 'status-normal'; }
   } else if(id === 'folate') {
-    if(num < 3) { status = 'Low'; cls = 'status-danger'; }
+    if(num < 3.1) { status = 'Low'; cls = 'status-danger'; }
+    else if(num > 17.5) { status = 'High'; cls = 'status-warn'; }
     else { status = 'Normal'; cls = 'status-normal'; }
   } else if(id === 'zinc' || id === 'magnesium') {
     const min = (id === 'zinc') ? 60 : 1.7;
+    const max = (id === 'zinc') ? 120 : 2.2;
     if(num < min) { status = 'Low'; cls = 'status-danger'; }
+    else if(num > max) { status = 'High'; cls = 'status-warn'; }
     else { status = 'Normal'; cls = 'status-normal'; }
   }
 
