@@ -1,31 +1,27 @@
-// theme.js
-document.addEventListener('DOMContentLoaded', () => {
-  const savedTheme = localStorage.getItem('theme') || 'dark';
-  const body = document.body;
-  
-  if (savedTheme === 'light') {
-    body.classList.add('light-theme');
-  } else {
-    body.classList.remove('light-theme');
-  }
-
-  // Find the toggle button if it exists and set its initial state
-  const btn = document.getElementById('themeToggleBtn');
-  if(btn) {
-    btn.innerHTML = savedTheme === 'light' ? '🌙 Dark Mode' : '☀️ Light Mode';
-  }
-});
-
-function toggleTheme() {
-  const body = document.body;
-  const isLight = body.classList.toggle('light-theme');
-  const btn = document.getElementById('themeToggleBtn');
-  
-  if (isLight) {
-    localStorage.setItem('theme', 'light');
-    if(btn) btn.innerHTML = '🌙 Dark Mode';
-  } else {
-    localStorage.setItem('theme', 'dark');
-    if(btn) btn.innerHTML = '☀️ Light Mode';
-  }
+// theme.js - Clinical Noir Theme Logic
+function toggleTheme(){
+  document.body.classList.toggle('light');
+  const isLight = document.body.classList.contains('light');
+  localStorage.setItem('onvilox_theme', isLight ? 'light' : 'dark');
+  updateThemeUI();
 }
+
+function updateThemeUI(){
+  const isLight = document.body.classList.contains('light');
+  const btnIcon = document.getElementById('themeIcon');
+  const btnLabel = document.getElementById('themeLabel');
+  
+  if(btnIcon) btnIcon.textContent = isLight ? '☀️' : '🌙';
+  if(btnLabel) btnLabel.textContent = isLight ? 'Light' : 'Dark';
+}
+
+(function(){
+  const saved = localStorage.getItem('onvilox_theme') || 'dark';
+  if(saved === 'light') document.body.classList.add('light');
+  // Run update after DOM is ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', updateThemeUI);
+  } else {
+    updateThemeUI();
+  }
+})();

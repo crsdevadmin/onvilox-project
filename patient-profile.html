@@ -2019,20 +2019,4 @@ function downloadNutritionPDF(autoClose){
 
 
 
-function toggleTheme(){
-  document.body.classList.toggle('light');
-  const isLight = document.body.classList.contains('light');
-  localStorage.setItem('onvilox_theme', isLight ? 'light' : 'dark');
-  updateThemeUI();
-}
-function updateThemeUI(){
-  const isLight = document.body.classList.contains('light');
-  document.getElementById('themeLabel').textContent = isLight ? 'Light' : 'Dark';
-  document.getElementById('themeIcon').textContent = isLight ? '☀️' : '🌙';
-}
-(function(){
-  const saved = localStorage.getItem('onvilox_theme') || 'dark';
-  if(saved === 'light') document.body.classList.add('light');
-  updateThemeUI();
-})();
 </script>

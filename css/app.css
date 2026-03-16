@@ -513,33 +513,34 @@ input:focus, select:focus, textarea:focus { border-color: var(--cyan); backgroun
 
 /* LIGHT THEME OVERRIDES */
 body.light {
-  --bg:         #f0f4fb;
-  --bg-2:       #e6ecf7;
+  --bg:         #f4f8fb;
+  --bg-2:       #e9eff6;
   --surface:    #ffffff;
-  --surface-2:  #f5f7ff;
-  --border:     rgba(0,0,0,0.08);
-  --border-2:   rgba(0,0,0,0.14);
+  --surface-2:  #f8fafc;
+  --border:     rgba(0,0,0,0.06);
+  --border-2:   rgba(0,0,0,0.12);
 
-  --cyan:       #0284c7;
-  --cyan-dim:   rgba(2,132,199,0.08);
-  --cyan-glow:  rgba(2,132,199,0.2);
-  --amber:      #d97706;
-  --amber-dim:  rgba(217,119,6,0.08);
-  --green:      #059669;
-  --green-dim:  rgba(5,150,105,0.08);
-  --rose:       #e11d48;
-  --rose-dim:   rgba(225,29,72,0.08);
-  --violet:     #7c3aed;
-  --violet-dim: rgba(124,58,237,0.08);
-  --sky:        #0369a1;
+  --cyan:       #0369a1; /* Deeper professional blue in light mode */
+  --cyan-dim:   rgba(3,105,161,0.07);
+  --cyan-glow:  rgba(3,105,161,0.15);
+  --amber:      #b45309;
+  --amber-dim:  rgba(180,83,9,0.07);
+  --green:      #047857;
+  --green-dim:  rgba(4,120,87,0.07);
+  --rose:       #be123c;
+  --rose-dim:   rgba(190,18,60,0.07);
+  --violet:     #6d28d9;
+  --violet-dim: rgba(109,40,217,0.07);
+  --sky:        #0284c7;
 
   --text:       #0f172a;
   --text-2:     #475569;
   --text-3:     #94a3b8;
 
+  color-scheme: light;
   background-image:
-    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(2,132,199,0.06), transparent),
-    radial-gradient(ellipse 60% 40% at 80% 100%, rgba(124,58,237,0.04), transparent);
+    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(3,105,161,0.08), transparent),
+    radial-gradient(ellipse 60% 40% at 80% 100%, rgba(109,40,217,0.04), transparent);
 }
 
 body.light::before {

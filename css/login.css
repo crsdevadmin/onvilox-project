@@ -34,11 +34,11 @@
   animation: floatOrb 20s infinite alternate-reverse;
 }
 
-body.light-theme .login-page::before {
+body.light .login-page::before {
   background: radial-gradient(circle, rgba(59,130,246,0.3) 0%, rgba(255,255,255,0) 70%);
 }
 
-body.light-theme .login-page::after {
+body.light .login-page::after {
   background: radial-gradient(circle, rgba(139,92,246,0.2) 0%, rgba(255,255,255,0) 70%);
 }
 
@@ -71,7 +71,7 @@ body.light-theme .login-page::after {
   -webkit-backdrop-filter: blur(8px);
 }
 
-body.light-theme .login-hero::before {
+body.light .login-hero::before {
   background: linear-gradient(135deg, rgba(255,255,255,0.7), rgba(255,255,255,0.2));
 }
 
@@ -100,12 +100,12 @@ body.light-theme .login-hero::before {
   text-transform: uppercase;
 }
 
-body.light-theme .hero-content h2 {
+body.light .hero-content h2 {
   color: #0f172a;
   text-shadow: 0 5px 20px rgba(255,255,255,0.8);
 }
 
-body.light-theme .hero-content p {
+body.light .hero-content p {
   color: #334155;
 }
 
@@ -123,7 +123,7 @@ body.light-theme .hero-content p {
   animation: textFloat 4s ease-in-out infinite alternate;
 }
 
-body.light-theme .logo-animation span {
+body.light .logo-animation span {
   background: linear-gradient(135deg, #0f172a, #3b82f6);
   -webkit-background-clip: text;
   background-clip: text;
@@ -145,7 +145,7 @@ body.light-theme .logo-animation span {
   animation: glowPulse 4s ease-in-out infinite alternate;
 }
 
-body.light-theme .logo-animation span::after {
+body.light .logo-animation span::after {
   background: linear-gradient(135deg, #0f172a, #3b82f6);
   -webkit-background-clip: text;
   background-clip: text;
@@ -193,7 +193,7 @@ body.light-theme .logo-animation span::after {
   overflow: hidden;
 }
 
-body.light-theme .login-card {
+body.light .login-card {
   box-shadow: 0 20px 50px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.5);
 }
 
