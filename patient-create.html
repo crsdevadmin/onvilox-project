@@ -211,6 +211,11 @@
 
 
 <div class="form-group">
+  <label>Allergies</label>
+  <textarea id="allergies" placeholder="Known allergies (e.g. lactose, specific drugs)"></textarea>
+</div>
+
+<div class="form-group">
   <label>Notes</label>
   <textarea id="notes" placeholder="Clinical notes"></textarea>
 </div>
@@ -247,9 +252,9 @@ function submitPatient(){
     { id: "uhic", name: "UHIC Code" },
     { id: "age", name: "Age" },
     { id: "sex", name: "Sex" },
+    { id: "usualWeight", name: "Usual Weight" },
     { id: "weight", name: "Current Weight" },
     { id: "height", name: "Height" },
-    { id: "reducedFoodIntake", name: "Reduced Food Intake %" },
     { id: "reducedFoodIntake", name: "Reduced Food Intake %" },
     { id: "cancerInput", name: "Cancer Type" },
     { id: "regimenInput", name: "Chemo Regimen" },
@@ -275,31 +280,46 @@ function submitPatient(){
     }
   }
 
+  const patientNameEl = document.getElementById('patientName');
+  const uhicEl = document.getElementById('uhic');
+  const ageEl = document.getElementById('age');
+  const sexEl = document.getElementById('sex');
+  const usualWeightEl = document.getElementById('usualWeight');
+  const weightEl = document.getElementById('weight');
+  const heightEl = document.getElementById('height');
+  const giIssuesEl = document.getElementById('giIssues');
+  const cancerInputEl = document.getElementById('cancerInput');
+  const regimenInputEl = document.getElementById('regimenInput');
+  const albuminEl = document.getElementById('albumin');
+  const feedingMethodEl = document.getElementById('feedingMethod');
+  const allergiesEl = document.getElementById('allergies');
+  const notesEl = document.getElementById('notes');
+
   const patient = {
-    name: patientName.value,
-    uhic: uhic.value,
-    age: parseInt(age.value),
-    sex: sex.value,
-    usualWeight: parseFloat(usualWeight.value),
-    weight: parseFloat(weight.value),
-    height: parseFloat(height.value),
+    name: patientNameEl.value,
+    uhic: uhicEl.value,
+    age: parseInt(ageEl.value),
+    sex: sexEl.value,
+    usualWeight: parseFloat(usualWeightEl.value),
+    weight: parseFloat(weightEl.value),
+    height: parseFloat(heightEl.value),
     weightLossPercent: (() => {
-      const uw = parseFloat(usualWeight.value);
-      const cw = parseFloat(weight.value);
+      const uw = parseFloat(usualWeightEl.value);
+      const cw = parseFloat(weightEl.value);
       if(uw > 0 && cw > 0 && cw < uw) return round1(((uw - cw) / uw) * 100);
       return 0;
     })(),
     reducedFoodIntake: parseFloat(document.getElementById('reducedFoodIntake').value) || 0,
-    giIssues: (giIssues.value === 'true'),
-    cancer: cancerInput.value,
-    regimen: regimenInput.value,
-    albumin: parseFloat(albumin.value),
-    feedingMethod: feedingMethod.value,
+    giIssues: (giIssuesEl.value === 'true'),
+    cancer: cancerInputEl.value,
+    regimen: regimenInputEl.value,
+    albumin: parseFloat(albuminEl.value),
+    feedingMethod: feedingMethodEl.value,
     comorbidities: tagsToArray('comorbidityTags'),
     sideEffects: tagsToArray('sideEffectTags'),
     genomicMarkers: tagsToArray('genomicMarkersTags'),
-    allergies: document.getElementById('allergies').value,
-    notes: document.getElementById('notes').value
+    allergies: allergiesEl.value,
+    notes: notesEl.value
   };
 
   savePatient(patient);

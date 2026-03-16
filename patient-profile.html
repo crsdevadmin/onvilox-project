@@ -430,6 +430,10 @@
       </div>
 
       <div class="form-group" style="grid-column:1 / -1;">
+        <label>Allergies</label>
+        <textarea id="epAllergies" placeholder="Known allergies (e.g. lactose, specific drugs)"></textarea>
+      </div>
+      <div class="form-group" style="grid-column:1 / -1;">
         <label>Doctor Note (optional)</label>
         <input id="epNote" type="text" placeholder="Reason for input correction (e.g., updated lab / corrected weight)">
       </div>
@@ -999,6 +1003,7 @@ function savePatientEdits(){
   patient.feedingMethod = document.getElementById('epFeeding').value;
   patient.cancer = document.getElementById('epCancer').value;
   patient.regimen = document.getElementById('epRegimen').value;
+  patient.allergies = document.getElementById('epAllergies').value;
 
   updatePatient(patient);
 
@@ -1205,6 +1210,7 @@ function bind(plan){
   const epUw = document.getElementById('epUW'); if(epUw) epUw.value = patient.usualWeight || '';
   const epCrp = document.getElementById('epCRP'); if(epCrp) epCrp.value = patient.crp || 0;
   const epG = document.getElementById('epGi'); if(epG) epG.value = (patient.giIssues||false).toString();
+  const epAller = document.getElementById('epAllergies'); if(epAller) epAller.value = patient.allergies || '';
   
   const calculatedBMI = computeBMI();
   setVal('pBMI', calculatedBMI);
