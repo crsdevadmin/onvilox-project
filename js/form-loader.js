@@ -229,13 +229,13 @@ function validateField(field, fieldName) {
   // Special: Cancer validation (manual entry allowed, but must not be empty)
   if (field.id === "cancerInput") {
     // Already checked for empty/null above
-    return true;
+    // Let it fall through to success state
   }
 
   // Special: Regimen validation (manual entry allowed, but must not be empty)
   if (field.id === "regimenInput") {
     // Already checked for empty/null above
-    return true;
+    // Let it fall through to success state
   }
 
   // Numeric checks (respect min/max where provided)

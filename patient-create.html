@@ -149,7 +149,7 @@
     <input type="text" id="cancerInput"
            placeholder="Search cancer type..."
            onclick="openCancerDropdown()"
-           onkeyup="filterCancerList()" onblur="validateField(this,'Cancer Type')">
+            onkeyup="filterCancerList()" onblur="setTimeout(()=>validateField(this,'Cancer Type'), 200)">
     <div class="dropdown-list" id="cancerDropdown"></div>
     <div class="validation-msg" id="cancerInput_msg"></div>
   </div>
@@ -159,7 +159,7 @@
     <input type="text" id="regimenInput"
            placeholder="Search regimen..."
            onclick="openRegimenDropdown()"
-           onkeyup="filterRegimenList()" onblur="validateField(this,'Chemo Regimen')">
+            onkeyup="filterRegimenList()" onblur="setTimeout(()=>validateField(this,'Chemo Regimen'), 200)">
     <div class="dropdown-list" id="regimenDropdown"></div>
     <div class="validation-msg" id="regimenInput_msg"></div>
   </div>
