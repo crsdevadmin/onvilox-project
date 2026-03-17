@@ -56,9 +56,64 @@ body.light .login-page::after {
 .login-hero .overlay {
   position: absolute;
   inset: 0;
-  background: url('https://images.unsplash.com/photo-1620641788421-7a1c342ea42e?auto=format&fit=crop&w=1500&q=80') center/cover no-repeat;
-  opacity: 0.3;
-  mix-blend-mode: overlay;
+  background: radial-gradient(circle, transparent 60%, rgba(0,0,0,0.6) 100%);
+  z-index: 2;
+  pointer-events: none;
+}
+
+.carousel {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+
+.slide {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  opacity: 0;
+  transition: opacity 1.5s ease-in-out;
+  display: flex;
+  align-items: flex-end;
+  padding: 60px;
+  text-align: left;
+}
+
+.slide.active {
+  opacity: 1;
+  animation: slideZoom 10s linear infinite alternate;
+}
+
+@keyframes slideZoom {
+  from { transform: scale(1); }
+  to { transform: scale(1.1); }
+}
+
+.slide-content {
+  position: relative;
+  z-index: 4;
+  color: white;
+  max-width: 600px;
+  transform: translateY(20px);
+  opacity: 0;
+  transition: all 1s ease 0.5s;
+}
+
+.slide.active .slide-content {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+.slide-content h3 {
+  font-size: 28px;
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+
+.slide-content p {
+  font-size: 16px;
+  opacity: 0.9;
 }
 
 /* Glass panel inside hero */
@@ -66,9 +121,8 @@ body.light .login-page::after {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, rgba(10,10,10,0.8), rgba(5,5,5,0.2));
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  background: linear-gradient(to bottom, rgba(10,10,10,0.1), rgba(10,10,10,0.6));
+  z-index: 2;
 }
 
 body.light .login-hero::before {
