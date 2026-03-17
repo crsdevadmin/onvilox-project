@@ -60,6 +60,9 @@ function addAssessment(patientId, formData) {
     muac: formData.muac,
     giIssues: formData.giIssues || false,
     reducedFoodIntake: formData.reducedFoodIntake,
+    sodium: formData.sodium,
+    potassium: formData.potassium,
+    urea: formData.urea,
     notes: formData.notes || ""
   };
   
@@ -67,6 +70,9 @@ function addAssessment(patientId, formData) {
   if (formData.albumin) patient.albumin = formData.albumin;
   if (formData.crp) patient.crp = formData.crp;
   if (formData.muac) patient.muac = formData.muac;
+  if (formData.sodium) patient.sodium = formData.sodium;
+  if (formData.potassium) patient.potassium = formData.potassium;
+  if (formData.urea) patient.urea = formData.urea;
   
   patient.assessments.push(assessment);
   updatePatient(patient);
