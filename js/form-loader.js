@@ -122,6 +122,7 @@ function loadFeedingMethods() {
 // ---------- MULTI TAG ----------
 function loadMultiSelect(dropdownId, dataList, tagContainerId) {
   const dropdown = document.getElementById(dropdownId);
+  if (!dropdown) return; // Exit if ID is not on this page
   dropdown.innerHTML = "";
 
   dataList.forEach(item => {

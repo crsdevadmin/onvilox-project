@@ -515,6 +515,7 @@ document.getElementById('height').addEventListener('input', updateBSA);
 
 function tagsToArray(containerId){
   const c = document.getElementById(containerId);
+  if (!c) return []; // Return empty array if container is missing
   return [...c.children].map(el => el.dataset.value);
 }
 
@@ -632,9 +633,9 @@ function submitPatient(){
     cancerStage: cancerStageEl.value,
     ecogStatus: parseInt(ecogStatusEl.value || 0),
     tumorBurden: document.getElementById('tumorBurden').value,
-    palliativeStage: document.getElementById('palliativeStage').value,
+    palliativeStage: document.getElementById('palliativeStage')?.value || 'Not Stated',
     metastasisSites: tagsToArray('metastasisTags'),
-    isVegetarian: isVegetarianEl.value === 'true'
+    isVegetarian: isVegetarianEl ? (isVegetarianEl.value === 'true') : false
   };
 
   savePatient(patient);
