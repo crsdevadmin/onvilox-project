@@ -233,6 +233,21 @@
         <input type="number" id="tsh" step="0.01" oninput="updateLabStatus('tsh', this.value)">
         <div class="range-hint">Normal: 0.4 – 4.0 mIU/L</div>
       </div>
+      <div class="form-group">
+        <label>Sodium (mEq/L) <span id="sodium_status" class="status-badge"></span></label>
+        <input type="number" id="sodium" step="0.1" placeholder="e.g. 140" oninput="updateLabStatus('sodium', this.value)">
+        <div class="range-hint">Normal: 135 – 145 mEq/L</div>
+      </div>
+      <div class="form-group">
+        <label>Potassium (mEq/L) <span id="potassium_status" class="status-badge"></span></label>
+        <input type="number" id="potassium" step="0.1" placeholder="e.g. 4.2" oninput="updateLabStatus('potassium', this.value)">
+        <div class="range-hint">Normal: 3.5 – 5.1 mEq/L</div>
+      </div>
+      <div class="form-group">
+        <label>Urea (mg/dL) <span id="urea_status" class="status-badge"></span></label>
+        <input type="number" id="urea" step="1" placeholder="e.g. 30" oninput="updateLabStatus('urea', this.value)">
+        <div class="range-hint">Normal: 15 – 45 mg/dL</div>
+      </div>
     </div>
   </div>
 
@@ -621,6 +636,9 @@ function submitPatient(){
     folate: parseFloat(document.getElementById('folate').value || 0),
     zinc: parseFloat(document.getElementById('zinc').value || 0),
     magnesium: parseFloat(document.getElementById('magnesium').value || 0),
+    sodium: parseFloat(document.getElementById('sodium').value || 0),
+    potassium: parseFloat(document.getElementById('potassium').value || 0),
+    urea: parseFloat(document.getElementById('urea').value || 0),
     feedingMethod: feedingMethodEl.value,
     treatmentTypes: tagsToArray('treatmentTags'),
     comorbidities: tagsToArray('comorbidityTags'),
@@ -721,6 +739,18 @@ function updateLabStatus(id, val) {
     else { status = 'Normal'; cls = 'status-normal'; }
   } else if(id === 'muac') {
     if(num < 23) { status = 'Low'; cls = 'status-danger'; }
+    else { status = 'Normal'; cls = 'status-normal'; }
+  } else if(id === 'sodium') {
+    if(num < 135) { status = 'Low'; cls = 'status-danger'; }
+    else if(num > 145) { status = 'High'; cls = 'status-danger'; }
+    else { status = 'Normal'; cls = 'status-normal'; }
+  } else if(id === 'potassium') {
+    if(num < 3.5) { status = 'Low'; cls = 'status-danger'; }
+    else if(num > 5.1) { status = 'High'; cls = 'status-danger'; }
+    else { status = 'Normal'; cls = 'status-normal'; }
+  } else if(id === 'urea') {
+    if(num < 15) { status = 'Low'; cls = 'status-warn'; }
+    else if(num > 45) { status = 'High'; cls = 'status-danger'; }
     else { status = 'Normal'; cls = 'status-normal'; }
   }
 

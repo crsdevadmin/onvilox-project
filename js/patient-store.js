@@ -101,7 +101,10 @@ function createOrUpdatePlan(patient, engineOutput, overrides, overrideNotes){
     muac: patient.muac,
     weightLossPercent: patient.weightLossPercent,
     feedingMethod: patient.feedingMethod,
-    giIssues: !!patient.giIssues
+    giIssues: !!patient.giIssues,
+    sodium: patient.sodium,
+    potassium: patient.potassium,
+    urea: patient.urea
   };
   const finalPlan = Object.assign({}, engineOutput, overrides || {});
   const plan = {

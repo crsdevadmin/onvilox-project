@@ -222,6 +222,9 @@
         <div class="rf"><div class="rf-lbl">ALT / AST</div><div class="rf-val" id="pLiver"></div></div>
         <div class="rf"><div class="rf-lbl">Bilirubin</div><div class="rf-val" id="pBilirubin"></div></div>
         <div class="rf"><div class="rf-lbl">Blood Sugar</div><div class="rf-val" id="pBloodSugar"></div></div>
+        <div class="rf"><div class="rf-lbl">Sodium (mEq/L)</div><div class="rf-val" id="pSodium"></div></div>
+        <div class="rf"><div class="rf-lbl">Potassium (mEq/L)</div><div class="rf-val" id="pPotassium"></div></div>
+        <div class="rf"><div class="rf-lbl">Urea (mg/dL)</div><div class="rf-val" id="pUrea"></div></div>
         <div class="rf"><div class="rf-lbl">BSA (m²)</div><div class="rf-val" id="pBSA"></div></div>
         <div class="rf"><div class="rf-lbl">Lean Body Mass</div><div class="rf-val" id="pLBM"></div></div>
         <div class="rf"><div class="rf-lbl">Sarcopenia</div><div class="rf-val" id="pSarcopenia"></div></div>
@@ -526,6 +529,21 @@
             <label>TSH (mIU/L) <span id="epTSH_status" class="status-badge"></span></label>
             <input id="epTSH" type="number" step="0.01" oninput="updateLabStatus('epTSH', this.value)">
             <div class="range-hint">Normal: 0.4 – 4.0 mIU/L</div>
+          </div>
+          <div class="form-group">
+            <label>Sodium (mEq/L) <span id="epSodium_status" class="status-badge"></span></label>
+            <input id="epSodium" type="number" step="0.1" placeholder="e.g. 140" oninput="updateLabStatus('epSodium', this.value)">
+            <div class="range-hint">Normal: 135 – 145 mEq/L</div>
+          </div>
+          <div class="form-group">
+            <label>Potassium (mEq/L) <span id="epPotassium_status" class="status-badge"></span></label>
+            <input id="epPotassium" type="number" step="0.1" placeholder="e.g. 4.2" oninput="updateLabStatus('epPotassium', this.value)">
+            <div class="range-hint">Normal: 3.5 – 5.1 mEq/L</div>
+          </div>
+          <div class="form-group">
+            <label>Urea (mg/dL) <span id="epUrea_status" class="status-badge"></span></label>
+            <input id="epUrea" type="number" step="1" placeholder="e.g. 30" oninput="updateLabStatus('epUrea', this.value)">
+            <div class="range-hint">Normal: 15 – 45 mg/dL</div>
           </div>
         </div>
       </div>
@@ -1065,6 +1083,9 @@ function showEditSectionIfAllowed(){
     document.getElementById('epBilirubin').value = patient.bilirubin ?? '';
     document.getElementById('epBloodSugar').value = patient.bloodSugar ?? '';
     document.getElementById('epTSH').value = patient.tsh ?? '';
+    document.getElementById('epSodium').value = patient.sodium ?? '';
+    document.getElementById('epPotassium').value = patient.potassium ?? '';
+    document.getElementById('epUrea').value = patient.urea ?? '';
 
     // Micronutrients
     document.getElementById('epPrealbumin').value = patient.prealbumin ?? '';
@@ -1444,6 +1465,9 @@ function savePatientEdits(){
   patient.zinc = parseFloat(document.getElementById('epZinc').value || 0);
   patient.magnesium = parseFloat(document.getElementById('epMagnesium').value || 0);
   patient.tsh = parseFloat(document.getElementById('epTSH').value || 0);
+  patient.sodium = parseFloat(document.getElementById('epSodium').value || 0);
+  patient.potassium = parseFloat(document.getElementById('epPotassium').value || 0);
+  patient.urea = parseFloat(document.getElementById('epUrea').value || 0);
   patient.prealbumin = parseFloat(document.getElementById('epPrealbumin')?.value || 0);
   patient.tumorBurden = document.getElementById('epTumorBurden').value;
   patient.sarcopeniaStatus = document.getElementById('epSarcopenia').value;
@@ -1671,6 +1695,9 @@ function bind(plan){
   setVal('pLiver', (patient.alt || patient.ast) ? `${patient.alt || '-'}/${patient.ast || '-'} U/L` : '-');
   setVal('pBilirubin', (patient.bilirubin ? patient.bilirubin + ' mg/dL' : '-'));
   setVal('pBloodSugar', (patient.bloodSugar ? patient.bloodSugar + ' mg/dL' : '-'));
+  setVal('pSodium', (patient.sodium ? patient.sodium + ' mEq/L' : '-'));
+  setVal('pPotassium', (patient.potassium ? patient.potassium + ' mEq/L' : '-'));
+  setVal('pUrea', (patient.urea ? patient.urea + ' mg/dL' : '-'));
   setVal('pBSA', (patient.bsa ? patient.bsa + ' m²' : '-'));
   setVal('pLBM', (patient.leanBodyMass ? patient.leanBodyMass + ' kg' : '-'));
   setVal('pSarcopenia', patient.sarcopeniaStatus || 'None');
@@ -1698,6 +1725,9 @@ function bind(plan){
   const epBs = document.getElementById('epBloodSugar'); if(epBs) epBs.value = patient.bloodSugar || '';
   const epHb = document.getElementById('epHemoglobin'); if(epHb) epHb.value = patient.hemoglobin || '';
   const epVd = document.getElementById('epVitD'); if(epVd) epVd.value = patient.vitD || '';
+  const epSod = document.getElementById('epSodium'); if(epSod) epSod.value = patient.sodium || '';
+  const epPot = document.getElementById('epPotassium'); if(epPot) epPot.value = patient.potassium || '';
+  const epUre = document.getElementById('epUrea'); if(epUre) epUre.value = patient.urea || '';
   const epTb = document.getElementById('epTumorBurden'); if(epTb) epTb.value = patient.tumorBurden || '';
   const epSar = document.getElementById('epSarcopenia'); if(epSar) epSar.value = patient.sarcopeniaStatus || 'None';
   const epLbm = document.getElementById('epLeanBodyMass'); if(epLbm) epLbm.value = patient.leanBodyMass || '';
@@ -2055,6 +2085,18 @@ function updateLabStatus(id, val) {
     else { status = 'Normal'; cls = 'status-normal'; }
   } else if(key === 'muac') {
     if(num < 23) { status = 'Low'; cls = 'status-danger'; }
+    else { status = 'Normal'; cls = 'status-normal'; }
+  } else if(key === 'sodium') {
+    if(num < 135) { status = 'Low'; cls = 'status-danger'; }
+    else if(num > 145) { status = 'High'; cls = 'status-danger'; }
+    else { status = 'Normal'; cls = 'status-normal'; }
+  } else if(key === 'potassium') {
+    if(num < 3.5) { status = 'Low'; cls = 'status-danger'; }
+    else if(num > 5.1) { status = 'High'; cls = 'status-danger'; }
+    else { status = 'Normal'; cls = 'status-normal'; }
+  } else if(key === 'urea') {
+    if(num < 15) { status = 'Low'; cls = 'status-warn'; }
+    else if(num > 45) { status = 'High'; cls = 'status-danger'; }
     else { status = 'Normal'; cls = 'status-normal'; }
   }
 
