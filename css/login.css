@@ -56,8 +56,8 @@ body.light .login-page::after {
 .login-hero .overlay {
   position: absolute;
   inset: 0;
-  background: radial-gradient(circle, transparent 60%, rgba(0,0,0,0.6) 100%);
-  z-index: 2;
+  background: linear-gradient(to bottom, transparent 40%, rgba(0,0,0,0.8) 100%);
+  z-index: 3;
   pointer-events: none;
 }
 
@@ -75,9 +75,10 @@ body.light .login-page::after {
   opacity: 0;
   transition: opacity 1.5s ease-in-out;
   display: flex;
-  align-items: flex-end;
+  align-items: center; /* Center vertically overall */
+  justify-content: center; /* Center horizontally */
   padding: 60px;
-  text-align: left;
+  text-align: center;
 }
 
 .slide.active {
@@ -91,17 +92,26 @@ body.light .login-page::after {
 }
 
 .slide-content {
-  position: relative;
-  z-index: 4;
+  position: absolute;
+  bottom: 80px; /* Positioned at bottom */
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  z-index: 5;
   color: white;
-  max-width: 600px;
-  transform: translateY(20px);
+  max-width: 700px;
+  width: 90%;
+  padding: 24px 40px;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 20px;
   opacity: 0;
   transition: all 1s ease 0.5s;
 }
 
 .slide.active .slide-content {
-  transform: translateY(0);
+  transform: translateX(-50%) translateY(0);
   opacity: 1;
 }
 
@@ -130,10 +140,14 @@ body.light .login-hero::before {
 }
 
 .hero-content {
-  position: relative;
+  position: absolute;
+  top: 25%; /* Shifted upward to give captions room */
+  left: 50%;
+  transform: translateX(-50%);
   color: white;
   text-align: center;
-  z-index: 2;
+  z-index: 4;
+  width: 100%;
   animation: fadeInDown 1.5s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
