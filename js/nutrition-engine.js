@@ -151,18 +151,24 @@ function generateNutritionPlan(patient) {
   else if (tolerance === 'lactose') proteinType = 'Plant proteins (pea / rice)';
   else if ((patient.feedingMethod || '').toLowerCase().includes('enteral')) proteinType = 'Peptide formulas';
 
+  // LAB-GUIDED MICRONUTRIENTS & TREATMENT SPECIFIC LOGIC
   const micronutrients = {
-    vitD: vitD > 0 && vitD < 30 ? '2000–4000 IU/day (Correction Dose)' : '1000–2000 IU/day (Maintenance)',
-    vitC: '500–1000 mg/day',
+    vitD: vitD > 0 && vitD < 20 ? '4000–6000 IU/day (Severe Deficiency)' : (vitD < 30 ? '2000–4000 IU/day (Correction)' : '1000–2000 IU/day (Maintenance)'),
+    vitC: (crp > 5 || tumorBurden) ? '1000–2000 mg/day (High Oxidative Stress)' : '500–1000 mg/day',
     zinc: zinc > 0 && zinc < 60 ? '30–50 mg/day (Replacement)' : '8–15 mg/day',
-    omega3: '1.5–2 g/day',
-    epa: 'Around 2 g EPA/day for cachexia support',
-    leucine: (sarcopenia || tumorBurden) ? '3–5 g/day (Enhanced MPS Support)' : '2–3 g/day',
-    glutamine: (patient.giIssues || (patient.sideEffects && patient.sideEffects.includes('Mucositis'))) ? '10–20 g/day for mucosal recovery' : 'Consider if mucositis / GI toxicity',
-    bcaa: (alt > 50 || ast > 50 || bilirubin > 1.2) ? '15–20 g/day Branched-Chain Amino Acids (BCAA)' : (sarcopenia ? '5–10 g/day additional BCAA' : null),
-    magnesium: patient.magnesium > 0 && patient.magnesium < 1.7 ? '250–500 mg/day supplemental Mg' : 'Daily supportive dose',
-    bComplex: 'High-potency daily supportive dose',
-    folate: patient.folate > 0 && patient.folate < 3 ? '1–5 mg/day' : 'Daily maintenance'
+    omega3: (crp > 5 || cachexia) ? '2–3 g/day (High EPA for Inflammation)' : '1.5–2 g/day',
+    epa: (cachexia || tumorBurden) ? '2.2 g EPA/day (Cachexia prevention)' : 'None',
+    leucine: (sarcopenia || tumorBurden || ecog >= 2) ? '3–5 g/day (Enhanced MPS Support)' : '2–3 g/day',
+    glutamine: (patient.giIssues || (patient.sideEffects && (patient.sideEffects.includes('Mucositis') || patient.sideEffects.includes('Diarrhea')))) ? '20–30 g/day (High-dose mucosal support)' : 'Consider if GI toxicity persists',
+    bcaa: (alt > 50 || ast > 50 || bilirubin > 1.2) ? '15–20 g/day for Liver Support' : (sarcopenia ? '5–10 g/day' : null),
+    magnesium: (() => {
+      let base = 'Daily supportive dose';
+      if (patient.magnesium > 0 && patient.magnesium < 1.7) base = '500 mg/day (Replacement)';
+      if (patient.regimen && patient.regimen.includes('Cisplatin')) base += ' + 500-1000 mg/day (Cisplatin-induced wasting prophylaxis)';
+      return base;
+    })(),
+    bComplex: (patient.regimen && (patient.regimen.includes('Taxane') || patient.regimen.includes('Pemetrexed'))) ? 'High-potency B-Complex (Neuroprotection/Anemia support)' : 'Standard daily dose',
+    folate: patient.folate > 0 && patient.folate < 3 ? '1–5 mg/day' : (patient.regimen && patient.regimen.includes('Pemetrexed') ? '1 mg/day (Routine protocol)' : '0.4-1.0 mg/day')
   };
 
   const flavorProfile = (() => {
@@ -202,27 +208,27 @@ function generateNutritionPlan(patient) {
     rationale.push(`<b>ASCO Practice Guideline:</b> Patient triggered high nutritional risk alert (${reasons.join(', ')}). Early targeted nutritional intervention is strongly recommended to improve tolerance to oncology therapy.`);
   }
 
-  // Systemic Inflammation (CRP)
-  if (crp > 10) {
-    rationale.push(`<b>ESPEN Guideline (Systemic Inflammation):</b> Elevated CRP (>10 mg/L) indicates a state of systemic inflammation which is a key component of cancer cachexia. Metabolism is altered, prioritizing nutrient repartitioning towards inflammatory processes rather than muscle maintenance.`);
+  // Inflammation strategy
+  if (crp > 5) {
+    rationale.push(`<b>Clinical Inflammation Strategy:</b> Elevated CRP (${crp} mg/L) indicates systemic inflammation. High-dose EPA (2g+) and optimized micronutrients are prioritized to downregulate pro-inflammatory cytokines.`);
   }
 
-  // Immunonutrition / EPA
-  if (cachexia || patient.weightLossPercent >= 5) {
-    rationale.push(`<b>ESPEN Guideline (Omega-3/EPA):</b> Supplementation with 1.5-2g/day of EPA/DHA is recommended in advanced cancer patients undergoing chemotherapy at risk of weight loss, to help stabilize weight, preserve lean body mass, and improve appetite.`);
+  // Treatment Specific: Cisplatin Nephrotoxicity / Wasting
+  if (patient.regimen && patient.regimen.includes('Cisplatin')) {
+    rationale.push(`<b>Regimen Specific Advice (Cisplatin):</b> High-dose Magnesium and B-Complex integrated for prophylaxis against Cisplatin-induced renal magnesium wasting and peripheral neuropathy.`);
   }
 
   // Protein source / GI
-  if (patient.giIssues || (patient.proteinTolerance || '').toLowerCase() === 'gi') {
-    rationale.push(`<b>Clinical Formulation:</b> Hydrolyzed protein / peptide-based formula prescribed due to reported GI issues or mucositis, to improve absorption and reduce osmotic diarrhea compared to intact proteins.`);
+  if (patient.giIssues || (patient.sideEffects && (patient.sideEffects.includes('Mucositis') || patient.sideEffects.includes('Diarrhea')))) {
+    rationale.push(`<b>Clinical Formulation (GI Toxicity):</b> Peptide-based formula (Hydrolyzed Whey) and high-dose Glutamine used to support mucosal integrity and improve absorption during treatment-induced GI toxicity.`);
   } else {
-    rationale.push(`<b>Clinical Formulation:</b> Standard high-biological-value protein (e.g. Whey isolate) utilized for optimal leucine content to stimulate muscle protein synthesis.`);
+    rationale.push(`<b>Clinical Formulation:</b> Standard high-biological-value protein (Whey isolate) utilized for optimal muscle protein synthesis support.`);
   }
 
 function buildFormulationOptions(targets) {
   if (typeof IngredientLibrary === 'undefined') return null;
 
-  const { macroProtein, macroCarbs, macroFat, proteinType } = targets;
+  const { macroProtein, macroCarbs, macroFat, proteinType, bloodSugar, cachexia, crp } = targets;
 
   // 1. Find the best protein match
   let selectedProtein = IngredientLibrary.find(i => i.id === 'whey_isolate');
@@ -233,8 +239,14 @@ function buildFormulationOptions(targets) {
   }
 
   // 2. Find carbs and fat
-  const selectedCarb = IngredientLibrary.find(i => i.id === 'maltodextrin');
+  // METABOLIC SELECTION: Use Palatinose if blood sugar is high or for reduced glycemic load oncology protocol
+  let selectedCarb = IngredientLibrary.find(i => i.id === 'palatinose');
+  if (bloodSugar < 100 && !cachexia) {
+      selectedCarb = IngredientLibrary.find(i => i.id === 'maltodextrin');
+  }
+
   const selectedFat = IngredientLibrary.find(i => i.id === 'mct_powder');
+  const selectedOmega = IngredientLibrary.find(i => i.id === 'omega3_powder');
 
   // Grams per serving calculation
   const pGrams = Math.round(macroProtein / (selectedProtein.pPerGram || 1));
@@ -246,6 +258,7 @@ function buildFormulationOptions(targets) {
 
   const cGrams = Math.round(neededCarbs / (selectedCarb.cPerGram || 1));
   const fGrams = Math.round(neededFat / (selectedFat.fPerGram || 1));
+  const oGrams = (crp > 5 || cachexia) ? 5 : 0; // Fixed small dose of Omega powder if inflammation present
 
   return {
     protein: { 
@@ -266,11 +279,23 @@ function buildFormulationOptions(targets) {
       grams: fGrams, 
       rationale: selectedFat.healingRationale 
     },
+    omega: oGrams > 0 ? {
+      id: selectedOmega.id,
+      name: selectedOmega.name,
+      grams: oGrams,
+      rationale: "Added for systemic anti-inflammatory support."
+    } : null,
     bcaa: (patient.alt > 50 || patient.ast > 50 || patient.bilirubin > 1.2) ? {
       id: 'bcaa_powder',
       name: 'BCAA (2:1:1 Mix)',
       grams: 15,
       rationale: "Included for liver support and to help maintain nitrogen balance in patients with elevated liver enzymes."
+    } : null,
+    glutamine: (pGrams > 0 && (patient.giIssues || (patient.sideEffects && patient.sideEffects.includes('Mucositis')))) ? {
+        id: 'glutamine',
+        name: 'L-Glutamine powder',
+        grams: 10,
+        rationale: "Essential for supporting bowel mucosal integrity during chemotherapy/radiation."
     } : null
   };
 }
@@ -301,6 +326,20 @@ function buildFormulationOptions(targets) {
 
   const feasibilityScore = computeFeasibilityScore();
 
+  // OUTCOME PREDICTIONS
+  const outcomes = {
+    weightStabilization: cachexia ? "High Probability (with hypercaloric support)" : "Likely Maintained",
+    musclePreservation: (sarcopenia || proteinPerKg >= 1.5) ? "Improved retention via High Protein/Leucine" : "Standard maintenance",
+    treatmentTolerance: (patient.giIssues || crp > 10) ? "Enhanced via inflammatory/mucosal support" : "Baseline"
+  };
+
+  // DIET INTEGRATION ADVICE
+  const dietIntegration = [
+    "Pair Onvilox with low-fiber, high-protein snacks (e.g. Greek yogurt, scrambled eggs) if mucositis is present.",
+    "Add 1 serving of cooked green vegetables daily for fiber/micronutrient synergy if GI tolerance allows.",
+    "Consume main whole-food meal mid-day; use Onvilox servings as breakfast/evening gap fillers."
+  ];
+
   return {
     cachexia,
     bmi: Math.round(bmi * 10) / 10,
@@ -325,7 +364,9 @@ function buildFormulationOptions(targets) {
     feasibilityScore,
     patientInstructions,
     manufacturingAlerts,
-    recipe: buildFormulationOptions({ macroProtein, macroCarbs, macroFat, proteinType }),
+    outcomes,
+    dietIntegration,
+    recipe: buildFormulationOptions({ macroProtein, macroCarbs, macroFat, proteinType, bloodSugar, cachexia, crp }),
     reportNotes: {
       nutritionRiskBasis: 'Nutrition risk is estimated from serum albumin, recent weight loss, BMI, CRP, and GI issues.',
       proteinValueBasis: 'Protein value varies based on body weight, inflammation (CRP), cachexia tendency, and tolerance status.'

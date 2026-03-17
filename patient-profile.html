@@ -369,6 +369,12 @@
           <div class="rs-title" style="font-size:9.5px; margin-top:20px;">Patient Guidance</div>
           <ul class="rrat" id="patientInstructions" style="font-size:11.5px; color:#475569;"></ul>
 
+          <div class="rs-title" style="font-size:9.5px; margin-top:20px;">Outcome Predictions</div>
+          <ul class="rrat" id="outcomePredictions" style="font-size:11.5px; color:#0369a1;"></ul>
+
+          <div class="rs-title" style="font-size:9.5px; margin-top:20px;">Daily Diet Integration</div>
+          <ul class="rrat" id="dietIntegration" style="font-size:11.5px; color:#1e293b; font-weight:500;"></ul>
+
           <div class="rs-title" style="font-size:9.5px; margin-top:20px;">Manufacturing Alerts (Store)</div>
           <ul class="rrat" id="manufacturingAlerts" style="font-size:11.5px; color:#dc2626; font-weight:600;"></ul>
 
@@ -644,6 +650,14 @@
           <div class="form-group">
             <label>Fat Percentage (%)</label>
             <input id="epFatPercent" type="number" step="0.1">
+          </div>
+          <div class="form-group">
+            <label>Skeletal Muscle Index (cm²/m²)</label>
+            <input id="epSMI" type="number" step="0.1" placeholder="e.g. 45.0">
+          </div>
+          <div class="form-group">
+            <label>Hand Grip Strength (kg)</label>
+            <input id="epHandGrip" type="number" step="0.1" placeholder="e.g. 30.0">
           </div>
           <div class="form-group">
             <label>BSA (m²) - Auto</label>
@@ -1399,6 +1413,8 @@ function savePatientEdits(){
   patient.activityLevel = document.getElementById('epActivityLevel').value;
   patient.leanBodyMass = parseFloat(document.getElementById('epLeanBodyMass').value || 0);
   patient.fatPercent = parseFloat(document.getElementById('epFatPercent').value || 0);
+  patient.smi = parseFloat(document.getElementById('epSMI').value || 0);
+  patient.handGrip = parseFloat(document.getElementById('epHandGrip').value || 0);
   patient.bsa = parseFloat(document.getElementById('epBSA').value || 0);
   patient.vegetarian = document.getElementById('epVegetarian').value === 'true';
   patient.culturalPreferences = document.getElementById('epCultural').value.trim();
@@ -1632,6 +1648,10 @@ function bind(plan){
   const epVd = document.getElementById('epVitD'); if(epVd) epVd.value = patient.vitD || '';
   const epTb = document.getElementById('epTumorBurden'); if(epTb) epTb.value = patient.tumorBurden || '';
   const epSar = document.getElementById('epSarcopenia'); if(epSar) epSar.value = patient.sarcopeniaStatus || 'None';
+  const epLbm = document.getElementById('epLeanBodyMass'); if(epLbm) epLbm.value = patient.leanBodyMass || '';
+  const epFat = document.getElementById('epFatPercent'); if(epFat) epFat.value = patient.fatPercent || '';
+  const epSmi = document.getElementById('epSMI'); if(epSmi) epSmi.value = patient.smi || '';
+  const epHg = document.getElementById('epHandGrip'); if(epHg) epHg.value = patient.handGrip || '';
   const epStg = document.getElementById('epStage'); if(epStg) epStg.value = patient.cancerStage || '';
   const epEcog = document.getElementById('epECOG'); if(epEcog) epEcog.value = patient.ecogStatus || 0;
   const epMet = document.getElementById('epMetastasis'); if(epMet) epMet.value = patient.metastasisSites || '';
@@ -1758,6 +1778,23 @@ function bind(plan){
     ma.innerHTML = '';
     (fp.manufacturingAlerts || []).forEach(text => {
       ma.innerHTML += `<li style="margin-bottom:4px;">${text}</li>`;
+    });
+  }
+
+  const op = document.getElementById('outcomePredictions');
+  if (op && fp.outcomes) {
+    op.innerHTML = '';
+    Object.entries(fp.outcomes).forEach(([key, val]) => {
+      const label = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+      op.innerHTML += `<li style="margin-bottom:4px;"><b>${label}:</b> ${val}</li>`;
+    });
+  }
+
+  const di = document.getElementById('dietIntegration');
+  if (di && fp.dietIntegration) {
+    di.innerHTML = '';
+    fp.dietIntegration.forEach(text => {
+      di.innerHTML += `<li style="margin-bottom:4px;">${text}</li>`;
     });
   }
 

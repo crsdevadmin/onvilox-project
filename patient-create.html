@@ -372,6 +372,14 @@
         <input type="number" id="fatPercent" step="0.1" placeholder="e.g. 25">
       </div>
       <div class="form-group">
+        <label>Skeletal Muscle Index (cm²/m²)</label>
+        <input type="number" id="smi" step="0.1" placeholder="e.g. 45.0">
+      </div>
+      <div class="form-group">
+        <label>Hand Grip Strength (kg)</label>
+        <input type="number" id="handGrip" step="0.1" placeholder="e.g. 30.0">
+      </div>
+      <div class="form-group">
         <label>BSA (m²) - Auto</label>
         <input type="number" id="bsa" readonly style="background:var(--bg-2); color:var(--text-3) !important;">
       </div>
@@ -584,6 +592,8 @@ function submitPatient(){
     bsa: parseFloat(document.getElementById('bsa').value || 0),
     leanBodyMass: parseFloat(document.getElementById('leanBodyMass').value || 0),
     fatPercent: parseFloat(document.getElementById('fatPercent').value || 0),
+    smi: parseFloat(document.getElementById('smi').value || 0),
+    handGrip: parseFloat(document.getElementById('handGrip').value || 0),
     sarcopeniaStatus: document.getElementById('sarcopeniaStatus').value,
     activityLevel: document.getElementById('activityLevel').value,
     weightLossPercent: (() => {
