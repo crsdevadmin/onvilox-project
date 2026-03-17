@@ -468,12 +468,22 @@
 
       <div class="form-group">
         <label class="required">Cancer Type</label>
-        <select id="epCancer"></select>
+        <div class="tag-box" style="margin-top:0; position:relative;">
+          <input type="text" id="epCancer" placeholder="Search or Enter Cancer Type..." 
+                 onfocus="openEpCancerDropdown()" onkeyup="filterEpCancerList()"
+                 onblur="setTimeout(()=>validateSelect('epCancer','Cancer Type'), 200)">
+          <div class="dropdown-list" id="epCancerDropdown"></div>
+        </div>
         <div class="validation-msg" id="epCancer_msg"></div>
       </div>
       <div class="form-group">
         <label>Chemo Regimen</label>
-        <select id="epRegimen"></select>
+        <div class="tag-box" style="margin-top:0; position:relative;">
+          <input type="text" id="epRegimen" placeholder="Search or Enter Regimen..." 
+                 onfocus="openEpRegimenDropdown()" onkeyup="filterEpRegimenList()"
+                 onblur="setTimeout(()=>validateSelect('epRegimen','Chemo Regimen'), 200)">
+          <div class="dropdown-list" id="epRegimenDropdown"></div>
+        </div>
         <div class="validation-msg" id="epRegimen_msg"></div>
       </div>
       
@@ -915,28 +925,70 @@ function loadEditSelects(){
     toggleEditIntakeUI();
   };
 
-  const cancerSel = document.getElementById('epCancer');
-  cancerSel.innerHTML = '<option value="">Select</option>';
-  Object.keys(typeof cancerRegimenMap !== 'undefined' ? cancerRegimenMap : {}).forEach(c=>{
-    const o=document.createElement('option'); o.value=c; o.text=c; cancerSel.appendChild(o);
-  });
-
-  cancerSel.onchange = () => {
-    loadRegimensForCancer(cancerSel.value);
-    validateSelect('epCancer','Cancer Type');
-  };
-
-  const regimenSel = document.getElementById('epRegimen');
-  regimenSel.onchange = ()=> validateSelect('epRegimen','Chemo Regimen');
+  // Cancer and Regimen are now text inputs with custom dropdowns
 }
 
-function loadRegimensForCancer(cancer){
-  const regimenSel = document.getElementById('epRegimen');
-  regimenSel.innerHTML = '<option value="">Select</option>';
-  if(!cancer || !cancerRegimenMap || !cancerRegimenMap[cancer]) return;
-  cancerRegimenMap[cancer].forEach(r=>{
-    const o=document.createElement('option'); o.value=r; o.text=r; regimenSel.appendChild(o);
+function openEpCancerDropdown() {
+  const dropdown = document.getElementById('epCancerDropdown');
+  dropdown.style.display = 'block';
+  filterEpCancerList();
+}
+
+function filterEpCancerList() {
+  const input = document.getElementById('epCancer').value.toLowerCase();
+  const dropdown = document.getElementById('epCancerDropdown');
+  dropdown.innerHTML = "";
+
+  Object.keys(cancerRegimenMap).forEach(cancer => {
+    if (cancer.toLowerCase().includes(input)) {
+      const div = document.createElement("div");
+      div.innerText = cancer;
+      div.onclick = () => selectEpCancer(cancer);
+      dropdown.appendChild(div);
+    }
   });
+}
+
+function selectEpCancer(cancer) {
+  const input = document.getElementById('epCancer');
+  input.value = cancer;
+  document.getElementById('epCancerDropdown').style.display = 'none';
+  
+  // Clear regimen if cancer changed
+  const regimenInput = document.getElementById('epRegimen');
+  regimenInput.value = "";
+  
+  validateSelect('epCancer', 'Cancer Type');
+}
+
+function openEpRegimenDropdown() {
+  const dropdown = document.getElementById('epRegimenDropdown');
+  dropdown.style.display = 'block';
+  filterEpRegimenList();
+}
+
+function filterEpRegimenList() {
+  const cancer = document.getElementById('epCancer').value;
+  const input = document.getElementById('epRegimen').value.toLowerCase();
+  const dropdown = document.getElementById('epRegimenDropdown');
+  dropdown.innerHTML = "";
+
+  const regimens = cancerRegimenMap[cancer] || [];
+  regimens.forEach(regimen => {
+    if (regimen.toLowerCase().includes(input)) {
+      const div = document.createElement("div");
+      div.innerText = regimen;
+      div.onclick = () => selectEpRegimen(regimen);
+      dropdown.appendChild(div);
+    }
+  });
+}
+
+function selectEpRegimen(regimen) {
+  const input = document.getElementById('epRegimen');
+  input.value = regimen;
+  document.getElementById('epRegimenDropdown').style.display = 'none';
+  validateSelect('epRegimen', 'Chemo Regimen');
 }
 
 // Simple inline validation helpers
@@ -2114,6 +2166,15 @@ function enableFollowUpMode() {
     addMessage("You are now in Follow-Up mode. Upload a new PDF report or type the patient's new weight and labs. I will append this directly to their Assessments History.", "ai");
   }, 300);
 }
+
+// Close dropdowns if clicking anywhere outside
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.dropdown-list') && !e.target.closest('input')) {
+    document.querySelectorAll('.dropdown-list').forEach(dl => {
+      dl.style.display = 'none';
+    });
+  }
+});
 
 function downloadNutritionPDF(autoClose){
   // If html2pdf isn't available (offline), fall back to Print.

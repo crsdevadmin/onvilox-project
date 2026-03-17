@@ -226,34 +226,16 @@ function validateField(field, fieldName) {
     return false;
   }
 
-  // Special: Cancer must be from master list
+  // Special: Cancer validation (manual entry allowed, but must not be empty)
   if (field.id === "cancerInput") {
-    const ok = Object.prototype.hasOwnProperty.call(cancerRegimenMap, val);
-    if (!ok) {
-      field.classList.add("field-invalid");
-      field.classList.remove("field-valid");
-      if (msgBox) {
-        msgBox.className = "validation-msg validation-error";
-        msgBox.innerText = "Please select a valid Cancer Type from the list";
-      }
-      return false;
-    }
+    // Already checked for empty/null above
+    return true;
   }
 
-  // Special: Regimen must be valid for selected cancer
+  // Special: Regimen validation (manual entry allowed, but must not be empty)
   if (field.id === "regimenInput") {
-    const cancer = (selectedCancer || (document.getElementById("cancerInput")?.value || "")).trim();
-    const regimens = cancerRegimenMap[cancer] || [];
-    const ok = regimens.includes(val);
-    if (!ok) {
-      field.classList.add("field-invalid");
-      field.classList.remove("field-valid");
-      if (msgBox) {
-        msgBox.className = "validation-msg validation-error";
-        msgBox.innerText = "Please select a valid Regimen for the chosen cancer type";
-      }
-      return false;
-    }
+    // Already checked for empty/null above
+    return true;
   }
 
   // Numeric checks (respect min/max where provided)
