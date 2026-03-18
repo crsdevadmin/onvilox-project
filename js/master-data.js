@@ -51,64 +51,27 @@ const cancerRegimenMap = {
   "Multiple Myeloma – Standard": ["VRd (Bortezomib + Lenalidomide + Dexamethasone)"],
   "Multiple Myeloma – Relapsed": ["Daratumumab-based"],
 
-  // --- Preserved from older version (not in image) ---
-  "Testicular Cancer – Germ Cell Tumor": [
-    "BEP (Bleomycin + Etoposide + Cisplatin)",
-    "EP (Etoposide + Cisplatin)"
-  ],
-  "Esophageal Cancer": [
-    "Carboplatin + Paclitaxel (CROSS Regimen)",
-    "5-FU + Cisplatin",
-    "Pembrolizumab"
-  ],
-  "Cholangiocarcinoma (Bile Duct Cancer)": [
-    "Gemcitabine + Cisplatin",
-    "FOLFOX",
-    "Durvalumab Combination",
-    "Pembrolizumab"
-  ],
-  "Gallbladder Cancer": [
-    "Gemcitabine + Cisplatin",
-    "5-FU Combination"
-  ],
-  "Neuroendocrine Tumors (NETs)": [
-    "Octreotide / Lanreotide",
-    "Everolimus",
-    "Sunitinib",
-    "PRRT (Lutetium-177)"
-  ],
-  "Thyroid Cancer": [
-    "Radioactive Iodine Therapy",
-    "Lenvatinib",
-    "Sorafenib"
-  ],
-  "Melanoma (Skin Cancer)": [
-    "Pembrolizumab (Keytruda)",
-    "Nivolumab (Opdivo)",
-    "Dabrafenib + Trametinib",
-    "Ipilimumab + Nivolumab"
-  ],
-  "Basal / Squamous Cell Carcinoma (Skin)": [
-    "Cemiplimab",
-    "Pembrolizumab"
-  ],
-  "Glioblastoma (Brain Cancer)": [
-    "Temozolomide + Radiation",
-    "Bevacizumab"
-  ],
-  "Sarcoma (Bone / Soft Tissue)": [
-    "Doxorubicin",
-    "Ifosfamide",
-    "Gemcitabine + Docetaxel"
-  ],
-  "Endometrial / Uterine Cancer": [
-    "Carboplatin + Paclitaxel",
-    "Pembrolizumab + Lenvatinib"
-  ],
-  "Mesothelioma (Pleural)": [
-    "Pemetrexed + Cisplatin",
-    "Ipilimumab + Nivolumab"
-  ]
+  "Melanoma – Advanced / Metastatic": ["Nivolumab + Ipilimumab OR Pembrolizumab"],
+  "Endometrial Cancer – Advanced / Recurrent": ["Carboplatin + Paclitaxel"],
+  "Esophageal Cancer – Neoadjuvant (Pre-op)": ["CROSS Regimen (Carboplatin + Paclitaxel + Radiation)"],
+  "Biliary Tract Cancer – Advanced / Metastatic": ["Gemcitabine + Cisplatin + Durvalumab"],
+  "Soft Tissue Sarcoma – Advanced / Metastatic": ["Doxorubicin ± Ifosfamide"],
+  "GIST – Kit (CD117) Positive": ["Imatinib"],
+  "Thyroid Cancer – RAI-Refractory": ["Lenvatinib OR Sorafenib"],
+  "Testicular Cancer – Germ Cell Tumor": ["BEP (Bleomycin + Etoposide + Cisplatin)"],
+  "Mesothelioma – Pleural": ["Pemetrexed + Cisplatin + Nivolumab + Ipilimumab"],
+  "Neuroendocrine (NETs) – Well-differentiated": ["CAPTEM (Capecitabine + Temozolomide)"],
+  "Myelodysplastic (MDS) – High-risk": ["Hypomethylating agents (Azacitidine OR Decitabine)"],
+  "Follicular Lymphoma – First-line": ["Obinutuzumab + CHOP OR Bendamustine + Rituximab"],
+  "Mantle Cell Lymphoma – Fit / Younger Patients": ["R-DHAP / R-ICE followed by ASCT"],
+  "CNS Lymphoma – Primary": ["High-dose Methotrexate-based regimens"],
+
+  // --- Preserved (not in either image) ---
+  "Basal / Squamous Cell Carcinoma (Skin)": ["Cemiplimab", "Pembrolizumab"],
+  "Glioblastoma (Brain Cancer)": ["Temozolomide + Radiation", "Bevacizumab"],
+  "Hematological Malignancy": ["CHOP", "R-CHOP", "ABVD", "Stem Cell Transplant"],
+  "Cholangiocarcinoma (Bile Duct Cancer)": ["Gemcitabine + Cisplatin", "FOLFOX", "Durvalumab Combination", "Pembrolizumab"],
+  "Gallbladder Cancer": ["Gemcitabine + Cisplatin", "5-FU Combination"]
 };
 
 

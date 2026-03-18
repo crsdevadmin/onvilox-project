@@ -1370,12 +1370,20 @@ function runAiExtraction(rawText) {
     'gastric': 'Gastric Cancer – Advanced', 'stomach': 'Gastric Cancer – Advanced', 'esophageal': 'Esophageal Cancer',
     'bladder': 'Bladder Cancer – Muscle Invasive', 'urothelial': 'Bladder Cancer – Muscle Invasive',
     'kidney': 'Kidney Cancer – Clear Cell RCC', 'renal': 'Kidney Cancer – Clear Cell RCC', 'thyroid': 'Thyroid Cancer',
-    'melanoma': 'Melanoma (Skin Cancer)', 'basal cell': 'Basal / Squamous Cell Carcinoma (Skin)', 'squamous cell': 'Basal / Squamous Cell Carcinoma (Skin)', 'bcc': 'Basal / Squamous Cell Carcinoma (Skin)', 'scc': 'Basal / Squamous Cell Carcinoma (Skin)',
-    'glioblastoma': 'Glioblastoma (Brain Cancer)', 'gbm': 'Glioblastoma (Brain Cancer)', 'astrocytoma': 'Glioblastoma (Brain Cancer)', 'brain': 'Glioblastoma (Brain Cancer)',
-    'sarcoma': 'Sarcoma (Bone / Soft Tissue)', 'osteosarcoma': 'Sarcoma (Bone / Soft Tissue)', 'ewing': 'Sarcoma (Bone / Soft Tissue)',
-    'cervical': 'Cervical Cancer – Locally Advanced', 'cervix': 'Cervical Cancer – Locally Advanced',
-    'endometrial': 'Endometrial / Uterine Cancer', 'endometrium': 'Endometrial / Uterine Cancer', 'uterine': 'Endometrial / Uterine Cancer', 'uterus': 'Endometrial / Uterine Cancer',
-    'mesothelioma': 'Mesothelioma (Pleural)', 'pleural': 'Mesothelioma (Pleural)'
+    'melanoma': 'Melanoma – Advanced / Metastatic',
+    'endometrial': 'Endometrial Cancer – Advanced / Recurrent', 'endometrium': 'Endometrial Cancer – Advanced / Recurrent', 'uterine': 'Endometrial Cancer – Advanced / Recurrent',
+    'esophageal': 'Esophageal Cancer – Neoadjuvant (Pre-op)', 'esophagus': 'Esophageal Cancer – Neoadjuvant (Pre-op)',
+    'biliary': 'Biliary Tract Cancer – Advanced / Metastatic', 'bile duct': 'Biliary Tract Cancer – Advanced / Metastatic',
+    'sarcoma': 'Soft Tissue Sarcoma – Advanced / Metastatic',
+    'gist': 'GIST – Kit (CD117) Positive',
+    'thyroid': 'Thyroid Cancer – RAI-Refractory',
+    'testicular': 'Testicular Cancer – Germ Cell Tumor', 'testis': 'Testicular Cancer – Germ Cell Tumor',
+    'mesothelioma': 'Mesothelioma – Pleural',
+    'neuroendocrine': 'Neuroendocrine (NETs) – Well-differentiated', 'net': 'Neuroendocrine (NETs) – Well-differentiated',
+    'mds': 'Myelodysplastic (MDS) – High-risk',
+    'follicular lymphoma': 'Follicular Lymphoma – First-line',
+    'mantle cell': 'Mantle Cell Lymphoma – Fit / Younger Patients',
+    'cns lymphoma': 'CNS Lymphoma – Primary'
   };
 
   for (const [key, val] of Object.entries(cancers)) {
