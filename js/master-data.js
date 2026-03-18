@@ -4,96 +4,62 @@
 
 // Cancer → Regimen Mapping
 const cancerRegimenMap = {
+  // --- NCCN Image Data ---
+  "Lung Cancer – NSCLC Adenocarcinoma": ["Carboplatin + Pemetrexed ± Pembrolizumab"],
+  "Lung Cancer – NSCLC Squamous": ["Carboplatin + Paclitaxel ± Pembrolizumab"],
+  "Lung Cancer – EGFR Mutant": ["Osimertinib"],
+  "Lung Cancer – ALK+": ["Alectinib"],
+  "Lung Cancer – SCLC Limited": ["Cisplatin + Etoposide + Radiation"],
+  "Lung Cancer – SCLC Extensive": ["Carboplatin + Etoposide + Atezolizumab"],
+  "Breast Cancer – HR+/HER2-": ["AC → Paclitaxel"],
+  "Breast Cancer – HER2+": ["TCH (Docetaxel + Carboplatin + Trastuzumab)"],
+  "Breast Cancer – Triple Negative": ["AC → Taxane ± Pembrolizumab"],
+  "Breast Cancer – Metastatic HR+": ["CDK4/6 inhibitor + AI"],
+  "Breast Cancer – Metastatic HER2+": ["Trastuzumab + Pertuzumab + Docetaxel"],
+  "Colorectal Cancer – Stage III": ["FOLFOX"],
+  "Colorectal Cancer – Metastatic": ["FOLFOX", "FOLFIRI ± Bevacizumab"],
+  "Colorectal Cancer – Rectal Locally Advanced": ["Capecitabine + Radiation"],
+  "Colorectal Cancer – MSI-H": ["Pembrolizumab"],
+  "Gastric Cancer – HER2-": ["FOLFOX", "CAPOX"],
+  "Gastric Cancer – HER2+": ["Trastuzumab + Chemo"],
+  "Gastric Cancer – Advanced": ["FLOT"],
+  "Pancreatic Cancer – Resectable": ["FOLFIRINOX"],
+  "Pancreatic Cancer – Metastatic": ["Gemcitabine + Nab-paclitaxel"],
+  "Pancreatic Cancer – BRCA Mutated": ["Olaparib"],
+  "Prostate Cancer – Hormone Sensitive": ["ADT ± Docetaxel"],
+  "Prostate Cancer – CRPC": ["Abiraterone", "Enzalutamide"],
+  "Prostate Cancer – Advanced": ["Docetaxel", "Cabazitaxel"],
+  "Ovarian Cancer – Epithelial": ["Carboplatin + Paclitaxel"],
+  "Ovarian Cancer – BRCA Mutated": ["Olaparib"],
+  "Ovarian Cancer – Recurrent Platinum Sensitive": ["Carboplatin + Gemcitabine"],
+  "Cervical Cancer – Locally Advanced": ["Cisplatin + Radiation"],
+  "Cervical Cancer – Metastatic": ["Carboplatin + Paclitaxel + Bevacizumab"],
+  "Head & Neck Cancer – Locally Advanced": ["Cisplatin + Radiation"],
+  "Head & Neck Cancer – Recurrent": ["EXTREME (Cisplatin + 5FU + Cetuximab)"],
+  "Head & Neck Cancer – PD-L1+": ["Pembrolizumab"],
+  "Liver Cancer – Advanced HCC": ["Atezolizumab + Bevacizumab"],
+  "Liver Cancer – Second Line": ["Sorafenib", "Lenvatinib"],
+  "Kidney Cancer – Clear Cell RCC": ["Nivolumab + Ipilimumab"],
+  "Kidney Cancer – Advanced RCC": ["Pembrolizumab + Axitinib"],
+  "Bladder Cancer – Muscle Invasive": ["MVAC", "Gemcitabine + Cisplatin"],
+  "Bladder Cancer – Metastatic": ["Pembrolizumab"],
+  "Lymphoma – DLBCL": ["R-CHOP"],
+  "Lymphoma – Hodgkin": ["ABVD"],
+  "Leukemia – AML": ["7+3 (Cytarabine + Daunorubicin)"],
+  "Leukemia – ALL": ["Hyper-CVAD"],
+  "Leukemia – CML": ["Imatinib"],
+  "Multiple Myeloma – Standard": ["VRd (Bortezomib + Lenalidomide + Dexamethasone)"],
+  "Multiple Myeloma – Relapsed": ["Daratumumab-based"],
 
-  "Breast Cancer – Invasive Ductal Carcinoma (IDC)": [
-    "AC-T (Doxorubicin + Cyclophosphamide → Paclitaxel)",
-    "TC (Docetaxel + Cyclophosphamide)",
-    "FEC (5-FU + Epirubicin + Cyclophosphamide)",
-    "TCH (Docetaxel + Carboplatin + Trastuzumab)"
-  ],
-
-  "Breast Cancer – Triple Negative": [
-    "AC-T",
-    "Carboplatin + Paclitaxel",
-    "Neoadjuvant Chemotherapy"
-  ],
-
-  "Lung Cancer – NSCLC": [
-    "Cisplatin + Pemetrexed",
-    "Carboplatin + Paclitaxel",
-    "Pembrolizumab",
-    "Nivolumab"
-  ],
-
-  "Lung Cancer – SCLC": [
-    "Cisplatin + Etoposide",
-    "Carboplatin + Etoposide"
-  ],
-
-  "Colorectal Cancer": [
-    "FOLFOX",
-    "FOLFIRI",
-    "CAPOX",
-    "Bevacizumab Combination"
-  ],
-
-  "Pancreatic Cancer": [
-    "FOLFIRINOX",
-    "Gemcitabine + Nab-Paclitaxel"
-  ],
-
+  // --- Preserved from older version (not in image) ---
   "Testicular Cancer – Germ Cell Tumor": [
     "BEP (Bleomycin + Etoposide + Cisplatin)",
     "EP (Etoposide + Cisplatin)"
-  ],
-
-  "Head & Neck Cancer": [
-    "Cisplatin-based Chemoradiation",
-    "Cetuximab-based Regimen"
-  ],
-
-  "Ovarian Cancer": [
-    "Carboplatin + Paclitaxel",
-    "PARP Inhibitor Therapy"
-  ],
-
-  "Prostate Cancer": [
-    "ADT (Hormonal Therapy)",
-    "Docetaxel",
-    "Abiraterone"
-  ],
-
-  "Hematological Malignancy": [
-    "CHOP",
-    "R-CHOP",
-    "ABVD",
-    "Stem Cell Transplant"
-  ],
-  "Gastric / Stomach Cancer": [
-    "FLOT (5-FU + Leucovorin + Oxaliplatin + Docetaxel)",
-    "ECF (Epirubicin + Cisplatin + 5-FU)",
-    "Ramucirumab + Paclitaxel"
   ],
   "Esophageal Cancer": [
     "Carboplatin + Paclitaxel (CROSS Regimen)",
     "5-FU + Cisplatin",
     "Pembrolizumab"
-  ],
-  "Bladder / Urothelial Cancer": [
-    "Gemcitabine + Cisplatin",
-    "MVAC (Methotrexate + Vinblastine + Doxorubicin + Cisplatin)",
-    "Pembrolizumab"
-  ],
-  "Kidney (Renal Cell) Cancer": [
-    "Pazopanib",
-    "Sunitinib",
-    "Nivolumab + Ipimumab",
-    "Axutinib + Pembrolizumab"
-  ],
-  "Liver (Hepatocellular) Cancer": [
-    "Sorafenib",
-    "Lenvatinib",
-    "Atezolizumab + Bevacizumab"
   ],
   "Cholangiocarcinoma (Bile Duct Cancer)": [
     "Gemcitabine + Cisplatin",
@@ -135,19 +101,9 @@ const cancerRegimenMap = {
     "Ifosfamide",
     "Gemcitabine + Docetaxel"
   ],
-  "Cervical Cancer": [
-    "Cisplatin + Paclitaxel + Bevacizumab",
-    "Pembrolizumab Combination",
-    "Cisplatin-based Chemoradiation"
-  ],
   "Endometrial / Uterine Cancer": [
     "Carboplatin + Paclitaxel",
     "Pembrolizumab + Lenvatinib"
-  ],
-  "Multiple Myeloma": [
-    "VRd (Bortezomib + Lenalidomide + Dexamethasone)",
-    "Daratumumab Combinations",
-    "Carfilzomib Combinations"
   ],
   "Mesothelioma (Pleural)": [
     "Pemetrexed + Cisplatin",
