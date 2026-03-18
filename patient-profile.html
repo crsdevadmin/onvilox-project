@@ -312,6 +312,8 @@
           <tr><td>Glutamine</td><td id="glutamine"></td></tr>
           <tr><td>Selenium & Magnesium</td><td><span id="selenium"></span> / <span id="magnesium"></span></td></tr>
           <tr><td>B-Complex</td><td id="bComplex"></td></tr>
+          <tr id="chromiumRow" style="display:none;"><td>Chromium</td><td id="chromium"></td></tr>
+          <tr id="alaRow" style="display:none;"><td>Alpha Lipoic Acid (ALA)</td><td id="ala"></td></tr>
           <tr id="bcaaRow" style="display:none;"><td>BCAA (Branched-Chain Amino Acids)</td><td id="bcaa"></td></tr>
         </tbody>
       </table>
@@ -1510,6 +1512,9 @@ function savePatientEdits(){
   patient.culturalPreferences = document.getElementById('epCultural').value.trim();
   patient.notes = document.getElementById('epNotes').value.trim();
 
+  // Age is critical for V3 protein calculation
+  patient.age = parseInt(document.getElementById('epAge').value || 0);
+
   updatePatient(patient);
 
   // regenerate plan as a new version due to input change
@@ -1816,6 +1821,20 @@ function bind(plan){
   setVal('magnesium', fp.micronutrients.magnesium);
   setVal('bComplex', fp.micronutrients.bComplex);
   
+  if (fp.micronutrients.chromium) {
+    setVal('chromium', fp.micronutrients.chromium);
+    document.getElementById('chromiumRow').style.display = 'table-row';
+  } else {
+    document.getElementById('chromiumRow').style.display = 'none';
+  }
+  
+  if (fp.micronutrients.ala) {
+    setVal('ala', fp.micronutrients.ala);
+    document.getElementById('alaRow').style.display = 'table-row';
+  } else {
+    document.getElementById('alaRow').style.display = 'none';
+  }
+  
   // Add Flavor Recommendation to rationale or dedicated section if it exists
   if(fp.flavorProfile) {
     const rationList = document.getElementById('clinicalRationale');
@@ -1848,7 +1867,7 @@ function bind(plan){
   if (rb && fp.recipe) {
     rb.innerHTML = '';
     const r = fp.recipe;
-    [r.protein, r.carb, r.fat, r.bcaa].forEach(ing => {
+    [r.protein, r.carb, r.fat, r.omega, r.bcaa, r.glutamine].forEach(ing => {
       if (!ing || !ing.grams) return;
       const tr = document.createElement('tr');
       tr.innerHTML = `
@@ -1922,28 +1941,37 @@ function bind(plan){
 
   // Trace
   const cachexia = fp.cachexia;
-  const kcalPerKg = cachexia ? 35 : 30;
-  const proteinPerKg = cachexia ? 1.8 : 1.4;
+  const age = parseInt(patient.age || 0);
+  const kcalPerKg = fp.kcalPerKg || (cachexia ? 35 : 30);
+  let proteinPerKg = fp.proteinPerKg || (cachexia ? 1.8 : 1.4);
+  
   const trace = [];
   const ibwVal = computeHamwiIBW();
   const uwStr = patient.usualWeight ? `, Usual Weight ${patient.usualWeight} kg` : '';
   const crpStr = patient.crp ? `, CRP ${patient.crp} mg/L` : '';
-  trace.push(`<b>Inputs used:</b> Current Weight ${patient.weight} kg${uwStr}, IBW ${ibwVal} kg, Albumin ${patient.albumin} g/dL, Weight loss ${patient.weightLossPercent}%${crpStr}`);
-  trace.push(`<b>Risk trigger:</b> Cachexia = (albumin &lt; 3.5) OR (weight loss ≥ 10%) OR (CRP > 10). Result: <b>${cachexia ? 'YES' : 'NO'}</b>.`);
+  const sarcStr = (patient.smi || patient.handGrip) ? `, SMI ${patient.smi}, Grip ${patient.handGrip}kg` : '';
+  
+  trace.push(`<b>Inputs used:</b> Age ${age}, Current Weight ${patient.weight} kg${uwStr}, IBW ${ibwVal} kg, Albumin ${patient.albumin} g/dL, Weight loss ${patient.weightLossPercent}%${crpStr}${sarcStr}`);
+  
+  const sarcRisk = (fp.nutritionRiskReasons || []).some(r => r.includes('Sarcopenia')) ? 'YES (SMI/Grip triggered)' : 'NO';
+  trace.push(`<b>Risk triggers:</b> Cachexia = ${cachexia ? 'YES' : 'NO'}; Sarcopenia = ${sarcRisk}.`);
   
   const baseCal = Math.round(ibwVal * kcalPerKg);
   trace.push(`<b>Base Energy Required:</b> ${kcalPerKg} kcal/kg/day → ${ibwVal} (IBW) × ${kcalPerKg} = <b>${baseCal} kcal/day</b>.`);
   
   const intakeDeficit = patient.reducedFoodIntake || 0;
   if (intakeDeficit > 0) {
-     trace.push(`<b>Deficit Adjustment:</b> Patient food intake is reduced by ${intakeDeficit}%. Onvilox plan designed to fulfill the <b>${intakeDeficit}% deficit</b> → ${baseCal} × ${intakeDeficit}% = <b>${plan.engineOutput.dailyCalories} kcal/day target</b>.`);
+     trace.push(`<b>Deficit Adjustment:</b> Patient food intake is reduced by ${intakeDeficit}%. Plan fulfills the <b>${intakeDeficit}% deficit</b> → ${baseCal} × ${intakeDeficit}% = <b>${fp.dailyCalories} kcal/day target</b>.`);
   }
 
+  const ageNote = (age >= 70 && proteinPerKg < 1.5) ? ' (Adjusted to 1.5 min for elderly)' : '';
   const baseProt = Math.round(ibwVal * proteinPerKg);
-  trace.push(`<b>Protein rule applied:</b> ${proteinPerKg} g/kg/day → ${ibwVal} (IBW) × ${proteinPerKg} = ${baseProt} g/day.${intakeDeficit > 0 ? ` (Reduced to <b>${plan.engineOutput.dailyProtein} g/day</b> for ${intakeDeficit}% deficit)` : ` Result: <b>${plan.engineOutput.dailyProtein} g/day</b>.`}`);
+  trace.push(`<b>Protein rule applied:</b> ${proteinPerKg} g/kg/day${ageNote} → ${ibwVal} (IBW) × ${proteinPerKg} = ${baseProt} g/day.${intakeDeficit > 0 ? ` (Reduced to <b>${fp.dailyProtein} g/day</b> for ${intakeDeficit}% deficit)` : ` Result: <b>${fp.dailyProtein} g/day</b>.`}`);
   trace.push(`<b>Serving pattern:</b> daily target ÷ ${fp.servingsPerDay || 2} servings/day for better tolerance.`);
-  trace.push(`<b>Macros:</b> protein target fixed clinically; remaining calories distributed with moderate carbs and higher fat density.`);
-  trace.push(`<b>Protein type:</b> ${patient.giIssues ? 'Hydrolyzed Whey (GI issues)' : 'Whey (standard)'}.`);
+  
+  const carbSource = (fp.recipe && fp.recipe.carb) ? fp.recipe.carb.name : 'Standard';
+  trace.push(`<b>Metabolic focus:</b> Using <b>${carbSource}</b> for carbohydrate based on glycemic risk profile.`);
+  trace.push(`<b>Protein type:</b> ${fp.proteinType}.`);
 
   if(plan.generatedBy === 'DOCTOR_OVERRIDE'){
     const o = plan.overrides || {};
