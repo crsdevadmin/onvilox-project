@@ -1956,8 +1956,8 @@ function bind(plan){
   const sarcRisk = (fp.nutritionRiskReasons || []).some(r => r.includes('Sarcopenia')) ? 'YES (SMI/Grip triggered)' : 'NO';
   trace.push(`<b>Risk triggers:</b> Cachexia = ${cachexia ? 'YES' : 'NO'}; Sarcopenia = ${sarcRisk}.`);
   
-  const baseCal = Math.round(ibwVal * kcalPerKg);
-  trace.push(`<b>Base Energy Required:</b> ${kcalPerKg} kcal/kg/day → ${ibwVal} (IBW) × ${kcalPerKg} = <b>${baseCal} kcal/day</b>.`);
+  const baseCal = Math.round(patient.weight * kcalPerKg);
+  trace.push(`<b>Base Energy Required:</b> ${kcalPerKg} kcal/kg/day → ${patient.weight} (Weight) × ${kcalPerKg} = <b>${baseCal} kcal/day</b>.`);
   
   const intakeDeficit = patient.reducedFoodIntake || 0;
   if (intakeDeficit > 0) {
@@ -1965,8 +1965,8 @@ function bind(plan){
   }
 
   const ageNote = (age >= 70 && proteinPerKg < 1.5) ? ' (Adjusted to 1.5 min for elderly)' : '';
-  const baseProt = Math.round(ibwVal * proteinPerKg);
-  trace.push(`<b>Protein rule applied:</b> ${proteinPerKg} g/kg/day${ageNote} → ${ibwVal} (IBW) × ${proteinPerKg} = ${baseProt} g/day.${intakeDeficit > 0 ? ` (Reduced to <b>${fp.dailyProtein} g/day</b> for ${intakeDeficit}% deficit)` : ` Result: <b>${fp.dailyProtein} g/day</b>.`}`);
+  const baseProt = Math.round(patient.weight * proteinPerKg);
+  trace.push(`<b>Protein rule applied:</b> ${proteinPerKg} g/kg/day${ageNote} → ${patient.weight} (Weight) × ${proteinPerKg} = ${baseProt} g/day.${intakeDeficit > 0 ? ` (Reduced to <b>${fp.dailyProtein} g/day</b> for ${intakeDeficit}% deficit)` : ` Result: <b>${fp.dailyProtein} g/day</b>.`}`);
   trace.push(`<b>Serving pattern:</b> daily target ÷ ${fp.servingsPerDay || 2} servings/day for better tolerance.`);
   
   const carbSource = (fp.recipe && fp.recipe.carb) ? fp.recipe.carb.name : 'Standard';
