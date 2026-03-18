@@ -1,4 +1,5 @@
 function generateNutritionPlan(patient) {
+  const gender = (patient.sex || '').toLowerCase();
 
   const weight = parseFloat(patient.weight || 0);
   const height = parseFloat(patient.height || 0);
@@ -42,7 +43,6 @@ function generateNutritionPlan(patient) {
   
   // Hamwi Idea Body Weight
   let idealWeight = weight;
-  const gender = (patient.sex || '').toLowerCase();
   if (height > 0 && (gender === 'male' || gender === 'female')) {
       const heightInInches = height * 0.393701;
       if (heightInInches >= 60) {
@@ -121,6 +121,7 @@ function generateNutritionPlan(patient) {
   else if (riskScore >= 2) nutritionRisk = 'Moderate';
 
   const cachexia = albumin < 3.5 || weightLossPercent >= 10 || bmi < 18.5 || crp > 10 || sarcopenia;
+  const kcalPerKg = cachexia ? 35 : 30;
 
   let proteinPerKg = (cachexia || tumorBurden) ? 1.8 : 1.4;
   // Age-based optimization for elderly
