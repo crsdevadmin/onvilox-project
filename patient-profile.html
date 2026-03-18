@@ -1469,7 +1469,6 @@
   </div>
 
   <script src="js/storage.js"></script>
-  <script src="js/seed.js"></script>
   <script src="js/theme.js"></script>
   <script src="js/auth.js"></script>
   <script src="js/users.js"></script>
@@ -1477,10 +1476,10 @@
   <script src="js/mappings.js"></script>
   <script src="js/manufacturing.js"></script>
   <script src="js/master-data.js"></script>
+  <script src="js/intake-calculator.js"></script>
   <script src="js/ingredients.js"></script>
   <script src="js/patient-store.js"></script>
   <script src="js/nutrition-engine.js"></script>
-  <script src="js/intake-calculator.js"></script>
 
   <script>
     // INTAKE CALCULATOR LOGIC
@@ -1658,6 +1657,12 @@
       input.value = regimen;
       document.getElementById('epRegimenDropdown').style.display = 'none';
       validateSelect('epRegimen', 'Chemo Regimen');
+    }
+
+    function loadRegimensForCancer(cancer) {
+      // This is a stub to ensure the regimens are pre-calculated if needed
+      // Currently handled dynamically by filterEpRegimenList
+      console.log("Loading regimens for:", cancer);
     }
 
     // Simple inline validation helpers

@@ -1,7 +1,13 @@
-function generateNutritionPlan(patient) {
-  const gender = (patient.sex || '').toLowerCase();
+console.log("Onvilox Nutrition Engine V3.1 Loaded");
 
-  const weight = parseFloat(patient.weight || 0);
+function generateNutritionPlan(patient) {
+  if (!patient) {
+    console.error("generateNutritionPlan called with null patient");
+    return null;
+  }
+  var gender = (patient.sex || '').toLowerCase();
+
+  var weight = parseFloat(patient.weight || 0);
   const height = parseFloat(patient.height || 0);
   const albumin = parseFloat(patient.albumin || 0);
   const weightLossPercent = parseFloat(patient.weightLossPercent || 0);
@@ -116,19 +122,23 @@ function generateNutritionPlan(patient) {
     nutritionRiskReasons.push('Confirmed Sarcopenia');
   }
 
-  let nutritionRisk = 'Low';
-  if (riskScore >= 4) nutritionRisk = 'High';
-  else if (riskScore >= 2) nutritionRisk = 'Moderate';
+  var nutritionRisk = 'Low';
+  if (riskScore >= 4) {
+    nutritionRisk = 'High';
+  } else if (riskScore >= 2) {
+    nutritionRisk = 'Moderate';
+  }
 
-  const cachexia = albumin < 3.5 || weightLossPercent >= 10 || bmi < 18.5 || crp > 10 || sarcopenia;
-  const kcalPerKg = cachexia ? 35 : 30;
+  var cachexia = (albumin < 3.5 || weightLossPercent >= 10 || bmi < 18.5 || crp > 10 || sarcopenia);
+  var kcalPerKg = cachexia ? 35 : 30;
+  var proteinPerKg = (cachexia || tumorBurden) ? 1.8 : 1.4;
 
-  let proteinPerKg = (cachexia || tumorBurden) ? 1.8 : 1.4;
-  // Age-based optimization for elderly
-  if (age >= 70 && proteinPerKg < 1.5) proteinPerKg = 1.5;
+  if (age >= 70 && proteinPerKg < 1.5) {
+    proteinPerKg = 1.5;
+  }
 
-  let baseCalories = Math.round(weight * kcalPerKg);
-  let dailyProtein = Math.round(weight * proteinPerKg);
+  var baseCalories = Math.round(weight * kcalPerKg);
+  var dailyProtein = Math.round(weight * proteinPerKg);
 
   // Adjust based on food intake % to calculate the DEFICIT
   // If input is "40%" reduced, the product should cover that 40% deficit.
