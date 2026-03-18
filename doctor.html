@@ -117,6 +117,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
 <script>
+console.log("ONVILOX_STABLE_V4_FIXED_LOADED");
+// INTAKE CALCULATOR LOGIC
 auth.requireRole(['DOCTOR','ASSISTANT']);
 const me = auth.getCurrentUser();
 
@@ -352,7 +354,7 @@ function openQrLink(){
 }
 
 function openPdf(patientId){
-  const url = `patient-profile.html?id=${encodeURIComponent(patientId)}&print=1`;
+  const url = `patient-profile.html?id=${encodeURIComponent(patientId)}&print=1&v=cache_bust_${Date.now()}`;
   window.open(url, '_blank', 'noopener');
 }
 </script>
