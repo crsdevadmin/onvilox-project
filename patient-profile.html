@@ -712,12 +712,20 @@
             <label>Cultural Preferences</label>
             <input type="text" id="epCultural" placeholder="e.g. Halal, No spices">
           </div>
-          <div class="form-group" style="grid-column:1 / span 1;">
+          <div class="form-group" style="grid-column:span 1;">
             <label>Allergies</label>
             <div class="tag-box">
               <div class="tag-container" id="epAllergyTags"></div>
               <input type="text" placeholder="Search allergies..." onkeyup="filterMultiList(this,'epAllergyDropdown')" onkeydown="handleTagInput(event, 'epAllergyTags')">
               <div class="dropdown-list" id="epAllergyDropdown"></div>
+            </div>
+          </div>
+          <div class="form-group" style="grid-column:span 1;">
+            <label>Side Effects (Current Therapy)</label>
+            <div class="tag-box">
+              <div class="tag-container" id="epSideEffectTags"></div>
+              <input type="text" placeholder="Search side effects..." onkeyup="filterMultiList(this,'epSideEffectDropdown')" onkeydown="handleTagInput(event, 'epSideEffectTags')">
+              <div class="dropdown-list" id="epSideEffectDropdown"></div>
             </div>
           </div>
           <div class="form-group" style="grid-column:span 1;">
@@ -1771,15 +1779,17 @@ function bind(plan){
   // New Clinical History fields
   const actualIntakePct = 100 - (patient.reducedFoodIntake || 0);
   setVal('pFoodIntake', actualIntakePct + ' %');
-  setVal('pHxAllergies', Array.isArray(patient.allergies) ? patient.allergies.join(', ') : (patient.allergies || 'None reported'));
+  const allergiesText = (Array.isArray(patient.allergies) && patient.allergies.length > 0) ? patient.allergies.join(', ') : (patient.allergies || 'None reported');
+  setVal('pHxAllergies', allergiesText);
   setVal('pSupplements', Array.isArray(patient.existingSupplements) ? patient.existingSupplements.join(', ') : (patient.existingSupplements || 'None'));
   setVal('pMetastasis', Array.isArray(patient.metastasisSites) ? patient.metastasisSites.join(', ') : (patient.metastasisSites || 'None reported'));
   setVal('pTreatments', Array.isArray(patient.treatmentTypes) ? patient.treatmentTypes.join(', ') : (patient.treatmentTypes || 'Standard'));
   setVal('pHxComorbidities', Array.isArray(patient.comorbidities) ? patient.comorbidities.join(', ') : (patient.comorbidities || 'None reported'));
-  setVal('pHxSideEffects', Array.isArray(patient.sideEffects) ? patient.sideEffects.join(', ') : (patient.sideEffects || 'None reported'));
+  const sideEffectsText = (Array.isArray(patient.sideEffects) && patient.sideEffects.length > 0) ? patient.sideEffects.join(', ') : (patient.sideEffects || 'None reported');
+  setVal('pHxSideEffects', sideEffectsText);
   setVal('pHxGenomicMarkers', Array.isArray(patient.genomicMarkers) ? patient.genomicMarkers.join(', ') : (patient.genomicMarkers || 'Not tested'));
   setVal('pCultural', patient.culturalPreferences || 'Standard');
-  setVal('pHxNotes', patient.notes || '-');
+  setVal('pHxNotes', patient.notes || 'None');
 
   const fp = plan.finalPlan;
 
