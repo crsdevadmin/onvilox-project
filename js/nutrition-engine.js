@@ -104,8 +104,8 @@ function generateNutritionPlan(patient) {
 
   const cachexia = albumin < 3.5 || weightLossPercent >= 10 || bmi < 18.5 || crp > 10 || sarcopenia;
 
-  const kcalPerKg = cachexia ? 35 : 30;
-  const proteinPerKg = (cachexia || tumorBurden) ? 1.8 : 1.4;
+  var kcalPerKg = cachexia ? 35 : 30;
+  var proteinPerKg = (cachexia || tumorBurden) ? 1.8 : 1.4;
 
   let baseCalories = Math.round(weight * kcalPerKg);
   let dailyProtein = Math.round(weight * proteinPerKg);

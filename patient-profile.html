@@ -1009,6 +1009,11 @@ function selectEpRegimen(regimen) {
   validateSelect('epRegimen', 'Chemo Regimen');
 }
 
+function loadRegimensForCancer(cancer) {
+  // Stub function to prevent ReferenceError during initialization
+  console.log("Preparing regimens for:", cancer);
+}
+
 // Simple inline validation helpers
 function setMsg(id, ok, msg){
   const box = document.getElementById(id + '_msg');
