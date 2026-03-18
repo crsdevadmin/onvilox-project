@@ -18,32 +18,6 @@
   </div>
 
   <div class="login-hero">
-    <div class="carousel" id="loginCarousel">
-      <div class="slide active" style="background-image: url('assets/oncology/1.png')">
-        <div class="slide-content">
-          <h3>Personalized Oncology Care</h3>
-          <p>Precision nutrition tailored to individual clinical profiles.</p>
-        </div>
-      </div>
-      <div class="slide" style="background-image: url('assets/oncology/2.png')">
-        <div class="slide-content">
-          <h3>Advanced Clinical Science</h3>
-          <p>Evidence-based formulations driven by metabolic data.</p>
-        </div>
-      </div>
-      <div class="slide" style="background-image: url('assets/oncology/3.png')">
-        <div class="slide-content">
-          <h3>Future of Cancer Support</h3>
-          <p>Integrating genomic markers and comorbidity intelligence.</p>
-        </div>
-      </div>
-      <div class="slide" style="background-image: url('assets/oncology/4.png')">
-        <div class="slide-content">
-          <h3>Compassionate Support</h3>
-          <p>Improving treatment tolerance through individualized care.</p>
-        </div>
-      </div>
-    </div>
     <div class="overlay"></div>
 
     <div class="hero-content">
@@ -54,18 +28,6 @@
       <p>Clinician-Facing Platform</p>
     </div>
   </div>
-
-  <script>
-    // Carousel Logic
-    let currentSlide = 0;
-    const slides = document.querySelectorAll('#loginCarousel .slide');
-    function nextSlide() {
-      slides[currentSlide].classList.remove('active');
-      currentSlide = (currentSlide + 1) % slides.length;
-      slides[currentSlide].classList.add('active');
-    }
-    setInterval(nextSlide, 5000);
-  </script>
 
   <div class="login-panel">
     <div class="login-card">

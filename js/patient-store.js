@@ -2,11 +2,20 @@ function getPatients() {
   return db.getTable('patients', []);
 }
 
+function savePatients(patients){
+  db.setTable('patients', patients);
+}
+
 function savePatient(patient) {
   const me = auth.getCurrentUser();
-  patient.id = patient.id || db.uid('pat');
+  let patients = getPatients();
+
+  patient.id = db.uid('pat');
+  patient.createdDate = new Date().toLocaleDateString();
+  patient.createdAt = new Date().toISOString();
   patient.status = 'CREATED';
-  patient.createdById = me ? me.id : null;
+  patient.createdByUserId = me ? me.id : null;
+  patient.assessments = []; // Initialize empty assessments history
 
   // ownership rules
   if(me && me.role === 'DOCTOR'){
@@ -14,49 +23,70 @@ function savePatient(patient) {
   } else if(me && me.role === 'ASSISTANT'){
     const docId = mappingService.getDoctorForAssistant(me.id);
     patient.assignedDoctorId = docId;
+  } else {
+    patient.assignedDoctorId = patient.assignedDoctorId || null;
   }
 
-  const list = getPatients();
-  list.push(patient);
-  db.setTable('patients', list);
+  patient.storeId = null; // set on approval
+  patients.push(patient);
+  savePatients(patients);
   return patient;
 }
 
 function updatePatient(updated) {
-  const list = getPatients();
-  const idx = list.findIndex(p => p.id === updated.id);
-  if(idx !== -1) {
-    list[idx] = updated;
-    db.setTable('patients', list);
-  }
-  return updated;
+  let patients = getPatients();
+  patients = patients.map(p => p.id === updated.id ? updated : p);
+  savePatients(patients);
 }
 
 function getPatientById(id) {
-  const list = getPatients();
-  return list.find(p => p.id === id) || null;
+  const patients = getPatients();
+  return patients.find(p => p.id == id);
 }
 
 function addAssessment(patientId, formData) {
-  const list = db.getTable('assessments', []);
+  const patient = getPatientById(patientId);
+  if (!patient) return null;
+  
+  if (!patient.assessments) patient.assessments = [];
+  
   const assessment = {
     id: db.uid('assess'),
-    patient_id: patientId,
-    assessment_date: new Date().toISOString().split('T')[0],
-    ...formData
+    date: new Date().toLocaleDateString(),
+    timestamp: new Date().toISOString(),
+    weight: formData.weight,
+    albumin: formData.albumin,
+    crp: formData.crp,
+    muac: formData.muac,
+    giIssues: formData.giIssues || false,
+    reducedFoodIntake: formData.reducedFoodIntake,
+    notes: formData.notes || ""
   };
-  list.push(assessment);
-  db.setTable('assessments', list);
-  return assessment;
+  
+  if (formData.weight) patient.weight = formData.weight;
+  if (formData.albumin) patient.albumin = formData.albumin;
+  if (formData.crp) patient.crp = formData.crp;
+  if (formData.muac) patient.muac = formData.muac;
+  
+  patient.assessments.push(assessment);
+  updatePatient(patient);
+  return patient;
 }
 
-function getPlansByPatient(patientId){
-  const list = db.getTable('plans', []);
-  return list.filter(p => (p.patientId === patientId || p.patient_id === patientId)).sort((a,b) => b.version - a.version);
+// Nutrition plan versioning
+function getPlans(){
+  return db.getTable('nutrition_plans', []);
+}
+
+function savePlan(plan){
+  const plans = getPlans();
+  plans.push(plan);
+  db.setTable('nutrition_plans', plans);
 }
 
 function getLatestPlanForPatient(patientId){
-  const plans = getPlansByPatient(patientId);
+  const plans = getPlans().filter(p => p.patientId === patientId);
+  plans.sort((a,b)=> (b.version||0) - (a.version||0));
   return plans[0] || null;
 }
 
@@ -74,27 +104,22 @@ function createOrUpdatePlan(patient, engineOutput, overrides, overrideNotes){
     giIssues: !!patient.giIssues,
     sodium: patient.sodium,
     potassium: patient.potassium,
-    urea: patient.urea,
-    age: patient.age,
-    smi: patient.smi,
-    handGrip: patient.handGrip
+    urea: patient.urea
   };
   const finalPlan = Object.assign({}, engineOutput, overrides || {});
   const plan = {
     id: db.uid('plan'),
     patientId: patient.id,
     version,
-    generatedBy: (overrides && Object.keys(overrides).length) ? 'DOCTOR_OVERRIDE' : 'ENGINE',
-    inputsSnapshot: inputsSnapshot,
-    engineOutput: engineOutput,
+    generatedAt: new Date().toISOString(),
+    generatedBy: overrides && Object.keys(overrides).length ? 'DOCTOR_OVERRIDE' : 'ENGINE',
+    inputsSnapshot,
+    engineOutput,
     overrides: overrides || {},
-    finalPlan: finalPlan,
+    finalPlan,
     rationale: engineOutput.rationale || [],
     overrideNotes: overrideNotes || ''
   };
-  
-  const list = db.getTable('plans', []);
-  list.push(plan);
-  db.setTable('plans', list);
+  savePlan(plan);
   return plan;
 }
