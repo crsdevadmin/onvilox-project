@@ -2381,26 +2381,6 @@ function downloadNutritionPDF(autoClose){
       window.print();
     });
 }
-let currentPlan = ensurePlan();
-bind(currentPlan);
-showEditSectionIfAllowed();
-initIntakeCalc();
-
-// Print-only mode (opened from dashboards)
-if(params.get('print') === '1'){
-  const ov = document.getElementById('overrideSection');
-  if(ov) ov.style.display = 'none';
-  const bar = document.getElementById('doctorReviewBar');
-  if(bar) bar.style.display = 'none';
-  const ep = document.getElementById('editPatientSection');
-  if(ep) ep.style.display = 'none';
-  const top = document.querySelector('.topbar');
-  if(top) top.style.display = 'none';
-
-  setTimeout(() => {
-    downloadNutritionPDF(true);
-  }, 600);
-}
 </script>
 </body>
 </html>
