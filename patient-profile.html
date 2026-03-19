@@ -245,6 +245,7 @@
         <div class="rf sp2"><div class="rf-lbl">Comorbidities</div><div class="rf-val" id="pHxComorbidities"></div></div>
         
         <div class="rf sp2"><div class="rf-lbl">Genomic Markers</div><div class="rf-val" id="pHxGenomicMarkers"></div></div>
+        <div class="rf sp2"><div class="rf-lbl">Microbiome & Gut Support</div><div class="rf-val" id="pMicrobiome"></div></div>
         <div class="rf full"><div class="rf-lbl">Side Effects</div><div class="rf-val" id="pHxSideEffects"></div></div>
         <div class="rf sp2"><div class="rf-lbl">Cultural Prefs</div><div class="rf-val" id="pCultural"></div></div>
         <div class="rf full"><div class="rf-lbl">Allergies</div><div class="rf-val" id="pHxAllergies"></div></div>
@@ -309,6 +310,21 @@
       </div>
     </div>
   
+    <!-- DRUG NUTRIENT INTERACTIONS -->
+    <div class="rs" id="drugSection" style="display:none; margin-top:20px;">
+      <div class="rs-title">Drug-Nutrient Interaction Guidance</div>
+      <table class="clinical-history-table">
+        <thead>
+          <tr>
+            <th style="width:150px;">Target Drug</th>
+            <th>Potential Interaction / Effect</th>
+            <th>Clinical Advice / Adaptation</th>
+          </tr>
+        </thead>
+        <tbody id="drugInteractionsBody"></tbody>
+      </table>
+    </div>
+
     <!-- MICROS -->
     <div class="rs">
       <div class="rs-title">Micronutrient & Functional Support</div>
@@ -1746,6 +1762,7 @@ function bind(plan){
   setVal('pFolate', (patient.folate ? patient.folate + ' ng/mL' : '-'));
   setVal('pZinc', (patient.zinc ? patient.zinc + ' μg/dL' : '-'));
   setVal('pMagnesium', (patient.magnesium ? patient.magnesium + ' mg/dL' : '-'));
+  setVal('pMicrobiome', plan.micronutrients.microbiome || '-');
   setVal('pFat', (patient.fatPercent ? patient.fatPercent + ' %' : '-'));
   setVal('pSMI', (patient.smi ? patient.smi + ' cm²/m²' : '-'));
   setVal('pHandGrip', (patient.handGrip ? patient.handGrip + ' kg' : '-'));
@@ -1829,6 +1846,22 @@ function bind(plan){
   setVal('pHxGenomicMarkers', Array.isArray(patient.genomicMarkers) ? patient.genomicMarkers.join(', ') : (patient.genomicMarkers || 'Not tested'));
   setVal('pCultural', patient.culturalPreferences || 'Standard');
   setVal('pHxNotes', patient.notes || 'None');
+
+  // Bind Drug Interactions if any
+  const drugSec = document.getElementById('drugSection');
+  const drugBody = document.getElementById('drugInteractionsBody');
+  if (plan.interactions && plan.interactions.length > 0) {
+    drugSec.style.display = 'block';
+    drugBody.innerHTML = plan.interactions.map(i => `
+      <tr>
+        <td style="font-weight:700; color:#0e2247;">${i.drug}</td>
+        <td>${i.effect}</td>
+        <td style="font-style:italic; color:#1e40af;">${i.advice}</td>
+      </tr>
+    `).join('');
+  } else {
+    drugSec.style.display = 'none';
+  }
 
   const fp = plan.finalPlan;
 
