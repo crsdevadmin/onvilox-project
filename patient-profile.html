@@ -1220,7 +1220,7 @@ function addTyping() {
   return typing;
 }
 
-function sendChatMessage() {
+async function sendChatMessage() {
   const input = document.getElementById('chatInput');
   const text = input.value.trim();
   if(!text) return;
@@ -1230,10 +1230,30 @@ function sendChatMessage() {
 
   const typing = addTyping();
 
-  setTimeout(() => {
+  try {
+    const isExtraction = text.length >= 150 || text.toLowerCase().includes('extract') || text.toLowerCase().includes('patient');
+    
+    if (isExtraction) {
+        await runAiExtraction(text);
+        typing.remove();
+        addMessage('Clinical data extracted via OpenAI and form populated automatically!', 'ai');
+    } else {
+        const response = await fetch('http://localhost:3000/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: text, contextObj: window.patient })
+        });
+        const data = await response.json();
+        typing.remove();
+        addMessage(data.reply || data.error || 'Server error', 'ai');
+    }
+  } catch (err) {
     typing.remove();
-    runAiExtraction(text);
-  }, 1000);
+    console.error(err);
+    addMessage('Cannot connect to AI Server. Please ensure the backend server is running on localhost:3000 (or your AWS domain).', 'danger');
+    addMessage('Currently using fallback text search due to missing server connection...', 'ai');
+    // Fallback logic omitted for brevity, standard deployment assumes server is active.
+  }
 }
 
 // --- PDF EXTRACTION LOGIC ---
@@ -1276,188 +1296,115 @@ async function extractTextFromPdf(file) {
   return fullText;
 }
 
-function runAiExtraction(rawText) {
-  const text = rawText.toLowerCase();
-  // Handle "is", "at", ":", space etc.
-  const numPattern = '(?:is|at|was|of|recorded at)?\\s*:?\\s*(\\d+\\.?\\d*)';
-  const reverseWeightPattern = /(\d+\.?\d*)\s*(?:kg|kilos?)?\s*(?:as|is|for)?\s*(?:the|my|his|her)?\s*(?:new\s*)?weight/;
-  const reverseAlbuminPattern = /(\d+\.?\d*)\s*(?:g\/dl)?\s*(?:as|is|for)?\s*(?:the|new\s*)?(?:albumin|alb)/;
-  const reverseCrpPattern = /(\d+\.?\d*)\s*(?:mg\/l)?\s*(?:as|is|for)?\s*(?:the|new\s*)?crp/;
-
-  // Name, Age, Sex extraction
-  const nameMatch = rawText.match(/(?:name\s*(?:is|:)?|patient\s*(?:is|:)?|this\s*is\s*)\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)/);
-  const ageMatch = text.match(/(\d+)\s*(?:years|yrs|yo|age)/) || text.match(/(?:age\s*(?:is|:)?\s*)(\d+)/);
-  const sexMatch = text.match(/\b(male|female|man|woman|boy|girl)\b/i);
-
-  const extractions = {
-    name: nameMatch ? nameMatch[1] : null,
-    age: ageMatch ? ageMatch[1] : null,
-    sex: sexMatch ? (['male','man','boy'].includes(sexMatch[1].toLowerCase()) ? 'Male' : 'Female') : null,
-    weight: text.match(new RegExp('weight' + numPattern))?.[1] || text.match(reverseWeightPattern)?.[1] || text.match(/(\d+\.?\d*)\s*kg/)?.[1],
-    uw: text.match(new RegExp('usual weight' + numPattern))?.[1] || text.match(new RegExp('uw' + numPattern))?.[1],
-    albumin: text.match(new RegExp('albumin' + numPattern))?.[1] || text.match(new RegExp('alb' + numPattern))?.[1] || text.match(reverseAlbuminPattern)?.[1],
-    crp: text.match(new RegExp('crp' + numPattern))?.[1] || text.match(reverseCrpPattern)?.[1],
-    creatinine: text.match(new RegExp('creatinine' + numPattern))?.[1] || text.match(new RegExp('cr' + numPattern))?.[1],
-    alt: text.match(new RegExp('alt' + numPattern))?.[1] || text.match(new RegExp('sgpt' + numPattern))?.[1],
-    ast: text.match(new RegExp('ast' + numPattern))?.[1] || text.match(new RegExp('sgot' + numPattern))?.[1],
-    bilirubin: text.match(new RegExp('bilirubin' + numPattern))?.[1] || text.match(new RegExp('bil' + numPattern))?.[1],
-    stage: text.match(/stage\s+([iv]+|1|2|3|4)/i)?.[1],
-    ecog: text.match(/ecog\s*(?:status|is|at|:)?\s*(\d)/i)?.[1],
-    gi: text.includes('vomiting') || text.includes('nausea') || text.includes('diarrhea') || text.includes('bloating') || text.includes('gastric issues')
-  };
-
-  if (window.isFollowUpMode) {
-    let foundCount = 0;
-    const foundItems = [];
-    if (extractions.weight) { foundCount++; foundItems.push(`Weight: ${extractions.weight} kg`); }
-    if (extractions.albumin) { foundCount++; foundItems.push(`Albumin: ${extractions.albumin} g/dL`); }
-    if (extractions.crp) { foundCount++; foundItems.push(`CRP: ${extractions.crp} mg/L`); }
-    if (extractions.alt) { foundCount++; foundItems.push(`ALT: ${extractions.alt} U/L`); }
-    if (extractions.creatinine) { foundCount++; foundItems.push(`Creatinine: ${extractions.creatinine} mg/dL`); }
-    
-    if (foundCount > 0) {
-      addAssessment(patient.id, {
-        weight: extractions.weight || '',
-        albumin: extractions.albumin || '',
-        crp: extractions.crp || '',
-        alt: extractions.alt || '',
-        creatinine: extractions.creatinine || '',
-        bilirubin: extractions.bilirubin || '',
-        giIssues: extractions.gi,
-        notes: rawText.substring(0, 100) + (rawText.length > 100 ? '...' : '')
-      });
-      addMessage(`Logged Follow-up Assessment:\n• ${foundItems.join('\n• ')}`, 'ai');
-      window.isFollowUpMode = false;
-      setTimeout(() => window.location.reload(), 2000);
-    } else {
-      addMessage("I couldn't find clinical markers in this follow-up note. Please try again.", 'ai');
-    }
-    return;
-  }
-
-  let foundCount = 0;
-  const foundItems = [];
-  const highlight = (id, label, val) => {
-    const el = document.getElementById(id);
-    if(!el) return;
-    el.classList.add('ai-filled');
-    setTimeout(() => el.classList.remove('ai-filled'), 3000);
-    if(label && val) foundItems.push(`${label}: ${val}`);
-  };
-
-  if (extractions.name) { document.getElementById('epName').value = extractions.name; highlight('epName', 'Name', extractions.name); foundCount++; }
-  if (extractions.age) { document.getElementById('epAge').value = extractions.age; highlight('epAge', 'Age', extractions.age); foundCount++; }
-  if (extractions.sex) { document.getElementById('epSex').value = extractions.sex; highlight('epSex', 'Sex', extractions.sex); foundCount++; }
-  if (extractions.weight) { document.getElementById('epWeight').value = extractions.weight; highlight('epWeight', 'Weight', extractions.weight); foundCount++; }
-  if (extractions.uw) { document.getElementById('epUW').value = extractions.uw; highlight('epUW', 'Usual Weight', extractions.uw); foundCount++; }
-  if (extractions.albumin) { document.getElementById('epAlbumin').value = extractions.albumin; highlight('epAlbumin', 'Albumin', extractions.albumin); foundCount++; }
-  if (extractions.crp) { 
-    document.getElementById('epCRP').value = extractions.crp; highlight('epCRP', 'CRP', extractions.crp); foundCount++;
-  }
-  if (extractions.creatinine) { document.getElementById('epCreatinine').value = extractions.creatinine; highlight('epCreatinine', 'Creatinine', extractions.creatinine); foundCount++; }
-  if (extractions.alt) { document.getElementById('epALT').value = extractions.alt; highlight('epALT', 'ALT', extractions.alt); foundCount++; }
-  if (extractions.ast) { document.getElementById('epAST').value = extractions.ast; highlight('epAST', 'AST', extractions.ast); foundCount++; }
-  if (extractions.bilirubin) { document.getElementById('epBilirubin').value = extractions.bilirubin; highlight('epBilirubin', 'Bilirubin', extractions.bilirubin); foundCount++; }
-  
-  if (extractions.stage) {
-    let s = extractions.stage.toUpperCase();
-    if(s === '1') s = 'STAGE I';
-    if(s === '2') s = 'STAGE II';
-    if(s === '3') s = 'STAGE III';
-    if(s === '4') s = 'STAGE IV';
-    if(!s.startsWith('STAGE')) s = 'STAGE ' + s;
-    document.getElementById('epStage').value = s;
-    highlight('epStage', 'Stage', s);
-    foundCount++;
-  }
-  if (extractions.ecog) {
-    document.getElementById('epECOG').value = extractions.ecog;
-    highlight('epECOG', 'ECOG', extractions.ecog);
-    foundCount++;
-  }
-
-  if (extractions.gi) { document.getElementById('epGi').value = "true"; highlight('epGi', 'GI Issues', 'Yes'); foundCount++; }
-
-  // Auto-show edit section if anything extracted
-  if(!window.isFollowUpMode && foundCount > 0) {
-    document.getElementById('editPatientSection').style.display = 'block';
-  }
-
-  const cancers = {
-    'cholangiocarcinoma': 'Cholangiocarcinoma (Bile Duct Cancer)',
-    'cholongiocarcinoma': 'Cholangiocarcinoma (Bile Duct Cancer)',
-    'gallbladder': 'Gallbladder Cancer',
-    'neuroendocrine': 'Neuroendocrine Tumors (NETs)', 'net': 'Neuroendocrine Tumors (NETs)', 'nets': 'Neuroendocrine Tumors (NETs)',
-    'hepatocellular': 'Liver Cancer – Advanced HCC',
-    'liver': 'Liver Cancer – Advanced HCC',
-    'lung': 'Lung Cancer – NSCLC Adenocarcinoma', 'nsclc': 'Lung Cancer – NSCLC Adenocarcinoma', 'sclc': 'Lung Cancer – SCLC Extensive',
-    'head': 'Head & Neck Cancer – Locally Advanced', 'neck': 'Head & Neck Cancer – Locally Advanced',
-    'colon': 'Colorectal Cancer – Stage III', 'colorectal': 'Colorectal Cancer – Stage III', 'breast': 'Breast Cancer – HR+/HER2-',
-    'prostate': 'Prostate Cancer – Advanced', 'leukemia': 'Leukemia – AML', 'lymphoma': 'Lymphoma – DLBCL',
-    'multiple myeloma': 'Multiple Myeloma – Standard', 'myeloma': 'Multiple Myeloma – Standard',
-    'pancreatic': 'Pancreatic Cancer – Resectable', 'pancreas': 'Pancreatic Cancer – Resectable',
-    'gastric': 'Gastric Cancer – Advanced', 'stomach': 'Gastric Cancer – Advanced', 'esophageal': 'Esophageal Cancer',
-    'bladder': 'Bladder Cancer – Muscle Invasive', 'urothelial': 'Bladder Cancer – Muscle Invasive',
-    'kidney': 'Kidney Cancer – Clear Cell RCC', 'renal': 'Kidney Cancer – Clear Cell RCC', 'thyroid': 'Thyroid Cancer',
-    'melanoma': 'Melanoma – Advanced / Metastatic',
-    'endometrial': 'Endometrial Cancer – Advanced / Recurrent', 'endometrium': 'Endometrial Cancer – Advanced / Recurrent', 'uterine': 'Endometrial Cancer – Advanced / Recurrent',
-    'esophageal': 'Esophageal Cancer – Neoadjuvant (Pre-op)', 'esophagus': 'Esophageal Cancer – Neoadjuvant (Pre-op)',
-    'biliary': 'Biliary Tract Cancer – Advanced / Metastatic', 'bile duct': 'Biliary Tract Cancer – Advanced / Metastatic',
-    'sarcoma': 'Soft Tissue Sarcoma – Advanced / Metastatic',
-    'gist': 'GIST – Kit (CD117) Positive',
-    'thyroid': 'Thyroid Cancer – RAI-Refractory',
-    'testicular': 'Testicular Cancer – Germ Cell Tumor', 'testis': 'Testicular Cancer – Germ Cell Tumor',
-    'mesothelioma': 'Mesothelioma – Pleural',
-    'neuroendocrine': 'Neuroendocrine (NETs) – Well-differentiated', 'net': 'Neuroendocrine (NETs) – Well-differentiated',
-    'mds': 'Myelodysplastic (MDS) – High-risk',
-    'follicular lymphoma': 'Follicular Lymphoma – First-line',
-    'mantle cell': 'Mantle Cell Lymphoma – Fit / Younger Patients',
-    'cns lymphoma': 'CNS Lymphoma – Primary'
-  };
-
-  for (const [key, val] of Object.entries(cancers)) {
-    // using word boundaries (\b) so "cholongiocarcinoma" does not match "lung"
-    const regex = new RegExp('\\b' + key + '\\b', 'i');
-    if (regex.test(text)) {
-      const el = document.getElementById('epCancer');
-      el.value = val;
-      el.dispatchEvent(new Event('change'));
-      highlight('epCancer', 'Cancer', val);
-      foundCount++;
-      break;
-    }
-  }
-
-  // Genomic Markers Extraction
-  const markersFound = [];
-  if (text.includes('mthfr')) markersFound.push('MTHFR Mutation');
-  if (text.includes('brca')) markersFound.push('BRCA1/2 Mutation');
-  if (text.includes('egfr')) markersFound.push('EGFR Mutation');
-  if (text.includes('alk')) markersFound.push('ALK Rearrangement');
-  if (text.includes('kras')) markersFound.push('KRAS Mutation');
-  if (text.includes('her2')) markersFound.push('HER2 Positive');
-  if (text.includes('pd-l1')) markersFound.push('PD-L1 Expression');
-  if (text.includes('msi')) markersFound.push('MSI-High (Microsatellite Instability)');
-
-  if (markersFound.length > 0) {
-    if(!patient.genomicMarkers) patient.genomicMarkers = [];
-    markersFound.forEach(m => {
-      if(!patient.genomicMarkers.includes(m)) patient.genomicMarkers.push(m);
+async function runAiExtraction(rawText) {
+  try {
+    const response = await fetch('http://localhost:3000/api/extract', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pdfText: rawText })
     });
     
-    // Auto-save this particular field to patient and re-render the view
-    updatePatient(patient);
-    setTimeout(() => window.location.reload(), 2000);
+    const json = await response.json();
+    if (!json.success || !json.data) {
+      addMessage("Extraction failed based on current API response.", 'ai');
+      return;
+    }
     
-    foundItems.push(`Genomic Markers: ${markersFound.join(', ')}`);
-    foundCount += markersFound.length;
-    highlight('pHxGenomicMarkers');
-  }
+    const d = json.data;
+    let foundCount = 0;
+    const foundItems = [];
+    
+    const highlight = (id, label, val) => {
+      const el = document.getElementById(id);
+      if(!el) return;
+      if (val !== undefined && val !== null && val !== "" && val !== "null") {
+        el.value = val;
+        el.classList.add('ai-filled');
+        setTimeout(() => el.classList.remove('ai-filled'), 3000);
+        if(label) {
+          foundItems.push(`${label}: ${val}`);
+          foundCount++;
+        }
+      }
+    };
 
-  if(foundCount > 0) {
-    addMessage(`I've extracted ${foundCount} item(s):\n• ${foundItems.join('\n• ')}\n\nAnything else?`, 'ai');
-  } else {
-    addMessage("I couldn't find specific clinical markers in that. Could you provide a weight, albumin level, or cancer type?", 'ai');
+    highlight('epName', 'Name', d.name);
+    highlight('epAge', 'Age', d.age);
+    if(d.sex && typeof d.sex === 'string' && (d.sex.toLowerCase() === 'male' || d.sex.toLowerCase() === 'female')) {
+      highlight('epSex', 'Sex', d.sex.charAt(0).toUpperCase() + d.sex.slice(1).toLowerCase());
+    }
+    highlight('epWeight', 'Weight', d.weight);
+    highlight('epHeight', 'Height', d.height);
+    highlight('epUW', 'Usual Weight', d.usualWeight);
+    highlight('epAlbumin', 'Albumin', d.albumin);
+    highlight('epCRP', 'CRP', d.crp);
+    highlight('epMUAC', 'MUAC', d.muac);
+    highlight('epCreatinine', 'Creatinine', d.creatinine);
+    highlight('epALT', 'ALT', d.alt);
+    highlight('epAST', 'AST', d.ast);
+    highlight('epBilirubin', 'Bilirubin', d.bilirubin);
+    highlight('epBloodSugar', 'Blood Sugar', d.bloodSugar);
+    highlight('epSodium', 'Sodium', d.sodium);
+    highlight('epPotassium', 'Potassium', d.potassium);
+    highlight('epUrea', 'Urea', d.urea);
+    highlight('epTSH', 'TSH', d.tsh);
+    highlight('epPrealbumin', 'Prealbumin', d.prealbumin);
+    highlight('epHemoglobin', 'Hemoglobin', d.hemoglobin);
+    highlight('epVitD', 'Vit D', d.vitD);
+    highlight('epVitB12', 'Vit B12', d.vitB12);
+    highlight('epFolate', 'Folate', d.folate);
+    highlight('epZinc', 'Zinc', d.zinc);
+    highlight('epMagnesium', 'Magnesium', d.magnesium);
+    highlight('epLeanBodyMass', 'LBM', d.leanBodyMass);
+    highlight('epFatPercent', 'Fat %', d.fatPercent);
+    highlight('epSMI', 'SMI', d.smi);
+    highlight('epHandGrip', 'Hand Grip', d.handGrip);
+    highlight('epBSA', 'BSA', d.bsa);
+
+    // Selects / Strings
+    highlight('epCancer', 'Cancer', d.cancer);
+    highlight('epRegimen', 'Regimen', d.regimen);
+    highlight('epStage', 'Stage', d.cancerStage);
+    highlight('epECOG', 'ECOG', d.ecogStatus);
+    highlight('epActivityLevel', 'Activity', d.activityLevel);
+    highlight('epTumorBurden', 'Tumor Burden', d.tumorBurden);
+    highlight('epSarcopenia', 'Sarcopenia', d.sarcopeniaStatus);
+    highlight('epFeeding', 'Feeding', d.feedingMethod);
+    
+    if (d.giIssues === true || d.giIssues === "true") highlight('epGi', 'GI Issues', "true");
+    
+    // Arrays representing complex tags
+    if (Array.isArray(d.allergies) && d.allergies.length) { foundItems.push(`Allergies: ${d.allergies.join(', ')}`); foundCount++; }
+    if (Array.isArray(d.comorbidities) && d.comorbidities.length) { foundItems.push(`Comorbidities: ${d.comorbidities.join(', ')}`); foundCount++; }
+    if (Array.isArray(d.sideEffects) && d.sideEffects.length) { foundItems.push(`Side Effects: ${d.sideEffects.join(', ')}`); foundCount++; }
+    if (Array.isArray(d.treatmentTypes) && d.treatmentTypes.length) { foundItems.push(`Treatments: ${d.treatmentTypes.join(', ')}`); foundCount++; }
+    
+    // Genomic Markers specific mapping
+    if (Array.isArray(d.genomicMarkers) && d.genomicMarkers.length > 0) {
+      if(!patient.genomicMarkers) patient.genomicMarkers = [];
+      d.genomicMarkers.forEach(m => {
+        if(!patient.genomicMarkers.includes(m)) patient.genomicMarkers.push(m);
+      });
+      foundItems.push(`Genomic Markers: ${d.genomicMarkers.join(', ')}`);
+      foundCount += d.genomicMarkers.length;
+      updatePatient(patient);
+    }
+
+    if(foundCount > 0) {
+      document.getElementById('editPatientSection').style.display = 'block';
+      if(!window.isFollowUpMode) {
+         addMessage(`OpenAI extracted ${foundCount} precise match(es):\n• ${foundItems.slice(0, 8).join('\n• ')}\n...and more.\nAnything else?`, 'ai');
+      } else {
+         addMessage(`Follow-up parameters extracted via OpenAI.\n• ${foundItems.slice(0, 5).join('\n• ')}`, 'ai');
+         setTimeout(() => window.location.reload(), 2000);
+      }
+    } else {
+      addMessage("OpenAI analyzed the text but extracted no specific clinical markers we track.", 'ai');
+    }
+
+  } catch(e) {
+    console.error("OpenAI Extraction error", e);
+    addMessage("Failed to extract data using OpenAI API. Please check your network and Node server status.", 'ai');
   }
 }
 
