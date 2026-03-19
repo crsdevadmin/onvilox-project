@@ -63,6 +63,14 @@ function addAssessment(patientId, formData) {
     sodium: formData.sodium,
     potassium: formData.potassium,
     urea: formData.urea,
+    tsh: formData.tsh,
+    prealbumin: formData.prealbumin,
+    hemoglobin: formData.hemoglobin,
+    vitD: formData.vitD,
+    vitB12: formData.vitB12,
+    folate: formData.folate,
+    zinc: formData.zinc,
+    magnesium: formData.magnesium,
     notes: formData.notes || ""
   };
   
@@ -73,6 +81,14 @@ function addAssessment(patientId, formData) {
   if (formData.sodium) patient.sodium = formData.sodium;
   if (formData.potassium) patient.potassium = formData.potassium;
   if (formData.urea) patient.urea = formData.urea;
+  if (formData.tsh) patient.tsh = formData.tsh;
+  if (formData.prealbumin) patient.prealbumin = formData.prealbumin;
+  if (formData.hemoglobin) patient.hemoglobin = formData.hemoglobin;
+  if (formData.vitD) patient.vitD = formData.vitD;
+  if (formData.vitB12) patient.vitB12 = formData.vitB12;
+  if (formData.folate) patient.folate = formData.folate;
+  if (formData.zinc) patient.zinc = formData.zinc;
+  if (formData.magnesium) patient.magnesium = formData.magnesium;
   
   patient.assessments.push(assessment);
   updatePatient(patient);
@@ -103,14 +119,43 @@ function createOrUpdatePlan(patient, engineOutput, overrides, overrideNotes){
     weight: patient.weight,
     height: patient.height,
     albumin: patient.albumin,
+    usualWeight: patient.usualWeight,
     crp: patient.crp,
     muac: patient.muac,
     weightLossPercent: patient.weightLossPercent,
     feedingMethod: patient.feedingMethod,
     giIssues: !!patient.giIssues,
+    cancer: patient.cancer,
+    regimen: patient.regimen,
     sodium: patient.sodium,
     potassium: patient.potassium,
-    urea: patient.urea
+    urea: patient.urea,
+    tsh: patient.tsh,
+    prealbumin: patient.prealbumin,
+    hemoglobin: patient.hemoglobin,
+    vitD: patient.vitD,
+    vitB12: patient.vitB12,
+    folate: patient.folate,
+    zinc: patient.zinc,
+    magnesium: patient.magnesium,
+    cancerStage: patient.cancerStage,
+    tumorBurden: patient.tumorBurden,
+    metastasisSites: patient.metastasisSites,
+    genomicMarkers: patient.genomicMarkers,
+    ecogStatus: patient.ecogStatus,
+    activityLevel: patient.activityLevel,
+    sarcopeniaStatus: patient.sarcopeniaStatus,
+    leanBodyMass: patient.leanBodyMass,
+    fatPercent: patient.fatPercent,
+    smi: patient.smi,
+    handGrip: patient.handGrip,
+    bsa: patient.bsa,
+    vegetarian: patient.vegetarian,
+    culturalPreferences: patient.culturalPreferences,
+    allergies: patient.allergies,
+    sideEffects: patient.sideEffects,
+    existingSupplements: patient.existingSupplements,
+    treatmentTypes: patient.treatmentTypes
   };
   const finalPlan = Object.assign({}, engineOutput, overrides || {});
   const plan = {

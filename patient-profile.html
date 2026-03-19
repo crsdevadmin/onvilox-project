@@ -224,6 +224,7 @@
         <div class="rf"><div class="rf-lbl">Sodium (mEq/L)</div><div class="rf-val" id="pSodium"></div></div>
         <div class="rf"><div class="rf-lbl">Potassium (mEq/L)</div><div class="rf-val" id="pPotassium"></div></div>
         <div class="rf"><div class="rf-lbl">Urea (mg/dL)</div><div class="rf-val" id="pUrea"></div></div>
+        <div class="rf"><div class="rf-lbl">TSH (mIU/L)</div><div class="rf-val" id="pTSH"></div></div>
         <div class="rf"><div class="rf-lbl">Prealbumin (mg/dL)</div><div class="rf-val" id="pPrealbumin"></div></div>
         <div class="rf"><div class="rf-lbl">Hemoglobin (g/dL)</div><div class="rf-val" id="pHemoglobin"></div></div>
         <div class="rf"><div class="rf-lbl">Vit D (ng/mL)</div><div class="rf-val" id="pVitD"></div></div>
@@ -231,6 +232,11 @@
         <div class="rf"><div class="rf-lbl">Folate (ng/mL)</div><div class="rf-val" id="pFolate"></div></div>
         <div class="rf"><div class="rf-lbl">Zinc (μg/dL)</div><div class="rf-val" id="pZinc"></div></div>
         <div class="rf"><div class="rf-lbl">Magnesium (mg/dL)</div><div class="rf-val" id="pMagnesium"></div></div>
+        <div class="rf"><div class="rf-lbl">Fat Percentage</div><div class="rf-val" id="pFat"></div></div>
+        <div class="rf"><div class="rf-lbl">SMI</div><div class="rf-val" id="pSMI"></div></div>
+        <div class="rf"><div class="rf-lbl">Hand Grip Strength</div><div class="rf-val" id="pHandGrip"></div></div>
+        <div class="rf"><div class="rf-lbl">Activity Level</div><div class="rf-val" id="pActivity"></div></div>
+        <div class="rf"><div class="rf-lbl">Dietary Pref</div><div class="rf-val" id="pVegetarian"></div></div>
         <div class="rf"><div class="rf-lbl">BSA (m²)</div><div class="rf-val" id="pBSA"></div></div>
         <div class="rf"><div class="rf-lbl">Lean Body Mass</div><div class="rf-val" id="pLBM"></div></div>
         <div class="rf"><div class="rf-lbl">Sarcopenia</div><div class="rf-val" id="pSarcopenia"></div></div>
@@ -1732,6 +1738,7 @@ function bind(plan){
   setVal('pSodium', (patient.sodium ? patient.sodium + ' mEq/L' : '-'));
   setVal('pPotassium', (patient.potassium ? patient.potassium + ' mEq/L' : '-'));
   setVal('pUrea', (patient.urea ? patient.urea + ' mg/dL' : '-'));
+  setVal('pTSH', (patient.tsh ? patient.tsh + ' mIU/L' : '-'));
   setVal('pPrealbumin', (patient.prealbumin ? patient.prealbumin + ' mg/dL' : '-'));
   setVal('pHemoglobin', (patient.hemoglobin ? patient.hemoglobin + ' g/dL' : '-'));
   setVal('pVitD', (patient.vitD ? patient.vitD + ' ng/mL' : '-'));
@@ -1739,6 +1746,11 @@ function bind(plan){
   setVal('pFolate', (patient.folate ? patient.folate + ' ng/mL' : '-'));
   setVal('pZinc', (patient.zinc ? patient.zinc + ' μg/dL' : '-'));
   setVal('pMagnesium', (patient.magnesium ? patient.magnesium + ' mg/dL' : '-'));
+  setVal('pFat', (patient.fatPercent ? patient.fatPercent + ' %' : '-'));
+  setVal('pSMI', (patient.smi ? patient.smi + ' cm²/m²' : '-'));
+  setVal('pHandGrip', (patient.handGrip ? patient.handGrip + ' kg' : '-'));
+  setVal('pActivity', patient.activityLevel || '-');
+  setVal('pVegetarian', (patient.vegetarian ? 'Vegetarian' : 'Non-Vegetarian'));
   setVal('pBSA', (patient.bsa ? patient.bsa + ' m²' : '-'));
   setVal('pLBM', (patient.leanBodyMass ? patient.leanBodyMass + ' kg' : '-'));
   setVal('pSarcopenia', patient.sarcopeniaStatus || 'None');
