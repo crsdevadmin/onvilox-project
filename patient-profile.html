@@ -224,6 +224,13 @@
         <div class="rf"><div class="rf-lbl">Sodium (mEq/L)</div><div class="rf-val" id="pSodium"></div></div>
         <div class="rf"><div class="rf-lbl">Potassium (mEq/L)</div><div class="rf-val" id="pPotassium"></div></div>
         <div class="rf"><div class="rf-lbl">Urea (mg/dL)</div><div class="rf-val" id="pUrea"></div></div>
+        <div class="rf"><div class="rf-lbl">Prealbumin (mg/dL)</div><div class="rf-val" id="pPrealbumin"></div></div>
+        <div class="rf"><div class="rf-lbl">Hemoglobin (g/dL)</div><div class="rf-val" id="pHemoglobin"></div></div>
+        <div class="rf"><div class="rf-lbl">Vit D (ng/mL)</div><div class="rf-val" id="pVitD"></div></div>
+        <div class="rf"><div class="rf-lbl">Vit B12 (pg/mL)</div><div class="rf-val" id="pVitB12"></div></div>
+        <div class="rf"><div class="rf-lbl">Folate (ng/mL)</div><div class="rf-val" id="pFolate"></div></div>
+        <div class="rf"><div class="rf-lbl">Zinc (μg/dL)</div><div class="rf-val" id="pZinc"></div></div>
+        <div class="rf"><div class="rf-lbl">Magnesium (mg/dL)</div><div class="rf-val" id="pMagnesium"></div></div>
         <div class="rf"><div class="rf-lbl">BSA (m²)</div><div class="rf-val" id="pBSA"></div></div>
         <div class="rf"><div class="rf-lbl">Lean Body Mass</div><div class="rf-val" id="pLBM"></div></div>
         <div class="rf"><div class="rf-lbl">Sarcopenia</div><div class="rf-val" id="pSarcopenia"></div></div>
@@ -1725,6 +1732,13 @@ function bind(plan){
   setVal('pSodium', (patient.sodium ? patient.sodium + ' mEq/L' : '-'));
   setVal('pPotassium', (patient.potassium ? patient.potassium + ' mEq/L' : '-'));
   setVal('pUrea', (patient.urea ? patient.urea + ' mg/dL' : '-'));
+  setVal('pPrealbumin', (patient.prealbumin ? patient.prealbumin + ' mg/dL' : '-'));
+  setVal('pHemoglobin', (patient.hemoglobin ? patient.hemoglobin + ' g/dL' : '-'));
+  setVal('pVitD', (patient.vitD ? patient.vitD + ' ng/mL' : '-'));
+  setVal('pVitB12', (patient.vitB12 ? patient.vitB12 + ' pg/mL' : '-'));
+  setVal('pFolate', (patient.folate ? patient.folate + ' ng/mL' : '-'));
+  setVal('pZinc', (patient.zinc ? patient.zinc + ' μg/dL' : '-'));
+  setVal('pMagnesium', (patient.magnesium ? patient.magnesium + ' mg/dL' : '-'));
   setVal('pBSA', (patient.bsa ? patient.bsa + ' m²' : '-'));
   setVal('pLBM', (patient.leanBodyMass ? patient.leanBodyMass + ' kg' : '-'));
   setVal('pSarcopenia', patient.sarcopeniaStatus || 'None');
