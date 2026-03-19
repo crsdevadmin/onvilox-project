@@ -482,8 +482,8 @@
       </div>
       <!-- Removed Weight Loss % input per user request - now calculated automatically -->
       <div class="form-group">
-        <label>CRP (mg/L) <span id="epCRP_status" class="status-badge"></span></label>
-        <input id="epCRP" type="number" min="0" max="500" step="0.1" onkeyup="updateLabStatus('epCRP', this.value)">
+        <label class="required">CRP (mg/L) <span id="epCRP_status" class="status-badge"></span></label>
+        <input id="epCRP" type="number" min="0" max="500" step="0.1" onkeyup="validateNumber('epCRP','CRP',0,500); updateLabStatus('epCRP', this.value)">
         <div class="range-hint">Normal Range: &lt; 10 mg/L</div>
         <div class="validation-msg" id="epCRP_msg"></div>
       </div>
@@ -538,9 +538,10 @@
         </div>
         <div class="form-grid" style="grid-template-columns: repeat(2, 1fr);">
           <div class="form-group">
-            <label>Creatinine (mg/dL) <span id="epCreatinine_status" class="status-badge"></span></label>
-            <input id="epCreatinine" type="number" step="0.01" oninput="updateLabStatus('epCreatinine', this.value)">
+            <label class="required">Creatinine (mg/dL) <span id="epCreatinine_status" class="status-badge"></span></label>
+            <input id="epCreatinine" type="number" step="0.01" oninput="validateNumber('epCreatinine','Creatinine',0.1,20); updateLabStatus('epCreatinine', this.value)">
             <div class="range-hint">Normal: 0.7 – 1.3 mg/dL</div>
+            <div class="validation-msg" id="epCreatinine_msg"></div>
           </div>
           <div class="form-group">
             <label>ALT (U/L) <span id="epALT_status" class="status-badge"></span></label>
@@ -558,9 +559,10 @@
             <div class="range-hint">Normal: 0.1 – 1.2 mg/dL</div>
           </div>
           <div class="form-group">
-            <label>Blood Sugar (mg/dL) <span id="epBloodSugar_status" class="status-badge"></span></label>
-            <input id="epBloodSugar" type="number" step="1" oninput="updateLabStatus('epBloodSugar', this.value)">
+            <label class="required">Blood Sugar (mg/dL) <span id="epBloodSugar_status" class="status-badge"></span></label>
+            <input id="epBloodSugar" type="number" step="1" oninput="validateNumber('epBloodSugar','Blood Sugar',20,1000); updateLabStatus('epBloodSugar', this.value)">
             <div class="range-hint">Normal: 70 – 126 mg/dL</div>
+            <div class="validation-msg" id="epBloodSugar_msg"></div>
           </div>
           <div class="form-group">
             <label>TSH (mIU/L) <span id="epTSH_status" class="status-badge"></span></label>
@@ -598,9 +600,10 @@
             <div class="range-hint">Normal: 15 – 36 mg/dL</div>
           </div>
           <div class="form-group">
-            <label>Hemoglobin (g/dL) <span id="epHemoglobin_status" class="status-badge"></span></label>
-            <input id="epHemoglobin" type="number" step="0.1" oninput="updateLabStatus('epHemoglobin', this.value)">
+            <label class="required">Hemoglobin (g/dL) <span id="epHemoglobin_status" class="status-badge"></span></label>
+            <input id="epHemoglobin" type="number" step="0.1" oninput="validateNumber('epHemoglobin','Hemoglobin',2,25); updateLabStatus('epHemoglobin', this.value)">
             <div class="range-hint">Normal: 12 – 16 g/dL</div>
+            <div class="validation-msg" id="epHemoglobin_msg"></div>
           </div>
           <div class="form-group">
             <label>Vitamin D (ng/mL) <span id="epVitD_status" class="status-badge"></span></label>
@@ -1428,6 +1431,10 @@ function savePatientEdits(){
     validateNumber('epWeight','Weight',25,300) &
     validateNumber('epHeight','Height',30,250) &
     validateNumber('epAlbumin','Serum Albumin',1,6) &
+    validateNumber('epCRP','CRP',0,500) &
+    validateNumber('epCreatinine','Creatinine',0.1,20) &
+    validateNumber('epBloodSugar','Blood Sugar',20,1000) &
+    validateNumber('epHemoglobin','Hemoglobin',2,25) &
     validateSelect('epFeeding','Feeding Method') &
     validateSelect('epCancer','Cancer Type') &
     validateSelect('epRegimen','Chemo Regimen');
