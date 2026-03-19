@@ -271,6 +271,12 @@
       </table>
     </div>
   
+    <!-- CLINICAL SAFETY ALERTS (NEW V5) -->
+    <div id="safetyAlertsBlock" class="rs" style="display:none; margin-top:20px;">
+      <div class="rs-title" style="color:#991b1b; border-bottom-color:#991b1b;">Clinical Safety Alerts (Step 6)</div>
+      <div id="safetyAlertsList"></div>
+    </div>
+
     <!-- NUTRITION RX -->
     <div class="rs">
       <div class="rs-title">Prescription Target</div>
@@ -1794,6 +1800,29 @@ function bind(plan){
   setVal('pCultural', patient.culturalPreferences || 'Standard');
   setVal('pHxNotes', patient.notes || 'None');
 
+  // Bind Safety Alerts (V5)
+  const safetyBlock = document.getElementById('safetyAlertsBlock');
+  const safetyList = document.getElementById('safetyAlertsList');
+  if (plan.safetyAlerts && plan.safetyAlerts.length > 0) {
+    safetyBlock.style.display = 'block';
+    safetyList.innerHTML = plan.safetyAlerts.map(a => {
+      const colors = {
+        danger: { bg: '#fee2e2', border: '#ef4444', text: '#991b1b', icon: '🚨' },
+        warning: { bg: '#fff7ed', border: '#f97316', text: '#9a3412', icon: '⚠️' },
+        info: { bg: '#eff6ff', border: '#3b82f6', text: '#1e40af', icon: 'ℹ️' }
+      };
+      const c = colors[a.level] || colors.info;
+      return `
+        <div style="background:${c.bg}; border:1px solid ${c.border}; color:${c.text}; padding:10px; border-radius:6px; margin-bottom:8px; font-weight:600; display:flex; align-items:center;">
+          <span style="margin-right:8px; font-size:1.2em;">${c.icon}</span>
+          <span>${a.message}</span>
+        </div>
+      `;
+    }).join('');
+  } else {
+    safetyBlock.style.display = 'none';
+  }
+
   // Bind Drug Interactions if any
   const drugSec = document.getElementById('drugSection');
   const drugBody = document.getElementById('drugInteractionsBody');
@@ -2267,6 +2296,34 @@ function enableFollowUpMode() {
   }, 300);
 }
 
+function validateMandatoryData() {
+  const mandatory = [
+    { id: 'pCancer', label: 'Cancer Type' },
+    { id: 'pWeight', label: 'Current Weight' },
+    { id: 'pFoodIntake', label: 'Actual Food Intake' },
+    { id: 'pAlbumin', label: 'Serum Albumin' },
+    { id: 'pCRP_val', label: 'CRP' },
+    { id: 'pBloodSugar', label: 'Blood Sugar' },
+    { id: 'pCreatinine', label: 'Creatinine' },
+    { id: 'pHemoglobin', label: 'Hemoglobin' }
+  ];
+
+  const missing = [];
+  mandatory.forEach(m => {
+    const el = document.getElementById(m.id);
+    const val = el ? el.innerText.trim() : '';
+    if (!val || val === '-' || val === '0' || val === '0 mg/dL' || val === '0 mg/L' || val === '0 g/dL') {
+      missing.push(m.label);
+    }
+  });
+
+  if (missing.length > 0) {
+    alert(`Step 1 Block: Report generation is locked. Mandatory Clinical Data Missing:\n- ${missing.join('\n- ')}\n\nPlease update the patient profile via the Edit section or AI Co-pilot.`);
+    return false;
+  }
+  return true;
+}
+
 // Close dropdowns if clicking anywhere outside
 document.addEventListener('click', function(e) {
   if (!e.target.closest('.dropdown-list') && !e.target.closest('input')) {
@@ -2277,6 +2334,9 @@ document.addEventListener('click', function(e) {
 });
 
 function downloadNutritionPDF(autoClose){
+  // Step 1: Mandatory Data Validation
+  if (!validateMandatoryData()) return;
+
   // If html2pdf isn't available (offline), fall back to Print.
   if(typeof html2pdf === 'undefined'){
     window.print();
