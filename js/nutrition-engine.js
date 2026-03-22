@@ -20,6 +20,8 @@ function generateNutritionPlan(patient) {
   const age = parseInt(patient.age || 0);
   const ecog = parseInt(patient.ecogStatus || 0);
   const gender = (patient.sex || '').toLowerCase();
+  const regimen = (patient.regimen || '').toLowerCase();
+  const cancer = (patient.cancer || '').toLowerCase();
   
   const bmi = height ? (weight / Math.pow(height / 100, 2)) : 0;
   
