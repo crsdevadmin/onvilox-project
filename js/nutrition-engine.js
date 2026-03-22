@@ -141,11 +141,9 @@ function generateNutritionPlan(patient) {
 
   // --- STEP 6: SAFETY LAYER (PROTEIN CAP) ---
   if (hasRenalIssue) {
-    if (cachexia || sarcopenia) {
-      proteinPerKg = 1.3; 
-    } else {
-      proteinPerKg = 1.1;
-    }
+    // KDIGO/ESPEN Renal Cap: Strict 0.8-1.0g/kg to avoid nitrogen overload, 
+    // even in cachexia, unless on dialysis.
+    proteinPerKg = (cachexia || sarcopenia) ? 1.0 : 0.8;
   } else {
     if ((regimen.includes('folfirinox') || regimen.includes('platin')) && cachexia) {
       proteinPerKg = 2.0;
@@ -208,7 +206,11 @@ function generateNutritionPlan(patient) {
   // Convert to array for the report renderer
   safetyAlerts = Object.values(safetyStatus);
   
-  const servingsPerDay = 3;
+  // Adaptive Servings: Increase frequency for high calorie/low appetite to decrease per-serving volume
+  let servingsPerDay = 3;
+  if (dailyCalories >= 1800 || hasAppetiteLoss || hasNausea) servingsPerDay = 4;
+  if (dailyCalories >= 2400) servingsPerDay = 5;
+
   const perServingCalories = Math.round(dailyCalories / servingsPerDay);
   const perServingProtein = Math.round(dailyProtein / servingsPerDay);
 
@@ -250,8 +252,8 @@ function generateNutritionPlan(patient) {
   }
 
   const micronutrients = {
-    vitD: vitD > 0 && vitD < 20 ? '4000–6000 IU/day' : (vitD < 30 ? '2000–4000 IU/day' : '1000–2000 IU/day'),
-    vitC: (crp > 5 || tumorBurden) && !regimen.includes('bortezomib') ? '2000 mg/day' : '1000 mg/day',
+    vitD: hasRenalIssue ? '2000 IU/day (Renal Cap)' : (vitD > 0 && vitD < 20 ? '4000–6000 IU/day' : (vitD < 30 ? '2000–4000 IU/day' : '1000–2000 IU/day')),
+    vitC: hasRenalIssue ? '500 mg/day (Renal Cap)' : ((crp > 5 || tumorBurden) && !regimen.includes('bortezomib') ? '2000 mg/day' : '1000 mg/day'),
     zinc: zinc > 0 && zinc < 60 ? '15–25 mg/day (Correction Protocol) + 2mg Copper' : '15 mg/day',
     omega3: (crp > 5 || cachexia || cancer.includes('pancreatic')) ? '3–4 g/day' : '2 g/day',
     epa: (cachexia || tumorBurden || cancer.includes('pancreatic')) ? '2.2 - 3.0 g EPA/day' : 'None',
@@ -288,11 +290,7 @@ function generateNutritionPlan(patient) {
 
   const rationale = [];
   if (hasRenalIssue) {
-    if (cachexia || sarcopenia) {
-      rationale.push(`<b>Renal/Cachexia Strategy:</b> Protein targeted at 1.3 g/kg to balance renal impairment risk against active muscle wasting.`);
-    } else {
-      rationale.push(`<b>Renal Safety Strategy:</b> Protein capped strictly at 1.1 g/kg due to renal function impairment.`);
-    }
+    rationale.push(`<b>Renal Safety (Strict):</b> Protein capped at ${proteinPerKg} g/kg to protect kidney function (KDIGO guidelines), prioritizing renal safety over aggressive muscle loading.`);
   } else if (cachexia) {
     rationale.push(`<b>Clinical (Energy):</b> Target at 35 kcal/kg/day for hypermetabolic cachexia.`);
   } else {
@@ -352,10 +350,14 @@ function generateNutritionPlan(patient) {
     };
   }
 
-  const patientInstructions = [
+  const patientInstructions = (actualIntake <= 50) ? [
+    "URGENT: Oral intake is insufficient (<50%). Transition to Enteral Tube Feeding recommended.",
+    "Do not attempt to 'sip' large volumes if nausea or early satiety is present.",
+    "Consult medical team for immediate nutrition escalation protocol."
+  ] : [
     "Mix powder thoroughly with 200-250ml of liquid.",
     "Consume slowly over 20-30 minutes.",
-    "Store in a cool, dry place."
+    "Small frequent sips improve tolerance."
   ];
 
   const outcomes = {
