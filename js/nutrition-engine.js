@@ -203,6 +203,26 @@ function generateNutritionPlan(patient) {
     safetyStatus.deficit = { level: 'warning', message: `HIGH DEFICIT ALERT: ${reducedFoodIntake}% intake gap. Prescription covers full deficit.` };
   }
 
+  // --- NEW: CLINICAL PROTOCOLS (TRANSITION & FOLLOW-UP) ---
+  const enteralProtocol = (actualIntake <= 50) ? {
+    type: "Isocaloric / High-Protein Enteral Formula",
+    dosage: `Initial: 20-25 ml/hr continuously; Target: ${Math.round(dailyCalories/24)} ml/hr`,
+    transition: "Day 1-2: Trophic feeding. Day 3: Achieve 100% target volume. If tolerated, transition ONS to meal-replacement only.",
+    rationale: "Intake < 50% mandates clinical escalation to prevent further catabolism."
+  } : null;
+
+  const electrolyteStrategy = {
+    potassium: (patient.potassium > 5.0) ? "STRICT LIMIT: < 40 mEq/day" : "Maintenance: 60-80 mEq/day",
+    sodium: (patient.sodium > 0 && patient.sodium < 135) ? "CORRECTION: NaCl 1-2g target; Target Na 135-140" : "Maintenance: 100-150 mEq/day",
+    fluids: `Daily target: ${Math.round(weight * 30)} - ${Math.round(weight * 35)} ml/day (inclusive of formula)`
+  };
+
+  const reassessmentProtocol = {
+    frequency: (nutritionRisk === 'High' || ecog >= 3) ? "Weekly" : "Bi-weekly",
+    markers: "Weight, Serum Albumin, CRP, Hand Grip Strength",
+    rationale: `High metabolic risk (${nutritionRisk}) requires rapid monitoring window.`
+  };
+
   // Convert to array for the report renderer
   safetyAlerts = Object.values(safetyStatus);
   
@@ -366,34 +386,35 @@ function generateNutritionPlan(patient) {
     organProtection: (hasRenalIssue || alt > 50) ? "Safety Protocols Active" : "Standard"
   };
 
-  // V3 Outcome Prediction Engine
+  // V3 Outcome Prediction Engine - Unified Logic
   function calculateOutcomePrediction(riskScore, ecoG, intake, tumorBurden) {
-    let baseProb = 95; // Default "ideal" probability
+    let baseProb = 98; // Default "ideal" probability
     
     // Risk Score Impact
-    baseProb -= (riskScore * 5);
+    baseProb -= (riskScore * 6);
     
-    // Performance Status Impact
+    // Performance Status Impact (ECOG)
     const ecogNum = parseInt(ecoG) || 0;
-    baseProb -= (ecogNum * 10);
+    baseProb -= (ecogNum * 12);
     
     // Intake Deficit Impact
     const intakeDeficit = 100 - (parseInt(intake) || 100);
-    if (intakeDeficit > 50) baseProb -= 20;
-    else if (intakeDeficit > 25) baseProb -= 10;
+    if (intakeDeficit > 50) baseProb -= 25;
+    else if (intakeDeficit > 25) baseProb -= 15;
     
     // Tumor Burden Impact
-    if (tumorBurden === 'High (Bulky)') baseProb -= 15;
-    else if (tumorBurden === 'Moderate') baseProb -= 5;
+    if (tumorBurden === 'High (Bulky)') baseProb -= 20;
+    else if (tumorBurden === 'Moderate') baseProb -= 8;
     
     // Floor the probability
-    const finalProb = Math.max(15, baseProb);
+    const finalProb = Math.max(10, baseProb);
     
     let description = "";
-    if (finalProb >= 80) description = "High probability of weight stabilization and muscle maintenance.";
-    else if (finalProb >= 60) description = "Moderate probability; requires strict adherence to protein targets.";
-    else if (finalProb >= 40) description = "Guarded prognosis; high risk of continued cachexia without enteral support.";
-    else description = "Critical risk; aggressive metabolic intervention and nutritional support mandatory.";
+    if (finalProb >= 85) description = "Excellent prognosis for weight stabilization.";
+    else if (finalProb >= 70) description = "Good probability; requires strict target adherence.";
+    else if (finalProb >= 50) description = "Guarded; high risk of continued cachexia without enteral intervention.";
+    else if (finalProb >= 30) description = "Severe risk; guarded prognosis requiring aggressive CDSS intervention.";
+    else description = "Critical risk; metabolic stabilization is primary goal.";
     
     return {
       percentage: finalProb,
@@ -411,6 +432,7 @@ function generateNutritionPlan(patient) {
     nutritionRiskReasons, safetyAlerts,
     patientInstructions, 
     outcomes, interactions,
+    enteralProtocol, electrolyteStrategy, reassessmentProtocol,
     outcomePrediction: calculateOutcomePrediction(riskScore, patient.ecogStatus, patient.reducedFoodIntake, patient.tumorBurden),
     recipe: buildFormulationOptions({ macroProtein, macroCarbs, macroFat, proteinType, bloodSugar, cachexia, crp }),
     reportNotes: {
