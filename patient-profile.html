@@ -286,8 +286,9 @@
           <div class="rf-val" style="font-size:12px; font-weight:600;" id="riskCachexia"></div>
         </div>
         
-        <div class="rf"><div class="rf-lbl">Daily Target Calories</div><div class="rf-val big accent" id="dailyCalories"></div></div>
-        <div class="rf"><div class="rf-lbl">Daily Protein</div><div class="rf-val big" id="dailyProtein"></div></div>
+        <div class="rf full" style="margin-bottom:8px;"><div class="rf-lbl">Total Base Target</div><div class="rf-val big" id="totalDailyTarget"></div></div>
+        <div class="rf"><div class="rf-lbl">Formula Intake Target</div><div class="rf-val big accent" id="dailyCalories"></div></div>
+        <div class="rf"><div class="rf-lbl">Formula Protein Target</div><div class="rf-val big" id="dailyProtein"></div></div>
         <div class="rf"><div class="rf-lbl">Protein Formulation Type</div><div class="rf-val" id="proteinType"></div></div>
   
         <div class="rf full" style="margin-top:4px;">
@@ -361,7 +362,7 @@
         <div class="rf"><div class="rf-lbl">Format</div><div class="rf-val" id="mForm"></div></div>
         <div class="rf"><div class="rf-lbl">Per Serving Energy</div><div class="rf-val" id="mCalories"></div></div>
         <div class="rf"><div class="rf-lbl">Per Serving Protein</div><div class="rf-val" id="mProtein"></div></div>
-        <div class="rf"><div class="rf-lbl">Macro Ratio (P/C/F)</div><div class="rf-val">30% / 30% / 40%</div></div>
+        <div class="rf"><div class="rf-lbl">Macro Ratio (P/C/F)</div><div class="rf-val" id="macroRatio"></div></div>
       </div>
       
       <div style="margin-top:12px; border:1px solid #dde8f5; border-radius:5px; background:#f7faff; padding:12px;">
@@ -1345,6 +1346,7 @@ async function runAiExtraction(rawText) {
     highlight('epWeight', 'Weight', d.weight);
     highlight('epHeight', 'Height', d.height);
     highlight('epUW', 'Usual Weight', d.usualWeight);
+    highlight('epFoodIntake', 'Reduced Food Intake %', d.reducedFoodIntake);
     highlight('epAlbumin', 'Albumin', d.albumin);
     highlight('epCRP', 'CRP', d.crp);
     highlight('epMUAC', 'MUAC', d.muac);
@@ -1848,10 +1850,21 @@ function bind(plan){
 
   const fp = plan.finalPlan;
 
+  const totalKcal = fp.totalDailyCalories || fp.dailyCalories;
+  const totalPro = fp.totalDailyProtein || fp.dailyProtein;
+  setVal('totalDailyTarget', totalKcal + ' kcal / ' + totalPro + ' g Protein');
+
   setVal('dailyCalories', fp.dailyCalories + ' kcal');
   setVal('perServingCalories', fp.perServingCalories + ' kcal');
   setVal('dailyProtein', fp.dailyProtein + ' g');
   setVal('perServingProtein', fp.perServingProtein + ' g');
+
+  // Fix macro ratio
+  const totalSupplKcal = fp.dailyCalories;
+  const pPct = Math.round((fp.dailyProtein * 4 / totalSupplKcal) * 100) || 0;
+  const cPct = Math.round((fp.dailyCarbs * 4 / totalSupplKcal) * 100) || 0;
+  const fPct = Math.round((fp.dailyFat * 9 / totalSupplKcal) * 100) || 0;
+  setVal('macroRatio', `${pPct}% / ${cPct}% / ${fPct}%`);
 
   // carbs/fat show daily totals derived from per-serving
   setVal('dailyCarbs', ((fp.dailyCarbs != null ? fp.dailyCarbs : fp.macroCarbs * (fp.servingsPerDay || 2))) + ' g');

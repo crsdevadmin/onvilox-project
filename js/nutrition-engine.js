@@ -11,6 +11,7 @@ function generateNutritionPlan(patient) {
   const ast = parseFloat(patient.ast || 0);
   const bilirubin = parseFloat(patient.bilirubin || 0);
   const bloodSugar = parseFloat(patient.bloodSugar || 0);
+  const urea = parseFloat(patient.urea || 0);
   const tsh = parseFloat(patient.tsh || 0);
   const hemoglobin = parseFloat(patient.hemoglobin || 0);
   const vitD = parseFloat(patient.vitD || 0);
@@ -58,7 +59,7 @@ function generateNutritionPlan(patient) {
   }
 
   // Comorbidities / Organ Function
-  const hasRenalIssue = comorbidities.some(c => c.toLowerCase().includes('renal')) || creatinine > 1.5;
+  const hasRenalIssue = comorbidities.some(c => c.toLowerCase().includes('renal')) || creatinine >= 1.5 || urea >= 40;
   const hasIBD = comorbidities.some(c => c.toLowerCase().includes('ibd') || c.toLowerCase().includes('crohn') || c.toLowerCase().includes('colitis'));
   const hasCardiac = comorbidities.some(c => c.toLowerCase().includes('cardiac'));
 
@@ -138,6 +139,9 @@ function generateNutritionPlan(patient) {
 
   let baseCalories = Math.round(weight * kcalPerKg);
   let dailyProtein = Math.round(weight * proteinPerKg);
+  
+  const totalDailyCalories = baseCalories;
+  const totalDailyProtein = dailyProtein;
 
   if (hasCardiac) {
     safetyAlerts.push({ level: 'info', message: 'Cardiac Focus: Sodium restricted to < 2000mg/day.' });
@@ -145,9 +149,16 @@ function generateNutritionPlan(patient) {
 
   if (reducedFoodIntake > 0 && reducedFoodIntake <= 100) {
       const deficitPct = reducedFoodIntake / 100;
-      baseCalories = Math.round(baseCalories * deficitPct);
-      dailyProtein = Math.round(dailyProtein * deficitPct);
+      baseCalories = Math.round(totalDailyCalories * deficitPct);
+      dailyProtein = Math.round(totalDailyProtein * deficitPct);
       if (baseCalories < 500 && reducedFoodIntake < 100) baseCalories = 500;
+      if (dailyProtein < 20 && reducedFoodIntake < 100) dailyProtein = 20;
+  }
+  
+  if (reducedFoodIntake >= 70) {
+      safetyAlerts.push({ level: 'danger', message: `Critical Intake Alert: Patient is only eating ${100 - reducedFoodIntake}%. Immediate feeding escalation to Enteral Nutrition or intensive ONS required.` });
+  } else if (reducedFoodIntake >= 50) {
+      safetyAlerts.push({ level: 'warning', message: `Low Intake Alert: Patient is only eating ${100 - reducedFoodIntake}%. Intensive ONS required as primary source.` });
   }
   
   const dailyCalories = baseCalories;
@@ -182,11 +193,16 @@ function generateNutritionPlan(patient) {
   if (regimen.includes('taxane') || regimen.includes('paclitaxel') || regimen.includes('docetaxel')) interactions.push({ drug: "Taxanes", effect: "Peripheral Neuropathy focus", advice: "ALA and B-Complex optimized." });
   if (regimen.includes('5-fu') || regimen.includes('capecitabine') || regimen.includes('folfirinox')) interactions.push({ drug: "Fluoropyrimidines", effect: "Mucositis / GI Toxicity risk", advice: "Glutamine and peptide protein prioritized." });
   if (regimen.includes('irinotecan')) interactions.push({ drug: "Irinotecan", effect: "Severe Diarrhea", advice: "Early mucosal support focus." });
+  if (regimen.includes('bortezomib')) {
+    interactions.push({ drug: "Bortezomib", effect: "Vitamin B6 Neuropathy Risk", advice: "Avoid high-dose Vitamin B6 above RDA." });
+    interactions.push({ drug: "Bortezomib", effect: "Antioxidant Interference", advice: "Avoid high-dose Vit C and ALA; may reduce drug efficacy." });
+  }
+  if (regimen.includes('lenalidomide')) interactions.push({ drug: "Lenalidomide", effect: "VTE/Antiplatelet Risk", advice: "Monitor Omega-3 dosing due to mild antiplatelet effects." });
 
   const micronutrients = {
     vitD: vitD > 0 && vitD < 20 ? '4000–6000 IU/day' : (vitD < 30 ? '2000–4000 IU/day' : '1000–2000 IU/day'),
-    vitC: (crp > 5 || tumorBurden) ? '2000 mg/day' : '1000 mg/day',
-    zinc: zinc > 0 && zinc < 60 ? '50 mg/day' : '15–30 mg/day',
+    vitC: (crp > 5 || tumorBurden) && !regimen.includes('bortezomib') ? '2000 mg/day' : '1000 mg/day',
+    zinc: zinc > 0 && zinc < 60 ? '15–25 mg/day + 2mg Copper' : '15 mg/day',
     omega3: (crp > 5 || cachexia || cancer.includes('pancreatic')) ? '3–4 g/day' : '2 g/day',
     epa: (cachexia || tumorBurden || cancer.includes('pancreatic')) ? '2.2 - 3.0 g EPA/day' : 'None',
     leucine: (sarcopenia || tumorBurden || ecog >= 2) ? '5 g/day' : '3 g/day',
@@ -258,7 +274,7 @@ function generateNutritionPlan(patient) {
     const neededFat = Math.max(0, macroFat - fatFromProtein);
     const cGrams = Math.round(neededCarbs / (selectedCarb.cPerGram || 1));
     const fGrams = Math.round(neededFat / (selectedFat.fPerGram || 1));
-    const oGrams = (crp > 5 || cachexia || cancer.includes('pancreatic')) ? 10 : 5; 
+    const oGrams = (crp > 5 || cachexia || cancer.includes('pancreatic')) ? 2 : 1; 
 
     return {
       protein: { id: selectedProtein.id, name: selectedProtein.name, grams: pGrams, rationale: selectedProtein.healingRationale },
@@ -284,7 +300,8 @@ function generateNutritionPlan(patient) {
 
   return {
     cachexia, bmi: Math.round(bmi * 10) / 10, kcalPerKg, proteinPerKg,
-    servingsPerDay, dailyCalories, dailyProtein, perServingCalories, perServingProtein,
+    servingsPerDay, totalDailyCalories, totalDailyProtein,
+    dailyCalories, dailyProtein, perServingCalories, perServingProtein,
     proteinType, dailyCarbs, dailyFat, macroProtein, macroCarbs, macroFat,
     micronutrients, rationale, nutritionRisk, nutritionRiskScore: riskScore,
     nutritionRiskReasons, safetyAlerts,

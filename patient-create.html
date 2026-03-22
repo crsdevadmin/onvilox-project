@@ -932,161 +932,190 @@ async function extractTextFromPdf(file) {
   return fullText;
 }
 
-function runAiExtraction(rawText) {
-  const text = rawText.toLowerCase();
-  // Handle "is", "at", ":", space etc.
-  const numPattern = '(?:is|at|was|of|recorded at)?\\s*:?\\s*(\\d+\\.?\\d*)';
-  const reverseWeightPattern = /(\d+\.?\d*)\s*(?:kg|kilos?)?\s*(?:as|is|for)?\s*(?:the|my|his|her)?\s*(?:new\s*)?weight/;
-  const reverseAlbuminPattern = /(\d+\.?\d*)\s*(?:g\/dl)?\s*(?:as|is|for)?\s*(?:the|new\s*)?(?:albumin|alb)/;
-  const reverseCrpPattern = /(\d+\.?\d*)\s*(?:mg\/l)?\s*(?:as|is|for)?\s*(?:the|new\s*)?crp/;
+async function runAiExtraction(rawText) {
+  addMessage("Sending data to Onvilox AI Server for extraction...", "ai");
+  const typing = addTyping();
 
-  // Name, Age, Sex, Height, UHIC extraction
-  const nameMatch = rawText.match(/(?:name\s*(?:is|:)?|patient\s*(?:is|:)?|this\s*is\s*)\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)/);
-  const ageMatch = text.match(/(\d+)\s*(?:years|yrs|yo|age)/) || text.match(/(?:age\s*(?:is|:)?\s*)(\d+)/);
-  const sexMatch = text.match(/\b(male|female|man|woman|boy|girl)\b/i);
-  const heightMatch = text.match(new RegExp('height' + numPattern)) || text.match(/(\d+)\s*cm/);
-  const uhicMatch = text.match(/(?:uhic|id|code)\s*(?:is|:)?\s*([a-z0-9-]+)/i);
+  try {
+    const response = await fetch('http://localhost:3000/api/extract', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pdfText: rawText })
+    });
+    
+    const json = await response.json();
+    typing.remove();
 
-  const extractions = {
-    name: nameMatch ? nameMatch[1] : null,
-    age: ageMatch ? ageMatch[1] : null,
-    sex: sexMatch ? (['male','man','boy'].includes(sexMatch[1].toLowerCase()) ? 'Male' : 'Female') : null,
-    uhic: uhicMatch ? uhicMatch[1].toUpperCase() : null,
-    height: heightMatch ? heightMatch[1] : null,
-    weight: text.match(new RegExp('weight' + numPattern))?.[1] || text.match(reverseWeightPattern)?.[1] || text.match(/(\d+\.?\d*)\s*kg/)?.[1],
-    uw: text.match(new RegExp('usual weight' + numPattern))?.[1] || text.match(new RegExp('uw' + numPattern))?.[1],
-    albumin: text.match(new RegExp('albumin' + numPattern))?.[1] || text.match(new RegExp('alb' + numPattern))?.[1] || text.match(reverseAlbuminPattern)?.[1],
-    crp: text.match(new RegExp('crp' + numPattern))?.[1] || text.match(reverseCrpPattern)?.[1],
-    creatinine: text.match(new RegExp('creatinine' + numPattern))?.[1] || text.match(new RegExp('cr' + numPattern))?.[1],
-    alt: text.match(new RegExp('alt' + numPattern))?.[1] || text.match(new RegExp('sgpt' + numPattern))?.[1],
-    ast: text.match(new RegExp('ast' + numPattern))?.[1] || text.match(new RegExp('sgot' + numPattern))?.[1],
-    bilirubin: text.match(new RegExp('bilirubin' + numPattern))?.[1] || text.match(new RegExp('bil' + numPattern))?.[1],
-    gi: text.includes('vomiting') || text.includes('nausea') || text.includes('diarrhea') || text.includes('bloating') || text.includes('gastric issues')
-  };
-
-  let foundCount = 0;
-  const foundItems = [];
-  const highlight = (id, label, val) => {
-    const el = document.getElementById(id);
-    if(!el) return;
-    el.classList.add('ai-filled');
-    setTimeout(() => el.classList.remove('ai-filled'), 3000);
-    if(label && val) foundItems.push(`${label}: ${val}`);
-  };
-
-  if (extractions.name) { document.getElementById('patientName').value = extractions.name; highlight('patientName', 'Name', extractions.name); foundCount++; }
-  if (extractions.uhic) { document.getElementById('uhic').value = extractions.uhic; highlight('uhic', 'UHIC', extractions.uhic); foundCount++; }
-  if (extractions.age) { document.getElementById('age').value = extractions.age; highlight('age', 'Age', extractions.age); foundCount++; }
-  if (extractions.sex) { document.getElementById('sex').value = extractions.sex; highlight('sex', 'Sex', extractions.sex); foundCount++; }
-  if (extractions.height) { document.getElementById('height').value = extractions.height; highlight('height', 'Height', extractions.height); foundCount++; }
-  if (extractions.weight) { document.getElementById('weight').value = extractions.weight; highlight('weight', 'Weight', extractions.weight); foundCount++; }
-  if (extractions.uw) { document.getElementById('usualWeight').value = extractions.uw; highlight('usualWeight', 'Usual Weight', extractions.uw); foundCount++; }
-  if (extractions.albumin) { 
-    document.getElementById('albumin').value = extractions.albumin; 
-    highlight('albumin', 'Albumin', extractions.albumin); 
-    updateLabStatus('albumin', extractions.albumin);
-    foundCount++; 
-  }
-  if (extractions.crp) { 
-    document.getElementById('crp').value = extractions.crp; 
-    highlight('crp', 'CRP', extractions.crp); 
-    updateLabStatus('crp', extractions.crp);
-    foundCount++; 
-  }
-  if (extractions.creatinine) {
-    document.getElementById('creatinine').value = extractions.creatinine;
-    highlight('creatinine', 'Creatinine', extractions.creatinine);
-    updateLabStatus('creatinine', extractions.creatinine);
-    foundCount++;
-  }
-  if (extractions.alt) {
-    document.getElementById('alt').value = extractions.alt;
-    highlight('alt', 'ALT', extractions.alt);
-    updateLabStatus('alt', extractions.alt);
-    foundCount++;
-  }
-  if (extractions.ast) {
-    document.getElementById('ast').value = extractions.ast;
-    highlight('ast', 'AST', extractions.ast);
-    updateLabStatus('ast', extractions.ast);
-    foundCount++;
-  }
-  if (extractions.bilirubin) {
-    document.getElementById('bilirubin').value = extractions.bilirubin;
-    highlight('bilirubin', 'Bilirubin', extractions.bilirubin);
-    updateLabStatus('bilirubin', extractions.bilirubin);
-    foundCount++;
-  }
-  if (extractions.gi) { document.getElementById('giIssues').value = "true"; highlight('giIssues', 'GI Issues', 'Yes'); foundCount++; }
-
-  const cancers = {
-    'cholangiocarcinoma': 'Cholangiocarcinoma (Bile Duct Cancer)',
-    'cholongiocarcinoma': 'Cholangiocarcinoma (Bile Duct Cancer)',
-    'gallbladder': 'Gallbladder Cancer',
-    'neuroendocrine': 'Neuroendocrine Tumors (NETs)', 'net': 'Neuroendocrine Tumors (NETs)', 'nets': 'Neuroendocrine Tumors (NETs)',
-    'hepatocellular': 'Liver Cancer – Advanced HCC',
-    'liver': 'Liver Cancer – Advanced HCC',
-    'lung': 'Lung Cancer – NSCLC Adenocarcinoma', 'nsclc': 'Lung Cancer – NSCLC Adenocarcinoma', 'sclc': 'Lung Cancer – SCLC Extensive',
-    'head': 'Head & Neck Cancer – Locally Advanced', 'neck': 'Head & Neck Cancer – Locally Advanced',
-    'colon': 'Colorectal Cancer – Stage III', 'colorectal': 'Colorectal Cancer – Stage III', 'breast': 'Breast Cancer – HR+/HER2-',
-    'prostate': 'Prostate Cancer – Advanced', 'leukemia': 'Leukemia – AML', 'lymphoma': 'Lymphoma – DLBCL',
-    'multiple myeloma': 'Multiple Myeloma – Standard', 'myeloma': 'Multiple Myeloma – Standard',
-    'pancreatic': 'Pancreatic Cancer – Resectable', 'pancreas': 'Pancreatic Cancer – Resectable',
-    'gastric': 'Gastric Cancer – Advanced', 'stomach': 'Gastric Cancer – Advanced', 'esophageal': 'Esophageal Cancer',
-    'bladder': 'Bladder Cancer – Muscle Invasive', 'urothelial': 'Bladder Cancer – Muscle Invasive',
-    'kidney': 'Kidney Cancer – Clear Cell RCC', 'renal': 'Kidney Cancer – Clear Cell RCC', 'thyroid': 'Thyroid Cancer',
-    'melanoma': 'Melanoma – Advanced / Metastatic',
-    'endometrial': 'Endometrial Cancer – Advanced / Recurrent', 'endometrium': 'Endometrial Cancer – Advanced / Recurrent', 'uterine': 'Endometrial Cancer – Advanced / Recurrent',
-    'esophageal': 'Esophageal Cancer – Neoadjuvant (Pre-op)', 'esophagus': 'Esophageal Cancer – Neoadjuvant (Pre-op)',
-    'biliary': 'Biliary Tract Cancer – Advanced / Metastatic', 'bile duct': 'Biliary Tract Cancer – Advanced / Metastatic',
-    'sarcoma': 'Soft Tissue Sarcoma – Advanced / Metastatic',
-    'gist': 'GIST – Kit (CD117) Positive',
-    'thyroid': 'Thyroid Cancer – RAI-Refractory',
-    'testicular': 'Testicular Cancer – Germ Cell Tumor', 'testis': 'Testicular Cancer – Germ Cell Tumor',
-    'mesothelioma': 'Mesothelioma – Pleural',
-    'neuroendocrine': 'Neuroendocrine (NETs) – Well-differentiated', 'net': 'Neuroendocrine (NETs) – Well-differentiated',
-    'mds': 'Myelodysplastic (MDS) – High-risk',
-    'follicular lymphoma': 'Follicular Lymphoma – First-line',
-    'mantle cell': 'Mantle Cell Lymphoma – Fit / Younger Patients',
-    'cns lymphoma': 'CNS Lymphoma – Primary'
-  };
-
-  for (const [key, val] of Object.entries(cancers)) {
-    // using word boundaries (\b) so "cholongiocarcinoma" does not match "lung"
-    const regex = new RegExp('\\b' + key + '\\b', 'i');
-    if (regex.test(text)) {
-      if(typeof selectCancer === 'function') selectCancer(val);
-      else document.getElementById('cancerInput').value = val;
-      
-      highlight('cancerInput', 'Cancer', val);
-      foundCount++;
-      break;
+    if (!json.success || !json.data) {
+      addMessage("AI analyzed the text but couldn't find specific clinical data to extract.", 'ai');
+      return;
     }
-  }
+    
+    const d = json.data;
+    let foundCount = 0;
+    const foundItems = [];
+    
+    const highlight = (id, label, val) => {
+      const el = document.getElementById(id);
+      if(!el) return;
+      if (val !== undefined && val !== null && val !== "" && val !== "null") {
+        el.value = val;
+        el.classList.add('ai-filled');
+        setTimeout(() => el.classList.remove('ai-filled'), 3000);
+        if(label) {
+          foundItems.push(`${label}: ${val}`);
+          foundCount++;
+        }
+      }
+    };
 
+    // Basic Information
+    highlight('patientName', 'Name', d.name);
+    highlight('uhic', 'UHIC', d.uhic);
+    highlight('age', 'Age', d.age);
+    if(d.sex && typeof d.sex === 'string' && (d.sex.toLowerCase() === 'male' || d.sex.toLowerCase() === 'female')) {
+      const sexVal = d.sex.charAt(0).toUpperCase() + d.sex.slice(1).toLowerCase();
+      document.getElementById('sex').value = sexVal;
+      highlight('sex', 'Sex', sexVal);
+    }
+    highlight('weight', 'Weight', d.weight);
+    highlight('height', 'Height', d.height);
+    highlight('usualWeight', 'Usual Weight', d.usualWeight);
+    highlight('reducedFoodIntake', 'Reduced Food Intake %', d.reducedFoodIntake);
 
-  // Genomic Markers Extraction
-  const markersFound = [];
-  if (text.includes('mthfr')) markersFound.push('MTHFR Mutation');
-  if (text.includes('brca')) markersFound.push('BRCA1/2 Mutation');
-  if (text.includes('egfr')) markersFound.push('EGFR Mutation');
-  if (text.includes('alk')) markersFound.push('ALK Rearrangement');
-  if (text.includes('kras')) markersFound.push('KRAS Mutation');
-  if (text.includes('her2')) markersFound.push('HER2 Positive');
-  if (text.includes('pd-l1')) markersFound.push('PD-L1 Expression');
-  if (text.includes('msi')) markersFound.push('MSI-High (Microsatellite Instability)');
+    // Labs & Parameters
+    highlight('albumin', 'Albumin', d.albumin);
+    if(d.albumin) updateLabStatus('albumin', d.albumin);
+    
+    highlight('crp', 'CRP', d.crp);
+    if(d.crp) updateLabStatus('crp', d.crp);
+    
+    highlight('muac', 'MUAC', d.muac);
+    if(d.muac) updateLabStatus('muac', d.muac);
 
-  if (markersFound.length > 0) {
-    markersFound.forEach(m => addTag(m, 'genomicMarkersTags'));
-    foundItems.push(`Genomic Markers: ${markersFound.join(', ')}`);
-    foundCount += markersFound.length;
-  }
+    highlight('creatinine', 'Creatinine', d.creatinine);
+    if(d.creatinine) updateLabStatus('creatinine', d.creatinine);
 
-  if(foundCount > 0) {
-    addMessage(`I've extracted ${foundCount} item(s):\n• ${foundItems.join('\n• ')}\n\nAnything else?`, 'ai');
-    if(typeof syncWeightLossFromForm === 'function') syncWeightLossFromForm();
-  } else {
-    addMessage("I couldn't find specific clinical markers in that. Could you provide a weight, albumin level, or cancer type?", 'ai');
+    highlight('alt', 'ALT', d.alt);
+    if(d.alt) updateLabStatus('alt', d.alt);
+
+    highlight('ast', 'AST', d.ast);
+    if(d.ast) updateLabStatus('ast', d.ast);
+
+    highlight('bilirubin', 'Bilirubin', d.bilirubin);
+    if(d.bilirubin) updateLabStatus('bilirubin', d.bilirubin);
+
+    highlight('bloodSugar', 'Blood Sugar', d.bloodSugar);
+    if(d.bloodSugar) updateLabStatus('bloodSugar', d.bloodSugar);
+
+    highlight('sodium', 'Sodium', d.sodium);
+    if(d.sodium) updateLabStatus('sodium', d.sodium);
+
+    highlight('potassium', 'Potassium', d.potassium);
+    if(d.potassium) updateLabStatus('potassium', d.potassium);
+
+    highlight('urea', 'Urea', d.urea);
+    if(d.urea) updateLabStatus('urea', d.urea);
+
+    highlight('tsh', 'TSH', d.tsh);
+    if(d.tsh) updateLabStatus('tsh', d.tsh);
+
+    highlight('prealbumin', 'Prealbumin', d.prealbumin);
+    if(d.prealbumin) updateLabStatus('prealbumin', d.prealbumin);
+
+    highlight('hemoglobin', 'Hemoglobin', d.hemoglobin);
+    if(d.hemoglobin) updateLabStatus('hemoglobin', d.hemoglobin);
+
+    highlight('vitD', 'Vit D', d.vitD);
+    if(d.vitD) updateLabStatus('vitD', d.vitD);
+
+    highlight('vitB12', 'Vit B12', d.vitB12);
+    if(d.vitB12) updateLabStatus('vitB12', d.vitB12);
+
+    highlight('folate', 'Folate', d.folate);
+    if(d.folate) updateLabStatus('folate', d.folate);
+
+    highlight('zinc', 'Zinc', d.zinc);
+    if(d.zinc) updateLabStatus('zinc', d.zinc);
+
+    highlight('magnesium', 'Magnesium', d.magnesium);
+    if(d.magnesium) updateLabStatus('magnesium', d.magnesium);
+
+    // Oncology & Cancer Data
+    if (d.cancer) {
+      if(typeof selectCancer === 'function') selectCancer(d.cancer);
+      else document.getElementById('cancerInput').value = d.cancer;
+      highlight('cancerInput', 'Cancer', d.cancer);
+    }
+    if (d.regimen) {
+      if(typeof selectRegimen === 'function') selectRegimen(d.regimen);
+      else document.getElementById('regimenInput').value = d.regimen;
+      highlight('regimenInput', 'Regimen', d.regimen);
+    }
+    
+    highlight('cancerStage', 'Stage', d.cancerStage);
+    highlight('tumorBurden', 'Tumor Burden', d.tumorBurden);
+    highlight('ecogStatus', 'ECOG', d.ecogStatus);
+
+    // Physical & Body Composition
+    highlight('activityLevel', 'Activity', d.activityLevel);
+    highlight('sarcopeniaStatus', 'Sarcopenia', d.sarcopeniaStatus);
+    highlight('leanBodyMass', 'LBM', d.leanBodyMass);
+    highlight('fatPercent', 'Fat %', d.fatPercent);
+    highlight('smi', 'SMI', d.smi);
+    highlight('handGrip', 'Hand Grip', d.handGrip);
+    highlight('bsa', 'BSA', d.bsa);
+
+    // Preferences & Dietary
+    if (d.feedingMethod) highlight('feedingMethod', 'Feeding', d.feedingMethod);
+    if (d.isVegetarian !== undefined) {
+      const vegVal = String(!!d.isVegetarian);
+      document.getElementById('isVegetarian').value = vegVal;
+      highlight('isVegetarian', 'Vegetarian', vegVal === 'true' ? 'Yes' : 'No');
+    }
+    highlight('culturalPreferences', 'Cultural Pref.', d.culturalPreferences);
+    
+    if (d.giIssues === true || d.giIssues === "true") {
+      document.getElementById('giIssues').value = "true";
+      highlight('giIssues', 'GI Issues', "Yes");
+    }
+
+    // Dynamic Tag Lists
+    const tagMaps = [
+      { data: d.allergies, container: 'allergyTags', label: 'Allergies' },
+      { data: d.comorbidities, container: 'comorbidityTags', label: 'Comorbidities' },
+      { data: d.sideEffects, container: 'sideEffectTags', label: 'Side Effects' },
+      { data: d.treatmentTypes, container: 'treatmentTags', label: 'Treatments' },
+      { data: d.genomicMarkers, container: 'genomicMarkersTags', label: 'Genomic Markers' },
+      { data: d.metastasisSites, container: 'metastasisTags', label: 'Metastasis' },
+      { data: d.existingSupplements, container: 'supplementTags', label: 'Supplements' }
+    ];
+
+    tagMaps.forEach(m => {
+      if (Array.isArray(m.data) && m.data.length) {
+        const container = document.getElementById(m.container);
+        if(container) {
+          container.innerHTML = ''; // Clear previous if any
+          m.data.forEach(item => addTag(item, m.container));
+        }
+        foundItems.push(`${m.label}: ${m.data.join(', ')}`);
+        foundCount++;
+      }
+    });
+
+    if (d.notes) highlight('notes', 'Notes', d.notes);
+
+    if(foundCount > 0) {
+      addMessage(`Onvilox AI extracted ${foundCount} clinical parameter(s) via OpenAI:\n• ${foundItems.slice(0, 10).join('\n• ')}\n\nAnything else?`, 'ai');
+      if(typeof syncWeightLossFromForm === 'function') syncWeightLossFromForm();
+    } else {
+      addMessage("AI analyzed the text but extracted no specific parameters that match our clinical form.", 'ai');
+    }
+
+  } catch (error) {
+    if(typing) typing.remove();
+    console.error("Extraction Error:", error);
+    addMessage("Connection to AI Server failed. Please ensure the server is running on localhost:3000.", 'ai');
   }
 }
 

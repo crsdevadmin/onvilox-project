@@ -93,6 +93,7 @@ Fields to extract (match formatting exactly):
   "usualWeight": "Number (kg)", "uhic": "String (Hospital ID)", "cancer": "String (e.g. Pancreatic Cancer)",
   "regimen": "String", "feedingMethod": "String", "tumorBurden": "String", "sarcopeniaStatus": "String",
   "cancerStage": "String", "ecogStatus": "Number", "activityLevel": "String",
+  "reducedFoodIntake": "Number (The % deficit, e.g. if intake is 20%, gap is 80)",
   "albumin": "Number (g/dL)", "crp": "Number (mg/L)", "muac": "Number (cm)", "creatinine": "Number",
   "alt": "Number", "ast": "Number", "bilirubin": "Number", "bloodSugar": "Number",
   "sodium": "Number", "potassium": "Number", "urea": "Number", "tsh": "Number",
