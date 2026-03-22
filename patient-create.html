@@ -1029,6 +1029,8 @@ function runAiExtraction(rawText) {
     folate: text.match(new RegExp('folate' + numPattern))?.[1],
     zinc: text.match(new RegExp('zinc' + numPattern))?.[1],
     magnesium: text.match(new RegExp('(?:magnesium|mg)' + numPattern))?.[1],
+    muac: text.match(new RegExp('(?:muac|mid-arm circumference)' + numPattern))?.[1],
+    prealbumin: text.match(new RegExp('(?:prealbumin|pab)' + numPattern))?.[1],
     gi: text.includes('vomiting') || text.includes('nausea') || text.includes('diarrhea') || text.includes('bloating'),
     reducedIntake: (() => {
       const actualMatch = text.match(/(?:actual )?food intake\s*[:\-]?\s*(\d+)%/i);
@@ -1081,6 +1083,8 @@ function runAiExtraction(rawText) {
   mapField('folate', 'folate', 'Folate');
   mapField('zinc', 'zinc', 'Zinc');
   mapField('magnesium', 'magnesium', 'Magnesium');
+  mapField('muac', 'muac', 'MUAC');
+  mapField('prealbumin', 'prealbumin', 'Prealbumin');
 
   if (extractions.gi) { 
     document.getElementById('giIssues').value = "true"; 
@@ -1177,6 +1181,7 @@ function runAiExtraction(rawText) {
 <script src="js/theme.js"></script>
 </body>
 </html>
+
 
 
 
