@@ -38,7 +38,7 @@ function generateNutritionPlan(patient) {
 
   const tumorBurden = patient.tumorBurden === 'High (Bulky)';
   const comorbidities = Array.isArray(patient.comorbidities) ? patient.comorbidities : [];
-  const isDiabetic = comorbidities.some(c => c.toLowerCase().includes('diabetes')) || bloodSugar > 180;
+  const isDiabetic = (comorbidities.some(c => c.toLowerCase().includes('diabetes')) || bloodSugar > 180);
   
   const nutritionRiskReasons = [];
   let riskScore = 0;
@@ -128,11 +128,13 @@ function generateNutritionPlan(patient) {
 
   const cachexia = albumin < 3.5 || weightLossPercent >= 10 || bmi < 18.5 || crp > 10 || sarcopenia;
 
-  const regimen = (patient.regimen || '').toLowerCase();
-  const cancer = (patient.cancer || '').toLowerCase();
-  const sideEffects = Array.isArray(patient.sideEffects) ? patient.sideEffects : [];
+  const sideEffects = (Array.isArray(patient.sideEffects) ? patient.sideEffects : []).map(s => s.toLowerCase());
+  const hasNausea = sideEffects.some(s => s.includes('nausea') || s.includes('vomit'));
+  const hasAppetiteLoss = sideEffects.some(s => s.includes('appetite') || s.includes('satiety'));
+  const hasMucositis = sideEffects.some(s => s.includes('mucositis') || s.includes('mouth sore'));
 
   var kcalPerKg = cachexia ? 35 : 30;
+  if (hasAppetiteLoss) kcalPerKg = Math.max(kcalPerKg, 32); // Ensure high density for low volume
   var proteinPerKg = (cachexia || tumorBurden) ? 1.8 : 1.4;
 
   // --- STEP 6: SAFETY LAYER (PROTEIN CAP) ---
@@ -150,8 +152,8 @@ function generateNutritionPlan(patient) {
   
   if (age >= 70 && proteinPerKg < 1.5 && !hasRenalIssue) proteinPerKg = 1.5;
 
-  let totalDailyCalories = Math.round(weight * kcalPerKg);
-  let totalDailyProtein = Math.round(weight * proteinPerKg);
+  const dailyCalories = Math.round(weight * kcalPerKg);
+  const dailyProtein = Math.round(weight * proteinPerKg);
   
   // V3 Safety Engine (Step 6) - Exactly 6 Categories
   const safetyStatus = {
@@ -173,14 +175,19 @@ function generateNutritionPlan(patient) {
     safetyStatus.metabolic = { level: 'danger', message: `HYPERGLYCEMIA ALERT: Blood Sugar ${bloodSugar}. Diabetic (Low-Carb) protocol active.` };
   }
 
+  const actualIntake = 100 - reducedFoodIntake;
   if (patient.sodium > 0 && patient.sodium < 130) {
     safetyStatus.electrolyte = { level: 'danger', message: `HYPONATREMIA ALERT: Sodium ${patient.sodium}. NaCl 1-2g target in formulation.` };
   } else if (patient.potassium > 5.5) {
     safetyStatus.electrolyte = { level: 'danger', message: `HYPERKALEMIA ALERT: Potassium ${patient.potassium}. Low-K formulation required.` };
   }
 
-  if (interactions.length > 0) {
-    safetyStatus.drug = { level: 'warning', message: `DRUG INTERACTION: ${interactions.length} clinical flags found (Antioxidants/B6).` };
+  // Drug interaction check (interactions array defined later, moved check)
+  const drugInteractions = []; 
+  if (regimen.includes('cisplatin')) drugInteractions.push("Cisplatin");
+  if (regimen.includes('bortezomib')) drugInteractions.push("Bortezomib");
+  if (drugInteractions.length > 0) {
+    safetyStatus.drug = { level: 'warning', message: `DRUG INTERACTION: ${drugInteractions.length} clinical flags found (Antioxidants/B6).` };
   }
 
   if (actualIntake <= 30) {
@@ -217,8 +224,8 @@ function generateNutritionPlan(patient) {
   let proteinType = 'Whey isolate';
   const tolerance = (patient.proteinTolerance || '').toLowerCase();
 
-  if (tolerance === 'gi' || cancer.includes('pancreatic') || hasIBD) proteinType = 'Hydrolyzed whey';
-  else if (tolerance === 'mucositis') proteinType = 'Peptide formulas';
+  if (tolerance === 'gi' || cancer.includes('pancreatic') || hasIBD || hasNausea) proteinType = 'Hydrolyzed whey';
+  else if (tolerance === 'mucositis' || hasMucositis) proteinType = 'Peptide formulas';
   else if (tolerance === 'lactose') proteinType = 'Plant proteins (pea / rice)';
   else if ((patient.feedingMethod || '').toLowerCase().includes('enteral')) proteinType = 'Peptide formulas';
 
@@ -244,7 +251,7 @@ function generateNutritionPlan(patient) {
     omega3: (crp > 5 || cachexia || cancer.includes('pancreatic')) ? '3–4 g/day' : '2 g/day',
     epa: (cachexia || tumorBurden || cancer.includes('pancreatic')) ? '2.2 - 3.0 g EPA/day' : 'None',
     leucine: (sarcopenia || tumorBurden || ecog >= 2) ? '5 g/day' : '3 g/day',
-    glutamine: (patient.giIssues || sideEffects.includes('Mucositis') || regimen.includes('folfirinox') || hasIBD) ? '30 g/day' : 'Consider if GI toxicity persists',
+    glutamine: (patient.giIssues || hasMucositis || hasNausea || regimen.includes('folfirinox') || hasIBD) ? '30 g/day' : 'Consider if GI toxicity persists',
     bcaa: (alt > 50 || ast > 50 || bilirubin > 1.2) ? '20 g/day for Hepatic Protection' : (sarcopenia ? '10 g/day' : null),
     magnesium: (patient.magnesium < 1.7 || regimen.includes('cisplatin')) ? '400 mg (Correction Protocol)' : 'Standard',
     bComplex: (regimen.includes('taxane') || regimen.includes('folfirinox')) ? 'High-potency B-Complex' : 'Standard dose',
@@ -268,7 +275,7 @@ function generateNutritionPlan(patient) {
   }
 
   const flavorProfile = (() => {
-    if (sideEffects.includes('Nausea') || sideEffects.includes('Taste alteration')) {
+    if (hasNausea || sideEffects.some(s => s.includes('taste'))) {
       return { recommendation: "Tart / Citrus / Neutral", logic: "Citrus masks metallic taste from chemo." };
     }
     return { recommendation: "Customizable", logic: "Patient-led preference." };

@@ -138,13 +138,13 @@
 
   <div class="form-group">
     <label class="required">Current Weight (kg)</label>
-    <input type="number" id="weight" oninput="syncWeightLossFromForm(); validateField(this,'Weight'); updateCompletenessScore()" min="25" max="300" step="0.1" required>
+    <input type="number" id="weight" oninput="syncWeightLossFromForm(); validateField(this,'Current Weight'); updateCompletenessScore(); updateBSAAuto()" min="25" max="300" step="0.1" required>
     <div class="validation-msg" id="weight_msg"></div>
   </div>
 
   <div class="form-group">
     <label class="required">Height (cm)</label>
-    <input type="number" id="height" onkeyup="validateField(this,'Height'); updateCompletenessScore()" min="30" max="250" required>
+    <input type="number" id="height" oninput="validateField(this,'Height'); updateCompletenessScore(); updateBSAAuto()" min="30" max="250" step="0.1" required>
     <div class="validation-msg" id="height_msg"></div>
   </div>
 
@@ -214,6 +214,11 @@
         <label>Urea (mg/dL) <span id="urea_status" class="status-badge"></span></label>
         <input type="number" id="urea" step="1" placeholder="e.g. 30" oninput="updateLabStatus('urea', this.value)">
         <div class="range-hint">Normal: 15 - 45 mg/dL</div>
+      </div>
+      <div class="form-group">
+        <label>HbA1c (%) <span id="hba1c_status" class="status-badge"></span></label>
+        <input type="number" id="hba1c" step="0.1" placeholder="e.g. 5.7" oninput="updateLabStatus('hba1c', this.value)">
+        <div class="range-hint">Normal: < 5.7%</div>
       </div>
     </div>
   </div>
@@ -422,6 +427,14 @@
         </div>
       </div>
       <div class="form-group" style="grid-column:span 1;">
+        <label>Side Effects (Current Therapy)</label>
+        <div class="tag-box">
+          <div class="tag-container" id="sideEffectTags"></div>
+          <input type="text" placeholder="Search side effects..." onkeyup="filterMultiList(this,'sideEffectDropdown')" onkeydown="handleTagInput(event, 'sideEffectTags')">
+          <div class="dropdown-list" id="sideEffectDropdown"></div>
+        </div>
+      </div>
+      <div class="form-group" style="grid-column:span 1;">
         <label>Existing Supplements</label>
         <div class="tag-box">
           <div class="tag-container" id="supplementTags"></div>
@@ -509,18 +522,7 @@
 <script>
 auth.requireRole(['DOCTOR','ASSISTANT']);
 
-// BSA Auto-calc (DuBois formula)
-function updateBSA() {
-  const w = parseFloat(document.getElementById('weight').value);
-  const h = parseFloat(document.getElementById('height').value);
-  if (w > 0 && h > 0) {
-    // 0.007184 * W^0.425 * H^0.725
-    const bsa = 0.007184 * Math.pow(w, 0.425) * Math.pow(h, 0.725);
-    document.getElementById('bsa').value = bsa.toFixed(2);
-  }
-}
-document.getElementById('weight').addEventListener('input', updateBSA);
-document.getElementById('height').addEventListener('input', updateBSA);
+// BSA is handled by updateBSAAuto and listeners on weight/height
 
 function tagsToArray(containerId){
   const c = document.getElementById(containerId);
@@ -691,8 +693,7 @@ function submitPatient(){
 }
 
 function syncWeightLossFromForm(){
-  // Auto-calculated during submission, but we can trigger BSA update here
-  updateBSA();
+  updateBSAAuto();
 }
 
 function toggleIntakeUI() {
@@ -777,6 +778,10 @@ function updateLabStatus(id, val) {
   } else if(id === 'potassium') {
     if(num < 3.5) { status = 'Low'; cls = 'status-danger'; }
     else if(num > 5.1) { status = 'High'; cls = 'status-danger'; }
+    else { status = 'Normal'; cls = 'status-normal'; }
+  } else if(id === 'hba1c') {
+    if(num >= 6.5) { status = 'Diabetes'; cls = 'status-danger'; }
+    else if(num >= 5.7) { status = 'Prediabetes'; cls = 'status-warn'; }
     else { status = 'Normal'; cls = 'status-normal'; }
   } else if(id === 'urea') {
     if(num < 15) { status = 'Low'; cls = 'status-warn'; }
@@ -867,6 +872,18 @@ function initIntakeCalc() {
 }
 
 function round1(n){ return Math.round(n*10)/10; }
+
+function updateBSAAuto() {
+  const h = parseFloat(document.getElementById('height').value);
+  const w = parseFloat(document.getElementById('weight').value);
+  const bsaEl = document.getElementById('bsa');
+  if (h > 0 && w > 0) {
+    const bsa = Math.sqrt((h * w) / 3600);
+    bsaEl.value = bsa.toFixed(2);
+  } else {
+    bsaEl.value = '';
+  }
+}
 
 initIntakeCalc();
 toggleIntakeUI();
@@ -981,7 +998,7 @@ function runAiExtraction(rawText) {
     urea: text.match(new RegExp('urea' + numPattern))?.[1] || text.match(new RegExp('bun' + numPattern))?.[1],
     sodium: text.match(new RegExp('sodium' + numPattern))?.[1] || text.match(new RegExp('na\\+?' + numPattern))?.[1],
     potassium: text.match(new RegExp('potassium' + numPattern))?.[1] || text.match(new RegExp('k\\+?' + numPattern))?.[1],
-    bloodSugar: text.match(new RegExp('(?:blood sugar|glucose|rbs|fbs)' + numPattern))?.[1],
+    bloodSugar: text.match(new RegExp('(?:blood sugar|glucose|rbs|fbs|bs|bg)(?:\\s*\\([^)]*\\))?' + numPattern))?.[1],
     hemoglobin: text.match(new RegExp('(?:hemoglobin|hb)' + numPattern))?.[1],
     alt: text.match(new RegExp('(?:alt|sgpt)' + numPattern))?.[1],
     ast: text.match(new RegExp('(?:ast|sgot)' + numPattern))?.[1],
@@ -991,6 +1008,7 @@ function runAiExtraction(rawText) {
     folate: text.match(new RegExp('folate' + numPattern))?.[1],
     zinc: text.match(new RegExp('zinc' + numPattern))?.[1],
     magnesium: text.match(new RegExp('(?:magnesium|mg)' + numPattern))?.[1],
+    hba1c: text.match(new RegExp('(?:hba1c|a1c|glycated hemoglobin)' + numPattern))?.[1],
     muac: text.match(new RegExp('(?:muac|mid-arm circumference)' + numPattern))?.[1],
     prealbumin: text.match(new RegExp('(?:prealbumin|pab)' + numPattern))?.[1],
     lbm: text.match(new RegExp('(?:lean body mass|lbm)' + numPattern))?.[1],
@@ -1005,7 +1023,19 @@ function runAiExtraction(rawText) {
       if (text.includes('tpn') || text.includes('parenteral')) return 'Parenteral Nutrition (TPN)';
       return null;
     })(),
-    gi: text.includes('vomiting') || text.includes('nausea') || text.includes('diarrhea') || text.includes('bloating'),
+    gi: (() => {
+      const gic = text.match(/(?:gi|bowel|ibd|stomach|gut)\s*[:\-]?\s*(normal|no|none|negative|good)/i);
+      if (gic) return false;
+      return text.includes('vomiting') || text.includes('nausea') || text.includes('diarrhea') || text.includes('bloating') || text.includes('constipation');
+    })(),
+    comorbidities: (() => {
+      const match = rawText.match(/comorbidities[\s\S]*?((?:[\t ]*[•\-\*][^\n]+\n?)+)/i);
+      return match ? match[1].split(/\n/).map(l => l.replace(/^[•\-\*\t\s]+/, '').trim()).filter(Boolean) : [];
+    })(),
+    sideEffects: (() => {
+      const match = rawText.match(/(?:side\s*effects|important)[\s\S]*?((?:[\t ]*[•\-\*][^\n]+\n?)+)/i);
+      return match ? match[1].split(/\n/).map(l => l.replace(/^[•\-\*\t\s]+/, '').trim()).filter(Boolean) : [];
+    })(),
     reducedIntake: (() => {
       const actualMatch = text.match(/(?:actual )?food intake\s*[:\-]?\s*(\d+)%/i);
       if (actualMatch) return String(100 - parseInt(actualMatch[1], 10));
@@ -1029,6 +1059,7 @@ function runAiExtraction(rawText) {
       document.getElementById(id).value = extractions[extKey];
       highlight(id, label, extractions[extKey]);
       if (typeof updateLabStatus === 'function') updateLabStatus(id, extractions[extKey]);
+    if (id === 'height' || id === 'weight') updateBSAAuto();
       foundCount++;
     }
   };
@@ -1057,6 +1088,7 @@ function runAiExtraction(rawText) {
   mapField('folate', 'folate', 'Folate');
   mapField('zinc', 'zinc', 'Zinc');
   mapField('magnesium', 'magnesium', 'Magnesium');
+  mapField('hba1c', 'hba1c', 'HbA1c');
   mapField('muac', 'muac', 'MUAC');
   mapField('prealbumin', 'prealbumin', 'Prealbumin');
   mapField('lbm', 'leanBodyMass', 'Lean Body Mass');
@@ -1078,10 +1110,22 @@ function runAiExtraction(rawText) {
     }
   }
 
-  if (extractions.gi) { 
-    document.getElementById('giIssues').value = "true"; 
-    highlight('giIssues', 'GI Issues', 'Yes'); 
+  if (extractions.gi !== null) { 
+    document.getElementById('giIssues').value = String(!!extractions.gi); 
+    highlight('giIssues', 'GI Issues', extractions.gi ? 'Symptomatic' : 'Normal'); 
     foundCount++; 
+  }
+
+  if (extractions.comorbidities?.length > 0) {
+    extractions.comorbidities.forEach(c => addTag(c, 'comorbidityTags'));
+    foundItems.push(`Comorbidities: ${extractions.comorbidities.join(', ')}`);
+    foundCount += extractions.comorbidities.length;
+  }
+
+  if (extractions.sideEffects?.length > 0) {
+    extractions.sideEffects.forEach(s => addTag(s, 'sideEffectTags'));
+    foundItems.push(`Side Effects: ${extractions.sideEffects.join(', ')}`);
+    foundCount += extractions.sideEffects.length;
   }
 
   // Enhanced Cancer Mapping (Avoiding "Liver Function" false positives)

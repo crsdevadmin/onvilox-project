@@ -218,6 +218,7 @@
             <div class="rf"><div class="rf-lbl">Sodium (mEq/L)</div><div class="rf-val" id="pSodium"></div></div>
             <div class="rf"><div class="rf-lbl">Potassium (mEq/L)</div><div class="rf-val" id="pPotassium"></div></div>
             <div class="rf"><div class="rf-lbl">Urea (mg/dL)</div><div class="rf-val" id="pUrea"></div></div>
+            <div class="rf"><div class="rf-lbl">HbA1c (%)</div><div class="rf-val" id="pHbA1c"></div></div>
           </div>
         </div>
 
@@ -529,12 +530,12 @@
         </div>
         <div class="form-group">
           <label class="required">Weight (kg)</label>
-          <input id="epWeight" type="number" min="25" max="300" step="0.1">
+          <input id="epWeight" type="number" min="25" max="300" step="0.1" oninput="updateBSAAuto()">
           <div class="validation-msg" id="epWeight_msg"></div>
         </div>
         <div class="form-group">
           <label class="required">Height (cm)</label>
-          <input id="epHeight" type="number" min="30" max="250" step="0.1">
+          <input id="epHeight" type="number" min="30" max="250" step="0.1" oninput="updateBSAAuto()">
           <div class="validation-msg" id="epHeight_msg"></div>
         </div>
         <div class="form-group">
@@ -606,6 +607,11 @@
             <label>TSH (mIU/L) <span id="epTSH_status" class="status-badge"></span></label>
             <input id="epTSH" type="number" step="0.01" oninput="updateLabStatus('epTSH', this.value)">
             <div class="range-hint">Normal: 0.4 - 4.0 mIU/L</div>
+          </div>
+          <div class="form-group">
+            <label>HbA1c (%) <span id="epHbA1c_status" class="status-badge"></span></label>
+            <input id="epHbA1c" type="number" step="0.1" oninput="updateLabStatus('epHbA1c', this.value)">
+            <div class="range-hint">Normal: < 5.7%</div>
           </div>
         </div>
       </div>
@@ -1207,6 +1213,7 @@ function showEditSectionIfAllowed(){
     document.getElementById('epSodium').value = patient.sodium ?? '';
     document.getElementById('epPotassium').value = patient.potassium ?? '';
     document.getElementById('epUrea').value = patient.urea ?? '';
+    document.getElementById('epHbA1c').value = patient.hba1c ?? '';
 
     // Micronutrients
     document.getElementById('epPrealbumin').value = patient.prealbumin ?? '';
@@ -1389,13 +1396,14 @@ async function runAiExtraction(rawText) {
     alt: text.match(/alt\s*[:\-]?\s*(\d+)/i)?.[1],
     ast: text.match(/ast\s*[:\-]?\s*(\d+)/i)?.[1],
     bilirubin: text.match(/(?:bilirubin|bili)\s*[:\-]?\s*(\d+(?:\.\d+)?)/i)?.[1],
-    bloodSugar: text.match(/(?:blood sugar|glucose|bs)\s*[:\-]?\s*(\d+)/i)?.[1],
+    bloodSugar: text.match(/(?:blood sugar|glucose|rbs|fbs|bs|bg)(?:\s*\([^)]*\))?\s*[:\-]?\s*(\d+)/i)?.[1],
     hemoglobin: text.match(/(?:hemoglobin|hb|hgb)\s*[:\-]?\s*(\d+(?:\.\d+)?)/i)?.[1],
     vitD: text.match(/(?:vitamin d|vit d|25-oh d)\s*[:\-]?\s*(\d+(?:\.\d+)?)/i)?.[1],
     vitB12: text.match(/(?:vitamin b12|vit b12|cobalamin)\s*[:\-]?\s*(\d+)/i)?.[1],
     folate: text.match(/(?:folate|folic acid)\s*[:\-]?\s*(\d+(?:\.\d+)?)/i)?.[1],
     zinc: text.match(/zinc\s*[:\-]?\s*(\d+)/i)?.[1],
     magnesium: text.match(/(?:magnesium|mg)\s*[:\-]?\s*(\d+(?:\.\d+)?)/i)?.[1],
+    hba1c: text.match(/(?:hba1c|a1c|glycated hemoglobin)\s*[:\-]?\s*(\d+(?:\.\d+)?)/i)?.[1],
     sodium: text.match(/sodium\s*[:\-]?\s*(\d+)/i)?.[1],
     potassium: text.match(/potassium\s*[:\-]?\s*(\d+(?:\.\d+)?)/i)?.[1],
     urea: text.match(/urea\s*[:\-]?\s*(\d+)/i)?.[1],
@@ -1415,7 +1423,19 @@ async function runAiExtraction(rawText) {
       if (text.includes('tpn') || text.includes('parenteral')) return 'Parenteral Nutrition (TPN)';
       return null;
     })(),
-    gi: text.includes('vomiting') || text.includes('nausea') || text.includes('diarrhea') || text.includes('bloating'),
+    gi: (() => {
+      const gic = text.match(/(?:gi|bowel|ibd|stomach|gut)\s*[:\-]?\s*(normal|no|none|negative|good)/i);
+      if (gic) return false;
+      return text.includes('vomiting') || text.includes('nausea') || text.includes('diarrhea') || text.includes('bloating') || text.includes('constipation');
+    })(),
+    comorbidities: (() => {
+      const match = rawText.match(/comorbidities[\s\S]*?((?:[\t ]*[•\-\*][^\n]+\n?)+)/i);
+      return match ? match[1].split(/\n/).map(l => l.replace(/^[•\-\*\t\s]+/, '').trim()).filter(Boolean) : [];
+    })(),
+    sideEffects: (() => {
+      const match = rawText.match(/(?:side\s*effects|important)[\s\S]*?((?:[\t ]*[•\-\*][^\n]+\n?)+)/i);
+      return match ? match[1].split(/\n/).map(l => l.replace(/^[•\-\*\t\s]+/, '').trim()).filter(Boolean) : [];
+    })(),
     reducedIntake: (() => {
       const actualMatch = text.match(/(?:actual )?food intake\s*[:\-]?\s*(\d+)%/i);
       if (actualMatch) return String(100 - parseInt(actualMatch[1], 10));
@@ -1441,6 +1461,7 @@ async function runAiExtraction(rawText) {
         el.value = extractions[extKey];
         highlight(id, label, extractions[extKey]);
         if (typeof updateLabStatus === 'function') updateLabStatus(id, extractions[extKey]);
+        if (id === 'epHeight' || id === 'epWeight') updateBSAAuto();
         foundCount++;
       }
     }
@@ -1469,6 +1490,7 @@ async function runAiExtraction(rawText) {
   mapField('folate', 'epFolate', 'Folate');
   mapField('zinc', 'epZinc', 'Zinc');
   mapField('magnesium', 'epMagnesium', 'Magnesium');
+  mapField('hba1c', 'epHbA1c', 'HbA1c');
   mapField('muac', 'epMUAC', 'MUAC');
   mapField('prealbumin', 'epPrealbumin', 'Prealbumin');
   mapField('lbm', 'epLeanBodyMass', 'Lean Body Mass');
@@ -1490,10 +1512,22 @@ async function runAiExtraction(rawText) {
     }
   }
 
-  if (extractions.gi) { 
-    document.getElementById('epGi').value = "true"; 
-    highlight('epGi', 'GI Issues', 'Yes'); 
+  if (extractions.gi !== null) { 
+    document.getElementById('epGi').value = String(!!extractions.gi); 
+    highlight('epGi', 'GI Issues', extractions.gi ? 'Symptomatic' : 'Normal'); 
     foundCount++; 
+  }
+
+  if (extractions.comorbidities?.length > 0) {
+    extractions.comorbidities.forEach(c => addTag(c, 'epComorbidityTags'));
+    foundItems.push(`Comorbidities: ${extractions.comorbidities.join(', ')}`);
+    foundCount += extractions.comorbidities.length;
+  }
+
+  if (extractions.sideEffects?.length > 0) {
+    extractions.sideEffects.forEach(s => addTag(s, 'epSideEffectTags'));
+    foundItems.push(`Side Effects: ${extractions.sideEffects.join(', ')}`);
+    foundCount += extractions.sideEffects.length;
   }
 
   // Enhanced Cancer Mapping
@@ -1621,6 +1655,7 @@ function savePatientEdits(){
   patient.sodium = parseFloat(document.getElementById('epSodium').value || 0);
   patient.potassium = parseFloat(document.getElementById('epPotassium').value || 0);
   patient.urea = parseFloat(document.getElementById('epUrea').value || 0);
+  patient.hba1c = parseFloat(document.getElementById('epHbA1c').value || 0);
   patient.prealbumin = parseFloat(document.getElementById('epPrealbumin')?.value || 0);
   patient.tumorBurden = document.getElementById('epTumorBurden').value;
   patient.sarcopeniaStatus = document.getElementById('epSarcopenia').value;
@@ -1710,6 +1745,18 @@ function computeAsianBMI(bmi) {
   if (bmi <= 22.9) return 'Normal weight';
   if (bmi <= 24.9) return 'Overweight';
   return 'Obese';
+}
+
+function updateBSAAuto() {
+  const h = parseFloat(document.getElementById('epHeight').value);
+  const w = parseFloat(document.getElementById('epWeight').value);
+  const bsaEl = document.getElementById('epBSA');
+  if (h > 0 && w > 0) {
+    const bsa = Math.sqrt((h * w) / 3600);
+    bsaEl.value = bsa.toFixed(2);
+  } else {
+    bsaEl.value = '';
+  }
 }
 
 function computeBMI(){
@@ -1854,6 +1901,7 @@ function bind(plan){
   setVal('pSodium', (patient.sodium ? patient.sodium + ' mEq/L' : '-'));
   setVal('pPotassium', (patient.potassium ? patient.potassium + ' mEq/L' : '-'));
   setVal('pUrea', (patient.urea ? patient.urea + ' mg/dL' : '-'));
+  setVal('pHbA1c', (patient.hba1c ? patient.hba1c + '%' : '-'));
   setVal('pTSH', (patient.tsh ? patient.tsh + ' mIU/L' : '-'));
   setVal('pPrealbumin', (patient.prealbumin ? patient.prealbumin + ' mg/dL' : '-'));
   setVal('pHemoglobin', (patient.hemoglobin ? patient.hemoglobin + ' g/dL' : '-'));
@@ -2390,6 +2438,10 @@ function updateLabStatus(id, val) {
   } else if(key === 'urea') {
     if(num < 15) { status = 'Low'; cls = 'status-warn'; }
     else if(num > 45) { status = 'High'; cls = 'status-danger'; }
+    else { status = 'Normal'; cls = 'status-normal'; }
+  } else if(key === 'hba1c') {
+    if(num >= 6.5) { status = 'Diabetes'; cls = 'status-danger'; }
+    else if(num >= 5.7) { status = 'Prediabetes'; cls = 'status-warn'; }
     else { status = 'Normal'; cls = 'status-normal'; }
   }
 
