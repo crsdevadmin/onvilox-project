@@ -1024,6 +1024,11 @@ function runAiExtraction(rawText) {
     alt: text.match(new RegExp('(?:alt|sgpt)' + numPattern))?.[1],
     ast: text.match(new RegExp('(?:ast|sgot)' + numPattern))?.[1],
     bilirubin: text.match(new RegExp('(?:bilirubin|bil)' + numPattern))?.[1],
+    vitD: text.match(new RegExp('(?:vitamin d|vit d|25-oh vit d)' + numPattern))?.[1],
+    vitB12: text.match(new RegExp('(?:vitamin b12|vit b12|b12)' + numPattern))?.[1],
+    folate: text.match(new RegExp('folate' + numPattern))?.[1],
+    zinc: text.match(new RegExp('zinc' + numPattern))?.[1],
+    magnesium: text.match(new RegExp('(?:magnesium|mg)' + numPattern))?.[1],
     gi: text.includes('vomiting') || text.includes('nausea') || text.includes('diarrhea') || text.includes('bloating'),
     reducedIntake: (() => {
       const actualMatch = text.match(/(?:actual )?food intake\s*[:\-]?\s*(\d+)%/i);
@@ -1071,6 +1076,11 @@ function runAiExtraction(rawText) {
   mapField('alt', 'alt', 'ALT');
   mapField('ast', 'ast', 'AST');
   mapField('bilirubin', 'bilirubin', 'Bilirubin');
+  mapField('vitD', 'vitD', 'Vitamin D');
+  mapField('vitB12', 'vitB12', 'Vitamin B12');
+  mapField('folate', 'folate', 'Folate');
+  mapField('zinc', 'zinc', 'Zinc');
+  mapField('magnesium', 'magnesium', 'Magnesium');
 
   if (extractions.gi) { 
     document.getElementById('giIssues').value = "true"; 
@@ -1167,4 +1177,6 @@ function runAiExtraction(rawText) {
 <script src="js/theme.js"></script>
 </body>
 </html>
+
+
 
