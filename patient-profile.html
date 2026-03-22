@@ -183,7 +183,7 @@
       <div class="rmg">
         <div class="rmi"><div class="rmi-n">Name</div><div class="rmi-v" id="pName"></div></div>
         <div class="rmi"><div class="rmi-n">Age / Sex</div><div class="rmi-v"><span id="pAge"></span> / <span id="pSex"></span></div></div>
-        <div class="rmi"><div class="rmi-n">Height</div><div class="rmi-v" id="pHeight"></div></div>
+        <div class="rmi"><div class="rmi-n">Weight / Height</div><div class="rmi-v"><span id="pWeight"></span> / <span id="pHeight"></span></div></div>
         <div class="rmi"><div class="rmi-n">BMI (Current)</div><div class="rmi-v" id="pBMI_top"></div></div>
       </div>
     </div>
@@ -2587,26 +2587,15 @@ function enableFollowUpMode() {
 }
 
 function validateMandatoryData() {
-  const mandatory = [
-    { id: 'pCancer', label: 'Cancer Type' },
-    { id: 'pWeight', label: 'Current Weight' },
-    { id: 'pFoodIntake', label: 'Actual Food Intake' },
-    { id: 'pAlbumin', label: 'Serum Albumin' },
-    { id: 'pCRP_val', label: 'CRP' },
-    { id: 'pBloodSugar', label: 'Blood Sugar' },
-    { id: 'pCreatinine', label: 'Creatinine' },
-    { id: 'pHemoglobin', label: 'Hemoglobin' }
-  ];
-
   const missing = [];
-  mandatory.forEach(m => {
-    const el = document.getElementById(m.id);
-    const val = el ? el.innerText.trim() : '';
-    if (!val || val === '-' || val === '0' || val === '0 mg/dL' || val === '0 mg/L' || val === '0 g/dL') {
-      missing.push(m.label);
-    }
-  });
-
+  if (!patient.name) missing.push('Patient Name');
+  if (!patient.weight || isNaN(parseFloat(patient.weight))) missing.push('Current Weight');
+  if (!patient.height || isNaN(parseFloat(patient.height))) missing.push('Height');
+  if (!patient.cancer) missing.push('Cancer Type');
+  if (!patient.albumin || isNaN(parseFloat(patient.albumin))) missing.push('Serum Albumin');
+  if (!patient.crp && patient.crp !== 0) missing.push('CRP (Inflammatory marker)');
+  if (!patient.bloodSugar && patient.bloodSugar !== 0) missing.push('Blood Sugar');
+  
   if (missing.length > 0) {
     alert(`Step 1 Block: Report generation is locked. Mandatory Clinical Data Missing:\n- ${missing.join('\n- ')}\n\nPlease update the patient profile via the Edit section or AI Co-pilot.`);
     return false;
