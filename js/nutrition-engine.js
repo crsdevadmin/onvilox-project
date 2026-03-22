@@ -141,8 +141,7 @@ function generateNutritionPlan(patient) {
 
   // --- STEP 6: SAFETY LAYER (PROTEIN CAP) ---
   if (hasRenalIssue) {
-    // KDIGO/ESPEN Renal Cap: Strict 0.8-1.0g/kg to avoid nitrogen overload, 
-    // even in cachexia, unless on dialysis.
+    // KDIGO: 0.8-1.0g/kg. 
     proteinPerKg = (cachexia || sarcopenia) ? 1.0 : 0.8;
   } else {
     if ((regimen.includes('folfirinox') || regimen.includes('platin')) && cachexia) {
@@ -152,11 +151,18 @@ function generateNutritionPlan(patient) {
   
   if (age >= 70 && proteinPerKg < 1.5 && !hasRenalIssue) proteinPerKg = 1.5;
 
-  const dailyCalories = Math.round(weight * kcalPerKg);
-  const dailyProtein = Math.round(weight * proteinPerKg);
-  
-  const totalDailyCalories = dailyCalories;
-  const totalDailyProtein = dailyProtein;
+  const baseDailyCalories = Math.round(weight * kcalPerKg);
+  const baseDailyProtein = Math.round(weight * proteinPerKg);
+
+  // --- DEFICIT LOGIC (ONS vs Total) ---
+  // If Enteral or very low intake (<30%), it's total nutrition. 
+  // Otherwise, it's a supplement (ONS) covering the deficit.
+  const isTotalNutrition = (patient.feedingMethod || '').toLowerCase().includes('enteral') || actualIntake < 30;
+  const targetCalories = isTotalNutrition ? baseDailyCalories : Math.round(baseDailyCalories * (reducedFoodIntake / 100));
+  const targetProtein = isTotalNutrition ? baseDailyProtein : Math.round(baseDailyProtein * (reducedFoodIntake / 100));
+
+  const totalDailyCalories = targetCalories;
+  const totalDailyProtein = targetProtein;
   
   // V3 Safety Engine (Step 6) - Exactly 6 Categories
   const safetyStatus = {
@@ -176,6 +182,12 @@ function generateNutritionPlan(patient) {
 
   if (bloodSugar > 180) {
     safetyStatus.metabolic = { level: 'danger', message: `HYPERGLYCEMIA ALERT: Blood Sugar ${bloodSugar}. Diabetic (Low-Carb) protocol active.` };
+    if (!patient.hba1c) safetyStatus.metabolic.message += " (Note: HbA1c missing)";
+  }
+
+  // ECOG vs Activity Contradiction
+  if (ecog === 0 && (patient.activityLevel || '').toLowerCase().includes('sedentary')) {
+    safetyStatus.metabolic = { level: 'warning', message: "CLINICAL CONTRADICTION: ECOG 0 (Active) while Activity is Sedentary. Verify performance status." };
   }
 
   const actualIntake = 100 - reducedFoodIntake;
@@ -186,12 +198,17 @@ function generateNutritionPlan(patient) {
   }
 
   // Drug interaction check (interactions array defined later, moved check)
-  const drugInteractions = []; 
-  if (regimen.includes('cisplatin')) drugInteractions.push("Cisplatin");
-  if (regimen.includes('bortezomib')) drugInteractions.push("Bortezomib");
-  if (drugInteractions.length > 0) {
-    safetyStatus.drug = { level: 'warning', message: `DRUG INTERACTION: ${drugInteractions.length} clinical flags found (Antioxidants/B6).` };
+  // Drug interaction check
+  const drugs = []; 
+  if (regimen.includes('cisplatin')) drugs.push("Cisplatin");
+  if (regimen.includes('bortezomib')) drugs.push("Bortezomib");
+  if (regimen.includes('lenalidomide')) drugs.push("Lenalidomide");
+  
+  if (drugs.length > 0) {
+    safetyStatus.drug = { level: 'warning', message: `DRUG INTERACTION: ${drugs.join(', ')} protocol active. Nutrients adjusted for safety.` };
   }
+  
+  const hasBortezomib = regimen.includes('bortezomib') || regimen.includes('velcade');
 
   if (actualIntake <= 30) {
     safetyStatus.escalation = { level: 'danger', message: `CRITICAL INTAKE REQ: Intaking only ${actualIntake}%. Immediate Enteral Tube Escalation required.` };
@@ -273,7 +290,7 @@ function generateNutritionPlan(patient) {
 
   const micronutrients = {
     vitD: hasRenalIssue ? '2000 IU/day (Renal Cap)' : (vitD > 0 && vitD < 20 ? '4000–6000 IU/day' : (vitD < 30 ? '2000–4000 IU/day' : '1000–2000 IU/day')),
-    vitC: hasRenalIssue ? '500 mg/day (Renal Cap)' : ((crp > 5 || tumorBurden) && !regimen.includes('bortezomib') ? '2000 mg/day' : '1000 mg/day'),
+    vitC: hasBortezomib ? '500 mg/day (Antioxidant Cap for Bortezomib)' : (hasRenalIssue ? '500 mg/day (Renal Cap)' : ((crp > 5 || tumorBurden) && !hasBortezomib ? '2000 mg/day' : '1000 mg/day')),
     zinc: zinc > 0 && zinc < 60 ? '15–25 mg/day (Correction Protocol) + 2mg Copper' : '15 mg/day',
     omega3: (crp > 5 || cachexia || cancer.includes('pancreatic')) ? '3–4 g/day' : '2 g/day',
     epa: (cachexia || tumorBurden || cancer.includes('pancreatic')) ? '2.2 - 3.0 g EPA/day' : 'None',
@@ -289,15 +306,15 @@ function generateNutritionPlan(patient) {
       return (patient.folate > 0 && patient.folate < 3 || hemoglobin < 10) ? '5 mg/day' : (regimen.includes('pemetrexed') || regimen.includes('methotrexate') ? '1 mg/day (per oncology protocol)' : '1.0 mg/day');
     })(),
     chromium: isDiabetic ? '400 mcg/day (Glycemic monitoring protocol active)' : null,
-    ala: ((isDiabetic || interactions.some(i => i.drug === 'Taxanes')) && !regimen.includes('bortezomib')) ? '600 mg/day' : null,
+    ala: (isDiabetic && !hasBortezomib) ? '600 mg/day' : null,
     microbiome: (regimen.includes('folfirinox') || hasIBD) ? 'Soluble Fiber + Probiotic' : null,
     iron: (hemoglobin > 0 && hemoglobin < 10) ? '100 mg elemental iron + B12 support' : null
   };
 
   if (cancer.includes('myeloma')) {
-    micronutrients.calcium = '1000-1200 mg/day (Myeloma Bone Protection strategy)';
+    micronutrients.calcium = '1000-1200 mg/day (Note: Requires Ionized Ca monitoring for hypercalcemia risk)';
     if (vitD > 0 && vitD < 30) {
-      micronutrients.vitD = '4000-6000 IU/day (High-dose Correction + Myeloma Bone Protocol)';
+      micronutrients.vitD = hasRenalIssue ? '2000 IU/day' : '4000-6000 IU/day (Myeloma Bone Protocol)';
     }
   }
 
@@ -433,6 +450,8 @@ function generateNutritionPlan(patient) {
     patientInstructions, 
     outcomes, interactions,
     enteralProtocol, electrolyteStrategy, reassessmentProtocol,
+    baseEnergy: baseDailyCalories,
+    baseProtein: baseDailyProtein,
     outcomePrediction: calculateOutcomePrediction(riskScore, patient.ecogStatus, patient.reducedFoodIntake, patient.tumorBurden),
     recipe: buildFormulationOptions({ macroProtein, macroCarbs, macroFat, proteinType, bloodSugar, cachexia, crp }),
     reportNotes: {

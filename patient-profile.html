@@ -180,9 +180,10 @@
     <!-- PATIENT SUMMARY (Micro Grid) -->
     <div class="rs">
       <div class="rs-title">Patient Profile</div>
-      <div class="rmg">
+      <div class="rmg" style="grid-template-columns: repeat(3, 1fr);">
         <div class="rmi"><div class="rmi-n">Name</div><div class="rmi-v" id="pName"></div></div>
         <div class="rmi"><div class="rmi-n">Age / Sex</div><div class="rmi-v"><span id="pAge"></span> / <span id="pSex"></span></div></div>
+        <div class="rmi"><div class="rmi-n">Protocol / Regimen</div><div class="rmi-v"><span id="pCancer"></span> / <span id="pRegimen"></span></div></div>
         <div class="rmi"><div class="rmi-n">Weight / Height</div><div class="rmi-v"><span id="pWeight"></span> / <span id="pHeight"></span></div></div>
         <div class="rmi"><div class="rmi-n">BMI (Current)</div><div class="rmi-v" id="pBMI_top"></div></div>
       </div>
@@ -2287,17 +2288,22 @@ function bind(plan){
   const sarcRisk = (fp.nutritionRiskReasons || []).some(r => r.includes('Sarcopenia')) ? 'YES (SMI/Grip triggered)' : 'NO';
   trace.push(`<b>Risk triggers:</b> Cachexia = ${cachexia ? 'YES' : 'NO'}; Sarcopenia = ${sarcRisk}.`);
   
-  const baseCal = Math.round(patient.weight * kcalPerKg);
+  const baseCal = fp.baseEnergy || Math.round(patient.weight * kcalPerKg);
   trace.push(`<b>Base Energy Required:</b> ${kcalPerKg} kcal/kg/day → ${patient.weight} (Weight) × ${kcalPerKg} = <b>${baseCal} kcal/day</b>.`);
   
-  const intakeDeficit = patient.reducedFoodIntake || 0;
-  if (intakeDeficit > 0) {
-     trace.push(`<b>Deficit Adjustment:</b> Patient food intake is reduced by ${intakeDeficit}%. Plan fulfills the <b>${intakeDeficit}% deficit</b> → ${baseCal} × ${intakeDeficit}% = <b>${fp.dailyCalories} kcal/day target</b>.`);
+  const reducedIntake = patient.reducedFoodIntake || 0;
+  if (reducedIntake > 0) {
+     const rule = (patient.feedingMethod || '').includes('Enteral') || (100-reducedIntake) < 30;
+     if (rule) {
+       trace.push(`<b>Feeding Rule (Total):</b> Intake deficit is severe or Enteral route used. Plan fulfills 100% of base → <b>${fp.dailyCalories} kcal/day</b>.`);
+     } else {
+       trace.push(`<b>Deficit Adjustment (Supplement):</b> Intake gap is ${reducedIntake}%. Plan fulfills the deficit portion → ${baseCal} × ${reducedIntake}% = <b>${fp.dailyCalories} kcal/day target</b>.`);
+     }
   }
 
-  const ageNote = (age >= 70 && proteinPerKg < 1.5) ? ' (Adjusted to 1.5 min for elderly)' : '';
-  const baseProt = Math.round(patient.weight * proteinPerKg);
-  trace.push(`<b>Protein rule applied:</b> ${proteinPerKg} g/kg/day${ageNote} → ${patient.weight} (Weight) × ${proteinPerKg} = ${baseProt} g/day.${intakeDeficit > 0 ? ` (Reduced to <b>${fp.dailyProtein} g/day</b> for ${intakeDeficit}% deficit)` : ` Result: <b>${fp.dailyProtein} g/day</b>.`}`);
+  const baseProt = fp.baseProtein || Math.round(patient.weight * proteinPerKg);
+  const protNote = (age >= 70 && proteinPerKg < 1.5 && !fp.hasRenalIssue) ? ' (Adjusted to 1.5 min for elderly)' : (fp.hasRenalIssue ? ' (Renal Restricted)' : '');
+  trace.push(`<b>Protein rule applied:</b> ${proteinPerKg} g/kg/day${protNote} → ${patient.weight} (Weight) × ${proteinPerKg} = ${baseProt} g/day. <b>Final Prescription: ${fp.dailyProtein} g/day</b>.`);
   trace.push(`<b>Serving pattern:</b> daily target ÷ ${fp.servingsPerDay || 2} servings/day for better tolerance.`);
   
   const carbSource = (fp.recipe && fp.recipe.carb) ? fp.recipe.carb.name : 'Standard';
