@@ -49,10 +49,10 @@ function generateNutritionPlan(patient) {
     safetyAlerts.push({ level: 'warning', message: `Anemia Protocol Active (Hb: ${hemoglobin} g/dL). Iron/B12 support intensified.` });
   }
   if (patient.potassium > 5.0) {
-    safetyAlerts.push({ level: 'danger', message: `Hyperkalemia Alert (K+: ${patient.potassium} mmol/L). Restrict potassium intake.` });
+    safetyAlerts.push({ level: 'danger', message: `Hyperkalemia Alert (K+: ${patient.potassium} mmol/L). Potassium-free formula components active.` });
   }
-  if (patient.sodium < 135) {
-    safetyAlerts.push({ level: 'warning', message: `Hyponatremia Flag (Na+: ${patient.sodium}). Clinical fluid balance review recommended.` });
+  if (patient.sodium > 0 && patient.sodium < 135) {
+    safetyAlerts.push({ level: 'warning', message: `Hyponatremia Flag (Na+: ${patient.sodium}). Add 1-2g Sodium Chloride (salt) to daily formulation.` });
   }
   if (tsh > 5.0) {
     safetyAlerts.push({ level: 'info', message: `Metabolic Rate Flag: Elevated TSH (${tsh}).` });
@@ -128,7 +128,11 @@ function generateNutritionPlan(patient) {
 
   // --- STEP 6: SAFETY LAYER (PROTEIN CAP) ---
   if (hasRenalIssue) {
-    proteinPerKg = 1.1; // Strict renal cap even in cancer
+    if (cachexia || sarcopenia) {
+      proteinPerKg = 1.3; // Balanced renal safety with high-stress cachexia needs
+    } else {
+      proteinPerKg = 1.1; // Strict renal cap
+    }
   } else {
     if ((regimen.includes('folfirinox') || regimen.includes('platin')) && cachexia) {
       proteinPerKg = 2.0;
@@ -156,7 +160,7 @@ function generateNutritionPlan(patient) {
   }
   
   if (reducedFoodIntake >= 70) {
-      safetyAlerts.push({ level: 'danger', message: `Critical Intake Alert: Patient is only eating ${100 - reducedFoodIntake}%. Immediate feeding escalation to Enteral Nutrition or intensive ONS required.` });
+      safetyAlerts.push({ level: 'danger', message: `Critical Intake Alert: Patient is only eating ${100 - reducedFoodIntake}%. Immediate feeding escalation to Enteral Nutrition (Tube Feeding via NGT, 1.5 kcal/mL standard or peptide formula at 40-50 mL/hr) required.` });
   } else if (reducedFoodIntake >= 50) {
       safetyAlerts.push({ level: 'warning', message: `Low Intake Alert: Patient is only eating ${100 - reducedFoodIntake}%. Intensive ONS required as primary source.` });
   }
@@ -202,7 +206,7 @@ function generateNutritionPlan(patient) {
   const micronutrients = {
     vitD: vitD > 0 && vitD < 20 ? '4000–6000 IU/day' : (vitD < 30 ? '2000–4000 IU/day' : '1000–2000 IU/day'),
     vitC: (crp > 5 || tumorBurden) && !regimen.includes('bortezomib') ? '2000 mg/day' : '1000 mg/day',
-    zinc: zinc > 0 && zinc < 60 ? '15–25 mg/day + 2mg Copper' : '15 mg/day',
+    zinc: zinc > 0 && zinc < 60 ? '15–25 mg/day (Correction Protocol) + 2mg Copper' : '15 mg/day',
     omega3: (crp > 5 || cachexia || cancer.includes('pancreatic')) ? '3–4 g/day' : '2 g/day',
     epa: (cachexia || tumorBurden || cancer.includes('pancreatic')) ? '2.2 - 3.0 g EPA/day' : 'None',
     leucine: (sarcopenia || tumorBurden || ecog >= 2) ? '5 g/day' : '3 g/day',
@@ -210,7 +214,7 @@ function generateNutritionPlan(patient) {
     bcaa: (alt > 50 || ast > 50 || bilirubin > 1.2) ? '20 g/day for Hepatic Protection' : (sarcopenia ? '10 g/day' : null),
     magnesium: (() => {
       let base = 'Daily supportive dose';
-      if (patient.magnesium > 0 && patient.magnesium < 1.7) base = '500-800 mg/day';
+      if (patient.magnesium > 0 && patient.magnesium < 1.7) base = '500-800 mg/day (Correction Protocol)';
       if (regimen.includes('cisplatin')) base += ' + 1000 mg/day';
       return base;
     })(),
@@ -227,6 +231,13 @@ function generateNutritionPlan(patient) {
     iron: (hemoglobin > 0 && hemoglobin < 10) ? '100 mg elemental iron/day (Anemia correction)' : null
   };
 
+  if (cancer.includes('myeloma')) {
+    micronutrients.calcium = '1000-1200 mg/day (Myeloma Bone Protection strategy)';
+    if (vitD > 0 && vitD < 30) {
+      micronutrients.vitD = '4000-6000 IU/day (High-dose Correction + Myeloma Bone Protocol)';
+    }
+  }
+
   const flavorProfile = (() => {
     if (sideEffects.includes('Nausea') || sideEffects.includes('Taste alteration')) {
       return { recommendation: "Tart / Citrus / Neutral", logic: "Citrus masks metallic taste from chemo." };
@@ -236,11 +247,25 @@ function generateNutritionPlan(patient) {
 
   const rationale = [];
   if (hasRenalIssue) {
-    rationale.push(`<b>Renal Safety Strategy:</b> Protein capped at 1.1 g/kg due to renal function impairment.`);
+    if (cachexia || sarcopenia) {
+      rationale.push(`<b>Renal/Cachexia Strategy:</b> Protein targeted at 1.3 g/kg to balance renal impairment risk against active muscle wasting.`);
+    } else {
+      rationale.push(`<b>Renal Safety Strategy:</b> Protein capped strictly at 1.1 g/kg due to renal function impairment.`);
+    }
   } else if (cachexia) {
     rationale.push(`<b>Clinical (Energy):</b> Target at 35 kcal/kg/day for hypermetabolic cachexia.`);
   } else {
     rationale.push(`<b>Clinical (Energy):</b> Maintenance at 25-30 kcal/kg/day.`);
+  }
+  
+  if (patient.potassium > 5.0) {
+    rationale.push(`<b>Electrolyte Safety:</b> Potassium-free formula matrix selected due to active Hyperkalemia.`);
+  }
+  if (patient.sodium > 0 && patient.sodium < 135) {
+    rationale.push(`<b>Electrolyte Safety:</b> Added 1-2g target Sodium Chloride to daily regimen for Hyponatremia correction.`);
+  }
+  if (isDiabetic) {
+    rationale.push(`<b>Glycemic Control:</b> Modified carbohydrate load and transitioned to low-glycemic index Palatinose source.`);
   }
 
   if (!hasRenalIssue && proteinPerKg >= 1.8) {
