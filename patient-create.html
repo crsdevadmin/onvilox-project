@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -60,16 +60,16 @@
 <div class="ai-chat-window" id="aiChatWindow">
   <div class="ai-chat-header">
     <h4><svg style="width:16px; height:16px; fill:currentColor;" viewBox="0 0 24 24"><path d="M12,2A10,10 0 0,1 22,12A10,10 0 0,1 12,22A10,10 0 0,1 2,12A10,10 0 0,1 12,2M12,4A8,8 0 0,0 4,12C4,14.39 5,16.5 6.74,18L7,17.27C7.3,16.27 8.23,15.5 9.35,15.5H10.5V14.5A0.5,0.5 0 0,1 11,14H13A0.5,0.5 0 0,1 13.5,14.5V15.5H14.65C15.77,15.5 16.7,16.27 17,17.27L17.26,18C19,16.5 20,14.39 20,12A8,8 0 0,0 12,4M12.5,7A1.5,1.5 0 0,1 14,8.5A1.5,1.5 0 0,1 12.5,10A1.5,1.5 0 0,1 11,8.5A1.5,1.5 0 0,1 12.5,7M11,14.5A0.5,0.5 0 0,0 10.5,14H9A0.5,0.5 0 0,1 8.5,14.5V15.5H9.35C10.1,15.5 10.74,15.04 11,14.41V14.5M15.5,14.5A0.5,0.5 0 0,0 15,14H13.5A0.5,0.5 0 0,1 13,14.5V15.5H14.65C15,15.5 15.29,15.4 15.5,15.24V14.5Z"/></svg> Onvilox Co-Pilot</h4>
-    <div class="close-chat" onclick="toggleChat()">ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¢</div>
+    <div class="close-chat" onclick="toggleChat()">&times;</div>
   </div>
   <div class="ai-chat-messages" id="chatMsgs">
     <div class="msg msg-ai">Hi! I'm your Clinical Co-Pilot. You can paste case notes or just tell me about the patient (e.g., "Patient is 65kg with stage 4 lung cancer"). I'll fill in the details for you!</div>
   </div>
   <div class="ai-chat-input-area">
     <input type="file" id="pdfUpload" accept=".pdf" style="display:none;" onchange="handlePdfUpload(event)">
-    <button class="ai-chat-send" onclick="triggerFileUpload()" title="Upload Medical Report (PDF)" style="font-size:16px; margin-right:5px;">ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã…Â½</button>
+    <button class="ai-chat-send" onclick="triggerFileUpload()" title="Upload Medical Report (PDF)" style="font-size:16px; margin-right:5px;">&num;</button>
     <input type="text" class="ai-chat-input" id="chatInput" placeholder="Type or paste notes..." onkeypress="if(event.key==='Enter') sendChatMessage()">
-    <button class="ai-chat-send" onclick="sendChatMessage()">ÃƒÂ¢Ã…Â¾Ã‚Â¤</button>
+    <button class="ai-chat-send" onclick="sendChatMessage()">&gt;</button>
   </div>
 </div>
 
@@ -79,7 +79,7 @@
     <a href="doctor.html">Dashboard</a>
     <a href="#" onclick="auth.logout()">Logout</a>
     <button id="themeToggleBtn" onclick="toggleTheme()" class="theme-toggle-btn" style="margin-left: 20px;">
-      <span id="themeIcon">ÃƒÂ°Ã…Â¸Ã…â€™Ã¢â€žÂ¢</span> <span id="themeLabel">Dark</span>
+      <span id="themeIcon"></span> <span id="themeLabel">Dark</span>
     </button>
   </div>
 </div>
@@ -186,7 +186,7 @@
   <div class="form-group">
     <label class="required">Serum Albumin (g/dL) <span id="albumin_status" class="status-badge"></span></label>
     <input type="number" id="albumin" step="0.1" onkeyup="validateField(this,'Serum Albumin'); updateLabStatus('albumin', this.value)">
-    <div class="range-hint">Normal Range: 3.5 ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“ 5.5 g/dL</div>
+    <div class="range-hint">Normal Range: 3.5 - 5.5 g/dL</div>
     <div class="validation-msg" id="albumin_msg"></div>
   </div>
 
@@ -208,14 +208,14 @@
     <label class="required">Feeding Method</label>
     <select id="feedingMethod" onchange="validateField(this,'Feeding Method'); toggleIntakeUI(); updateCompletenessScore()" required>
       <option value="">Select Method</option>
-      <option>Oral Feeding (Normal Diet)</option>
-      <option>Oral Nutrition Supplements (ONS)</option>
+<option>Oral Feeding (Normal Diet)</option>
+<option>Oral Nutrition Supplements (ONS)</option>
       <option>Enteral Feeding - Nasogastric Tube (NG)</option>
       <option>Enteral Feeding - PEG Tube</option>
       <option>Enteral Feeding - Jejunostomy (J-Tube)</option>
-      <option>Parenteral Nutrition (TPN)</option>
-      <option>Combination Feeding (Oral + Enteral)</option>
-      <option>Combination Feeding (Enteral + Parenteral)</option>
+<option>Parenteral Nutrition (TPN)</option>
+<option>Combination Feeding (Oral + Enteral)</option>
+<option>Combination Feeding (Enteral + Parenteral)</option>
     </select>
     <div class="validation-msg" id="feedingMethod_msg"></div>
   </div>
@@ -235,49 +235,49 @@
       <div class="form-group">
         <label class="required">Creatinine (mg/dL) <span id="creatinine_status" class="status-badge"></span></label>
         <input type="number" id="creatinine" step="0.01" placeholder="e.g. 0.9" oninput="validateField(this,'Creatinine'); updateLabStatus('creatinine', this.value)">
-        <div class="range-hint">Normal: 0.7 ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“ 1.3 mg/dL</div>
+        <div class="range-hint">Normal: 0.7 - 1.3 mg/dL</div>
         <div class="validation-msg" id="creatinine_msg"></div>
       </div>
       <div class="form-group">
         <label>ALT (U/L) <span id="alt_status" class="status-badge"></span></label>
         <input type="number" id="alt" step="1" placeholder="e.g. 30" oninput="updateLabStatus('alt', this.value)">
-        <div class="range-hint">Normal: 7 ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“ 56 U/L</div>
+        <div class="range-hint">Normal: 7 - 56 U/L</div>
       </div>
       <div class="form-group">
         <label>AST (U/L) <span id="ast_status" class="status-badge"></span></label>
         <input type="number" id="ast" step="1" placeholder="e.g. 28" oninput="updateLabStatus('ast', this.value)">
-        <div class="range-hint">Normal: 5 ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“ 40 U/L</div>
+        <div class="range-hint">Normal: 5 - 40 U/L</div>
       </div>
       <div class="form-group">
         <label>Bilirubin (mg/dL) <span id="bilirubin_status" class="status-badge"></span></label>
         <input type="number" id="bilirubin" step="0.1" placeholder="e.g. 0.8" oninput="updateLabStatus('bilirubin', this.value)">
-        <div class="range-hint">Normal: 0.1 ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“ 1.2 mg/dL</div>
+        <div class="range-hint">Normal: 0.1 - 1.2 mg/dL</div>
       </div>
       <div class="form-group">
         <label class="required">Blood Sugar (mg/dL) <span id="blood_sugar_status" class="status-badge"></span></label>
         <input type="number" id="bloodSugar" step="1" oninput="validateField(this,'Blood Sugar'); updateLabStatus('bloodSugar', this.value)">
-        <div class="range-hint">Normal: 70 ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“ 126 mg/dL</div>
+        <div class="range-hint">Normal: 70 - 126 mg/dL</div>
         <div class="validation-msg" id="bloodSugar_msg"></div>
       </div>
       <div class="form-group">
         <label>TSH (mIU/L) <span id="tsh_status" class="status-badge"></span></label>
         <input type="number" id="tsh" step="0.01" oninput="updateLabStatus('tsh', this.value)">
-        <div class="range-hint">Normal: 0.4 ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“ 4.0 mIU/L</div>
+        <div class="range-hint">Normal: 0.4 - 4.0 mIU/L</div>
       </div>
       <div class="form-group">
         <label>Sodium (mEq/L) <span id="sodium_status" class="status-badge"></span></label>
         <input type="number" id="sodium" step="0.1" placeholder="e.g. 140" oninput="updateLabStatus('sodium', this.value)">
-        <div class="range-hint">Normal: 135 ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“ 145 mEq/L</div>
+        <div class="range-hint">Normal: 135 - 145 mEq/L</div>
       </div>
       <div class="form-group">
         <label>Potassium (mEq/L) <span id="potassium_status" class="status-badge"></span></label>
         <input type="number" id="potassium" step="0.1" placeholder="e.g. 4.2" oninput="updateLabStatus('potassium', this.value)">
-        <div class="range-hint">Normal: 3.5 ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“ 5.1 mEq/L</div>
+        <div class="range-hint">Normal: 3.5 - 5.1 mEq/L</div>
       </div>
       <div class="form-group">
         <label>Urea (mg/dL) <span id="urea_status" class="status-badge"></span></label>
         <input type="number" id="urea" step="1" placeholder="e.g. 30" oninput="updateLabStatus('urea', this.value)">
-        <div class="range-hint">Normal: 15 ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“ 45 mg/dL</div>
+        <div class="range-hint">Normal: 15 - 45 mg/dL</div>
       </div>
     </div>
   </div>
@@ -292,38 +292,38 @@
       <div class="form-group">
         <label>Prealbumin (mg/dL) <span id="prealbumin_status" class="status-badge"></span></label>
         <input type="number" id="prealbumin" step="1" oninput="updateLabStatus('prealbumin', this.value)">
-        <div class="range-hint">Normal: 15 ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“ 36 mg/dL</div>
+        <div class="range-hint">Normal: 15 - 36 mg/dL</div>
       </div>
       <div class="form-group">
         <label class="required">Hemoglobin (g/dL) <span id="hemoglobin_status" class="status-badge"></span></label>
         <input type="number" id="hemoglobin" step="0.1" oninput="validateField(this,'Hemoglobin'); updateLabStatus('hemoglobin', this.value)">
-        <div class="range-hint">Normal: 12 ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“ 16 g/dL</div>
+        <div class="range-hint">Normal: 12 - 16 g/dL</div>
         <div class="validation-msg" id="hemoglobin_msg"></div>
       </div>
       <div class="form-group">
         <label>Vitamin D (ng/mL) <span id="vit_d_status" class="status-badge"></span></label>
         <input type="number" id="vitD" step="1" oninput="updateLabStatus('vitD', this.value)">
-        <div class="range-hint">Normal: 30 ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“ 100 ng/mL</div>
+        <div class="range-hint">Normal: 30 - 100 ng/mL</div>
       </div>
       <div class="form-group">
         <label>Vitamin B12 (pg/mL) <span id="vit_b12_status" class="status-badge"></span></label>
         <input type="number" id="vitB12" step="1" oninput="updateLabStatus('vitB12', this.value)">
-        <div class="range-hint">Normal: 200 ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“ 900 pg/mL</div>
+        <div class="range-hint">Normal: 200 - 900 pg/mL</div>
       </div>
       <div class="form-group">
         <label>Folate (ng/mL) <span id="folate_status" class="status-badge"></span></label>
         <input type="number" id="folate" step="1" oninput="updateLabStatus('folate', this.value)">
-        <div class="range-hint">Normal: 2 ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“ 20 ng/mL</div>
+        <div class="range-hint">Normal: 2 - 20 ng/mL</div>
       </div>
       <div class="form-group">
         <label>Zinc (mcg/dL) <span id="zinc_status" class="status-badge"></span></label>
         <input type="number" id="zinc" step="1" oninput="updateLabStatus('zinc', this.value)">
-        <div class="range-hint">Normal: 60 ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“ 120 mcg/dL</div>
+        <div class="range-hint">Normal: 60 - 120 mcg/dL</div>
       </div>
       <div class="form-group">
         <label>Magnesium (mg/dL) <span id="magnesium_status" class="status-badge"></span></label>
         <input type="number" id="magnesium" step="0.1" oninput="updateLabStatus('magnesium', this.value)">
-        <div class="range-hint">Normal: 1.7 ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“ 2.2 mg/dL</div>
+        <div class="range-hint">Normal: 1.7 - 2.2 mg/dL</div>
       </div>
     </div>
   </div>
@@ -419,7 +419,7 @@
         <input type="number" id="fatPercent" step="0.1" placeholder="e.g. 25">
       </div>
       <div class="form-group">
-        <label>Skeletal Muscle Index (cmÃƒâ€šÃ‚Â²/mÃƒâ€šÃ‚Â²)</label>
+        <label>Skeletal Muscle Index (cmÂ²/mÂ²)</label>
         <input type="number" id="smi" step="0.1" placeholder="e.g. 45.0">
       </div>
       <div class="form-group">
@@ -427,7 +427,7 @@
         <input type="number" id="handGrip" step="0.1" placeholder="e.g. 30.0">
       </div>
       <div class="form-group">
-        <label>BSA (mÃƒâ€šÃ‚Â²) - Auto</label>
+        <label>BSA (mÂ²) - Auto</label>
         <input type="number" id="bsa" readonly style="background:var(--bg-2); color:var(--text-3) !important;">
       </div>
     </div>
@@ -631,7 +631,7 @@ function submitPatient(){
   if(me.role === 'ASSISTANT'){
     const docId = mappingService.getDoctorForAssistant(me.id);
     if(!docId){
-      document.getElementById('errorBox').innerText = 'Assistant is not mapped to a Doctor. Admin must map Assistant ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ Doctor.';
+      document.getElementById('errorBox').innerText = 'Assistant is not mapped to a Doctor. Admin must map Assistant â†’ Doctor.';
       return;
     }
   }
@@ -1038,8 +1038,8 @@ function runAiExtraction(rawText) {
     feeding: (() => {
       if (text.includes('oral') && text.includes('diet')) return 'Oral Feeding (Normal Diet)';
       if (text.includes('ons') || text.includes('supplement')) return 'Oral Nutrition Supplements (ONS)';
-      if (text.includes('nasogastric') || text.includes('ng')) return 'Enteral Feeding â€“ Nasogastric Tube (NG)';
-      if (text.includes('peg')) return 'Enteral Feeding â€“ PEG Tube';
+      if (text.includes('nasogastric') || text.includes('ng')) return 'Enteral Feeding - Nasogastric Tube (NG)';
+      if (text.includes('peg')) return 'Enteral Feeding - PEG Tube';
       if (text.includes('tpn') || text.includes('parenteral')) return 'Parenteral Nutrition (TPN)';
       return null;
     })(),
@@ -1101,6 +1101,7 @@ function runAiExtraction(rawText) {
   mapField('smi', 'smi', 'SMI');
   mapField('grip', 'handGrip', 'Hand Grip');
   mapField('feeding', 'feedingMethod', 'Feeding Method');
+
   if (extractions.stage) {
     const s = extractions.stage.toUpperCase();
     let stageVal = '';
@@ -1116,12 +1117,12 @@ function runAiExtraction(rawText) {
   }
 
   if (extractions.gi) { 
-    document.getElementById('giIssues').value = 'true'; 
+    document.getElementById('giIssues').value = "true"; 
     highlight('giIssues', 'GI Issues', 'Yes'); 
     foundCount++; 
   }
 
-  // Enhanced Cancer Mapping
+  // Enhanced Cancer Mapping (Avoiding "Liver Function" false positives)
   const cancers = {
     'multiple myeloma': 'Multiple Myeloma - Standard', 'myeloma': 'Multiple Myeloma - Standard',
     'hepatocellular': 'Liver Cancer - Advanced HCC', 'hcc': 'Liver Cancer - Advanced HCC',
@@ -1144,6 +1145,7 @@ function runAiExtraction(rawText) {
     'thyroid cancer': 'Thyroid Cancer - RAI-Refractory',
     'testicular': 'Testicular Cancer - Germ Cell Tumor'
   };
+
   // First try to find explicit cancer type statement
   const explicitCancerMatch = text.match(/cancer(?: type)?\s*[:\-]?\s*([a-z\s]+)(?:\n|$)/i);
   let resolvedCancer = null;
@@ -1152,7 +1154,7 @@ function runAiExtraction(rawText) {
     const cancerText = explicitCancerMatch[1];
     for (const [key, val] of Object.entries(cancers)) {
       if (cancerText.includes(key) || (cancerText.includes('liver') && !cancerText.includes('function'))) {
-         resolvedCancer = cancerText.includes('liver') ? 'Liver Cancer ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“ Advanced HCC' : val;
+         resolvedCancer = cancerText.includes('liver') ? 'Liver Cancer - Advanced HCC' : val;
          break;
       }
     }
@@ -1192,7 +1194,7 @@ function runAiExtraction(rawText) {
   }
 
   if (foundCount > 0) {
-    addMessage(`Onvilox Regex Extracted ${foundCount} item(s):\nÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ ${foundItems.join('\nÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ ')}\n\n(API integration disabled per team request)`, 'ai');
+    addMessage(`Onvilox Regex Extracted ${foundCount} item(s):\n* ${foundItems.join('\n* ')}\n\n(API integration disabled per team request)`, 'ai');
     if(typeof syncWeightLossFromForm === 'function') syncWeightLossFromForm();
   } else {
     addMessage("I couldn't find specific clinical markers in that. Could you provide a weight, albumin level, or cancer type?", 'ai');
@@ -1209,11 +1211,4 @@ function runAiExtraction(rawText) {
 <script src="js/theme.js"></script>
 </body>
 </html>
-
-
-
-
-
-
-
 
