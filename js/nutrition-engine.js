@@ -38,7 +38,7 @@ function generateNutritionPlan(patient) {
 
   const tumorBurden = patient.tumorBurden === 'High (Bulky)';
   const comorbidities = Array.isArray(patient.comorbidities) ? patient.comorbidities : [];
-  const isDiabetic = comorbidities.some(c => c.toLowerCase().includes('diabetes')) || bloodSugar > 126;
+  const isDiabetic = comorbidities.some(c => c.toLowerCase().includes('diabetes')) || bloodSugar > 180;
   
   const nutritionRiskReasons = [];
   let riskScore = 0;
@@ -46,16 +46,24 @@ function generateNutritionPlan(patient) {
 
   // --- STEP 4 & 6: LAB INTERPRETATION & SAFETY ---
   if (hemoglobin > 0 && hemoglobin < 10) {
-    safetyAlerts.push({ level: 'warning', message: `Anemia Protocol Active (Hb: ${hemoglobin} g/dL). Iron/B12 support intensified.` });
+    safetyAlerts.push({ condition: 'ANEMIA (Hb < 10)', severity: 'Moderate', action: 'Initiate Iron + B12 intensification protocol.' });
   }
   if (patient.potassium > 5.0) {
-    safetyAlerts.push({ level: 'danger', message: `Hyperkalemia Alert (K+: ${patient.potassium} mmol/L). Potassium-free formula components active.` });
+    safetyAlerts.push({ condition: 'HYPERKALEMIA (>5.0)', severity: 'High', action: 'Restrict potassium sources; adjust formula to K-free matrix.' });
   }
-  if (patient.sodium > 0 && patient.sodium < 135) {
-    safetyAlerts.push({ level: 'warning', message: `Hyponatremia Flag (Na+: ${patient.sodium}). Add 1-2g Sodium Chloride (salt) to daily formulation.` });
+  if (patient.sodium > 0 && patient.sodium < 130) {
+    safetyAlerts.push({ condition: 'HYPONATREMIA (<130)', severity: 'High', action: 'Fluid balance correction protocol; target 1-2g NaCl.' });
+  } else if (patient.sodium > 0 && patient.sodium < 135) {
+    safetyAlerts.push({ condition: 'MILD HYPONATREMIA (<135)', severity: 'Moderate', action: 'Monitor volume status; standard sodium target.' });
+  }
+  if (vitD > 0 && vitD < 20) {
+    safetyAlerts.push({ condition: 'VITAMIN D DEFICIENCY (<20)', severity: 'Moderate', action: 'High-dose Vit D protocol (4000-6000 IU/day).' });
+  }
+  if (patient.magnesium > 0 && patient.magnesium < 1.7) {
+    safetyAlerts.push({ condition: 'HYPOMAGNESEMIA (<1.7)', severity: 'Moderate', action: 'Magnesium correction protocol (200-400mg Mg Oxide/Citrate).' });
   }
   if (tsh > 5.0) {
-    safetyAlerts.push({ level: 'info', message: `Metabolic Rate Flag: Elevated TSH (${tsh}).` });
+    safetyAlerts.push({ condition: 'METABOLIC RATE FLAG', severity: 'Low', action: 'Elevated TSH detected; monitor metabolic rate.' });
   }
 
   // Comorbidities / Organ Function
@@ -66,7 +74,7 @@ function generateNutritionPlan(patient) {
   if (hasRenalIssue) {
     riskScore += 2;
     nutritionRiskReasons.push('Renal Function Impairment (Creatinine: ' + creatinine + ')');
-    safetyAlerts.push({ level: 'danger', message: 'Renal Safety Protocol: Protein capped to prevent nitrogen overload.' });
+    safetyAlerts.push({ condition: 'RENAL SAFETY PROTOCOL', severity: 'High', action: 'Protein capped to prevent nitrogen overload.' });
   }
   if (hasIBD) {
     riskScore += 1;
@@ -129,9 +137,9 @@ function generateNutritionPlan(patient) {
   // --- STEP 6: SAFETY LAYER (PROTEIN CAP) ---
   if (hasRenalIssue) {
     if (cachexia || sarcopenia) {
-      proteinPerKg = 1.3; // Balanced renal safety with high-stress cachexia needs
+      proteinPerKg = 1.3; 
     } else {
-      proteinPerKg = 1.1; // Strict renal cap
+      proteinPerKg = 1.1;
     }
   } else {
     if ((regimen.includes('folfirinox') || regimen.includes('platin')) && cachexia) {
@@ -141,31 +149,32 @@ function generateNutritionPlan(patient) {
   
   if (age >= 70 && proteinPerKg < 1.5 && !hasRenalIssue) proteinPerKg = 1.5;
 
-  let baseCalories = Math.round(weight * kcalPerKg);
-  let dailyProtein = Math.round(weight * proteinPerKg);
+  let totalDailyCalories = Math.round(weight * kcalPerKg);
+  let totalDailyProtein = Math.round(weight * proteinPerKg);
   
-  const totalDailyCalories = baseCalories;
-  const totalDailyProtein = dailyProtein;
-
   if (hasCardiac) {
-    safetyAlerts.push({ level: 'info', message: 'Cardiac Focus: Sodium restricted to < 2000mg/day.' });
+    safetyAlerts.push({ condition: 'CARDIAC FOCUS', severity: 'Low', action: 'Sodium restricted to < 2000mg/day.' });
   }
 
-  if (reducedFoodIntake > 0 && reducedFoodIntake <= 100) {
+  let dailyCalories = totalDailyCalories;
+  let dailyProtein = totalDailyProtein;
+
+  let actualIntake = 100 - (reducedFoodIntake || 0);
+
+  if (reducedFoodIntake >= 0 && reducedFoodIntake <= 100) {
       const deficitPct = reducedFoodIntake / 100;
-      baseCalories = Math.round(totalDailyCalories * deficitPct);
+      dailyCalories = Math.round(totalDailyCalories * deficitPct);
       dailyProtein = Math.round(totalDailyProtein * deficitPct);
-      if (baseCalories < 500 && reducedFoodIntake < 100) baseCalories = 500;
-      if (dailyProtein < 20 && reducedFoodIntake < 100) dailyProtein = 20;
+      if (dailyCalories < 500 && reducedFoodIntake > 0) dailyCalories = 500;
+      if (dailyProtein < 20 && reducedFoodIntake > 0) dailyProtein = 20;
   }
   
-  if (reducedFoodIntake >= 70) {
-      safetyAlerts.push({ level: 'danger', message: `Critical Intake Alert: Patient is only eating ${100 - reducedFoodIntake}%. Immediate feeding escalation to Enteral Nutrition (Tube Feeding via NGT, 1.5 kcal/mL standard or peptide formula at 40-50 mL/hr) required.` });
-  } else if (reducedFoodIntake >= 50) {
-      safetyAlerts.push({ level: 'warning', message: `Low Intake Alert: Patient is only eating ${100 - reducedFoodIntake}%. Intensive ONS required as primary source.` });
+  if (actualIntake <= 30) {
+      safetyAlerts.push({ condition: 'CRITICAL INTAKE ALERT', severity: 'High', action: `Patient is only eating ${actualIntake}%. Immediate feeding escalation to Enteral Nutrition (Tube Feeding via NGT, 1.5 kcal/mL standard or peptide formula at 40-50 mL/hr) required.` });
+  } else if (actualIntake <= 50) {
+      safetyAlerts.push({ condition: 'LOW INTAKE ALERT', severity: 'High', action: `Patient is only eating ${actualIntake}%. Intensive ONS required as primary source.` });
   }
   
-  const dailyCalories = baseCalories;
   const servingsPerDay = 3;
   const perServingCalories = Math.round(dailyCalories / servingsPerDay);
   const perServingProtein = Math.round(dailyProtein / servingsPerDay);
@@ -193,13 +202,14 @@ function generateNutritionPlan(patient) {
   else if ((patient.feedingMethod || '').toLowerCase().includes('enteral')) proteinType = 'Peptide formulas';
 
   const interactions = [];
-  if (regimen.includes('cisplatin')) interactions.push({ drug: "Cisplatin", effect: "Renal Magnesium/Zinc wasting", advice: "Increased Mg/Zn dosing included." });
+  if (regimen.includes('cisplatin')) {
+    interactions.push({ drug: "Cisplatin", effect: "Renal Magnesium Wasting", advice: "Mandatory Magnesium protocol; monitor creatinine closely." });
+  }
   if (regimen.includes('taxane') || regimen.includes('paclitaxel') || regimen.includes('docetaxel')) interactions.push({ drug: "Taxanes", effect: "Peripheral Neuropathy focus", advice: "ALA and B-Complex optimized." });
   if (regimen.includes('5-fu') || regimen.includes('capecitabine') || regimen.includes('folfirinox')) interactions.push({ drug: "Fluoropyrimidines", effect: "Mucositis / GI Toxicity risk", advice: "Glutamine and peptide protein prioritized." });
   if (regimen.includes('irinotecan')) interactions.push({ drug: "Irinotecan", effect: "Severe Diarrhea", advice: "Early mucosal support focus." });
   if (regimen.includes('bortezomib')) {
-    interactions.push({ drug: "Bortezomib", effect: "Vitamin B6 Neuropathy Risk", advice: "Avoid high-dose Vitamin B6 above RDA." });
-    interactions.push({ drug: "Bortezomib", effect: "Antioxidant Interference", advice: "Avoid high-dose Vit C and ALA; may reduce drug efficacy." });
+    interactions.push({ drug: "Bortezomib", effect: "Antioxidant & B6 Interference", advice: "Avoid high-dose Vit C, ALA, and high-dose B6 (may reduce efficacy)." });
   }
   if (regimen.includes('lenalidomide')) interactions.push({ drug: "Lenalidomide", effect: "VTE/Antiplatelet Risk", advice: "Monitor Omega-3 dosing due to mild antiplatelet effects." });
   if (regimen.includes('pemetrexed') || regimen.includes('methotrexate')) {
@@ -215,12 +225,7 @@ function generateNutritionPlan(patient) {
     leucine: (sarcopenia || tumorBurden || ecog >= 2) ? '5 g/day' : '3 g/day',
     glutamine: (patient.giIssues || sideEffects.includes('Mucositis') || regimen.includes('folfirinox') || hasIBD) ? '30 g/day' : 'Consider if GI toxicity persists',
     bcaa: (alt > 50 || ast > 50 || bilirubin > 1.2) ? '20 g/day for Hepatic Protection' : (sarcopenia ? '10 g/day' : null),
-    magnesium: (() => {
-      let base = 'Daily supportive dose';
-      if (patient.magnesium > 0 && patient.magnesium < 1.7) base = '500-800 mg/day (Correction Protocol)';
-      if (regimen.includes('cisplatin')) base += ' + 1000 mg/day';
-      return base;
-    })(),
+    magnesium: (patient.magnesium < 1.7 || regimen.includes('cisplatin')) ? '400 mg (Correction Protocol)' : 'Standard',
     bComplex: (regimen.includes('taxane') || regimen.includes('folfirinox')) ? 'High-potency B-Complex' : 'Standard dose',
     folate: (() => {
       const markers = (patient.genomicMarkers || []);
@@ -231,7 +236,7 @@ function generateNutritionPlan(patient) {
     chromium: isDiabetic ? '400 mcg/day (Glycemic monitoring protocol active)' : null,
     ala: ((isDiabetic || interactions.some(i => i.drug === 'Taxanes')) && !regimen.includes('bortezomib')) ? '600 mg/day' : null,
     microbiome: (regimen.includes('folfirinox') || hasIBD) ? 'Soluble Fiber + Probiotic' : null,
-    iron: (hemoglobin > 0 && hemoglobin < 10) ? '100 mg elemental iron/day (Anemia correction)' : null
+    iron: (hemoglobin > 0 && hemoglobin < 10) ? '100 mg elemental iron + B12 support' : null
   };
 
   if (cancer.includes('myeloma')) {
