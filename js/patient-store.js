@@ -71,6 +71,7 @@ function addAssessment(patientId, formData) {
     folate: formData.folate,
     zinc: formData.zinc,
     magnesium: formData.magnesium,
+    hba1c: formData.hba1c,
     notes: formData.notes || ""
   };
   
@@ -89,6 +90,7 @@ function addAssessment(patientId, formData) {
   if (formData.folate) patient.folate = formData.folate;
   if (formData.zinc) patient.zinc = formData.zinc;
   if (formData.magnesium) patient.magnesium = formData.magnesium;
+  if (formData.hba1c) patient.hba1c = formData.hba1c;
   
   patient.assessments.push(assessment);
   updatePatient(patient);
@@ -138,6 +140,7 @@ function createOrUpdatePlan(patient, engineOutput, overrides, overrideNotes){
     folate: patient.folate,
     zinc: patient.zinc,
     magnesium: patient.magnesium,
+    hba1c: patient.hba1c,
     cancerStage: patient.cancerStage,
     tumorBurden: patient.tumorBurden,
     metastasisSites: patient.metastasisSites,

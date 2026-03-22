@@ -222,8 +222,8 @@ const CLINICAL_RANGES = {
 };
 
 function validateField(field, fieldName) {
-  const msgBox = document.getElementById(field.id + "_msg");
   if (!field) return true;
+  const msgBox = document.getElementById(field.id + "_msg");
 
   const valRaw = (field.value ?? "");
   const val = (typeof valRaw === "string") ? valRaw.trim() : valRaw;

@@ -383,15 +383,36 @@
       </div>
       <div class="form-group">
         <label>LBM (kg)</label>
-        <input type="number" id="leanBodyMass" step="0.1">
+        <input type="number" id="leanBodyMass" step="0.1" placeholder="e.g. 45.0">
       </div>
       <div class="form-group">
         <label>SMI (cm²/m²)</label>
-        <input type="number" id="smi" step="0.1">
+        <input type="number" id="smi" step="0.1" placeholder="e.g. 38.5">
       </div>
       <div class="form-group">
         <label>Grip Strength (kg)</label>
-        <input type="number" id="handGrip" step="0.1">
+        <input type="number" id="handGrip" step="0.1" placeholder="e.g. 22.0">
+      </div>
+      <div class="form-group">
+        <label>Activity Level</label>
+        <select id="activityLevel">
+          <option value="Sedentary">Sedentary (Mostly sitting)</option>
+          <option value="Lightly Active">Lightly Active (Light exercise/walk)</option>
+          <option value="Moderately Active">Moderately Active (Moderate exercise)</option>
+          <option value="Highly Active">Highly Active (Heavy physical activity)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Sarcopenia Status</label>
+        <select id="sarcopeniaStatus">
+          <option value="No">No (Normal Muscle Mass/Strength)</option>
+          <option value="Yes">Yes (Low Muscle Mass/Strength)</option>
+          <option value="Unknown">Unknown / Not Assessed</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Body Fat (%)</label>
+        <input type="number" id="fatPercent" step="0.1" placeholder="e.g. 25">
       </div>
       <div class="form-group" style="grid-column: 1 / -1;">
         <label>BSA (m²) - Auto</label>
