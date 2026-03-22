@@ -1029,18 +1029,38 @@ function runAiExtraction(rawText) {
       return text.includes('vomiting') || text.includes('nausea') || text.includes('diarrhea') || text.includes('bloating') || text.includes('constipation');
     })(),
     comorbidities: (() => {
-      const match = rawText.match(/comorbidities[\s\S]*?((?:[\t ]*[•\-\*][^\n]+\n?)+)/i);
-      return match ? match[1].split(/\n/).map(l => l.replace(/^[•\-\*\t\s]+/, '').trim()).filter(Boolean) : [];
+      const seg = rawText.match(/comorbidities[\s\S]*?(?=\n\n|⸻|🌍|$)/i);
+      if (!seg) return [];
+      const lines = seg[0].split(/\n/);
+      let items = [];
+      lines.forEach(l => {
+        const parts = l.split(/[•\-\*]/).map(p => p.trim()).filter(Boolean);
+        if (parts.length > 0 && !parts[0].toLowerCase().includes('comorbidities')) items.push(...parts);
+        else if (parts.length > 1) items.push(...parts.slice(1));
+      });
+      return items;
     })(),
     sideEffects: (() => {
-      const match = rawText.match(/(?:side\s*effects|important)[\s\S]*?((?:[\t ]*[•\-\*][^\n]+\n?)+)/i);
-      return match ? match[1].split(/\n/).map(l => l.replace(/^[•\-\*\t\s]+/, '').trim()).filter(Boolean) : [];
+      const seg = rawText.match(/(?:side\s*effects|important)[\s\S]*?(?=\n\n|⸻|🧫|🌍|$)/i);
+      if (!seg) return [];
+      const lines = seg[0].split(/\n/);
+      let items = [];
+      lines.forEach(l => {
+        const parts = l.split(/[•\-\*]/).map(p => p.trim()).filter(Boolean);
+        const header = parts[0].toLowerCase();
+        if (parts.length > 0 && !header.includes('side') && !header.includes('important')) items.push(...parts);
+        else if (parts.length > 1) items.push(...parts.slice(1));
+      });
+      return items;
     })(),
     reducedIntake: (() => {
       const actualMatch = text.match(/(?:actual )?food intake\s*[:\-]?\s*(\d+)%/i);
       if (actualMatch) return String(100 - parseInt(actualMatch[1], 10));
-      const reducedMatch = text.match(/reduced food intake\s*[:\-]?\s*(\d+)%/i);
-      return reducedMatch ? reducedMatch[1] : null;
+      const reducedMatch = text.match(/(?:reduced food intake|intake deficit|intake deficiat|intake gap)\s*[:\-]?\s*(\d+)%/i);
+      if (reducedMatch) return reducedMatch[1];
+      // Backward match: "50% intake deficit"
+      const backwardMatch = text.match(/(\d+)%\s*(?:reduced food intake|intake deficit|intake deficiat|intake gap)/i);
+      return backwardMatch ? backwardMatch[1] : null;
     })()
   };
 
