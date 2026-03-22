@@ -326,6 +326,42 @@ function generateNutritionPlan(patient) {
     organProtection: (hasRenalIssue || alt > 50) ? "Safety Protocols Active" : "Standard"
   };
 
+  // V3 Outcome Prediction Engine
+  function calculateOutcomePrediction(riskScore, ecoG, intake, tumorBurden) {
+    let baseProb = 95; // Default "ideal" probability
+    
+    // Risk Score Impact
+    baseProb -= (riskScore * 5);
+    
+    // Performance Status Impact
+    const ecogNum = parseInt(ecoG) || 0;
+    baseProb -= (ecogNum * 10);
+    
+    // Intake Deficit Impact
+    const intakeDeficit = 100 - (parseInt(intake) || 100);
+    if (intakeDeficit > 50) baseProb -= 20;
+    else if (intakeDeficit > 25) baseProb -= 10;
+    
+    // Tumor Burden Impact
+    if (tumorBurden === 'High (Bulky)') baseProb -= 15;
+    else if (tumorBurden === 'Moderate') baseProb -= 5;
+    
+    // Floor the probability
+    const finalProb = Math.max(15, baseProb);
+    
+    let description = "";
+    if (finalProb >= 80) description = "High probability of weight stabilization and muscle maintenance.";
+    else if (finalProb >= 60) description = "Moderate probability; requires strict adherence to protein targets.";
+    else if (finalProb >= 40) description = "Guarded prognosis; high risk of continued cachexia without enteral support.";
+    else description = "Critical risk; aggressive metabolic intervention and nutritional support mandatory.";
+    
+    return {
+      percentage: finalProb,
+      description: description,
+      timeframe: "4 weeks (standard protocol window)"
+    };
+  }
+
   return {
     cachexia, bmi: Math.round(bmi * 10) / 10, kcalPerKg, proteinPerKg,
     servingsPerDay, totalDailyCalories, totalDailyProtein,
@@ -335,6 +371,7 @@ function generateNutritionPlan(patient) {
     nutritionRiskReasons, safetyAlerts,
     patientInstructions, 
     outcomes, interactions,
+    outcomePrediction: calculateOutcomePrediction(riskScore, patient.ecogStatus, patient.reducedFoodIntake, patient.tumorBurden),
     recipe: buildFormulationOptions({ macroProtein, macroCarbs, macroFat, proteinType, bloodSugar, cachexia, crp }),
     reportNotes: {
       basis: 'V5 Multi-System Engine (ESMO/ESPEN/ASCO/KDIGO guidelines).'

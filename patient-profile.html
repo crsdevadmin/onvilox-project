@@ -413,7 +413,26 @@
           <div class="rs-title" style="font-size:9.5px; margin-top:20px;">Patient Guidance</div>
           <ul class="rrat" id="patientInstructions" style="font-size:11.5px; color:#475569;"></ul>
 
-          <div class="rs-title" style="font-size:9.5px; margin-top:20px;">Outcome Predictions</div>
+          <!-- V3 Outcome Probability Engine -->
+          <div id="v3OutcomeModule" style="margin-top:20px; border:2px solid #0ea5e9; border-radius:10px; background:#f0f9ff; padding:15px; display:none;">
+            <div style="display:flex; align-items:center; gap:12px; margin-bottom:10px;">
+              <div style="background:#0ea5e9; color:white; font-size:10px; font-weight:900; padding:3px 8px; border-radius:4px; text-transform:uppercase;">V3 CDSS Logic</div>
+              <div style="font-weight:700; color:#0369a1; font-size:14px;">Outcome Probability</div>
+            </div>
+            <div style="display:flex; align-items:center; gap:20px;">
+               <div id="outcomePct" style="font-size:32px; font-weight:800; color:#0ea5e9; min-width:80px;">0%</div>
+               <div style="flex:1;">
+                 <div style="font-weight:600; color:#1e293b; font-size:12.5px;" id="outcomeTitle">Standard Forecast</div>
+                 <div style="font-size:11px; color:#475569; margin-top:4px;" id="outcomeDesc">Calculating clinical probability based on risk factors, ECOG, and tumor burden.</div>
+               </div>
+            </div>
+            <div style="margin-top:12px; height:8px; background:#e0f2fe; border-radius:4px; overflow:hidden;">
+              <div id="outcomeBar" style="height:100%; width:0%; background:#0ea5e9; transition:width 1s ease;"></div>
+            </div>
+            <div style="font-size:9px; color:#64748b; margin-top:8px; font-style:italic;">* Quantified prediction based on 4-week stabilization protocol.</div>
+          </div>
+
+          <div class="rs-title" style="font-size:9.5px; margin-top:20px;">Detailed Clinical Forecasts</div>
           <ul class="rrat" id="outcomePredictions" style="font-size:11.5px; color:#0369a1;"></ul>
 
           <div class="rs-title" style="font-size:9.5px; margin-top:20px;">Daily Diet Integration</div>
@@ -1981,6 +2000,35 @@ function bind(plan){
     (fp.manufacturingAlerts || []).forEach(text => {
       ma.innerHTML += `<li style="margin-bottom:4px;">${text}</li>`;
     });
+  }
+
+  // V3 Outcome Prediction Module
+  if (fp.outcomePrediction) {
+    const module = document.getElementById('v3OutcomeModule');
+    const pct = document.getElementById('outcomePct');
+    const bar = document.getElementById('outcomeBar');
+    const desc = document.getElementById('outcomeDesc');
+    const title = document.getElementById('outcomeTitle');
+    
+    if (module) {
+      module.style.display = 'block';
+      pct.innerText = fp.outcomePrediction.percentage + '%';
+      bar.style.width = fp.outcomePrediction.percentage + '%';
+      desc.innerText = fp.outcomePrediction.description;
+      title.innerText = `Prediction: ${fp.outcomePrediction.timeframe}`;
+      
+      // Dynamic coloring
+      if (fp.outcomePrediction.percentage < 40) {
+        pct.style.color = '#ef4444';
+        bar.style.background = '#ef4444';
+      } else if (fp.outcomePrediction.percentage < 70) {
+        pct.style.color = '#f59e0b';
+        bar.style.background = '#f59e0b';
+      } else {
+        pct.style.color = '#0ea5e9';
+        bar.style.background = '#0ea5e9';
+      }
+    }
   }
 
   const op = document.getElementById('outcomePredictions');

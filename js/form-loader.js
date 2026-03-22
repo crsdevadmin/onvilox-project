@@ -210,64 +210,79 @@ function removeTag(el) {
 }
 
 // ---------- VALIDATION ----------
+const CLINICAL_RANGES = {
+  sodium: { min: 110, max: 160, label: "Sodium (Na+)", ref: "135-145 mEq/L" },
+  potassium: { min: 2.0, max: 8.0, label: "Potassium (K+)", ref: "3.5-5.0 mmol/L" },
+  hemoglobin: { min: 4, max: 20, label: "Hemoglobin (Hb)", ref: "12-16 g/dL" },
+  creatinine: { min: 0.1, max: 15, label: "Creatinine", ref: "0.6-1.2 mg/dL" },
+  bloodSugar: { min: 20, max: 1000, label: "Blood Sugar", ref: "70-140 mg/dL" },
+  albumin: { min: 1.0, max: 6.0, label: "Albumin", ref: "3.5-5.0 g/dL" },
+  weight: { min: 20, max: 300, label: "Weight" },
+  height: { min: 50, max: 250, label: "Height" }
+};
+
 function validateField(field, fieldName) {
   const msgBox = document.getElementById(field.id + "_msg");
+  if (!field) return true;
 
   const valRaw = (field.value ?? "");
   const val = (typeof valRaw === "string") ? valRaw.trim() : valRaw;
+  const isMandatory = field.getAttribute('required') !== null;
 
   // Required check
   if (val === "" || val === null || val === undefined) {
-    field.classList.add("field-invalid");
-    field.classList.remove("field-valid");
-    if (msgBox) {
-      msgBox.className = "validation-msg validation-error";
-      msgBox.innerText = fieldName + " is required";
-    }
-    return false;
-  }
-
-  // Special: Cancer validation (manual entry allowed, but must not be empty)
-  if (field.id === "cancerInput") {
-    // Already checked for empty/null above
-    // Let it fall through to success state
-  }
-
-  // Special: Regimen validation (manual entry allowed, but must not be empty)
-  if (field.id === "regimenInput") {
-    // Already checked for empty/null above
-    // Let it fall through to success state
-  }
-
-  // Numeric checks (respect min/max where provided)
-  if (field.type === "number") {
-    const num = parseFloat(val);
-    if (Number.isNaN(num)) {
+    if (isMandatory) {
       field.classList.add("field-invalid");
       field.classList.remove("field-valid");
       if (msgBox) {
         msgBox.className = "validation-msg validation-error";
-        msgBox.innerText = fieldName + " must be a number";
+        msgBox.innerText = fieldName + " is required";
+      }
+      return false;
+    } else {
+      field.classList.remove("field-invalid", "field-valid");
+      if (msgBox) {
+        msgBox.className = "validation-msg validation-info";
+        msgBox.innerText = "Not available";
+      }
+      return true;
+    }
+  }
+
+  // Numeric checks
+  if (field.type === "number" || field.getAttribute('data-type') === 'number') {
+    const num = parseFloat(val);
+    if (Number.isNaN(num)) {
+      field.classList.add("field-invalid");
+      if (msgBox) {
+        msgBox.className = "validation-msg validation-error";
+        msgBox.innerText = "Invalid entry";
       }
       return false;
     }
+
+    // Check against CLINICAL_RANGES
+    const range = CLINICAL_RANGES[field.id];
+    if (range) {
+      if (num < range.min || num > range.max) {
+        field.classList.add("field-invalid");
+        if (msgBox) {
+          msgBox.className = "validation-msg validation-warning";
+          msgBox.innerText = `Out of physiological range (${range.min}-${range.max})`;
+        }
+        // We return true but keep the warning class
+        return true; 
+      }
+    }
+
+    // Generic min/max attributes
     const minAttr = field.getAttribute("min");
     const maxAttr = field.getAttribute("max");
     if (minAttr !== null && num < parseFloat(minAttr)) {
       field.classList.add("field-invalid");
-      field.classList.remove("field-valid");
       if (msgBox) {
         msgBox.className = "validation-msg validation-error";
-        msgBox.innerText = fieldName + " must be ≥ " + minAttr;
-      }
-      return false;
-    }
-    if (maxAttr !== null && num > parseFloat(maxAttr)) {
-      field.classList.add("field-invalid");
-      field.classList.remove("field-valid");
-      if (msgBox) {
-        msgBox.className = "validation-msg validation-error";
-        msgBox.innerText = fieldName + " must be ≤ " + maxAttr;
+        msgBox.innerText = "Too low";
       }
       return false;
     }
@@ -277,7 +292,7 @@ function validateField(field, fieldName) {
   field.classList.remove("field-invalid");
   if (msgBox) {
     msgBox.className = "validation-msg validation-success";
-    msgBox.innerText = "✓ Looks good";
+    msgBox.innerText = "✓ Valid";
   }
   return true;
 }

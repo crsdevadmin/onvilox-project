@@ -8,6 +8,12 @@
   <!-- PDF.js library for client-side extraction -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
   <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';</script>
+  <script>
+    window.onload = function() {
+      loadFeedingMethods();
+      updateCompletenessScore(); // V3 Init
+    };
+  </script>
   <style>
     .range-hint {
       font-size: 11px;
@@ -37,9 +43,30 @@
       50% { border-color: #22c55e; box-shadow: 0 0 0 6px rgba(34, 197, 94, 0.3); }
       100% { border-color: var(--border); box-shadow: none; }
     }
+    .ai-filled { background-color: rgba(16, 185, 129, 0.1) !important; border-color: #10b981 !important; }
+    
+    /* V3 Completeness UI */
+    .completeness-container {
+      background: var(--bg-1);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px 20px;
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      position: sticky;
+      top: 80px;
+      z-index: 90;
+      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+    }
+    .completeness-label { font-weight: 700; font-size: 14px; color: var(--text-2); min-width: 150px; }
+    .completeness-bar-bg { flex: 1; height: 10px; background: var(--bg-3); border-radius: 5px; overflow: hidden; }
+    .completeness-bar-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #3b82f6, #10b981); transition: width 0.4s ease; }
+    .completeness-pct { font-weight: 800; font-size: 18px; color: #10b981; min-width: 50px; text-align: right; }
   </style>
 </head>
-<body>
+<body class="light-mode">
 
 <!-- INTERACTIVE AI CO-PILOT CHATBOT -->
 <div class="ai-chat-launcher" onclick="toggleChat()">
@@ -78,31 +105,43 @@
 
 <h2>Create New Patient</h2>
 
+<div class="container main-content">
+  <div class="error-box" id="errorBox"></div>
 
+  <!-- V3 Completeness Score Bar -->
+  <div class="completeness-container">
+    <div class="completeness-label">Data Completeness</div>
+    <div class="completeness-bar-bg">
+      <div id="completenessFill" class="completeness-bar-fill"></div>
+    </div>
+    <div id="completenessScore" class="completeness-pct">0%</div>
+  </div>
+
+  <div class="form-grid-cards" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(400px, 1fr)); gap:20px;">
 
 <div class="form-grid">
 
   <div class="form-group">
     <label class="required">Patient Name</label>
-    <input type="text" id="patientName" onkeyup="validateField(this,'Patient Name')">
+    <input type="text" id="patientName" placeholder="Full Name" onkeyup="validateField(this,'Patient Name'); updateCompletenessScore()" required>
     <div class="validation-msg" id="patientName_msg"></div>
   </div>
 
   <div class="form-group">
-    <label class="required">UHIC Code</label>
-    <input type="text" id="uhic" onkeyup="validateField(this,'UHIC Code')">
+    <label class="required">UHIC Code / ID</label>
+    <input type="text" id="uhic" placeholder="e.g. ONV-123456" onkeyup="validateField(this,'UHIC Code'); updateCompletenessScore()" required>
     <div class="validation-msg" id="uhic_msg"></div>
   </div>
 
   <div class="form-group">
     <label class="required">Age</label>
-    <input type="number" id="age" onkeyup="validateField(this,'Age')" min="1" max="120">
+    <input type="number" id="age" placeholder="Years" onkeyup="validateField(this,'Age'); updateCompletenessScore()" min="1" max="120" required>
     <div class="validation-msg" id="age_msg"></div>
   </div>
 
   <div class="form-group">
     <label class="required">Sex</label>
-    <select id="sex" onchange="validateField(this,'Sex')">
+    <select id="sex" onchange="validateField(this,'Sex'); updateCompletenessScore()" required>
       <option value="">Select</option>
       <option>Male</option>
       <option>Female</option>
@@ -112,19 +151,19 @@
 
   <div class="form-group">
     <label class="required">Usual Weight (kg)</label>
-    <input type="number" id="usualWeight" oninput="syncWeightLossFromForm(); validateField(this,'Usual Weight')" min="25" max="300" step="0.1">
+    <input type="number" id="usualWeight" oninput="syncWeightLossFromForm(); validateField(this,'Usual Weight'); updateCompletenessScore()" min="25" max="300" step="0.1" required>
     <div class="validation-msg" id="usualWeight_msg"></div>
   </div>
 
   <div class="form-group">
     <label class="required">Current Weight (kg)</label>
-    <input type="number" id="weight" oninput="syncWeightLossFromForm(); validateField(this,'Weight')" min="25" max="300" step="0.1">
+    <input type="number" id="weight" oninput="syncWeightLossFromForm(); validateField(this,'Weight'); updateCompletenessScore()" min="25" max="300" step="0.1" required>
     <div class="validation-msg" id="weight_msg"></div>
   </div>
 
   <div class="form-group">
     <label class="required">Height (cm)</label>
-    <input type="number" id="height" onkeyup="validateField(this,'Height')" min="30" max="250">
+    <input type="number" id="height" onkeyup="validateField(this,'Height'); updateCompletenessScore()" min="30" max="250" required>
     <div class="validation-msg" id="height_msg"></div>
   </div>
 
@@ -140,7 +179,7 @@
 
   <div class="form-group">
     <label class="required">Reduced Food Intake (%)</label>
-    <input type="number" id="reducedFoodIntake" placeholder="e.g. 20" step="1" min="0" max="100" onkeyup="validateField(this,'Reduced Food Intake %')">
+    <input type="number" id="reducedFoodIntake" placeholder="e.g. 20" step="1" min="0" max="100" onkeyup="validateField(this,'Reduced Food Intake %'); updateCompletenessScore()" required>
     <div class="validation-msg" id="reducedFoodIntake_msg"></div>
   </div>
 
@@ -149,7 +188,7 @@
     <input type="text" id="cancerInput"
            placeholder="Search cancer type..."
            onclick="openCancerDropdown()"
-            onkeyup="filterCancerList()" onblur="setTimeout(()=>validateField(this,'Cancer Type'), 200)">
+            onkeyup="filterCancerList()" onblur="setTimeout(()=>{validateField(this,'Cancer Type'); updateCompletenessScore()}, 200)" required>
     <div class="dropdown-list" id="cancerDropdown"></div>
     <div class="validation-msg" id="cancerInput_msg"></div>
   </div>
@@ -159,35 +198,35 @@
     <input type="text" id="regimenInput"
            placeholder="Search regimen..."
            onclick="openRegimenDropdown()"
-            onkeyup="filterRegimenList()" onblur="setTimeout(()=>validateField(this,'Chemo Regimen'), 200)">
+            onkeyup="filterRegimenList()" onblur="setTimeout(()=>{validateField(this,'Chemo Regimen'); updateCompletenessScore()}, 200)" required>
     <div class="dropdown-list" id="regimenDropdown"></div>
     <div class="validation-msg" id="regimenInput_msg"></div>
   </div>
 
   <div class="form-group">
     <label class="required">Serum Albumin (g/dL) <span id="albumin_status" class="status-badge"></span></label>
-    <input type="number" id="albumin" step="0.1" onkeyup="validateField(this,'Serum Albumin'); updateLabStatus('albumin', this.value)">
+    <input type="number" id="albumin" step="0.1" onkeyup="validateField(this,'Serum Albumin'); updateLabStatus('albumin', this.value); updateCompletenessScore()" required>
     <div class="range-hint">Normal Range: 3.5 – 5.5 g/dL</div>
     <div class="validation-msg" id="albumin_msg"></div>
   </div>
 
   <div class="form-group">
     <label class="required">CRP (mg/L) <span id="crp_status" class="status-badge"></span></label>
-    <input type="number" id="crp" step="0.1" placeholder="e.g. 5.0" onkeyup="validateField(this,'CRP'); updateLabStatus('crp', this.value)">
+    <input type="number" id="crp" step="0.1" placeholder="e.g. 5.0" onkeyup="validateField(this,'CRP'); updateLabStatus('crp', this.value); updateCompletenessScore()" required>
     <div class="range-hint">Normal Range: &lt; 10 mg/L</div>
     <div class="validation-msg" id="crp_msg"></div>
   </div>
 
   <div class="form-group">
     <label>MUAC (cm) <span id="muac_status" class="status-badge"></span></label>
-    <input type="number" id="muac" step="0.1" placeholder="e.g. 24.5" oninput="updateLabStatus('muac', this.value)">
+    <input type="number" id="muac" step="0.1" placeholder="e.g. 24.5" oninput="updateLabStatus('muac', this.value); updateCompletenessScore()">
     <div class="range-hint">Normal: &ge; 23 cm</div>
     <div class="validation-msg" id="muac_msg"></div>
   </div>
 
   <div class="form-group">
     <label class="required">Feeding Method</label>
-    <select id="feedingMethod" onchange="validateField(this,'Feeding Method'); toggleIntakeUI()"></select>
+    <select id="feedingMethod" onchange="validateField(this,'Feeding Method'); toggleIntakeUI(); updateCompletenessScore()" required></select>
     <div class="validation-msg" id="feedingMethod_msg"></div>
   </div>
 
@@ -205,7 +244,7 @@
     <div class="form-grid" style="grid-template-columns: repeat(2, 1fr);">
       <div class="form-group">
         <label class="required">Creatinine (mg/dL) <span id="creatinine_status" class="status-badge"></span></label>
-        <input type="number" id="creatinine" step="0.01" placeholder="e.g. 0.9" oninput="validateField(this,'Creatinine'); updateLabStatus('creatinine', this.value)">
+        <input type="number" id="creatinine" step="0.01" placeholder="e.g. 0.9" oninput="validateField(this,'Creatinine'); updateLabStatus('creatinine', this.value); updateCompletenessScore()" required>
         <div class="range-hint">Normal: 0.7 – 1.3 mg/dL</div>
         <div class="validation-msg" id="creatinine_msg"></div>
       </div>
@@ -226,7 +265,7 @@
       </div>
       <div class="form-group">
         <label class="required">Blood Sugar (mg/dL) <span id="blood_sugar_status" class="status-badge"></span></label>
-        <input type="number" id="bloodSugar" step="1" oninput="validateField(this,'Blood Sugar'); updateLabStatus('bloodSugar', this.value)">
+        <input type="number" id="bloodSugar" step="1" oninput="validateField(this,'Blood Sugar'); updateLabStatus('bloodSugar', this.value); updateCompletenessScore()" required>
         <div class="range-hint">Normal: 70 – 126 mg/dL</div>
         <div class="validation-msg" id="bloodSugar_msg"></div>
       </div>
@@ -267,7 +306,7 @@
       </div>
       <div class="form-group">
         <label class="required">Hemoglobin (g/dL) <span id="hemoglobin_status" class="status-badge"></span></label>
-        <input type="number" id="hemoglobin" step="0.1" oninput="validateField(this,'Hemoglobin'); updateLabStatus('hemoglobin', this.value)">
+        <input type="number" id="hemoglobin" step="0.1" oninput="validateField(this,'Hemoglobin'); updateLabStatus('hemoglobin', this.value); updateCompletenessScore()" required>
         <div class="range-hint">Normal: 12 – 16 g/dL</div>
         <div class="validation-msg" id="hemoglobin_msg"></div>
       </div>
@@ -537,6 +576,26 @@ function tagsToArray(containerId){
   return [...c.children].map(el => el.dataset.value);
 }
 
+// V3 Completeness Score Logic
+function updateCompletenessScore() {
+  const mandatoryIds = [
+    'patientName', 'uhic', 'age', 'sex', 'usualWeight', 'weight', 'height', 
+    'reducedFoodIntake', 'cancerInput', 'regimenInput', 'albumin', 'crp', 
+    'creatinine', 'bloodSugar', 'hemoglobin', 'feedingMethod'
+  ];
+  const total = mandatoryIds.length;
+  let filled = 0;
+  
+  mandatoryIds.forEach(id => {
+    const el = document.getElementById(id);
+    if (el && el.value && el.value.trim() !== "") filled++;
+  });
+  
+  const pct = Math.round((filled / total) * 100);
+  document.getElementById('completenessFill').style.width = pct + '%';
+  document.getElementById('completenessScore').innerText = pct + '%';
+}
+
 function submitPatient(){
   const fields = [
     { id: "patientName", name: "Patient Name" },
@@ -557,13 +616,22 @@ function submitPatient(){
     { id: "feedingMethod", name: "Feeding Method" }
   ];
 
+  let isValid = true;
   for (let f of fields) {
     const el = document.getElementById(f.id);
     if (!validateField(el, f.name)) {
-      el.scrollIntoView({ behavior: "smooth", block: "center" });
-      return;
+      if (isValid) el.scrollIntoView({ behavior: "smooth", block: "center" });
+      isValid = false;
     }
   }
+  
+  if (!isValid) {
+    document.getElementById('errorBox').innerText = 'CRITICAL: Mandatory clinical fields are missing. Please complete the form to 100% to generate a report.';
+    document.getElementById('errorBox').style.display = 'block';
+    return;
+  }
+  
+  updateCompletenessScore();
 
   // assistants must be mapped
   const me = auth.getCurrentUser();
@@ -911,6 +979,7 @@ async function handlePdfUpload(event) {
     
     // Run extraction on the full text
     runAiExtraction(text);
+    updateCompletenessScore(); // V3 Sync
   } catch (error) {
     typing.remove();
     addMessage("Sorry, I couldn't read that PDF. Please try pasting the text instead.", 'ai');
