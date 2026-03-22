@@ -157,6 +157,9 @@ function generateNutritionPlan(patient) {
   const dailyCalories = Math.round(weight * kcalPerKg);
   const dailyProtein = Math.round(weight * proteinPerKg);
   
+  const totalDailyCalories = dailyCalories;
+  const totalDailyProtein = dailyProtein;
+  
   // V3 Safety Engine (Step 6) - Exactly 6 Categories
   const safetyStatus = {
     renal: { level: 'info', message: 'Renal Safety: Normal (CR < 1.3)' },
