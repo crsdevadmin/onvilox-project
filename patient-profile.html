@@ -963,6 +963,10 @@
 <script src="js/intake-calculator.js"></script>
 
 <script>
+window.onerror = function(msg, url, lineNo, columnNo, error) {
+  alert("FATAL ERROR: " + msg + "\nAt: " + lineNo + ":" + columnNo + "\nPlease report this to support.");
+  return false;
+};
 console.log("ONVILOX_STABLE_V4_FIXED_LOADED");
 // INTAKE CALCULATOR LOGIC
 function addIntakeRow() {
@@ -2311,8 +2315,13 @@ function bind(plan){
   }
 }
 
-let currentPlan = ensurePlan();
-bind(currentPlan);
+try {
+  let currentPlan = ensurePlan();
+  bind(currentPlan);
+} catch (e) {
+  console.error("Initialization Failed:", e);
+  alert("Report Generation Failed: " + e.message);
+}
 showEditSectionIfAllowed();
 initIntakeCalc();
 
