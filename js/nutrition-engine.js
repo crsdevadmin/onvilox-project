@@ -202,6 +202,9 @@ function generateNutritionPlan(patient) {
     interactions.push({ drug: "Bortezomib", effect: "Antioxidant Interference", advice: "Avoid high-dose Vit C and ALA; may reduce drug efficacy." });
   }
   if (regimen.includes('lenalidomide')) interactions.push({ drug: "Lenalidomide", effect: "VTE/Antiplatelet Risk", advice: "Monitor Omega-3 dosing due to mild antiplatelet effects." });
+  if (regimen.includes('pemetrexed') || regimen.includes('methotrexate')) {
+    interactions.push({ drug: "Antifolates (e.g. Pemetrexed)", effect: "Folate Antagonism", advice: "Strict adherence to explicit folate supplementation protocol required." });
+  }
 
   const micronutrients = {
     vitD: vitD > 0 && vitD < 20 ? '4000–6000 IU/day' : (vitD < 30 ? '2000–4000 IU/day' : '1000–2000 IU/day'),
@@ -223,10 +226,10 @@ function generateNutritionPlan(patient) {
       const markers = (patient.genomicMarkers || []);
       const hasMthfr = markers.some(m => m.includes('MTHFR'));
       if (hasMthfr) return '5 mg/day (Methylfolate)';
-      return (patient.folate > 0 && patient.folate < 3 || hemoglobin < 10) ? '5 mg/day' : (regimen.includes('pemetrexed') ? '1 mg/day' : '1.0 mg/day');
+      return (patient.folate > 0 && patient.folate < 3 || hemoglobin < 10) ? '5 mg/day' : (regimen.includes('pemetrexed') || regimen.includes('methotrexate') ? '1 mg/day (per oncology protocol)' : '1.0 mg/day');
     })(),
-    chromium: isDiabetic ? '400 mcg/day' : null,
-    ala: (isDiabetic || interactions.some(i => i.drug === 'Taxanes')) ? '600 mg/day' : null,
+    chromium: isDiabetic ? '400 mcg/day (Glycemic monitoring protocol active)' : null,
+    ala: ((isDiabetic || interactions.some(i => i.drug === 'Taxanes')) && !regimen.includes('bortezomib')) ? '600 mg/day' : null,
     microbiome: (regimen.includes('folfirinox') || hasIBD) ? 'Soluble Fiber + Probiotic' : null,
     iron: (hemoglobin > 0 && hemoglobin < 10) ? '100 mg elemental iron/day (Anemia correction)' : null
   };
@@ -299,15 +302,15 @@ function generateNutritionPlan(patient) {
     const neededFat = Math.max(0, macroFat - fatFromProtein);
     const cGrams = Math.round(neededCarbs / (selectedCarb.cPerGram || 1));
     const fGrams = Math.round(neededFat / (selectedFat.fPerGram || 1));
-    const oGrams = (crp > 5 || cachexia || cancer.includes('pancreatic')) ? 2 : 1; 
+    const oGrams = (crp > 5 || cachexia || cancer.includes('pancreatic')) ? 1.3 : 0.7; 
 
     return {
       protein: { id: selectedProtein.id, name: selectedProtein.name, grams: pGrams, rationale: selectedProtein.healingRationale },
       carb: { id: selectedCarb.id, name: selectedCarb.name, grams: cGrams, rationale: selectedCarb.healingRationale },
-      fat: { id: selectedFat.id, name: selectedFat.name, grams: fGrams, rationale: selectedFat.healingRationale },
-      omega: { id: selectedOmega.id, name: selectedOmega.name, grams: oGrams, rationale: "Anti-inflammatory lipid strategy." },
+      fat: { id: selectedFat.id, name: selectedFat.name, grams: fGrams, rationale: "Metabolic energy without glycemic load" },
+      omega: (oGrams > 0) ? { id: 'omega3_powder', name: 'Omega-3 Powder', grams: oGrams, rationale: "Anti-inflammatory / EPA support." } : null,
       bcaa: (patient.alt > 50 || patient.ast > 50 || patient.bilirubin > 1.2) ? { id: 'bcaa_powder', name: 'BCAA (2:1:1 Mix)', grams: 20, rationale: "Hepatic Protection dose." } : null,
-      glutamine: (pGrams > 0 && (patient.giIssues || sideEffects.includes('Mucositis') || regimen.includes('folfirinox') || hasIBD)) ? { id: 'glutamine', name: 'L-Glutamine powder', grams: 15, rationale: "Mucosal protection." } : null
+      glutamine: (pGrams > 0 && (patient.giIssues || sideEffects.includes('Mucositis') || regimen.includes('folfirinox') || hasIBD)) ? { id: 'glutamine', name: 'L-Glutamine powder', grams: 10, rationale: "Mucosal protection." } : null
     };
   }
 
