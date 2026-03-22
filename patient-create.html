@@ -1031,6 +1031,18 @@ function runAiExtraction(rawText) {
     magnesium: text.match(new RegExp('(?:magnesium|mg)' + numPattern))?.[1],
     muac: text.match(new RegExp('(?:muac|mid-arm circumference)' + numPattern))?.[1],
     prealbumin: text.match(new RegExp('(?:prealbumin|pab)' + numPattern))?.[1],
+    lbm: text.match(new RegExp('(?:lean body mass|lbm)' + numPattern))?.[1],
+    smi: text.match(new RegExp('(?:skeletal muscle index|smi)' + numPattern))?.[1],
+    grip: text.match(new RegExp('(?:hand grip|grip strength|grip)' + numPattern))?.[1],
+    stage: text.match(/(?:stage|grade)\s*[:\-]?\s*([ivx]+|[1-4])/i)?.[1],
+    feeding: (() => {
+      if (text.includes('oral') && text.includes('diet')) return 'Oral Feeding (Normal Diet)';
+      if (text.includes('ons') || text.includes('supplement')) return 'Oral Nutrition Supplements (ONS)';
+      if (text.includes('nasogastric') || text.includes('ng')) return 'Enteral Feeding – Nasogastric Tube (NG)';
+      if (text.includes('peg')) return 'Enteral Feeding – PEG Tube';
+      if (text.includes('tpn') || text.includes('parenteral')) return 'Parenteral Nutrition (TPN)';
+      return null;
+    })(),
     gi: text.includes('vomiting') || text.includes('nausea') || text.includes('diarrhea') || text.includes('bloating'),
     reducedIntake: (() => {
       const actualMatch = text.match(/(?:actual )?food intake\s*[:\-]?\s*(\d+)%/i);
@@ -1085,6 +1097,23 @@ function runAiExtraction(rawText) {
   mapField('magnesium', 'magnesium', 'Magnesium');
   mapField('muac', 'muac', 'MUAC');
   mapField('prealbumin', 'prealbumin', 'Prealbumin');
+  mapField('lbm', 'leanBodyMass', 'Lean Body Mass');
+  mapField('smi', 'smi', 'SMI');
+  mapField('grip', 'handGrip', 'Hand Grip');
+  mapField('feeding', 'feedingMethod', 'Feeding Method');
+  if (extractions.stage) {
+    const s = extractions.stage.toUpperCase();
+    let stageVal = '';
+    if (s === 'I' || s === '1') stageVal = 'Stage I';
+    else if (s === 'II' || s === '2') stageVal = 'Stage II';
+    else if (s === 'III' || s === '3') stageVal = 'Stage III';
+    else if (s === 'IV' || s === '4') stageVal = 'Stage IV';
+    if (stageVal) {
+      document.getElementById('cancerStage').value = stageVal;
+      highlight('cancerStage', 'Stage', stageVal);
+      foundCount++;
+    }
+  }
 
   if (extractions.gi) { 
     document.getElementById('giIssues').value = 'true'; 
@@ -1180,6 +1209,7 @@ function runAiExtraction(rawText) {
 <script src="js/theme.js"></script>
 </body>
 </html>
+
 
 
 
