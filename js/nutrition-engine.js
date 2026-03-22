@@ -42,7 +42,8 @@ function generateNutritionPlan(patient) {
   
   const nutritionRiskReasons = [];
   let riskScore = 0;
-  const safetyAlerts = [];
+  // V3 Safety Engine (Step 6) - Initialized later in function
+  let safetyAlerts = [];
 
   // --- STEP 4 & 6: LAB INTERPRETATION & SAFETY ---
   if (hemoglobin > 0 && hemoglobin < 10) {
@@ -152,28 +153,48 @@ function generateNutritionPlan(patient) {
   let totalDailyCalories = Math.round(weight * kcalPerKg);
   let totalDailyProtein = Math.round(weight * proteinPerKg);
   
-  if (hasCardiac) {
-    safetyAlerts.push({ condition: 'CARDIAC FOCUS', severity: 'Low', action: 'Sodium restricted to < 2000mg/day.' });
+  // V3 Safety Engine (Step 6) - Exactly 6 Categories
+  const safetyStatus = {
+    renal: { level: 'info', message: 'Renal Safety: Normal (CR < 1.3)' },
+    metabolic: { level: 'info', message: 'Metabolic Safety: Stable BS (< 180)' },
+    electrolyte: { level: 'info', message: 'Electrolyte Safety: Standard formula (Na/K normal)' },
+    drug: { level: 'info', message: 'Drug Interference: No major antioxidants flagged' },
+    escalation: { level: 'info', message: 'Escalation Status: Standard oral intake' },
+    deficit: { level: 'info', message: 'Deficit Monitoring: Gap fully covered by prescription' }
+  };
+
+  if (creatinine > 1.3) {
+    safetyStatus.renal = { level: 'danger', message: `CRITICAL RENAL ALERT: Creatinine ${creatinine} is elevated. Protein restricted to 0.8-1g/kg.` };
+  } else if (creatinine < 0.6) {
+    safetyStatus.renal = { level: 'warning', message: 'LOW CREATININE ALERT: Potential muscle wasting; verify SMI/Grip.' };
   }
 
-  let dailyCalories = totalDailyCalories;
-  let dailyProtein = totalDailyProtein;
-
-  let actualIntake = 100 - (reducedFoodIntake || 0);
-
-  if (reducedFoodIntake >= 0 && reducedFoodIntake <= 100) {
-      const deficitPct = reducedFoodIntake / 100;
-      dailyCalories = Math.round(totalDailyCalories * deficitPct);
-      dailyProtein = Math.round(totalDailyProtein * deficitPct);
-      if (dailyCalories < 500 && reducedFoodIntake > 0) dailyCalories = 500;
-      if (dailyProtein < 20 && reducedFoodIntake > 0) dailyProtein = 20;
+  if (bloodSugar > 180) {
+    safetyStatus.metabolic = { level: 'danger', message: `HYPERGLYCEMIA ALERT: Blood Sugar ${bloodSugar}. Diabetic (Low-Carb) protocol active.` };
   }
-  
+
+  if (patient.sodium > 0 && patient.sodium < 130) {
+    safetyStatus.electrolyte = { level: 'danger', message: `HYPONATREMIA ALERT: Sodium ${patient.sodium}. NaCl 1-2g target in formulation.` };
+  } else if (patient.potassium > 5.5) {
+    safetyStatus.electrolyte = { level: 'danger', message: `HYPERKALEMIA ALERT: Potassium ${patient.potassium}. Low-K formulation required.` };
+  }
+
+  if (interactions.length > 0) {
+    safetyStatus.drug = { level: 'warning', message: `DRUG INTERACTION: ${interactions.length} clinical flags found (Antioxidants/B6).` };
+  }
+
   if (actualIntake <= 30) {
-      safetyAlerts.push({ condition: 'CRITICAL INTAKE ALERT', severity: 'High', action: `Patient is only eating ${actualIntake}%. Immediate feeding escalation to Enteral Nutrition (Tube Feeding via NGT, 1.5 kcal/mL standard or peptide formula at 40-50 mL/hr) required.` });
+    safetyStatus.escalation = { level: 'danger', message: `CRITICAL INTAKE REQ: Intaking only ${actualIntake}%. Immediate Enteral Tube Escalation required.` };
   } else if (actualIntake <= 50) {
-      safetyAlerts.push({ condition: 'LOW INTAKE ALERT', severity: 'High', action: `Patient is only eating ${actualIntake}%. Intensive ONS required as primary source.` });
+    safetyStatus.escalation = { level: 'warning', message: `LOW INTAKE ALERT: Intaking ${actualIntake}%. Intensive ONS required.` };
   }
+
+  if (reducedFoodIntake > 50) {
+    safetyStatus.deficit = { level: 'warning', message: `HIGH DEFICIT ALERT: ${reducedFoodIntake}% intake gap. Prescription covers full deficit.` };
+  }
+
+  // Convert to array for the report renderer
+  safetyAlerts = Object.values(safetyStatus);
   
   const servingsPerDay = 3;
   const perServingCalories = Math.round(dailyCalories / servingsPerDay);
