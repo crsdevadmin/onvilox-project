@@ -199,57 +199,99 @@
         <div class="rb rb-i">Clinical Fit: <span id="pFitScore"></span>%</div>
       </div>
   
-      <div class="rg">
-        <div class="rf"><div class="rf-lbl">Ideal Weight (Hamwi)</div><div class="rf-val" style="font-weight:800; color:#0e2247;" id="pIBW"></div></div>
-        <div class="rf"><div class="rf-lbl">Current Weight</div><div class="rf-val" id="pWeight"></div></div>
-        <div class="rf"><div class="rf-lbl">Usual Weight</div><div class="rf-val" id="pUW"></div></div>
-        <div class="rf"><div class="rf-lbl">Weight Loss (last 6 months)</div><div class="rf-val danger" id="pWL"></div></div>
-        <div class="rf"><div class="rf-lbl">Actual Food Intake (%)</div><div class="rf-val warn" id="pFoodIntake"></div></div>
-        <div class="rf"><div class="rf-lbl">MUAC (cm)</div><div class="rf-val" id="pMUAC"></div></div>
+      <!-- CLINICAL ASSESSMENT CARDS (REPORT VIEW) -->
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px; margin-top:20px;" class="clinical-report-grid">
         
-        <div class="rf sp2"><div class="rf-lbl">Cancer Type</div><div class="rf-val" id="pCancer"></div></div>
-        <div class="rf sp2"><div class="rf-lbl">Chemo Regimen</div><div class="rf-val" id="pRegimen"></div></div>
-        
-        <div class="rf"><div class="rf-lbl">Feeding Method</div><div class="rf-val" id="pFeeding"></div></div>
-        <div class="rf"><div class="rf-lbl">ECOG Status</div><div class="rf-val" id="pECOG"></div></div>
-        <div class="rf"><div class="rf-lbl">Cancer Stage</div><div class="rf-val" id="pStage"></div></div>
-        <div class="rf"><div class="rf-lbl">Metastasis</div><div class="rf-val" id="pMetastasis"></div></div>
-        
-        <div class="rf"><div class="rf-lbl">Serum Albumin</div><div class="rf-val warn" id="pAlbumin"></div></div>
-        <div class="rf"><div class="rf-lbl">CRP (mg/L)</div><div class="rf-val danger" id="pCRP_val"></div></div>
-        <div class="rf"><div class="rf-lbl">Creatinine</div><div class="rf-val" id="pCreatinine"></div></div>
-        <div class="rf"><div class="rf-lbl">ALT / AST</div><div class="rf-val" id="pLiver"></div></div>
-        <div class="rf"><div class="rf-lbl">Bilirubin</div><div class="rf-val" id="pBilirubin"></div></div>
-        <div class="rf"><div class="rf-lbl">Blood Sugar</div><div class="rf-val" id="pBloodSugar"></div></div>
-        <div class="rf"><div class="rf-lbl">Sodium (mEq/L)</div><div class="rf-val" id="pSodium"></div></div>
-        <div class="rf"><div class="rf-lbl">Potassium (mEq/L)</div><div class="rf-val" id="pPotassium"></div></div>
-        <div class="rf"><div class="rf-lbl">Urea (mg/dL)</div><div class="rf-val" id="pUrea"></div></div>
-        <div class="rf"><div class="rf-lbl">TSH (mIU/L)</div><div class="rf-val" id="pTSH"></div></div>
-        <div class="rf"><div class="rf-lbl">Prealbumin (mg/dL)</div><div class="rf-val" id="pPrealbumin"></div></div>
-        <div class="rf"><div class="rf-lbl">Hemoglobin (g/dL)</div><div class="rf-val" id="pHemoglobin"></div></div>
-        <div class="rf"><div class="rf-lbl">Vit D (ng/mL)</div><div class="rf-val" id="pVitD"></div></div>
-        <div class="rf"><div class="rf-lbl">Vit B12 (pg/mL)</div><div class="rf-val" id="pVitB12"></div></div>
-        <div class="rf"><div class="rf-lbl">Folate (ng/mL)</div><div class="rf-val" id="pFolate"></div></div>
-        <div class="rf"><div class="rf-lbl">Zinc (μg/dL)</div><div class="rf-val" id="pZinc"></div></div>
-        <div class="rf"><div class="rf-lbl">Magnesium (mg/dL)</div><div class="rf-val" id="pMagnesium"></div></div>
-        <div class="rf"><div class="rf-lbl">Fat Percentage</div><div class="rf-val" id="pFat"></div></div>
-        <div class="rf"><div class="rf-lbl">SMI</div><div class="rf-val" id="pSMI"></div></div>
-        <div class="rf"><div class="rf-lbl">Hand Grip Strength</div><div class="rf-val" id="pHandGrip"></div></div>
-        <div class="rf"><div class="rf-lbl">Activity Level</div><div class="rf-val" id="pActivity"></div></div>
-        <div class="rf"><div class="rf-lbl">Dietary Pref</div><div class="rf-val" id="pVegetarian"></div></div>
-        <div class="rf"><div class="rf-lbl">BSA (m²)</div><div class="rf-val" id="pBSA"></div></div>
-        <div class="rf"><div class="rf-lbl">Lean Body Mass</div><div class="rf-val" id="pLBM"></div></div>
-        <div class="rf"><div class="rf-lbl">Sarcopenia</div><div class="rf-val" id="pSarcopenia"></div></div>
-        <div class="rf"><div class="rf-lbl">Tumor Burden</div><div class="rf-val" id="pTumorBurden"></div></div>
-        <div class="rf sp2"><div class="rf-lbl">Treatments</div><div class="rf-val" id="pTreatments"></div></div>
-        <div class="rf sp2"><div class="rf-lbl">Comorbidities</div><div class="rf-val" id="pHxComorbidities"></div></div>
-        
-        <div class="rf sp2"><div class="rf-lbl">Genomic Markers</div><div class="rf-val" id="pHxGenomicMarkers"></div></div>
-        <div class="rf sp2"><div class="rf-lbl">Microbiome & Gut Support</div><div class="rf-val" id="pMicrobiome"></div></div>
-        <div class="rf full"><div class="rf-lbl">Side Effects</div><div class="rf-val" id="pHxSideEffects"></div></div>
-        <div class="rf sp2"><div class="rf-lbl">Cultural Prefs</div><div class="rf-val" id="pCultural"></div></div>
-        <div class="rf full"><div class="rf-lbl">Allergies</div><div class="rf-val" id="pHxAllergies"></div></div>
-        <div class="rf full"><div class="rf-lbl">Clinical Notes</div><div class="rf-val" id="pHxNotes"></div></div>
+        <!-- CARD 1: METABOLIC & RENAL (Cyan) -->
+        <div class="ai-panel card-cyan" style="margin:0; padding:15px; border-radius:12px; height:100%;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; border-bottom:1px solid rgba(0,0,0,0.05); padding-bottom:8px;">
+            <div style="font-size:10px; font-weight:900; color:#0e7490; text-transform:uppercase; letter-spacing:0.05em;">Metabolic & Renal</div>
+            <div style="font-size:12px; font-weight:700; color:#0e2247;">Organ Function & Labs</div>
+          </div>
+          <div class="rg" style="display:grid; grid-template-columns: 1fr; gap:8px;">
+            <div class="rf"><div class="rf-lbl">Creatinine (mg/dL)</div><div class="rf-val" id="pCreatinine"></div></div>
+            <div class="rf"><div class="rf-lbl">CRP (mg/L)</div><div class="rf-val danger" id="pCRP_val"></div></div>
+            <div class="rf"><div class="rf-lbl">ALT / AST (U/L)</div><div class="rf-val" id="pLiver"></div></div>
+            <div class="rf"><div class="rf-lbl">Bilirubin (mg/dL)</div><div class="rf-val" id="pBilirubin"></div></div>
+            <div class="rf"><div class="rf-lbl">Blood Sugar (mg/dL)</div><div class="rf-val" id="pBloodSugar"></div></div>
+            <div class="rf"><div class="rf-lbl">TSH (mIU/L)</div><div class="rf-val" id="pTSH"></div></div>
+            <div class="rf"><div class="rf-lbl">Sodium (mEq/L)</div><div class="rf-val" id="pSodium"></div></div>
+            <div class="rf"><div class="rf-lbl">Potassium (mEq/L)</div><div class="rf-val" id="pPotassium"></div></div>
+            <div class="rf"><div class="rf-lbl">Urea (mg/dL)</div><div class="rf-val" id="pUrea"></div></div>
+          </div>
+        </div>
+
+        <!-- CARD 2: MICRONUTRIENTS (Violet) -->
+        <div class="ai-panel card-violet" style="margin:0; padding:15px; border-radius:12px; height:100%;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; border-bottom:1px solid rgba(0,0,0,0.05); padding-bottom:8px;">
+            <div style="font-size:10px; font-weight:900; color:#6d28d9; text-transform:uppercase; letter-spacing:0.05em;">Micronutrients</div>
+            <div style="font-size:12px; font-weight:700; color:#0e2247;">Nutritional Profile</div>
+          </div>
+          <div class="rg" style="display:grid; grid-template-columns: 1fr; gap:8px;">
+            <div class="rf"><div class="rf-lbl">Serum Albumin (g/dL)</div><div class="rf-val warn" id="pAlbumin"></div></div>
+            <div class="rf"><div class="rf-lbl">Prealbumin (mg/dL)</div><div class="rf-val" id="pPrealbumin"></div></div>
+            <div class="rf"><div class="rf-lbl">Hemoglobin (g/dL)</div><div class="rf-val" id="pHemoglobin"></div></div>
+            <div class="rf"><div class="rf-lbl">Vitamin D (ng/mL)</div><div class="rf-val" id="pVitD"></div></div>
+            <div class="rf"><div class="rf-lbl">Vitamin B12 (pg/mL)</div><div class="rf-val" id="pVitB12"></div></div>
+            <div class="rf"><div class="rf-lbl">Folate (ng/mL)</div><div class="rf-val" id="pFolate"></div></div>
+            <div class="rf"><div class="rf-lbl">Zinc (μg/dL)</div><div class="rf-val" id="pZinc"></div></div>
+            <div class="rf"><div class="rf-lbl">Magnesium (mg/dL)</div><div class="rf-val" id="pMagnesium"></div></div>
+          </div>
+        </div>
+
+        <!-- CARD 3: ONCOLOGY (Amber) -->
+        <div class="ai-panel card-amber" style="margin:0; padding:15px; border-radius:12px; height:100%;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; border-bottom:1px solid rgba(0,0,0,0.05); padding-bottom:8px;">
+            <div style="font-size:10px; font-weight:900; color:#b45309; text-transform:uppercase; letter-spacing:0.05em;">Oncology</div>
+            <div style="font-size:12px; font-weight:700; color:#0e2247;">Cancer Dynamics & Treatment</div>
+          </div>
+          <div class="rg" style="display:grid; grid-template-columns: 1fr; gap:8px;">
+            <div class="rf full"><div class="rf-lbl">Cancer Type</div><div class="rf-val" id="pCancer"></div></div>
+            <div class="rf full"><div class="rf-lbl">Chemo Regimen</div><div class="rf-val" id="pRegimen"></div></div>
+            <div class="rf"><div class="rf-lbl">Cancer Stage</div><div class="rf-val" id="pStage"></div></div>
+            <div class="rf"><div class="rf-lbl">Tumor Burden</div><div class="rf-val" id="pTumorBurden"></div></div>
+            <div class="rf full"><div class="rf-lbl">Metastatic Sites</div><div class="rf-val" id="pMetastasis"></div></div>
+            <div class="rf full"><div class="rf-lbl">Genomic Markers</div><div class="rf-val" id="pHxGenomicMarkers"></div></div>
+            <div class="rf full"><div class="rf-lbl">Treatments</div><div class="rf-val" id="pTreatments"></div></div>
+          </div>
+        </div>
+
+        <!-- CARD 4: FUNCTIONAL (Green) -->
+        <div class="ai-panel card-green" style="margin:0; padding:15px; border-radius:12px; height:100%;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; border-bottom:1px solid rgba(0,0,0,0.05); padding-bottom:8px;">
+            <div style="font-size:10px; font-weight:900; color:#15803d; text-transform:uppercase; letter-spacing:0.05em;">Functional</div>
+            <div style="font-size:12px; font-weight:700; color:#0e2247;">Physical Status & Composition</div>
+          </div>
+          <div class="rg" style="display:grid; grid-template-columns: 1fr; gap:8px;">
+            <div class="rf"><div class="rf-lbl">Feeding Method</div><div class="rf-val" id="pFeeding"></div></div>
+            <div class="rf"><div class="rf-lbl">ECOG Status</div><div class="rf-val" id="pECOG"></div></div>
+            <div class="rf"><div class="rf-lbl">Activity Level</div><div class="rf-val" id="pActivity"></div></div>
+            <div class="rf"><div class="rf-lbl">Sarcopenia Status</div><div class="rf-val" id="pSarcopenia"></div></div>
+            <div class="rf"><div class="rf-lbl">MUAC (cm)</div><div class="rf-val" id="pMUAC"></div></div>
+            <div class="rf"><div class="rf-lbl">Lean Body Mass (kg)</div><div class="rf-val" id="pLBM"></div></div>
+            <div class="rf"><div class="rf-lbl">Fat Percentage (%)</div><div class="rf-val" id="pFat"></div></div>
+            <div class="rf"><div class="rf-lbl">Skeletal Muscle Index (cm²/m²)</div><div class="rf-val" id="pSMI"></div></div>
+            <div class="rf"><div class="rf-lbl">Hand Grip Strength (kg)</div><div class="rf-val" id="pHandGrip"></div></div>
+            <div class="rf full"><div class="rf-lbl">BSA (m²) - Auto</div><div class="rf-val" id="pBSA"></div></div>
+          </div>
+        </div>
+
+        <!-- CARD 5: LIFESTYLE (Slate - Full Width) -->
+        <div class="ai-panel card-slate" style="margin:0; padding:15px; border-radius:12px; grid-column: 1 / -1;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; border-bottom:1px solid rgba(0,0,0,0.05); padding-bottom:8px;">
+            <div style="font-size:10px; font-weight:900; color:#475569; text-transform:uppercase; letter-spacing:0.05em;">Lifestyle</div>
+            <div style="font-size:12px; font-weight:700; color:#0e2247;">Dietary & Metadata</div>
+          </div>
+          <div class="rg" style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
+            <div class="rf"><div class="rf-lbl">Dietary preference</div><div class="rf-val" id="pVegetarian"></div></div>
+            <div class="rf"><div class="rf-lbl">Cultural Preferences</div><div class="rf-val" id="pCultural"></div></div>
+            <div class="rf full"><div class="rf-lbl">Allergies</div><div class="rf-val" id="pHxAllergies"></div></div>
+            <div class="rf full"><div class="rf-lbl">Side Effects (Current Therapy)</div><div class="rf-val" id="pHxSideEffects"></div></div>
+            <div class="rf full"><div class="rf-lbl">Comorbidities</div><div class="rf-val" id="pHxComorbidities"></div></div>
+            <div class="rf full"><div class="rf-lbl">Additional Notes</div><div class="rf-val" id="pHxNotes"></div></div>
+          </div>
+        </div>
+
       </div>
     </div>
   
@@ -457,104 +499,56 @@
     </div>
   </div> <!-- end #reportDoc -->
 </div> <!-- end #pdfExportRoot -->
-  <div id="editPatientSection" style="margin-top:28px;display:none;">
-    <h3>Edit Patient Details</h3>
-    <div style="color:#6b7280;font-size:13px;margin-bottom:14px;">
-      Update clinical inputs (weight/albumin/weight loss etc.). The plan will be recalculated and versioned.
-    </div>
-
-
-
-    <div class="form-grid-cards" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(400px, 1fr)); gap:20px; margin-top:20px;">
-      <div class="form-group">
-        <label class="required">Patient Name</label>
-        <input id="epName" type="text" placeholder="Full Name">
-      </div>
-      <div class="form-group">
-        <label class="required">Age</label>
-        <input id="epAge" type="number" min="1" max="120">
-      </div>
-      <div class="form-group">
-        <label class="required">Sex</label>
-        <select id="epSex">
-          <option value="">Select</option>
-          <option value="Male">Male</option>
-          <option value="Female">Female</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label class="required">Weight (kg)</label>
-        <input id="epWeight" type="number" min="25" max="300" step="0.1">
-        <div class="validation-msg" id="epWeight_msg"></div>
-      </div>
-      <div class="form-group">
-        <label class="required">Height (cm)</label>
-        <input id="epHeight" type="number" min="30" max="250" step="0.1">
-        <div class="validation-msg" id="epHeight_msg"></div>
-      </div>
-      <div class="form-group">
-        <label class="required">Serum Albumin (g/dL) <span id="epAlbumin_status" class="status-badge"></span></label>
-        <input id="epAlbumin" type="number" min="1" max="6" step="0.1" onkeyup="updateLabStatus('epAlbumin', this.value)">
-        <div class="range-hint">Normal Range: 3.5 – 5.5 g/dL</div>
-        <div class="validation-msg" id="epAlbumin_msg"></div>
-      </div>
-      <div class="form-group">
-        <label>Usual Weight (kg)</label>
-        <input id="epUW" type="number" min="25" max="300" step="0.1">
-        <div class="validation-msg" id="epUW_msg"></div>
-      </div>
-      <!-- Removed Weight Loss % input per user request - now calculated automatically -->
-      <div class="form-group">
-        <label class="required">CRP (mg/L) <span id="epCRP_status" class="status-badge"></span></label>
-        <input id="epCRP" type="number" min="0" max="500" step="0.1" onkeyup="validateNumber('epCRP','CRP',0,500); updateLabStatus('epCRP', this.value)">
-        <div class="range-hint">Normal Range: &lt; 10 mg/L</div>
-        <div class="validation-msg" id="epCRP_msg"></div>
-      </div>
-      <div class="form-group">
-        <label>MUAC (cm) <span id="epMUAC_status" class="status-badge"></span></label>
-        <input id="epMUAC" type="number" min="5" max="100" step="0.1" oninput="updateLabStatus('epMUAC', this.value)">
-        <div class="range-hint">Normal: &ge; 23 cm</div>
-        <div class="validation-msg" id="epMUAC_msg"></div>
-      </div>
-      <div class="form-group">
-        <label class="required">Feeding Method</label>
-        <select id="epFeeding"></select>
-        <div class="validation-msg" id="epFeeding_msg"></div>
-      </div>
-      <div class="form-group">
-        <label class="required">GI Issues (need hydrolyzed whey?)</label>
-        <select id="epGi">
-          <option value="false">No</option>
-          <option value="true">Yes</option>
-        </select>
+  <div id="editPatientSection" style="margin-top:28px;display:none; max-width:1400px; margin-left:auto; margin-right:auto;">
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+        <h2>Edit Patient Details</h2>
+        <button class="btn-secondary btn-sm" onclick="document.getElementById('editPatientSection').style.display='none'">Cancel</button>
       </div>
 
-      <div class="form-group">
-        <label class="required">Cancer Type</label>
-        <div class="tag-box" style="margin-top:0; position:relative;">
-          <input type="text" id="epCancer" placeholder="Search or Enter Cancer Type..." 
-                 onfocus="openEpCancerDropdown()" onkeyup="filterEpCancerList()"
-                 onblur="setTimeout(()=>validateSelect('epCancer','Cancer Type'), 200)">
-          <div class="dropdown-list" id="epCancerDropdown"></div>
+      <div style="color:var(--text-2); font-size:13px; margin-bottom:24px;">
+        Update clinical inputs (weight/albumin/weight loss etc.). The plan will be recalculated and versioned.
+      </div>
+
+      <div class="form-grid" style="margin-bottom:30px;">
+        <div class="form-group">
+          <label class="required">Patient Name</label>
+          <input id="epName" type="text" placeholder="Full Name">
         </div>
-        <div class="validation-msg" id="epCancer_msg"></div>
-      </div>
-      <div class="form-group">
-        <label>Chemo Regimen</label>
-        <div class="tag-box" style="margin-top:0; position:relative;">
-          <input type="text" id="epRegimen" placeholder="Search or Enter Regimen..." 
-                 onfocus="openEpRegimenDropdown()" onkeyup="filterEpRegimenList()"
-                 onblur="setTimeout(()=>validateSelect('epRegimen','Chemo Regimen'), 200)">
-          <div class="dropdown-list" id="epRegimenDropdown"></div>
+        <div class="form-group">
+          <label class="required">Age</label>
+          <input id="epAge" type="number" min="1" max="120">
         </div>
-        <div class="validation-msg" id="epRegimen_msg"></div>
+        <div class="form-group">
+          <label class="required">Sex</label>
+          <select id="epSex">
+            <option value="">Select</option>
+            <option value="Male">Male</option>
+            <option value="Female">Female</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="required">Weight (kg)</label>
+          <input id="epWeight" type="number" min="25" max="300" step="0.1">
+          <div class="validation-msg" id="epWeight_msg"></div>
+        </div>
+        <div class="form-group">
+          <label class="required">Height (cm)</label>
+          <input id="epHeight" type="number" min="30" max="250" step="0.1">
+          <div class="validation-msg" id="epHeight_msg"></div>
+        </div>
+        <div class="form-group">
+          <label>Usual Weight (kg)</label>
+          <input id="epUW" type="number" min="25" max="300" step="0.1">
+          <div class="validation-msg" id="epUW_msg"></div>
+        </div>
       </div>
-      
-    <!-- CLINICAL ASSESSMENT CARDS RESTRUCTURED -->
-    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(400px, 1fr)); gap:20px; margin-top:24px;">
+
+    <!-- CLINICAL ASSESSMENT CARDS RESTRUCTURED (Sync with patient-create) -->
+    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px; margin-top:24px;" class="clinical-cards-grid">
       
       <!-- SECTION 1 (METABOLIC & RENAL) -->
-      <div class="ai-panel card-cyan" style="margin:0;">
+      <div class="ai-panel card-cyan" style="margin:0; min-height:480px;">
         <div class="ai-header">
           <div class="ai-badge">METABOLIC & RENAL</div>
           <h4>Organ Function & Labs</h4>
@@ -563,106 +557,138 @@
           <div class="form-group">
             <label class="required">Creatinine (mg/dL) <span id="epCreatinine_status" class="status-badge"></span></label>
             <input id="epCreatinine" type="number" step="0.01" oninput="validateNumber('epCreatinine','Creatinine',0.1,20); updateLabStatus('epCreatinine', this.value)">
-            <div class="range-hint">Normal: 0.7 – 1.3 mg/dL</div>
+            <div class="range-hint">Normal: 0.7 - 1.3 mg/dL</div>
             <div class="validation-msg" id="epCreatinine_msg"></div>
+          </div>
+          <div class="form-group">
+            <label class="required">CRP (mg/L) <span id="epCRP_status" class="status-badge"></span></label>
+            <input id="epCRP" type="number" min="0" max="500" step="0.1" oninput="validateNumber('epCRP','CRP',0,500); updateLabStatus('epCRP', this.value)">
+            <div class="range-hint">Normal: < 10 mg/L</div>
+            <div class="validation-msg" id="epCRP_msg"></div>
           </div>
           <div class="form-group">
             <label>ALT (U/L) <span id="epALT_status" class="status-badge"></span></label>
             <input id="epALT" type="number" step="1" oninput="updateLabStatus('epALT', this.value)">
-            <div class="range-hint">Normal: 7 – 56 U/L</div>
+            <div class="range-hint">Normal: 7 - 56 U/L</div>
           </div>
           <div class="form-group">
             <label>AST (U/L) <span id="epAST_status" class="status-badge"></span></label>
             <input id="epAST" type="number" step="1" oninput="updateLabStatus('epAST', this.value)">
-            <div class="range-hint">Normal: 5 – 40 U/L</div>
+            <div class="range-hint">Normal: 5 - 40 U/L</div>
           </div>
           <div class="form-group">
             <label>Bilirubin (mg/dL) <span id="epBilirubin_status" class="status-badge"></span></label>
             <input id="epBilirubin" type="number" step="0.1" oninput="updateLabStatus('epBilirubin', this.value)">
-            <div class="range-hint">Normal: 0.1 – 1.2 mg/dL</div>
+            <div class="range-hint">Normal: 0.1 - 1.2 mg/dL</div>
           </div>
           <div class="form-group">
             <label class="required">Blood Sugar (mg/dL) <span id="epBloodSugar_status" class="status-badge"></span></label>
             <input id="epBloodSugar" type="number" step="1" oninput="validateNumber('epBloodSugar','Blood Sugar',20,1000); updateLabStatus('epBloodSugar', this.value)">
-            <div class="range-hint">Normal: 70 – 126 mg/dL</div>
+            <div class="range-hint">Normal: 70 - 126 mg/dL</div>
             <div class="validation-msg" id="epBloodSugar_msg"></div>
-          </div>
-          <div class="form-group">
-            <label>TSH (mIU/L) <span id="epTSH_status" class="status-badge"></span></label>
-            <input id="epTSH" type="number" step="0.01" oninput="updateLabStatus('epTSH', this.value)">
-            <div class="range-hint">Normal: 0.4 – 4.0 mIU/L</div>
           </div>
           <div class="form-group">
             <label>Sodium (mEq/L) <span id="epSodium_status" class="status-badge"></span></label>
             <input id="epSodium" type="number" step="0.1" placeholder="e.g. 140" oninput="updateLabStatus('epSodium', this.value)">
-            <div class="range-hint">Normal: 135 – 145 mEq/L</div>
+            <div class="range-hint">Normal: 135 - 145 mEq/L</div>
           </div>
           <div class="form-group">
             <label>Potassium (mEq/L) <span id="epPotassium_status" class="status-badge"></span></label>
             <input id="epPotassium" type="number" step="0.1" placeholder="e.g. 4.2" oninput="updateLabStatus('epPotassium', this.value)">
-            <div class="range-hint">Normal: 3.5 – 5.1 mEq/L</div>
+            <div class="range-hint">Normal: 3.5 - 5.1 mEq/L</div>
           </div>
           <div class="form-group">
             <label>Urea (mg/dL) <span id="epUrea_status" class="status-badge"></span></label>
             <input id="epUrea" type="number" step="1" placeholder="e.g. 30" oninput="updateLabStatus('epUrea', this.value)">
-            <div class="range-hint">Normal: 15 – 45 mg/dL</div>
+            <div class="range-hint">Normal: 15 - 45 mg/dL</div>
+          </div>
+          <div class="form-group">
+            <label>TSH (mIU/L) <span id="epTSH_status" class="status-badge"></span></label>
+            <input id="epTSH" type="number" step="0.01" oninput="updateLabStatus('epTSH', this.value)">
+            <div class="range-hint">Normal: 0.4 - 4.0 mIU/L</div>
           </div>
         </div>
       </div>
 
       <!-- SECTION 2 (MICRONUTRIENTS) -->
-      <div class="ai-panel card-violet" style="margin:0;">
+      <div class="ai-panel card-violet" style="margin:0; min-height:480px;">
         <div class="ai-header">
           <div class="ai-badge">MICRONUTRIENTS</div>
           <h4>Nutritional Profile</h4>
         </div>
         <div class="form-grid" style="grid-template-columns: repeat(2, 1fr);">
           <div class="form-group">
+            <label class="required">Serum Albumin (g/dL) <span id="epAlbumin_status" class="status-badge"></span></label>
+            <input id="epAlbumin" type="number" min="1" max="6" step="0.1" onkeyup="updateLabStatus('epAlbumin', this.value)">
+            <div class="range-hint">Normal Range: 3.5 - 5.5 g/dL</div>
+            <div class="validation-msg" id="epAlbumin_msg"></div>
+          </div>
+          <div class="form-group">
             <label>Prealbumin (mg/dL) <span id="epPrealbumin_status" class="status-badge"></span></label>
             <input id="epPrealbumin" type="number" step="0.1" oninput="updateLabStatus('epPrealbumin', this.value)">
-            <div class="range-hint">Normal: 15 – 36 mg/dL</div>
+            <div class="range-hint">Normal: 15 - 36 mg/dL</div>
           </div>
           <div class="form-group">
             <label class="required">Hemoglobin (g/dL) <span id="epHemoglobin_status" class="status-badge"></span></label>
             <input id="epHemoglobin" type="number" step="0.1" oninput="validateNumber('epHemoglobin','Hemoglobin',2,25); updateLabStatus('epHemoglobin', this.value)">
-            <div class="range-hint">Normal: 12 – 16 g/dL</div>
+            <div class="range-hint">Normal: 12 - 16 g/dL</div>
             <div class="validation-msg" id="epHemoglobin_msg"></div>
           </div>
           <div class="form-group">
             <label>Vitamin D (ng/mL) <span id="epVitD_status" class="status-badge"></span></label>
             <input id="epVitD" type="number" step="1" oninput="updateLabStatus('epVitD', this.value)">
-            <div class="range-hint">Normal: 30 – 100 ng/mL</div>
+            <div class="range-hint">Normal: 30 - 100 ng/mL</div>
           </div>
           <div class="form-group">
             <label>Vitamin B12 (pg/mL) <span id="epVitB12_status" class="status-badge"></span></label>
             <input id="epVitB12" type="number" step="1" oninput="updateLabStatus('epVitB12', this.value)">
-            <div class="range-hint">Normal: 200 – 900 pg/mL</div>
+            <div class="range-hint">Normal: 200 - 900 pg/mL</div>
           </div>
           <div class="form-group">
             <label>Folate (ng/mL) <span id="epFolate_status" class="status-badge"></span></label>
             <input id="epFolate" type="number" step="0.1" oninput="updateLabStatus('epFolate', this.value)">
-            <div class="range-hint">Normal: 3.1 – 17.5 ng/mL</div>
+            <div class="range-hint">Normal: 3.1 - 17.5 ng/mL</div>
           </div>
           <div class="form-group">
             <label>Zinc (μg/dL) <span id="epZinc_status" class="status-badge"></span></label>
             <input id="epZinc" type="number" step="1" oninput="updateLabStatus('epZinc', this.value)">
-            <div class="range-hint">Normal: 60 – 120 μg/dL</div>
+            <div class="range-hint">Normal: 60 - 120 μg/dL</div>
           </div>
           <div class="form-group">
             <label>Magnesium (mg/dL) <span id="epMagnesium_status" class="status-badge"></span></label>
             <input id="epMagnesium" type="number" step="0.1" oninput="updateLabStatus('epMagnesium', this.value)">
-            <div class="range-hint">Normal: 1.7 – 2.2 mg/dL</div>
+            <div class="range-hint">Normal: 1.7 - 2.2 mg/dL</div>
           </div>
         </div>
       </div>
 
       <!-- SECTION 3 (ONCOLOGY DYNAMICS) -->
-      <div class="ai-panel card-amber" style="margin:0;">
+      <div class="ai-panel card-amber" style="margin:0; min-height:480px;">
         <div class="ai-header">
           <div class="ai-badge">ONCOLOGY</div>
           <h4>Cancer Dynamics & Treatment</h4>
         </div>
         <div class="form-grid" style="grid-template-columns: 1fr 1fr;">
+          <div class="form-group" style="grid-column: 1 / -1;">
+            <label class="required">Cancer Type</label>
+            <div class="tag-box" style="margin-top:0; position:relative;">
+              <input type="text" id="epCancer" placeholder="Search or Enter Cancer Type..." 
+                     onfocus="openEpCancerDropdown()" onkeyup="filterEpCancerList()"
+                     onblur="setTimeout(()=>validateSelect('epCancer','Cancer Type'), 200)">
+              <div class="dropdown-list" id="epCancerDropdown"></div>
+            </div>
+            <div class="validation-msg" id="epCancer_msg"></div>
+          </div>
+          <div class="form-group" style="grid-column: 1 / -1;">
+            <label>Chemo Regimen</label>
+            <div class="tag-box" style="margin-top:0; position:relative;">
+              <input type="text" id="epRegimen" placeholder="Search or Enter Regimen..." 
+                     onfocus="openEpRegimenDropdown()" onkeyup="filterEpRegimenList()"
+                     onblur="setTimeout(()=>validateSelect('epRegimen','Chemo Regimen'), 200)">
+              <div class="dropdown-list" id="epRegimenDropdown"></div>
+            </div>
+            <div class="validation-msg" id="epRegimen_msg"></div>
+          </div>
           <div class="form-group">
             <label>Cancer Stage</label>
             <select id="epStage">
@@ -703,12 +729,24 @@
       </div>
 
       <!-- SECTION 4 (FUNCTIONAL & BODY COMP) -->
-      <div class="ai-panel card-green" style="margin:0;">
+      <div class="ai-panel card-green" style="margin:0; min-height:480px;">
         <div class="ai-header">
           <div class="ai-badge">FUNCTIONAL</div>
           <h4>Physical Status & Composition</h4>
         </div>
         <div class="form-grid" style="grid-template-columns: 1fr 1fr;">
+          <div class="form-group">
+            <label class="required">Feeding Method</label>
+            <select id="epFeeding" onchange="toggleEditIntakeUI()"></select>
+            <div class="validation-msg" id="epFeeding_msg"></div>
+          </div>
+          <div class="form-group">
+            <label class="required">GI Issues (Hydrolyzed?)</label>
+            <select id="epGi">
+              <option value="false">No</option>
+              <option value="true">Yes</option>
+            </select>
+          </div>
           <div class="form-group">
             <label>ECOG Status</label>
             <select id="epECOG">
@@ -720,11 +758,22 @@
             </select>
           </div>
           <div class="form-group">
-            <label>Activity Level</label>
-            <select id="epActivityLevel">
-              <option value="Ambulatory">Ambulatory (Active)</option>
-              <option value="Bedridden">Bedridden (Limited)</option>
-            </select>
+            <label>MUAC (cm) <span id="epMUAC_status" class="status-badge"></span></label>
+            <input id="epMUAC" type="number" min="5" max="100" step="0.1" oninput="updateLabStatus('epMUAC', this.value)">
+            <div class="range-hint">Normal: >= 23 cm</div>
+            <div class="validation-msg" id="epMUAC_msg"></div>
+          </div>
+          <div class="form-group">
+            <label>Lean Body Mass (kg)</label>
+            <input id="epLeanBodyMass" type="number" step="0.1">
+          </div>
+          <div class="form-group">
+            <label>Skeletal Muscle Index (cm2/m2)</label>
+            <input id="epSMI" type="number" step="0.1" placeholder="e.g. 45.0">
+          </div>
+          <div class="form-group">
+            <label>Hand Grip Strength (kg)</label>
+            <input id="epHandGrip" type="number" step="0.1" placeholder="e.g. 30.0">
           </div>
           <div class="form-group">
             <label>Sarcopenia Status</label>
@@ -735,91 +784,85 @@
             </select>
           </div>
           <div class="form-group">
-            <label>Lean Body Mass (kg)</label>
-            <input id="epLeanBodyMass" type="number" step="0.1">
+            <label>Activity Level</label>
+            <select id="epActivityLevel">
+              <option value="Ambulatory">Ambulatory (Active)</option>
+              <option value="Bedridden">Bedridden (Limited)</option>
+            </select>
           </div>
           <div class="form-group">
             <label>Fat Percentage (%)</label>
             <input id="epFatPercent" type="number" step="0.1">
           </div>
-          <div class="form-group">
-            <label>Skeletal Muscle Index (cm²/m²)</label>
-            <input id="epSMI" type="number" step="0.1" placeholder="e.g. 45.0">
-          </div>
-          <div class="form-group">
-            <label>Hand Grip Strength (kg)</label>
-            <input id="epHandGrip" type="number" step="0.1" placeholder="e.g. 30.0">
-          </div>
-          <div class="form-group">
-            <label>BSA (m²) - Auto</label>
-            <input id="epBSA" type="number" readonly style="background:var(--bg-2); color:var(--text-3) !important;">
+          <div class="form-group" style="grid-column: 1 / -1;">
+            <label>BSA (m2) - Auto</label>
+            <input id="epBSA" type="number" readonly style="background:var(--bg-2);">
           </div>
         </div>
-      </div>
-
-      <!-- SECTION 5 (DIETARY & PREFERENCES) - FULL WIDTH -->
-      <div class="ai-panel card-sky" style="margin:0; grid-column:1 / -1;">
-        <div class="ai-header">
-          <div class="ai-badge">LIFESTYLE</div>
-          <h4>Dietary & Metadata</h4>
-        </div>
-        <div class="form-grid" style="grid-template-columns: repeat(2, 1fr);">
-          <div class="form-group">
-            <label>Dietary preference</label>
-            <select id="epVegetarian">
-              <option value="false">Non-Vegetarian</option>
-              <option value="true">Vegetarian</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>Cultural Preferences</label>
-            <input type="text" id="epCultural" placeholder="e.g. Halal, No spices">
-          </div>
-          <div class="form-group" style="grid-column:span 1;">
-            <label>Allergies</label>
-            <div class="tag-box">
-              <div class="tag-container" id="epAllergyTags"></div>
-              <input type="text" placeholder="Search allergies..." onkeyup="filterMultiList(this,'epAllergyDropdown')" onkeydown="handleTagInput(event, 'epAllergyTags')">
-              <div class="dropdown-list" id="epAllergyDropdown"></div>
-            </div>
-          </div>
-          <div class="form-group" style="grid-column:span 1;">
-            <label>Side Effects (Current Therapy)</label>
-            <div class="tag-box">
-              <div class="tag-container" id="epSideEffectTags"></div>
-              <input type="text" placeholder="Search side effects..." onkeyup="filterMultiList(this,'epSideEffectDropdown')" onkeydown="handleTagInput(event, 'epSideEffectTags')">
-              <div class="dropdown-list" id="epSideEffectDropdown"></div>
-            </div>
-          </div>
-          <div class="form-group" style="grid-column:span 1;">
-            <label>Existing Supplements</label>
-            <div class="tag-box">
-              <div class="tag-container" id="epSupplementTags"></div>
-              <input type="text" placeholder="Search supplements..." onkeyup="filterMultiList(this,'epSupplementDropdown')" onkeydown="handleTagInput(event, 'epSupplementTags')">
-              <div class="dropdown-list" id="epSupplementDropdown"></div>
-            </div>
-          </div>
-          <div class="form-group" style="grid-column:1 / -1;">
-            <label>Comorbidities</label>
-            <div class="tag-box">
-              <div class="tag-container" id="epComorbidityTags"></div>
-              <input type="text" placeholder="Search comorbidities..." onkeyup="filterMultiList(this,'epComorbidityDropdown')" onkeydown="handleTagInput(event, 'epComorbidityTags')">
-              <div class="dropdown-list" id="epComorbidityDropdown"></div>
-            </div>
-          </div>
-          <div class="form-group" style="grid-column:1 / -1; display:none;">
-            <label>Treatment Modalities (Moved to Oncology)</label>
-            <div class="tag-box"><div class="tag-container" id="epTreatmentTags_dummy"></div></div>
-          </div>
-          <div class="form-group" style="grid-column:1 / -1;">
-            <label>Additional Notes</label>
-            <textarea id="epNotes" placeholder="Clinical notes..." rows="2"></textarea>
-          </div>
-        </div>
-      </div>
-
     </div>
+
+    <!-- SECTION 5 (LIFESTYLE & METADATA) -->
+    <div class="ai-panel card-slate" style="margin:0; padding:15px; border-radius:12px; margin-top:24px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; border-bottom:1px solid rgba(0,0,0,0.05); padding-bottom:8px;">
+        <div style="font-size:10px; font-weight:900; color:#475569; text-transform:uppercase; letter-spacing:0.05em;">Lifestyle</div>
+        <div style="font-size:12px; font-weight:700; color:#0e2247;">Dietary & Metadata</div>
       </div>
+      <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap:12px;">
+        <div class="form-group">
+          <label>Dietary preference</label>
+          <select id="epVegetarian">
+            <option value="false">Non-Vegetarian</option>
+            <option value="true">Vegetarian</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Cultural Preferences</label>
+          <input type="text" id="epCultural" placeholder="e.g. Halal, No spices">
+        </div>
+        <div class="form-group" style="grid-column:span 1;">
+          <label>Allergies</label>
+          <div class="tag-box">
+            <div class="tag-container" id="epAllergyTags"></div>
+            <input type="text" placeholder="Search allergies..." onkeyup="filterMultiList(this,'epAllergyDropdown')" onkeydown="handleTagInput(event, 'epAllergyTags')">
+            <div class="dropdown-list" id="epAllergyDropdown"></div>
+          </div>
+        </div>
+        <div class="form-group" style="grid-column:span 1;">
+          <label>Side Effects (Current Therapy)</label>
+          <div class="tag-box">
+            <div class="tag-container" id="epSideEffectTags"></div>
+            <input type="text" placeholder="Search side effects..." onkeyup="filterMultiList(this,'epSideEffectDropdown')" onkeydown="handleTagInput(event, 'epSideEffectTags')">
+            <div class="dropdown-list" id="epSideEffectDropdown"></div>
+          </div>
+        </div>
+        <div class="form-group" style="grid-column:span 1;">
+          <label>Existing Supplements</label>
+          <div class="tag-box">
+            <div class="tag-container" id="epSupplementTags"></div>
+            <input type="text" placeholder="Search supplements..." onkeyup="filterMultiList(this,'epSupplementDropdown')" onkeydown="handleTagInput(event, 'epSupplementTags')">
+            <div class="dropdown-list" id="epSupplementDropdown"></div>
+          </div>
+        </div>
+        <div class="form-group" style="grid-column:1 / -1;">
+          <label>Comorbidities</label>
+          <div class="tag-box">
+            <div class="tag-container" id="epComorbidityTags"></div>
+            <input type="text" placeholder="Search comorbidities..." onkeyup="filterMultiList(this,'epComorbidityDropdown')" onkeydown="handleTagInput(event, 'epComorbidityTags')">
+            <div class="dropdown-list" id="epComorbidityDropdown"></div>
+          </div>
+        </div>
+        <div class="form-group" style="grid-column:1 / -1; display:none;">
+          <label>Treatment Modalities (Moved to Oncology)</label>
+          <div class="tag-box"><div class="tag-container" id="epTreatmentTags_dummy"></div></div>
+        </div>
+        <div class="form-group" style="grid-column:1 / -1;">
+          <label>Additional Notes</label>
+          <textarea id="epNotes" placeholder="Clinical notes..." rows="2"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- Intake and Save logic below -->
 
 
 
@@ -858,12 +901,13 @@
       </div>
     </div>
 
-    <div style="display:flex; gap:12px; flex-wrap:wrap; margin-top:14px;">
+
+    <div style="display:flex; gap:12px; flex-wrap:wrap; margin-top:20px; padding-top:20px; border-top:1px solid #e2e8f0;">
       <button class="btn-warning" type="button" onclick="savePatientEdits()">Save Changes & Recalculate</button>
       <button id="approveBtn" class="btn-primary" type="button" onclick="approveFromReport()">Approve Patient</button>
     </div>
-  </div>
-
+  </div> <!-- end .card -->
+</div> <!-- end #editPatientSection -->
 
   <div id="overrideSection" style="margin-top:28px;display:none;">
     <h3>Doctor Override (optional)</h3>
@@ -1329,115 +1373,187 @@ async function extractTextFromPdf(file) {
 }
 
 async function runAiExtraction(rawText) {
+  const text = rawText.toLowerCase();
+  
+  // Logic from patient-create sync'ed to ep-prefixed IDs
+  const extractions = {
+    name: text.match(/(?:patient(?:\s*name)?|name)\s*[:\-]?\s*([a-z\s]+)(?:\n|$)/i)?.[1]?.trim(),
+    age: text.match(/(?:age|years old)\s*[:\-]?\s*(\d{1,3})/i)?.[1],
+    sex: text.match(/(?:sex|gender)\s*[:\-]?\s*(male|female)/i)?.[1],
+    height: text.match(/(?:height|ht)\s*[:\-]?\s*(\d+(?:\.\d+)?)\s*(?:cm|inches|'|")/i)?.[1],
+    weight: text.match(/(?:weight|wt|current weight)\s*[:\-]?\s*(\d+(?:\.\d+)?)\s*kg/i)?.[1],
+    uw: text.match(/(?:usual weight|uw)\s*[:\-]?\s*(\d+(?:\.\d+)?)\s*kg/i)?.[1],
+    albumin: text.match(/(?:albumin|alb)\s*[:\-]?\s*(\d+(?:\.\d+)?)\s*(?:g\/dl)?/i)?.[1],
+    crp: text.match(/(?:crp|c-reactive protein)\s*[:\-]?\s*(\d+(?:\.\d+)?)\s*(?:mg\/l)?/i)?.[1],
+    creatinine: text.match(/(?:creatinine|cr|creat)\s*[:\-]?\s*(\d+(?:\.\d+)?)\s*(?:mg\/dl)?/i)?.[1],
+    alt: text.match(/alt\s*[:\-]?\s*(\d+)/i)?.[1],
+    ast: text.match(/ast\s*[:\-]?\s*(\d+)/i)?.[1],
+    bilirubin: text.match(/(?:bilirubin|bili)\s*[:\-]?\s*(\d+(?:\.\d+)?)/i)?.[1],
+    bloodSugar: text.match(/(?:blood sugar|glucose|bs)\s*[:\-]?\s*(\d+)/i)?.[1],
+    hemoglobin: text.match(/(?:hemoglobin|hb|hgb)\s*[:\-]?\s*(\d+(?:\.\d+)?)/i)?.[1],
+    vitD: text.match(/(?:vitamin d|vit d|25-oh d)\s*[:\-]?\s*(\d+(?:\.\d+)?)/i)?.[1],
+    vitB12: text.match(/(?:vitamin b12|vit b12|cobalamin)\s*[:\-]?\s*(\d+)/i)?.[1],
+    folate: text.match(/(?:folate|folic acid)\s*[:\-]?\s*(\d+(?:\.\d+)?)/i)?.[1],
+    zinc: text.match(/zinc\s*[:\-]?\s*(\d+)/i)?.[1],
+    magnesium: text.match(/(?:magnesium|mg)\s*[:\-]?\s*(\d+(?:\.\d+)?)/i)?.[1],
+    sodium: text.match(/sodium\s*[:\-]?\s*(\d+)/i)?.[1],
+    potassium: text.match(/potassium\s*[:\-]?\s*(\d+(?:\.\d+)?)/i)?.[1],
+    urea: text.match(/urea\s*[:\-]?\s*(\d+)/i)?.[1],
+    tsh: text.match(/tsh\s*[:\-]?\s*(\d+(?:\.\d+)?)/i)?.[1],
+    muac: text.match(/muac\s*[:\-]?\s*(\d+(?:\.\d+)?)/i)?.[1],
+    prealbumin: text.match(/prealbumin\s*[:\-]?\s*(\d+(?:\.\d+)?)/i)?.[1],
+    lbm: text.match(/(?:lean body mass|lbm)\s*[:\-]?\s*(\d+(?:\.\d+)?)/i)?.[1],
+    smi: text.match(/(?:skeletal muscle index|smi)\s*[:\-]?\s*(\d+(?:\.\d+)?)/i)?.[1],
+    grip: text.match(/(?:hand grip strength|handgrip|grip)\s*[:\-]?\s*(\d+(?:\.\d+)?)/i)?.[1],
+    stage: text.match(/(?:cancer stage|stage)\s*[:\-]?\s*([iv1234]{1,3})/i)?.[1],
+    tumorBurden: text.match(/tumor burden\s*[:\-]?\s*(low|moderate|high|bulky)/i)?.[1],
+    feeding: (() => {
+      if (text.includes('oral') && text.includes('diet')) return 'Oral Feeding (Normal Diet)';
+      if (text.includes('ons') || text.includes('supplement')) return 'Oral Nutrition Supplements (ONS)';
+      if (text.includes('nasogastric') || text.includes('ng')) return 'Enteral Feeding - Nasogastric Tube (NG)';
+      if (text.includes('peg')) return 'Enteral Feeding - PEG Tube';
+      if (text.includes('tpn') || text.includes('parenteral')) return 'Parenteral Nutrition (TPN)';
+      return null;
+    })(),
+    gi: text.includes('vomiting') || text.includes('nausea') || text.includes('diarrhea') || text.includes('bloating'),
+    reducedIntake: (() => {
+      const actualMatch = text.match(/(?:actual )?food intake\s*[:\-]?\s*(\d+)%/i);
+      if (actualMatch) return String(100 - parseInt(actualMatch[1], 10));
+      const reducedMatch = text.match(/reduced food intake\s*[:\-]?\s*(\d+)%/i);
+      return reducedMatch ? reducedMatch[1] : null;
+    })()
+  };
+
+  let foundCount = 0;
+  const foundItems = [];
+  const highlight = (id, label, val) => {
+    const el = document.getElementById(id);
+    if(!el) return;
+    el.classList.add('ai-filled');
+    setTimeout(() => el.classList.remove('ai-filled'), 3000);
+    if(label && val) foundItems.push(`${label}: ${val}`);
+  };
+
+  const mapField = (extKey, id, label) => {
+    if (extractions[extKey]) {
+      const el = document.getElementById(id);
+      if(el) {
+        el.value = extractions[extKey];
+        highlight(id, label, extractions[extKey]);
+        if (typeof updateLabStatus === 'function') updateLabStatus(id, extractions[extKey]);
+        foundCount++;
+      }
+    }
+  };
+
+  mapField('name', 'epName', 'Name');
+  mapField('age', 'epAge', 'Age');
+  mapField('sex', 'epSex', 'Sex');
+  mapField('height', 'epHeight', 'Height');
+  mapField('weight', 'epWeight', 'Weight');
+  mapField('uw', 'epUW', 'Usual Weight');
+  mapField('reducedIntake', 'epFoodIntake', 'Reduced Intake %');
+  mapField('albumin', 'epAlbumin', 'Albumin');
+  mapField('crp', 'epCRP', 'CRP');
+  mapField('creatinine', 'epCreatinine', 'Creatinine');
+  mapField('urea', 'epUrea', 'Urea');
+  mapField('sodium', 'epSodium', 'Sodium');
+  mapField('potassium', 'epPotassium', 'Potassium');
+  mapField('bloodSugar', 'epBloodSugar', 'Blood Sugar');
+  mapField('hemoglobin', 'epHemoglobin', 'Hemoglobin');
+  mapField('alt', 'epALT', 'ALT');
+  mapField('ast', 'epAST', 'AST');
+  mapField('bilirubin', 'epBilirubin', 'Bilirubin');
+  mapField('vitD', 'epVitD', 'Vitamin D');
+  mapField('vitB12', 'epVitB12', 'Vitamin B12');
+  mapField('folate', 'epFolate', 'Folate');
+  mapField('zinc', 'epZinc', 'Zinc');
+  mapField('magnesium', 'epMagnesium', 'Magnesium');
+  mapField('muac', 'epMUAC', 'MUAC');
+  mapField('prealbumin', 'epPrealbumin', 'Prealbumin');
+  mapField('lbm', 'epLeanBodyMass', 'Lean Body Mass');
+  mapField('smi', 'epSMI', 'SMI');
+  mapField('grip', 'epHandGrip', 'Hand Grip');
+  mapField('feeding', 'epFeeding', 'Feeding Method');
+
+  if (extractions.stage) {
+    const s = extractions.stage.toUpperCase();
+    let stageVal = '';
+    if (s === 'I' || s === '1') stageVal = 'Stage I';
+    else if (s === 'II' || s === '2') stageVal = 'Stage II';
+    else if (s === 'III' || s === '3') stageVal = 'Stage III';
+    else if (s === 'IV' || s === '4') stageVal = 'Stage IV';
+    if (stageVal) {
+      document.getElementById('epStage').value = stageVal;
+      highlight('epStage', 'Stage', stageVal);
+      foundCount++;
+    }
+  }
+
+  if (extractions.gi) { 
+    document.getElementById('epGi').value = "true"; 
+    highlight('epGi', 'GI Issues', 'Yes'); 
+    foundCount++; 
+  }
+
+  // Enhanced Cancer Mapping
+  const cancers = {
+    'multiple myeloma': 'Multiple Myeloma - Standard', 'myeloma': 'Multiple Myeloma - Standard',
+    'hepatocellular': 'Liver Cancer - Advanced HCC', 'hcc': 'Liver Cancer - Advanced HCC',
+    'liver cancer': 'Liver Cancer - Advanced HCC', 'liver tumor': 'Liver Cancer - Advanced HCC',
+    'lung cancer': 'Lung Cancer - NSCLC Adenocarcinoma', 'nsclc': 'Lung Cancer - NSCLC Adenocarcinoma', 'sclc': 'Lung Cancer - SCLC Extensive',
+    'breast cancer': 'Breast Cancer - HR+/HER2-',
+    'colon cancer': 'Colorectal Cancer - Stage III', 'colorectal': 'Colorectal Cancer - Stage III',
+    'prostate cancer': 'Prostate Cancer - Advanced', 'leukemia': 'Leukemia - AML', 'lymphoma': 'Lymphoma - DLBCL',
+    'pancreatic': 'Pancreatic Cancer - Resectable', 'pancreas cancer': 'Pancreatic Cancer - Resectable',
+    'gastric': 'Gastric Cancer - Advanced', 'stomach cancer': 'Gastric Cancer - Advanced', 
+    'cholangiocarcinoma': 'Cholangiocarcinoma (Bile Duct Cancer)',
+    'neuroendocrine': 'Neuroendocrine Tumors (NETs)',
+    'bladder cancer': 'Bladder Cancer - Muscle Invasive', 'urothelial': 'Bladder Cancer - Muscle Invasive',
+    'kidney cancer': 'Kidney Cancer - Clear Cell RCC', 'renal cell': 'Kidney Cancer - Clear Cell RCC',
+    'melanoma': 'Melanoma - Advanced / Metastatic',
+    'endometrial': 'Endometrial Cancer - Advanced / Recurrent',
+    'esophageal': 'Esophageal Cancer - Neoadjuvant (Pre-op)',
+    'sarcoma': 'Soft Tissue Sarcoma - Advanced / Metastatic',
+    'gist': 'GIST - Kit (CD117) Positive',
+    'thyroid cancer': 'Thyroid Cancer - RAI-Refractory',
+    'testicular': 'Testicular Cancer - Germ Cell Tumor'
+  };
+
+  let resolvedCancer = null;
+  for (const [key, val] of Object.entries(cancers)) {
+    const regex = new RegExp('\\b' + key + '\\b', 'i');
+    if (regex.test(text)) {
+      if (key === 'liver' && text.includes('liver function')) continue;
+      resolvedCancer = val;
+      break;
+    }
+  }
+
+  if (resolvedCancer) {
+    document.getElementById('epCancer').value = resolvedCancer;
+    highlight('epCancer', 'Cancer', resolvedCancer);
+    foundCount++;
+  }
+
+  // Optional server call for complex logic
   try {
-    const response = await fetch('http://localhost:3000/api/extract', {
+     fetch('http://localhost:3000/api/extract', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ pdfText: rawText })
-    });
-    
-    const json = await response.json();
-    if (!json.success || !json.data) {
-      addMessage("Extraction failed based on current API response.", 'ai');
-      return;
-    }
-    
-    const d = json.data;
-    let foundCount = 0;
-    const foundItems = [];
-    
-    const highlight = (id, label, val) => {
-      const el = document.getElementById(id);
-      if(!el) return;
-      if (val !== undefined && val !== null && val !== "" && val !== "null") {
-        el.value = val;
-        el.classList.add('ai-filled');
-        setTimeout(() => el.classList.remove('ai-filled'), 3000);
-        if(label) {
-          foundItems.push(`${label}: ${val}`);
-          foundCount++;
-        }
-      }
-    };
+    }).then(res => res.json()).then(json => {
+       if (json.success && json.data) {
+         // Supplemental logic from server could go here
+         console.log("Server supplemental extraction completed");
+       }
+    }).catch(() => {});
+  } catch(err) {}
 
-    highlight('epName', 'Name', d.name);
-    highlight('epAge', 'Age', d.age);
-    if(d.sex && typeof d.sex === 'string' && (d.sex.toLowerCase() === 'male' || d.sex.toLowerCase() === 'female')) {
-      highlight('epSex', 'Sex', d.sex.charAt(0).toUpperCase() + d.sex.slice(1).toLowerCase());
-    }
-    highlight('epWeight', 'Weight', d.weight);
-    highlight('epHeight', 'Height', d.height);
-    highlight('epUW', 'Usual Weight', d.usualWeight);
-    highlight('epFoodIntake', 'Reduced Food Intake %', d.reducedFoodIntake);
-    highlight('epAlbumin', 'Albumin', d.albumin);
-    highlight('epCRP', 'CRP', d.crp);
-    highlight('epMUAC', 'MUAC', d.muac);
-    highlight('epCreatinine', 'Creatinine', d.creatinine);
-    highlight('epALT', 'ALT', d.alt);
-    highlight('epAST', 'AST', d.ast);
-    highlight('epBilirubin', 'Bilirubin', d.bilirubin);
-    highlight('epBloodSugar', 'Blood Sugar', d.bloodSugar);
-    highlight('epSodium', 'Sodium', d.sodium);
-    highlight('epPotassium', 'Potassium', d.potassium);
-    highlight('epUrea', 'Urea', d.urea);
-    highlight('epTSH', 'TSH', d.tsh);
-    highlight('epPrealbumin', 'Prealbumin', d.prealbumin);
-    highlight('epHemoglobin', 'Hemoglobin', d.hemoglobin);
-    highlight('epVitD', 'Vit D', d.vitD);
-    highlight('epVitB12', 'Vit B12', d.vitB12);
-    highlight('epFolate', 'Folate', d.folate);
-    highlight('epZinc', 'Zinc', d.zinc);
-    highlight('epMagnesium', 'Magnesium', d.magnesium);
-    highlight('epLeanBodyMass', 'LBM', d.leanBodyMass);
-    highlight('epFatPercent', 'Fat %', d.fatPercent);
-    highlight('epSMI', 'SMI', d.smi);
-    highlight('epHandGrip', 'Hand Grip', d.handGrip);
-    highlight('epBSA', 'BSA', d.bsa);
-
-    // Selects / Strings
-    highlight('epCancer', 'Cancer', d.cancer);
-    highlight('epRegimen', 'Regimen', d.regimen);
-    highlight('epStage', 'Stage', d.cancerStage);
-    highlight('epECOG', 'ECOG', d.ecogStatus);
-    highlight('epActivityLevel', 'Activity', d.activityLevel);
-    highlight('epTumorBurden', 'Tumor Burden', d.tumorBurden);
-    highlight('epSarcopenia', 'Sarcopenia', d.sarcopeniaStatus);
-    highlight('epFeeding', 'Feeding', d.feedingMethod);
-    
-    if (d.giIssues === true || d.giIssues === "true") highlight('epGi', 'GI Issues', "true");
-    
-    // Arrays representing complex tags
-    if (Array.isArray(d.allergies) && d.allergies.length) { foundItems.push(`Allergies: ${d.allergies.join(', ')}`); foundCount++; }
-    if (Array.isArray(d.comorbidities) && d.comorbidities.length) { foundItems.push(`Comorbidities: ${d.comorbidities.join(', ')}`); foundCount++; }
-    if (Array.isArray(d.sideEffects) && d.sideEffects.length) { foundItems.push(`Side Effects: ${d.sideEffects.join(', ')}`); foundCount++; }
-    if (Array.isArray(d.treatmentTypes) && d.treatmentTypes.length) { foundItems.push(`Treatments: ${d.treatmentTypes.join(', ')}`); foundCount++; }
-    
-    // Genomic Markers specific mapping
-    if (Array.isArray(d.genomicMarkers) && d.genomicMarkers.length > 0) {
-      if(!patient.genomicMarkers) patient.genomicMarkers = [];
-      d.genomicMarkers.forEach(m => {
-        if(!patient.genomicMarkers.includes(m)) patient.genomicMarkers.push(m);
-      });
-      foundItems.push(`Genomic Markers: ${d.genomicMarkers.join(', ')}`);
-      foundCount += d.genomicMarkers.length;
-      updatePatient(patient);
-    }
-
-    if(foundCount > 0) {
-      document.getElementById('editPatientSection').style.display = 'block';
-      if(!window.isFollowUpMode) {
-         addMessage(`OpenAI extracted ${foundCount} precise match(es):\n• ${foundItems.slice(0, 8).join('\n• ')}\n...and more.\nAnything else?`, 'ai');
-      } else {
-         addMessage(`Follow-up parameters extracted via OpenAI.\n• ${foundItems.slice(0, 5).join('\n• ')}`, 'ai');
-         setTimeout(() => window.location.reload(), 2000);
-      }
-    } else {
-      addMessage("OpenAI analyzed the text but extracted no specific clinical markers we track.", 'ai');
-    }
-
-  } catch(e) {
-    console.error("OpenAI Extraction error", e);
-    addMessage("Failed to extract data using OpenAI API. Please check your network and Node server status.", 'ai');
+  if(foundCount > 0) {
+     addMessage(`AI Co-Pilot extracted ${foundCount} clinical fields:\n• ${foundItems.slice(0, 8).join('\n• ')}${foundItems.length > 8 ? '\n...and more.' : ''}\nForm updated!`, 'ai');
+  } else {
+     addMessage("I've analyzed the notes but couldn't find specific clinical markers to auto-fill. You can still enter them manually.", 'ai');
   }
 }
 
