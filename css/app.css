@@ -141,7 +141,7 @@ body::before {
   margin-bottom: 22px;
   transition: border-color 0.3s, box-shadow 0.3s;
   position: relative;
-  overflow: hidden;
+  /* overflow: visible; removed hidden so dropdowns can fly out of the card boundaries */
 }
 
 /* COLORED CARD VARIANTS */
