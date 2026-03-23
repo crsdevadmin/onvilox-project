@@ -5,18 +5,13 @@
 // Cancer → Regimen Mapping
 const cancerRegimenMap = {
   // --- NCCN Image Data ---
-  "Lung Cancer - NSCLC Adenocarcinoma": ["Cisplatin + Pemetrexed", "Carboplatin + Pemetrexed ± Pembrolizumab"],
+  "Lung Cancer - NSCLC Adenocarcinoma": ["Carboplatin + Pemetrexed ± Pembrolizumab"],
   "Lung Cancer - NSCLC Squamous": ["Carboplatin + Paclitaxel ± Pembrolizumab"],
   "Lung Cancer - EGFR Mutant": ["Osimertinib"],
   "Lung Cancer - ALK+": ["Alectinib"],
   "Lung Cancer - SCLC Limited": ["Cisplatin + Etoposide + Radiation"],
   "Lung Cancer - SCLC Extensive": ["Carboplatin + Etoposide + Atezolizumab"],
-  "Breast Cancer - HR+/HER2-": [
-    "AC -> Paclitaxel", 
-    "TC (Docetaxel + Cyclophosphamide)",
-    "FAC / FEC",
-    "Hormonal Therapy (AI / Tamoxifen)"
-  ],
+  "Breast Cancer - HR+/HER2-": ["AC -> Paclitaxel", "TC (Docetaxel + Cyclophosphamide)"],
   "Breast Cancer - HER2+": ["TCH (Docetaxel + Carboplatin + Trastuzumab)"],
   "Breast Cancer - Triple Negative": ["AC -> Taxane ± Pembrolizumab"],
   "Breast Cancer - Metastatic HR+": ["CDK4/6 inhibitor + AI"],
