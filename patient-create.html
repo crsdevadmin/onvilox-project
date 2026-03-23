@@ -284,13 +284,13 @@
     <div class="form-grid" style="grid-template-columns: 1fr 1fr;">
       <div class="form-group" style="grid-column:1 / -1;">
         <label class="required">Cancer Type</label>
-        <input type="text" id="cancerInput" placeholder="Search cancer type..." onclick="openCancerDropdown()" onkeyup="filterCancerList()" onblur="setTimeout(()=>validateField(this,'Cancer Type'), 200)">
+        <input type="text" id="cancerInput" placeholder="Search cancer type..." autocomplete="new-password" name="off" spellcheck="false" onfocus="openCancerDropdown()" onkeyup="filterCancerList()" onblur="setTimeout(()=>validateField(this,'Cancer Type'), 200)">
         <div class="dropdown-list" id="cancerDropdown"></div>
         <div class="validation-msg" id="cancerInput_msg"></div>
       </div>
       <div class="form-group" style="grid-column:1 / -1;">
         <label class="required">Chemo Regimen</label>
-        <input type="text" id="regimenInput" placeholder="Search regimen..." onclick="openRegimenDropdown()" onkeyup="filterRegimenList()" onblur="setTimeout(()=>validateField(this,'Chemo Regimen'), 200)">
+        <input type="text" id="regimenInput" placeholder="Search regimen..." autocomplete="new-password" name="off" spellcheck="false" onfocus="openRegimenDropdown()" onkeyup="filterRegimenList()" onblur="setTimeout(()=>validateField(this,'Chemo Regimen'), 200)">
         <div class="dropdown-list" id="regimenDropdown"></div>
         <div class="validation-msg" id="regimenInput_msg"></div>
       </div>
@@ -1168,52 +1168,31 @@ function runAiExtraction(rawText) {
     foundCount += extractions.sideEffects.length;
   }
 
-  // Enhanced Cancer Mapping (Avoiding "Liver Function" false positives)
-  const cancers = {
-    'multiple myeloma': 'Multiple Myeloma - Standard', 'myeloma': 'Multiple Myeloma - Standard',
-    'hepatocellular': 'Liver Cancer - Advanced HCC', 'hcc': 'Liver Cancer - Advanced HCC',
-    'liver cancer': 'Liver Cancer - Advanced HCC', 'liver tumor': 'Liver Cancer - Advanced HCC',
-    'lung cancer': 'Lung Cancer - NSCLC Adenocarcinoma', 'nsclc': 'Lung Cancer - NSCLC Adenocarcinoma', 'sclc': 'Lung Cancer - SCLC Extensive',
-    'breast cancer': 'Breast Cancer - HR+/HER2-',
-    'colon cancer': 'Colorectal Cancer - Stage III', 'colorectal': 'Colorectal Cancer - Stage III',
-    'prostate cancer': 'Prostate Cancer - Advanced', 'leukemia': 'Leukemia - AML', 'lymphoma': 'Lymphoma - DLBCL',
-    'pancreatic': 'Pancreatic Cancer - Resectable', 'pancreas cancer': 'Pancreatic Cancer - Resectable',
-    'gastric': 'Gastric Cancer - Advanced', 'stomach cancer': 'Gastric Cancer - Advanced', 
-    'cholangiocarcinoma': 'Cholangiocarcinoma (Bile Duct Cancer)',
-    'neuroendocrine': 'Neuroendocrine Tumors (NETs)',
-    'bladder cancer': 'Bladder Cancer - Muscle Invasive', 'urothelial': 'Bladder Cancer - Muscle Invasive',
-    'kidney cancer': 'Kidney Cancer - Clear Cell RCC', 'renal cell': 'Kidney Cancer - Clear Cell RCC',
-    'melanoma': 'Melanoma - Advanced / Metastatic',
-    'endometrial': 'Endometrial Cancer - Advanced / Recurrent',
-    'esophageal': 'Esophageal Cancer - Neoadjuvant (Pre-op)',
-    'sarcoma': 'Soft Tissue Sarcoma - Advanced / Metastatic',
-    'gist': 'GIST - Kit (CD117) Positive',
-    'thyroid cancer': 'Thyroid Cancer - RAI-Refractory',
-    'testicular': 'Testicular Cancer - Germ Cell Tumor'
-  };
-
-  // First try to find explicit cancer type statement
-  const explicitCancerMatch = text.match(/cancer(?: type)?\s*[:\-]?\s*([a-z\s]+)(?:\n|$)/i);
+  // Dynamic Cancer Mapping using Master Data
   let resolvedCancer = null;
 
-  if (explicitCancerMatch) {
-    const cancerText = explicitCancerMatch[1];
-    for (const [key, val] of Object.entries(cancers)) {
-      if (cancerText.includes(key) || (cancerText.includes('liver') && !cancerText.includes('function'))) {
-         resolvedCancer = cancerText.includes('liver') ? 'Liver Cancer - Advanced HCC' : val;
-         break;
-      }
+  // 1. Explicit search for keywords in cancer names from master data
+  const cancerKeys = Object.keys(cancerRegimenMap);
+  for (const cancerKey of cancerKeys) {
+    // Generate keywords from the key (e.g., "Lung Cancer – NSCLC" -> ["lung", "cancer", "nsclc"])
+    const keywords = cancerKey.toLowerCase().split(/[\s–\-]+/).filter(k => k.length > 3);
+    
+    // Check if any significant keyword matches the text
+    const matchesKeyword = keywords.some(k => text.includes(k));
+    
+    if (matchesKeyword) {
+      if (cancerKey.toLowerCase().includes('liver') && text.includes('liver function')) continue;
+      resolvedCancer = cancerKey;
+      break;
     }
   }
 
-  // If explicit search fails, do a very safe word boundary search
+  // 2. Fallback: Precise word boundaries for short terms like 'HCC', 'CML'
   if (!resolvedCancer) {
-    for (const [key, val] of Object.entries(cancers)) {
-      const regex = new RegExp('\\b' + key + '\\b', 'i');
-      if (regex.test(text)) {
-        // Double check it's not a false positive
-        if (key === 'liver' && text.includes('liver function')) continue;
-        resolvedCancer = val;
+    const shortTerms = { 'hcc': 'Liver Cancer – Advanced HCC', 'cml': 'Leukemia – CML', 'all': 'Leukemia – ALL', 'nsclc': 'Lung Cancer – NSCLC' };
+    for (const [term, key] of Object.entries(shortTerms)) {
+      if (new RegExp('\\b' + term + '\\b', 'i').test(text)) {
+        resolvedCancer = key;
         break;
       }
     }

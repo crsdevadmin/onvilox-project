@@ -58,7 +58,15 @@ function selectCancer(cancer) {
   input.value = cancer;
   document.getElementById("cancerDropdown").style.display = "none";
 
-  document.getElementById("regimenInput").value = "";
+  const regimenInput = document.getElementById("regimenInput");
+  const regimens = cancerRegimenMap[cancer] || [];
+  if (regimens.length === 1) {
+    regimenInput.value = regimens[0];
+    validateField(regimenInput, "Chemo Regimen");
+  } else {
+    regimenInput.value = "";
+  }
+  
   loadRegimenDropdown();
   validateField(input, "Cancer Type");
 }

@@ -411,7 +411,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--cyan); backgroun
 .dropdown-list {
   background: var(--surface-2); border: 1px solid var(--border-2);
   border-radius: var(--radius-sm); max-height: 200px; overflow-y: auto;
-  display: none; position: absolute; z-index: 50; width: 100%; margin-top: 4px;
+  display: none; position: absolute; z-index: 1000; width: 100%; margin-top: 4px;
 }
 .dropdown-list div { padding: 10px 14px; cursor: pointer; font-size: 13.5px; color: var(--text-2); transition: all 0.15s; }
 .dropdown-list div:hover { background: rgba(34,211,238,0.08); color: var(--cyan); }
