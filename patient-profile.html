@@ -2325,9 +2325,12 @@
 
             // 1. Explicit search for keywords in cancer names from master data
             const cancerKeys = Object.keys(cancerRegimenMap);
+            const genericTerms = ['cancer', 'tumor', 'stage', 'type', 'subtype', 'risk'];
+            
             for (const cancerKey of cancerKeys) {
-              // Generate keywords from the key (e.g., "Lung Cancer – NSCLC" -> ["lung", "cancer", "nsclc"])
-              const keywords = cancerKey.toLowerCase().split(/[\s–\-]+/).filter(k => k.length > 2); // Slightly shorter for profile flexibility
+              // Generate keywords, filtering out generic diagnostic terms
+              const keywords = cancerKey.toLowerCase().split(/[\s–\-]+/)
+                                .filter(k => k.length > 3 && !genericTerms.includes(k));
 
               // Check if any significant keyword matches the text
               const matchesKeyword = keywords.some(k => text.includes(k));
