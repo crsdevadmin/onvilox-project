@@ -5,7 +5,7 @@
 // Cancer → Regimen Mapping
 const cancerRegimenMap = {
   // --- NCCN Image Data ---
-  "Lung Cancer - NSCLC Adenocarcinoma": ["Carboplatin + Pemetrexed ± Pembrolizumab"],
+  "Lung Cancer - NSCLC Adenocarcinoma": ["Cisplatin + Pemetrexed", "Carboplatin + Pemetrexed ± Pembrolizumab"],
   "Lung Cancer - NSCLC Squamous": ["Carboplatin + Paclitaxel ± Pembrolizumab"],
   "Lung Cancer - EGFR Mutant": ["Osimertinib"],
   "Lung Cancer - ALK+": ["Alectinib"],

@@ -341,6 +341,7 @@
         <div class="rf"><div class="rf-lbl">Formula Intake Target</div><div class="rf-val big accent" id="dailyCalories"></div></div>
         <div class="rf"><div class="rf-lbl">Formula Protein Target</div><div class="rf-val big" id="dailyProtein"></div></div>
         <div class="rf"><div class="rf-lbl">Protein Formulation Type</div><div class="rf-val" id="proteinType"></div></div>
+        <div class="rf"><div class="rf-lbl">Prescribed Nutrition Route</div><div class="rf-val accent" style="font-weight:800;" id="pFeedingRoute"></div></div>
   
         <div class="rf full" style="margin-top:4px;">
           <table class="rt">
@@ -1728,6 +1729,17 @@ function savePatientEdits(){
   // Age is critical for V3 protein calculation
   patient.age = parseInt(document.getElementById('epAge').value || 0);
 
+  // --- NEW: Antioxidant & Renal Strength Blocking on Save ---
+  const eng = generateNutritionPlan(patient);
+  const dangerAlerts = (eng.safetyAlerts || []).filter(a => a.level === 'danger');
+  const drugDanger = dangerAlerts.find(a => a.message.includes('ANTIOXIDANTS') || a.message.includes('Bortezomib'));
+  
+  if (drugDanger) {
+    alert(`BLOCKING SAFETY ALERT: ${drugDanger.message}\n\nYou must remove 'Vitamin C', 'Alpha Lipoic Acid', or 'ALA' from the Existing Supplements list before this plan can be saved or dispensed.`);
+    document.getElementById('editPatientSection').scrollIntoView({behavior:'smooth', block:'start'});
+    return;
+  }
+
   updatePatient(patient);
 
   // regenerate plan as a new version due to input change
@@ -1746,6 +1758,14 @@ function approveFromReport(){
   }
   if(patient.status !== 'CREATED'){
     alert('Patient is already approved or in production.');
+    return;
+  }
+
+  // Final Safety Check before Approval
+  const eng = generateNutritionPlan(patient);
+  const dangerAlerts = (eng.safetyAlerts || []).filter(a => a.level === 'danger');
+  if (dangerAlerts.length > 0) {
+    alert(`APPROVAL DENIED: There are unresolved ${dangerAlerts.length} Critical Safety Alerts (🚨). These must be resolved in the patient profile or via a documented medical override before production.`);
     return;
   }
 
@@ -2066,15 +2086,21 @@ function bind(plan){
   // Bind Drug Interactions if any
   const drugSec = document.getElementById('drugSection');
   const drugBody = document.getElementById('drugInteractionsBody');
-  if (plan.finalPlan.interactions && plan.finalPlan.interactions.length > 0) {
+  const hasHighRisk = plan.finalPlan.hasHighRiskRegimen;
+
+  if (hasHighRisk || (plan.finalPlan.interactions && plan.finalPlan.interactions.length > 0)) {
     drugSec.style.display = 'block';
-    drugBody.innerHTML = plan.finalPlan.interactions.map(i => `
-      <tr>
-        <td style="font-weight:700; color:#0e2247;">${i.drug}</td>
-        <td>${i.effect}</td>
-        <td style="font-style:italic; color:#1e40af;">${i.advice}</td>
-      </tr>
-    `).join('');
+    if (hasHighRisk && (!plan.finalPlan.interactions || plan.finalPlan.interactions.length === 0)) {
+        drugBody.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:20px; color:#64748b;">Mandatory safety screening active for this regimen. No specific flags.</td></tr>';
+    } else {
+        drugBody.innerHTML = plan.finalPlan.interactions.map(i => `
+          <tr>
+            <td style="font-weight:700; color:#0e2247;">${i.drug}</td>
+            <td>${i.effect}</td>
+            <td style="font-style:italic; color:#1e40af;">${i.advice}</td>
+          </tr>
+        `).join('');
+    }
   } else {
     drugSec.style.display = 'none';
   }
@@ -2108,6 +2134,7 @@ function bind(plan){
 
   setVal('vitD', fp.micronutrients.vitD || '2000 IU');
   setVal('vitC', fp.micronutrients.vitC || '500-1000 mg');
+  setVal('pFeedingRoute', fp.prescribedRoute || 'Oral Feeding');
   
   if (fp.micronutrients.iron) {
     document.getElementById('ironRow').style.display = 'table-row';
@@ -2173,7 +2200,10 @@ function bind(plan){
   setVal('mProtein', fp.perServingProtein + ' g');
   setVal('mCarbs', fp.macroCarbs + ' g');
   setVal('mFat', fp.macroFat + ' g');
-  setVal('mForm', (patient.feedingMethod||'').includes('Oral') ? 'Powder' : 'Liquid');
+  
+  // Mandatory Switch: Format follows the Prescribed Route (Safety Escalation) not the current profile method
+  const isEscalation = (fp.prescribedRoute || '').includes('Enteral');
+  setVal('mForm', isEscalation ? 'Liquid (Emergency Enteral Format)' : ((patient.feedingMethod||'').includes('Oral') ? 'Powder (Oral Mix)' : 'Liquid (Tube Formula)'));
   
   // Recipe Binding
   const rb = document.getElementById('recipeBody');
@@ -2323,8 +2353,22 @@ function bind(plan){
   if(plan.generatedBy === 'DOCTOR_OVERRIDE'){
     const o = plan.overrides || {};
     const changes = [];
-    Object.keys(o).forEach(k => changes.push(`${k}: <b>${plan.engineOutput[k]}</b> → <b>${o[k]}</b>`));
-    trace.push(`<b>Doctor override:</b> ${changes.join(', ') || 'Applied'}${plan.overrideNotes ? `<br><b>Note:</b> ${plan.overrideNotes}`:''}`);
+    Object.keys(o).forEach(k => {
+      let label = k;
+      if (k === 'dailyProtein') label = 'Protein (Target)';
+      if (k === 'dailyCalories') label = 'Calories (Target)';
+      changes.push(`${label}: <b>${plan.engineOutput[k]}</b> → <b>${o[k]}</b>`);
+    });
+    
+    let overrideHeader = "<b>Doctor override applied:</b> ";
+    if (fp.hasRenalIssue && o.dailyProtein > fp.dailyProtein) {
+        overrideHeader = '<b>⚠️ RENAL SAFETY OVERRIDE (Alert Acknowledged):</b> ';
+    }
+    if (fp.safetyAlerts && fp.safetyAlerts.some(a => a.message.toLowerCase().includes('bortezomib') || a.message.toLowerCase().includes('myeloma'))) {
+      overrideHeader = '<b>⚠️ BORTEZOMIB/MYELOMA SAFETY OVERRIDE (Alert Acknowledged):</b> ';
+    }
+    
+    trace.push(`${overrideHeader}${changes.join(', ') || 'Modifications accepted.'}${plan.overrideNotes ? `<br><b>Justification:</b> ${plan.overrideNotes}`:''}`);
   }
 
   trace.push(`<div style="margin-top:10px;color:#6b7280;font-size:13px;">Guideline notes: uses weight-loss/albumin to stratify nutritional risk and cachexia-related wasting states.</div>`);
@@ -2437,11 +2481,42 @@ function applyOverride(){
     overrides.macroFat = d.macroFat;
   }
 
-  if(ovO && ovO.trim()){
-    overrides.micronutrients = Object.assign({}, engineOutput.micronutrients, { omega3: ovO.trim() });
+  // Strength Blocking: Force note if overriding renal cap
+  if (engineOutput.hasRenalIssue && overrides.dailyProtein > engineOutput.dailyProtein) {
+    if (!note || note.trim().length < 5) {
+      alert("CRITICAL SAFETY BLOCK: Renal restriction (0.8-1g/kg) is active. To override this, you must enter a detailed clinical justification.\n\nExample: '1.3g/kg selected per cachexia-renal balance. Nephrologist co-sign required.'");
+      return;
+    }
+    // Append acknowledgment prefix to ensure forensic record
+    const prefix = "Alert acknowledged; ";
+    if (!note.toLowerCase().includes("alert acknowledged")) {
+        document.getElementById('ovNote').value = prefix + note;
+    }
   }
 
-  const plan = createOrUpdatePlan(patient, engineOutput, overrides, note || '');
+  // --- NEW: Antioxidant Strength Blocking ---
+  const hasBortezomib = (engineOutput.safetyAlerts || []).some(a => 
+    a.message.toLowerCase().includes('bortezomib') || 
+    a.message.toLowerCase().includes('myeloma') || 
+    a.message.toLowerCase().includes('velcade') || 
+    a.message.toLowerCase().includes('vrd')
+  );
+  const overVitC = (overrides.micronutrients && parseInt(overrides.micronutrients.vitC) > 500);
+  const hasALAVal = (overrides.micronutrients && overrides.micronutrients.ala != null); 
+  
+  // Note: Since micronutrients override is partial, check against engine output if not in override
+  const finalVitC = overrides.micronutrients?.vitC || engineOutput.micronutrients.vitC;
+  const finalALA = overrides.micronutrients?.ala || engineOutput.micronutrients.ala;
+  const isTooMuchVitC = parseInt(finalVitC) > 500;
+  const isALAActive = !!finalALA && finalALA.toString().toLowerCase() !== 'null';
+
+  if (hasBortezomib && (isTooMuchVitC || isALAActive)) {
+     alert("CRITICAL SAFETY BLOCK: Bortezomib regimen detected. High-dose antioxidants (Vit C > 500mg or any Alpha Lipoic Acid) are CONTRAINDICATED as they neutralize Bortezomib efficacy. Correct the prescription before proceeding.");
+     return;
+  }
+
+  const finalNote = document.getElementById('ovNote').value;
+  const plan = createOrUpdatePlan(patient, engineOutput, overrides, finalNote || '');
   currentPlan = plan;
   bind(plan);
 

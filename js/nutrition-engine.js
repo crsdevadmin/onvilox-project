@@ -70,9 +70,10 @@ function generateNutritionPlan(patient) {
   }
 
   // Comorbidities / Organ Function
-  const hasRenalIssue = comorbidities.some(c => c.toLowerCase().includes('renal')) || creatinine >= 1.5 || urea >= 40;
-  const hasIBD = comorbidities.some(c => c.toLowerCase().includes('ibd') || c.toLowerCase().includes('crohn') || c.toLowerCase().includes('colitis'));
-  const hasCardiac = comorbidities.some(c => c.toLowerCase().includes('cardiac'));
+  const lowerComorbidities = comorbidities.map(c => c.toLowerCase());
+  const hasRenalIssue = lowerComorbidities.some(c => c.includes('renal') || c.includes('kidney') || c.includes('ckd') || c.includes('nephro')) || creatinine > 1.3 || urea >= 40;
+  const hasIBD = lowerComorbidities.some(c => c.includes('ibd') || c.includes('crohn') || c.includes('colitis'));
+  const hasCardiac = lowerComorbidities.some(c => c.includes('cardiac'));
 
   if (hasRenalIssue) {
     riskScore += 2;
@@ -141,8 +142,8 @@ function generateNutritionPlan(patient) {
 
   // --- STEP 6: SAFETY LAYER (PROTEIN CAP) ---
   if (hasRenalIssue) {
-    // KDIGO: 0.8-1.0g/kg. 
-    proteinPerKg = (cachexia || sarcopenia) ? 1.0 : 0.8;
+    // KDIGO: 0.8g/kg strict limit. Any increase (e.g. to 1.0g/kg) requires documented medical override.
+    proteinPerKg = 0.8;
   } else {
     if ((regimen.includes('folfirinox') || regimen.includes('platin')) && cachexia) {
       proteinPerKg = 2.0;
@@ -176,7 +177,7 @@ function generateNutritionPlan(patient) {
   };
 
   if (creatinine > 1.3) {
-    safetyStatus.renal = { level: 'danger', message: `CRITICAL RENAL ALERT: Creatinine ${creatinine} is elevated. Protein restricted to 0.8-1g/kg.` };
+    safetyStatus.renal = { level: 'danger', message: `CRITICAL RENAL ALERT: Creatinine ${creatinine} is elevated. Protein strictly restricted to 0.8g/kg.` };
   } else if (creatinine < 0.6) {
     safetyStatus.renal = { level: 'warning', message: 'LOW CREATININE ALERT: Potential muscle wasting; verify SMI/Grip.' };
   }
@@ -191,24 +192,46 @@ function generateNutritionPlan(patient) {
     safetyStatus.metabolic = { level: 'warning', message: "CLINICAL CONTRADICTION: ECOG 0 (Active) while Activity is Sedentary. Verify performance status." };
   }
 
-  if (patient.sodium > 0 && patient.sodium < 130) {
-    safetyStatus.electrolyte = { level: 'danger', message: `HYPONATREMIA ALERT: Sodium ${patient.sodium}. NaCl 1-2g target in formulation.` };
-  } else if (patient.potassium > 5.5) {
-    safetyStatus.electrolyte = { level: 'danger', message: `HYPERKALEMIA ALERT: Potassium ${patient.potassium}. Low-K formulation required.` };
+  if (patient.sodium > 0 && patient.sodium < 135) {
+    const naLevel = patient.sodium < 130 ? 'danger' : 'warning';
+    safetyStatus.electrolyte = { level: naLevel, message: `HYPONATREMIA ALERT: Sodium ${patient.sodium}. NaCl 1-2g target in formulation.` };
+  } else if (patient.potassium > 5.0) {
+    const kLevel = patient.potassium > 5.5 ? 'danger' : 'warning';
+    safetyStatus.electrolyte = { level: kLevel, message: `HYPERKALEMIA ALERT: Potassium ${patient.potassium}. Low-K formulation required.` };
   }
 
-  // Drug interaction check (interactions array defined later, moved check)
-  // Drug interaction check
-  const drugs = []; 
-  if (regimen.includes('cisplatin')) drugs.push("Cisplatin");
-  if (regimen.includes('bortezomib')) drugs.push("Bortezomib");
-  if (regimen.includes('lenalidomide')) drugs.push("Lenalidomide");
+  // --- Enhanced Drug Detection (Step 6 Safety) ---
+  const lowerRegimen = regimen.toLowerCase();
+  const lowerCancer = cancer.toLowerCase();
   
-  if (drugs.length > 0) {
-    safetyStatus.drug = { level: 'warning', message: `DRUG INTERACTION: ${drugs.join(', ')} protocol active. Nutrients adjusted for safety.` };
+  const drugs = [];
+  if (lowerRegimen.includes('cisplatin')) drugs.push("Cisplatin");
+  if (lowerRegimen.includes('bortezomib') || lowerRegimen.includes('velcade') || lowerRegimen.includes('vrd') || lowerRegimen.includes('vcd')) drugs.push("Bortezomib");
+  if (lowerRegimen.includes('lenalidomide') || lowerRegimen.includes('revlimid')) drugs.push("Lenalidomide");
+  
+  const hasBortezomib = drugs.includes("Bortezomib") || lowerCancer.includes('myeloma');
+  
+  if (drugs.length > 0 || lowerCancer.includes('myeloma')) {
+    let msg = `DRUG INTERACTION: ${drugs.join(', ') || 'Bortezomib/Myeloma'} protocol active.`;
+    
+    // Check for existing supplements that might interfere
+    const existingSupplements = (Array.isArray(patient.existingSupplements) ? patient.existingSupplements : []).map(s => s.toLowerCase());
+    const hasExistingAntioxidants = existingSupplements.some(s => s.includes('vitamin c') || s.includes('alpha lipoic acid') || s.includes('ala'));
+
+    if (hasBortezomib) {
+      msg += " Antioxidant cap (Vit C < 500mg, No ALA) enforced.";
+      if (hasExistingAntioxidants) {
+        safetyStatus.drug = { level: 'danger', message: `CRITICAL DRUG CLASH: High-dose antioxidants (Vit C/ALA) found in current patient list. This interferes with Bortezomib. Discontinue immediately.` };
+      } else {
+        safetyStatus.drug = { level: 'warning', message: msg };
+      }
+    } else {
+      msg += " Nutrients adjusted for safety.";
+      safetyStatus.drug = { level: 'warning', message: msg };
+    }
+  } else {
+    safetyStatus.drug = { level: 'info', message: 'Drug Interference: Screened for major antioxidant-chemo clashes (Bortezomib/Cisplatin). No flags.' };
   }
-  
-  const hasBortezomib = regimen.includes('bortezomib') || regimen.includes('velcade');
 
   if (actualIntake <= 30) {
     safetyStatus.escalation = { level: 'danger', message: `CRITICAL INTAKE REQ: Intaking only ${actualIntake}%. Immediate Enteral Tube Escalation required.` };
@@ -274,17 +297,25 @@ function generateNutritionPlan(patient) {
   else if ((patient.feedingMethod || '').toLowerCase().includes('enteral')) proteinType = 'Peptide formulas';
 
   const interactions = [];
-  if (regimen.includes('cisplatin')) {
+  if (lowerRegimen.includes('cisplatin')) {
     interactions.push({ drug: "Cisplatin", effect: "Renal Magnesium Wasting", advice: "Mandatory Magnesium protocol; monitor creatinine closely." });
   }
-  if (regimen.includes('taxane') || regimen.includes('paclitaxel') || regimen.includes('docetaxel')) interactions.push({ drug: "Taxanes", effect: "Peripheral Neuropathy focus", advice: "ALA and B-Complex optimized." });
-  if (regimen.includes('5-fu') || regimen.includes('capecitabine') || regimen.includes('folfirinox')) interactions.push({ drug: "Fluoropyrimidines", effect: "Mucositis / GI Toxicity risk", advice: "Glutamine and peptide protein prioritized." });
-  if (regimen.includes('irinotecan')) interactions.push({ drug: "Irinotecan", effect: "Severe Diarrhea", advice: "Early mucosal support focus." });
-  if (regimen.includes('bortezomib')) {
-    interactions.push({ drug: "Bortezomib", effect: "Antioxidant & B6 Interference", advice: "Avoid high-dose Vit C, ALA, and high-dose B6 (may reduce efficacy)." });
+  if (lowerRegimen.includes('taxane') || lowerRegimen.includes('paclitaxel') || lowerRegimen.includes('docetaxel')) {
+    interactions.push({ drug: "Taxanes", effect: "Peripheral Neuropathy focus", advice: "ALA and B-Complex optimized." });
   }
-  if (regimen.includes('lenalidomide')) interactions.push({ drug: "Lenalidomide", effect: "VTE/Antiplatelet Risk", advice: "Monitor Omega-3 dosing due to mild antiplatelet effects." });
-  if (regimen.includes('pemetrexed') || regimen.includes('methotrexate')) {
+  if (lowerRegimen.includes('5-fu') || lowerRegimen.includes('capecitabine') || lowerRegimen.includes('folfirinox')) {
+    interactions.push({ drug: "Fluoropyrimidines", effect: "Mucositis / GI Toxicity risk", advice: "Glutamine and peptide protein prioritized." });
+  }
+  if (lowerRegimen.includes('irinotecan')) {
+    interactions.push({ drug: "Irinotecan", effect: "Severe Diarrhea", advice: "Early mucosal support focus." });
+  }
+  if (hasBortezomib) {
+    interactions.push({ drug: "Bortezomib (Velcade)", effect: "Antioxidant & B6 Interference", advice: "Avoid high-dose Vit C, ALA, and high-dose B6. If ALA is required for neuropathy, restrict to non-Bortezomib days ONLY with oncologist approval." });
+  }
+  if (lowerRegimen.includes('lenalidomide') || lowerRegimen.includes('revlimid') || lowerRegimen.includes('vrd')) {
+    interactions.push({ drug: "Lenalidomide (Revlimid)", effect: "VTE/Antiplatelet Risk", advice: "Monitor Omega-3 dosing due to mild antiplatelet effects." });
+  }
+  if (lowerRegimen.includes('pemetrexed') || lowerRegimen.includes('methotrexate')) {
     interactions.push({ drug: "Antifolates (e.g. Pemetrexed)", effect: "Folate Antagonism", advice: "Strict adherence to explicit folate supplementation protocol required." });
   }
 
@@ -349,7 +380,9 @@ function generateNutritionPlan(patient) {
   }
   if (hasIBD) rationale.push(`<b>GI Strategy (IBD):</b> Low-residue focus and hydrolyzed protein used.`);
   if (cancer.includes('pancreatic')) rationale.push(`<b>PERT Focus:</b> Enzymes strongly recommended to address EPI.`);
-  if (hemoglobin > 0 && hemoglobin < 10) rationale.push(`<b>Anemia Focus:</b> Hb < 10 detected; Iron protocol active.`);
+  if (actualIntake <= 50 && !isEnteral) {
+    rationale.push(`<b>Escalation Strategy:</b> Critical intake deficit (${actualIntake}%) detected; clinical transition to Enteral Feeding (Liquid format) strongly recommended to meet targets.`);
+  }
 
   function buildFormulationOptions(targets) {
     if (typeof IngredientLibrary === 'undefined') return null;
@@ -397,12 +430,6 @@ function generateNutritionPlan(patient) {
     "Small frequent sips improve tolerance."
   ];
 
-  const outcomes = {
-    weightStabilization: cachexia ? "90% Probability" : "98% Probability",
-    musclePreservation: (sarcopenia || proteinPerKg >= 1.8) ? "Clinically improved" : "Likely Maintained",
-    organProtection: (hasRenalIssue || alt > 50) ? "Safety Protocols Active" : "Standard"
-  };
-
   // V3 Outcome Prediction Engine - Unified Logic
   function calculateOutcomePrediction(riskScore, ecoG, intake, tumorBurden) {
     let baseProb = 98; // Default "ideal" probability
@@ -440,6 +467,14 @@ function generateNutritionPlan(patient) {
     };
   }
 
+  const outcomePrediction = calculateOutcomePrediction(riskScore, patient.ecogStatus, patient.reducedFoodIntake, patient.tumorBurden);
+
+  const outcomes = {
+    weightStabilization: `${outcomePrediction.percentage}% Probability`,
+    musclePreservation: (sarcopenia || proteinPerKg >= 1.8) ? "Clinically improved" : "Likely Maintained",
+    organProtection: (hasRenalIssue || alt > 50) ? "Safety Protocols Active" : "Standard"
+  };
+
   return {
     cachexia, bmi: Math.round(bmi * 10) / 10, kcalPerKg, proteinPerKg,
     servingsPerDay, totalDailyCalories, totalDailyProtein,
@@ -450,9 +485,12 @@ function generateNutritionPlan(patient) {
     patientInstructions, 
     outcomes, interactions,
     enteralProtocol, electrolyteStrategy, reassessmentProtocol,
+    hasRenalIssue,
+    hasHighRiskRegimen: (hasBortezomib || lowerRegimen.includes('cisplatin') || lowerRegimen.includes('platin') || lowerRegimen.includes('lenalidomide')),
+    prescribedRoute: (actualIntake <= 50) ? "Enteral Tube Feeding (Escalation)" : (actualIntake <= 75 ? "Oral Nutrition Supplements (ONS)" : "Oral Feeding (Maintenance)"),
     baseEnergy: baseDailyCalories,
     baseProtein: baseDailyProtein,
-    outcomePrediction: calculateOutcomePrediction(riskScore, patient.ecogStatus, patient.reducedFoodIntake, patient.tumorBurden),
+    outcomePrediction,
     recipe: buildFormulationOptions({ macroProtein, macroCarbs, macroFat, proteinType, bloodSugar, cachexia, crp }),
     reportNotes: {
       basis: 'V5 Multi-System Engine (ESMO/ESPEN/ASCO/KDIGO guidelines).'
