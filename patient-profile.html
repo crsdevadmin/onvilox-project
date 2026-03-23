@@ -1722,7 +1722,7 @@ function savePatientEdits(){
 
   // regenerate plan as a new version due to input change
   const engineOutput = generateNutritionPlan(patient);
-  const note = document.getElementById('epNote').value || 'User updated clinical inputs';
+  const note = document.getElementById('epNotes')?.value || 'User updated clinical inputs';
   const newPlan = createOrUpdatePlan(patient, engineOutput, {}, note);
 
   bind(newPlan);
