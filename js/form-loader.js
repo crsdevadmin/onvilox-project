@@ -73,14 +73,15 @@ function loadRegimenDropdown() {
   const dropdown = document.getElementById("regimenDropdown");
   dropdown.innerHTML = "";
 
-  if (!selectedCancer) return;
-
-  cancerRegimenMap[selectedCancer].forEach(regimen => {
-    const div = document.createElement("div");
-    div.innerText = regimen;
-    div.onclick = () => selectRegimen(regimen);
-    dropdown.appendChild(div);
-  });
+  const regimens = cancerRegimenMap[selectedCancer] || [];
+  if (Array.isArray(regimens)) {
+    regimens.forEach(regimen => {
+      const div = document.createElement("div");
+      div.innerText = regimen;
+      div.onclick = () => selectRegimen(regimen);
+      dropdown.appendChild(div);
+    });
+  }
 }
 
 function filterRegimenList() {
@@ -88,16 +89,17 @@ function filterRegimenList() {
   const dropdown = document.getElementById("regimenDropdown");
   dropdown.innerHTML = "";
 
-  if (!selectedCancer) return;
-
-  cancerRegimenMap[selectedCancer].forEach(regimen => {
-    if (regimen.toLowerCase().includes(input)) {
-      const div = document.createElement("div");
-      div.innerText = regimen;
-      div.onclick = () => selectRegimen(regimen);
-      dropdown.appendChild(div);
-    }
-  });
+  const regimens = cancerRegimenMap[selectedCancer] || [];
+  if (Array.isArray(regimens)) {
+    regimens.forEach(regimen => {
+      if (regimen.toLowerCase().includes(input)) {
+        const div = document.createElement("div");
+        div.innerText = regimen;
+        div.onclick = () => selectRegimen(regimen);
+        dropdown.appendChild(div);
+      }
+    });
+  }
 }
 
 function selectRegimen(regimen) {
@@ -296,5 +298,4 @@ function validateField(field, fieldName) {
   }
   return true;
 }
-
 

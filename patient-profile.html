@@ -1126,14 +1126,16 @@ function filterEpRegimenList() {
   dropdown.innerHTML = "";
 
   const regimens = cancerRegimenMap[cancer] || [];
-  regimens.forEach(regimen => {
-    if (regimen.toLowerCase().includes(input)) {
-      const div = document.createElement("div");
-      div.innerText = regimen;
-      div.onclick = () => selectEpRegimen(regimen);
-      dropdown.appendChild(div);
-    }
-  });
+  if (Array.isArray(regimens)) {
+    regimens.forEach(regimen => {
+      if (regimen.toLowerCase().includes(input)) {
+        const div = document.createElement("div");
+        div.innerText = regimen;
+        div.onclick = () => selectEpRegimen(regimen);
+        dropdown.appendChild(div);
+      }
+    });
+  }
 }
 
 function selectEpRegimen(regimen) {
@@ -1573,7 +1575,7 @@ async function runAiExtraction(rawText) {
     'pancreatic': 'Pancreatic Cancer - Resectable', 'pancreas cancer': 'Pancreatic Cancer - Resectable',
     'gastric': 'Gastric Cancer - Advanced', 'stomach cancer': 'Gastric Cancer - Advanced', 
     'cholangiocarcinoma': 'Cholangiocarcinoma (Bile Duct Cancer)',
-    'neuroendocrine': 'Neuroendocrine Tumors (NETs)',
+    'neuroendocrine': 'Neuroendocrine (NETs) - Well-differentiated',
     'bladder cancer': 'Bladder Cancer - Muscle Invasive', 'urothelial': 'Bladder Cancer - Muscle Invasive',
     'kidney cancer': 'Kidney Cancer - Clear Cell RCC', 'renal cell': 'Kidney Cancer - Clear Cell RCC',
     'melanoma': 'Melanoma - Advanced / Metastatic',
