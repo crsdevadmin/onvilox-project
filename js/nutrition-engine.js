@@ -155,14 +155,14 @@ function generateNutritionPlan(patient) {
   const baseDailyProtein = Math.round(weight * proteinPerKg);
 
   // --- DEFICIT LOGIC (ONS vs Total) ---
-  // If Enteral or very low intake (<30%), it's total nutrition. 
-  // Otherwise, it's a supplement (ONS) covering the deficit.
+  const actualIntake = 100 - reducedFoodIntake;
   const isTotalNutrition = (patient.feedingMethod || '').toLowerCase().includes('enteral') || actualIntake < 30;
-  const targetCalories = isTotalNutrition ? baseDailyCalories : Math.round(baseDailyCalories * (reducedFoodIntake / 100));
-  const targetProtein = isTotalNutrition ? baseDailyProtein : Math.round(baseDailyProtein * (reducedFoodIntake / 100));
+  
+  const dailyCalories = isTotalNutrition ? baseDailyCalories : Math.round(baseDailyCalories * (reducedFoodIntake / 100));
+  const dailyProtein = isTotalNutrition ? baseDailyProtein : Math.round(baseDailyProtein * (reducedFoodIntake / 100));
 
-  const totalDailyCalories = targetCalories;
-  const totalDailyProtein = targetProtein;
+  const totalDailyCalories = dailyCalories;
+  const totalDailyProtein = dailyProtein;
   
   // V3 Safety Engine (Step 6) - Exactly 6 Categories
   const safetyStatus = {
@@ -190,7 +190,6 @@ function generateNutritionPlan(patient) {
     safetyStatus.metabolic = { level: 'warning', message: "CLINICAL CONTRADICTION: ECOG 0 (Active) while Activity is Sedentary. Verify performance status." };
   }
 
-  const actualIntake = 100 - reducedFoodIntake;
   if (patient.sodium > 0 && patient.sodium < 130) {
     safetyStatus.electrolyte = { level: 'danger', message: `HYPONATREMIA ALERT: Sodium ${patient.sodium}. NaCl 1-2g target in formulation.` };
   } else if (patient.potassium > 5.5) {
