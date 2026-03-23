@@ -1720,6 +1720,10 @@
             return false;
           };
           console.log("ONVILOX_STABLE_V4_FIXED_LOADED");
+          function setVal(id, val) {
+            const el = document.getElementById(id);
+            if (el) el.innerText = val ?? '-';
+          }
           // INTAKE CALCULATOR LOGIC
           function addIntakeRow() {
             const container = document.getElementById('intakeRows');
@@ -2651,10 +2655,6 @@
             if (aaEl) aaEl.innerText = approvedAt;
 
             // Patient
-            function setVal(id, val) {
-              const el = document.getElementById(id);
-              if (el) el.innerText = val ?? '-';
-            }
 
             // Bind History Assessments
             const assessments = patient.assessments || [];
