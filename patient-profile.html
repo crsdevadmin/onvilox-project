@@ -1663,6 +1663,7 @@ function savePatientEdits(){
   patient.height = parseFloat(document.getElementById('epHeight').value);
   patient.albumin = parseFloat(document.getElementById('epAlbumin').value);
   patient.usualWeight = parseFloat(document.getElementById('epUW').value || 0);
+  patient.reducedFoodIntake = parseFloat(document.getElementById('epFoodIntake')?.value || 0);
   patient.weightLossPercent = (() => {
     const uw = patient.usualWeight;
     const cw = patient.weight;
