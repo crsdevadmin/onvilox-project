@@ -156,12 +156,16 @@ function generateNutritionPlan(patient) {
   const baseDailyProtein = Math.round(weight * proteinPerKg);
 
   // --- DEFICIT LOGIC (Pure arithmetic without force-total override) ---
+  // --- DEFICIT LOGIC (Optimized for Escalation) ---
   const actualIntake = 100 - (reducedFoodIntake || 0);
-  const isEnteral = (patient.feedingMethod || '').toLowerCase().includes('enteral');
   
-  // If Enteral feeding, target 100%. Otherwise, calculate the exact missing deficit.
-  const dailyCalories = isEnteral ? baseDailyCalories : Math.round(baseDailyCalories * (reducedFoodIntake / 100));
-  const dailyProtein = isEnteral ? baseDailyProtein : Math.round(baseDailyProtein * (reducedFoodIntake / 100));
+  // CRITICAL FIX: If the patient is Renal, Enteral, or Escalated, we always target 100% 
+  // to ensure they receive the full therapeutic dose (e.g. 0.8g/kg) without it being 
+  // further restricted by an estimated oral intake gap.
+  const isFullReplacement = (patient.feedingMethod || '').toLowerCase().includes('enteral') || (actualIntake <= 50) || hasRenalIssue;
+  
+  const dailyCalories = isFullReplacement ? baseDailyCalories : Math.round(baseDailyCalories * (reducedFoodIntake / 100));
+  const dailyProtein = isFullReplacement ? baseDailyProtein : Math.round(baseDailyProtein * (reducedFoodIntake / 100));
 
   const totalDailyCalories = dailyCalories;
   const totalDailyProtein = dailyProtein;
@@ -242,6 +246,11 @@ function generateNutritionPlan(patient) {
   if (reducedFoodIntake > 50) {
     safetyStatus.deficit = { level: 'warning', message: `HIGH DEFICIT ALERT: ${reducedFoodIntake}% intake gap. Prescription covers full deficit.` };
   }
+  
+  // New Safety Check: Missing HbA1c in high-risk glycemic cases
+  if ((isDiabetic || bloodSugar > 180) && (!patient.hba1c || patient.hba1c === 0)) {
+     safetyStatus.hba1c = { level: 'warning', message: `SCREENING REQ: Glucose ${bloodSugar}mg/dL detected without HbA1c record. Glycemic control depth unknown.` };
+  }
 
   // --- NEW: CLINICAL PROTOCOLS (TRANSITION & FOLLOW-UP) ---
   const enteralProtocol = (actualIntake <= 50) ? {
@@ -271,8 +280,8 @@ function generateNutritionPlan(patient) {
   if (dailyCalories >= 1800 || hasAppetiteLoss || hasNausea) servingsPerDay = 4;
   if (dailyCalories >= 2400) servingsPerDay = 5;
 
-  const perServingCalories = Math.round(dailyCalories / servingsPerDay);
-  const perServingProtein = Math.round(dailyProtein / servingsPerDay);
+  const perServingCalories = Math.round((dailyCalories / servingsPerDay) * 10) / 10;
+  const perServingProtein = Math.round((dailyProtein / servingsPerDay) * 10) / 10;
 
   const proteinCalories = dailyProtein * 4;
   const remainingCalories = Math.max(0, dailyCalories - proteinCalories);
@@ -284,8 +293,8 @@ function generateNutritionPlan(patient) {
   const fatCalories = remainingCalories - carbCalories;
   const dailyFat = Math.round((fatCalories / 9) * 10) / 10;
 
-  const macroProtein = Math.round(dailyProtein / servingsPerDay);
-  const macroCarbs = Math.round(dailyCarbs / servingsPerDay);
+  const macroProtein = Math.round((dailyProtein / servingsPerDay) * 10) / 10;
+  const macroCarbs = Math.round((dailyCarbs / servingsPerDay) * 10) / 10;
   const macroFat = Math.round((dailyFat / servingsPerDay) * 10) / 10;
 
   let proteinType = 'Whey isolate';
@@ -345,7 +354,8 @@ function generateNutritionPlan(patient) {
   if (cancer.includes('myeloma')) {
     micronutrients.calcium = '1000-1200 mg/day (Note: Requires Ionized Ca monitoring for hypercalcemia risk)';
     if (vitD > 0 && vitD < 30) {
-      micronutrients.vitD = hasRenalIssue ? '2000 IU/day' : '4000-6000 IU/day (Myeloma Bone Protocol)';
+      // Myeloma Bone Protocol overrides renal cap for severe deficiency (correction phase)
+      micronutrients.vitD = (vitD < 20) ? '5000 IU/day (Correction Phase; Myeloma Bone Protocol)' : (hasRenalIssue ? '2000 IU/day' : '4000 IU/day');
     }
   }
 
@@ -476,7 +486,7 @@ function generateNutritionPlan(patient) {
   };
 
   return {
-    cachexia, bmi: Math.round(bmi * 10) / 10, kcalPerKg, proteinPerKg,
+    cachexia, sarcopenia, bmi: Math.round(bmi * 10) / 10, kcalPerKg, proteinPerKg,
     servingsPerDay, totalDailyCalories, totalDailyProtein,
     dailyCalories, dailyProtein, perServingCalories, perServingProtein,
     proteinType, dailyCarbs, dailyFat, macroProtein, macroCarbs, macroFat,

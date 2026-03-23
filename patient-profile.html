@@ -599,7 +599,7 @@
             </div>
             <div class="rmi">
               <div class="rmi-n">Protocol / Regimen</div>
-              <div class="rmi-v"><span id="pCancer"></span> / <span id="pRegimen"></span></div>
+              <div class="rmi-v"><span id="pCancer_header"></span> / <span id="pRegimen_header"></span></div>
             </div>
             <div class="rmi">
               <div class="rmi-n">Weight / Height</div>
@@ -741,11 +741,11 @@
               <div class="rg" style="display:grid; grid-template-columns: 1fr; gap:8px;">
                 <div class="rf full">
                   <div class="rf-lbl">Cancer Type</div>
-                  <div class="rf-val" id="pCancer"></div>
+                  <div class="rf-val" id="pCancer_card"></div>
                 </div>
                 <div class="rf full">
                   <div class="rf-lbl">Chemo Regimen</div>
-                  <div class="rf-val" id="pRegimen"></div>
+                  <div class="rf-val" id="pRegimen_card"></div>
                 </div>
                 <div class="rf">
                   <div class="rf-lbl">Cancer Stage</div>
@@ -2727,10 +2727,13 @@
             setVal('pVegetarian', (patient.vegetarian ? 'Vegetarian' : 'Non-Vegetarian'));
             setVal('pBSA', (patient.bsa ? patient.bsa + ' m²' : '-'));
             setVal('pLBM', (patient.leanBodyMass ? patient.leanBodyMass + ' kg' : '-'));
-            setVal('pSarcopenia', patient.sarcopeniaStatus || 'None');
+            setVal('pSarcopenia', plan.finalPlan.sarcopenia ? 'YES (SMI/Grip Triggered)' : (patient.sarcopeniaStatus || 'None'));
             setVal('pTumorBurden', patient.tumorBurden || 'Not Stated');
             setVal('pStage', patient.cancerStage || '-');
             setVal('pECOG', patient.ecogStatus || '0');
+            setVal('pCancer_card', patient.cancer);
+            setVal('pRegimen_card', patient.regimen);
+            setVal('pFeeding_header', plan.finalPlan.prescribedRoute);
             setVal('pMetastasis', patient.metastasisSites || 'None reported');
             setVal('pTreatments', (Array.isArray(patient.treatmentTypes) && patient.treatmentTypes.length) ? patient.treatmentTypes.join(', ') : 'None Reported');
             setVal('pCultural', patient.culturalPreferences || 'Not Reported');
@@ -2783,9 +2786,9 @@
             setVal('pIBW', computeHamwiIBW() + ' kg');
             setVal('pUW', (patient.usualWeight ? patient.usualWeight + ' kg' : '-'));
             setVal('pWL', (patient.weightLossPercent ?? '-') + ' %');
-            setVal('pCancer', patient.cancer);
-            setVal('pRegimen', patient.regimen);
-            setVal('pFeeding', patient.feedingMethod);
+            setVal('pCancer_header', patient.cancer);
+            setVal('pRegimen_header', patient.regimen);
+            setVal('pFeeding', plan.finalPlan.prescribedRoute);
             setVal('pAlbumin', patient.albumin + ' g/dL');
             setVal('pCRP_val', (patient.crp || 0) + ' mg/L');
 
@@ -3507,6 +3510,18 @@
             if (typeof html2pdf === 'undefined') {
               window.print();
               return;
+            }
+
+            // Step 2: Sync current form oncology data to the report UI before export
+            const currentCancer = document.getElementById('epCancer')?.value;
+            const currentRegimen = document.getElementById('epRegimen')?.value;
+            if (currentCancer) {
+                setVal('pCancer_header', currentCancer);
+                setVal('pCancer_card', currentCancer);
+            }
+            if (currentRegimen) {
+                setVal('pRegimen_header', currentRegimen);
+                setVal('pRegimen_card', currentRegimen);
             }
 
             // Make sure the export source is visible before rendering.
