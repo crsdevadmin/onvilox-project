@@ -2293,9 +2293,9 @@ function bind(plan){
   
   const reducedIntake = patient.reducedFoodIntake || 0;
   if (reducedIntake > 0) {
-     const rule = (patient.feedingMethod || '').includes('Enteral') || (100-reducedIntake) < 30;
-     if (rule) {
-       trace.push(`<b>Feeding Rule (Total):</b> Intake deficit is severe or Enteral route used. Plan fulfills 100% of base → <b>${fp.dailyCalories} kcal/day</b>.`);
+     const isEnteral = (patient.feedingMethod || '').includes('Enteral');
+     if (isEnteral) {
+       trace.push(`<b>Feeding Rule (Total):</b> Enteral route used. Plan fulfills 100% of base → <b>${fp.dailyCalories} kcal/day target</b>.`);
      } else {
        trace.push(`<b>Deficit Adjustment (Supplement):</b> Intake gap is ${reducedIntake}%. Plan fulfills the deficit portion → ${baseCal} × ${reducedIntake}% = <b>${fp.dailyCalories} kcal/day target</b>.`);
      }

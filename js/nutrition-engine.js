@@ -154,12 +154,13 @@ function generateNutritionPlan(patient) {
   const baseDailyCalories = Math.round(weight * kcalPerKg);
   const baseDailyProtein = Math.round(weight * proteinPerKg);
 
-  // --- DEFICIT LOGIC (ONS vs Total) ---
-  const actualIntake = 100 - reducedFoodIntake;
-  const isTotalNutrition = (patient.feedingMethod || '').toLowerCase().includes('enteral') || actualIntake < 30;
+  // --- DEFICIT LOGIC (Pure arithmetic without force-total override) ---
+  const actualIntake = 100 - (reducedFoodIntake || 0);
+  const isEnteral = (patient.feedingMethod || '').toLowerCase().includes('enteral');
   
-  const dailyCalories = isTotalNutrition ? baseDailyCalories : Math.round(baseDailyCalories * (reducedFoodIntake / 100));
-  const dailyProtein = isTotalNutrition ? baseDailyProtein : Math.round(baseDailyProtein * (reducedFoodIntake / 100));
+  // If Enteral feeding, target 100%. Otherwise, calculate the exact missing deficit.
+  const dailyCalories = isEnteral ? baseDailyCalories : Math.round(baseDailyCalories * (reducedFoodIntake / 100));
+  const dailyProtein = isEnteral ? baseDailyProtein : Math.round(baseDailyProtein * (reducedFoodIntake / 100));
 
   const totalDailyCalories = dailyCalories;
   const totalDailyProtein = dailyProtein;
