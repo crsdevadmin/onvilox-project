@@ -390,7 +390,8 @@ function generateNutritionPlan(patient) {
   }
   if (hasIBD) rationale.push(`<b>GI Strategy (IBD):</b> Low-residue focus and hydrolyzed protein used.`);
   if (cancer.includes('pancreatic')) rationale.push(`<b>PERT Focus:</b> Enzymes strongly recommended to address EPI.`);
-  if (actualIntake <= 50 && !isEnteral) {
+  const currentIsEnteral = (patient.feedingMethod || '').toLowerCase().includes('enteral');
+  if (actualIntake <= 50 && !currentIsEnteral) {
     rationale.push(`<b>Escalation Strategy:</b> Critical intake deficit (${actualIntake}%) detected; clinical transition to Enteral Feeding (Liquid format) strongly recommended to meet targets.`);
   }
 
