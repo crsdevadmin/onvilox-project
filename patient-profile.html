@@ -1705,6 +1705,7 @@
           <button class="btn-primary" onclick="downloadNutritionPDF()">Download PDF</button>
         </div>
 
+        <script src="js/config.js"></script>
         <script src="js/storage.js"></script>
         <script src="js/seed.js"></script>
         <script src="js/theme.js"></script>
@@ -2100,8 +2101,8 @@
                 await runAiExtraction(text);
                 typing.remove();
                 addMessage('Clinical data extracted via OpenAI and form populated automatically!', 'ai');
-              } else {
-                const response = await fetch('http://localhost:3000/api/chat', {
+               } else {
+                const response = await fetch(`${CONFIG.API_BASE_URL}/api/chat`, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({ message: text, contextObj: window.patient })
@@ -2126,7 +2127,7 @@
             btn.disabled = true;
 
             try {
-              const response = await fetch('http://localhost:3000/api/claude-report', {
+              const response = await fetch(`${CONFIG.API_BASE_URL}/api/claude-report`, {
                 method: 'POST',
                 headers: { 
                   'Content-Type': 'application/json',
