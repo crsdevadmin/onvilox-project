@@ -1152,9 +1152,9 @@
             <div>
               <div style="display:flex; justify-content:space-between; align-items:center;">
                 <div class="rs-title" style="font-size:9.5px; margin:0;">Clinical Rationale</div>
-                <button class="btn-primary btn-sm" id="btnClaude" onclick="generateClaudeInsight()" style="background:#6d28d9; border-color:#5b21b6; font-size:10px; padding:4px 8px;">
-                   ✨ Refine with Claude 3.5
-                </button>
+                 <button class="btn-primary btn-sm" id="btnClaude" onclick="generateClaudeInsight()" style="background:#6d28d9; border-color:#5b21b6; font-size:10px; padding:4px 8px; box-shadow: 0 0 15px rgba(109,40,217,0.35); animation: pulse-violet 2s infinite;">
+                    ✨ Refine with Claude 3.5
+                 </button>
               </div>
               <ul class="rrat" id="clinicalRationale"></ul>
 
@@ -2122,11 +2122,20 @@
 
           async function generateClaudeInsight() {
             const btn = document.getElementById('btnClaude');
+            if(!window.patient || !window.currentPlan) {
+                alert("Data is still loading or plan is not generated yet. Please wait a moment.");
+                return;
+            }
             const originalText = btn.innerHTML;
             btn.innerHTML = '✨ Thinking...';
             btn.disabled = true;
 
             try {
+              // Refresh plan context one last time to include any on-screen changes
+              if (typeof generateNutritionPlan === 'function') {
+                window.currentPlan = generateNutritionPlan(window.patient);
+              }
+              
               const response = await fetch(`${CONFIG.API_BASE_URL}/api/claude-report`, {
                 method: 'POST',
                 headers: { 
