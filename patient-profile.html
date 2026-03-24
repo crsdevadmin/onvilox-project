@@ -538,8 +538,11 @@
       <div class="close-chat" onclick="toggleChat()">✕</div>
     </div>
     <div class="ai-chat-messages" id="chatMsgs">
-      <div class="msg msg-ai">Hi! I'm your Clinical Co-Pilot. You can update patient details just by telling me (e.g.,
-        "Weight is now 70kg"). I'll update the form for you!</div>
+      <div class="msg msg-ai">👋 Hi! I'm your <b>Clinical Co-Pilot</b>.<br><br>
+        📋 <b>Paste clinical notes</b> and I'll fill the form automatically.<br>
+        📎 <b>Upload a PDF report</b> using the 📎 button.<br>
+        💬 <b>Ask me anything</b> about this patient's nutrition plan!
+      </div>
     </div>
     <div class="ai-chat-input-area">
       <input type="file" id="pdfUpload" accept=".pdf" style="display:none;" onchange="handlePdfUpload(event)">
@@ -2102,7 +2105,12 @@
               if (isExtraction) {
                 await runAiExtraction(text);
                 typing.remove();
-                addMessage('Clinical data extracted via OpenAI and form populated automatically!', 'ai');
+                addMessage('✅ Clinical data extracted and form populated! Regenerating report...', 'ai');
+                // Auto-close chat after extraction success and re-run Claude
+                setTimeout(() => {
+                  toggleChat();
+                  generateClaudeInsight();
+                }, 2000);
               } else {
                 const response = await fetch(`${CONFIG.API_BASE_URL}/api/chat`, {
                   method: 'POST',
@@ -2116,9 +2124,7 @@
             } catch (err) {
               typing.remove();
               console.error(err);
-              addMessage('Cannot connect to AI Server. Please ensure the backend server is running on localhost:3000 (or your AWS domain).', 'danger');
-              addMessage('Currently using fallback text search due to missing server connection...', 'ai');
-              // Fallback logic omitted for brevity, standard deployment assumes server is active.
+              addMessage('⚠️ Cannot connect to AI Server. Please ensure the backend is running.', 'danger');
             }
           }
 
