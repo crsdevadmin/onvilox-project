@@ -2124,10 +2124,29 @@
 
           async function generateClaudeInsight() {
             const btn = document.getElementById('btnClaude');
-            if (!window.patient || !window.currentPlan) {
-              alert("Data is still loading or plan is not generated yet. Please wait a moment.");
-              return;
+            
+            // Hard refresh patient data from storage if somehow lost
+            if(!window.patient) {
+                const params = new URLSearchParams(window.location.search);
+                const id = params.get('id');
+                if(id) window.patient = getPatientById(id);
             }
+
+            if(!window.patient) {
+                alert("Critical Error: Patient record not found. Please refresh the page.");
+                return;
+            }
+            
+            // Force generate latest plan context
+            if (typeof generateNutritionPlan === 'function') {
+                window.currentPlan = generateNutritionPlan(window.patient);
+            }
+
+            if(!window.currentPlan) {
+                alert("Critical Error: Nutrition plan calculation failed. Check patient weight/labs.");
+                return;
+            }
+
             const originalText = btn.innerHTML;
             btn.innerHTML = '✨ Thinking...';
             btn.disabled = true;
