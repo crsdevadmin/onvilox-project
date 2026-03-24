@@ -1150,7 +1150,12 @@
               <div class="rtrace" id="calcTrace"></div>
             </div>
             <div>
-              <div class="rs-title" style="font-size:9.5px;">Clinical Rationale</div>
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <div class="rs-title" style="font-size:9.5px; margin:0;">Clinical Rationale</div>
+                <button class="btn-primary btn-sm" id="btnClaude" onclick="generateClaudeInsight()" style="background:#6d28d9; border-color:#5b21b6; font-size:10px; padding:4px 8px;">
+                   ✨ Refine with Claude 3.5
+                </button>
+              </div>
               <ul class="rrat" id="clinicalRationale"></ul>
 
               <div class="rs-title" style="font-size:9.5px; margin-top:20px;">Patient Guidance</div>
@@ -2114,6 +2119,46 @@
             }
           }
 
+          async function generateClaudeInsight() {
+            const btn = document.getElementById('btnClaude');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '✨ Thinking...';
+            btn.disabled = true;
+
+            try {
+              const response = await fetch('http://localhost:3000/api/claude-report', {
+                method: 'POST',
+                headers: { 
+                  'Content-Type': 'application/json',
+                  'Authorization': 'Bearer ' + localStorage.getItem('onvilox_token') 
+                },
+                body: JSON.stringify({ patient: window.patient, plan: window.currentPlan })
+              });
+              
+              const data = await response.json();
+              if (data.error) throw new Error(data.error);
+
+              // Update the UI with Claude's generated insights
+              const ratEl = document.getElementById('clinicalRationale');
+              const instEl = document.getElementById('patientInstructions');
+              
+              if (Array.isArray(data.rationale)) {
+                ratEl.innerHTML = data.rationale.map(r => `<li>${r}</li>`).join('');
+              }
+              if (Array.isArray(data.instructions)) {
+                instEl.innerHTML = data.instructions.map(i => `<li>${i}</li>`).join('');
+              }
+              
+              btn.innerHTML = '✨ Insight Updated!';
+              setTimeout(() => { btn.innerHTML = originalText; btn.disabled = false; }, 3000);
+            } catch (err) {
+              console.error("Claude Sync Error:", err);
+              alert("Claude Integration Error: " + err.message + "\nCheck if the server is running and ANTHROPIC_API_KEY is set.");
+              btn.innerHTML = originalText;
+              btn.disabled = false;
+            }
+          }
+
           // --- PDF EXTRACTION LOGIC ---
           function triggerFileUpload() {
             document.getElementById('pdfUpload').click();
@@ -2633,11 +2678,13 @@
               // Else fall through to generate new version
             }
 
-            const engineOutput = generateNutritionPlan(patient);
-            return createOrUpdatePlan(patient, engineOutput, {}, latest ? 'Automatic update due to clinical input change' : '');
+             const engineOutput = generateNutritionPlan(patient);
+             window.currentPlan = engineOutput; // Store globally for Claude access
+             return createOrUpdatePlan(patient, engineOutput, {}, latest ? 'Automatic update due to clinical input change' : '');
           }
 
           function bind(plan) {
+            window.currentPlan = plan.finalPlan || plan; // Ensure Claude has the latest plan context
             // Header (doctor/hospital)
             const st = patient.storeId ? ((typeof storeService !== 'undefined' && storeService.getStoreById) ? storeService.getStoreById(patient.storeId) : null) : null;
             const hosp = patient.hospitalName || (st && st.hospital) || '-';

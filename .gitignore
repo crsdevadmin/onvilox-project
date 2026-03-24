@@ -1,0 +1,11 @@
+# Environment Variables (SENSITIVE)
+.env
+server/.env
+
+# Dependencies
+node_modules/
+server/node_modules/
+
+# OS Files
+.DS_Store
+Thumbs.db

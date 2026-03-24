@@ -160,6 +160,44 @@ ${contextStr}
   }
 });
 
+// --- ANTHROPIC (CLAUDE) INTEGRATION ---
+const Anthropic = require('@anthropic-ai/sdk');
+const anthropic = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY,
+});
+
+app.post('/api/claude-report', async (req, res) => {
+  const { patient, plan } = req.body;
+  if (!patient || !plan) return res.status(400).json({ error: 'Context required.' });
+
+  try {
+    const msg = await anthropic.messages.create({
+      model: "claude-3-5-sonnet-20240620",
+      max_tokens: 1024,
+      messages: [{ 
+        role: "user", 
+        content: `You are a Senior Oncology Dietitian (PhD). Based on the following patient data and calculated nutrition plan, generate:
+        1. A clinical rationale for the doctor (3 bullet points, highly technical).
+        2. Personal instructions for the patient (4 bullet points, simple and encouraging).
+        
+        Patient: ${JSON.stringify(patient)}
+        Generated Plan: ${JSON.stringify(plan)}
+        
+        Return ONLY a JSON object with keys "rationale" (Array) and "instructions" (Array).`
+      }],
+    });
+    
+    // Extract JSON from Claude's response (handling potential markdown wrapping)
+    const rawText = msg.content[0].text;
+    const jsonStr = rawText.match(/{[\s\S]*}/)?.[0] || rawText;
+    const data = JSON.parse(jsonStr);
+    res.json(data);
+  } catch (error) {
+    console.error("Claude Error:", error);
+    res.status(500).json({ error: 'Claude failed to generate clinical insight.' });
+  }
+});
+
 // Start Server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
