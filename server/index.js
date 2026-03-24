@@ -201,14 +201,51 @@ app.post('/api/claude-report', async (req, res) => {
       max_tokens: 1024,
       messages: [{
         role: "user",
-        content: `You are a Senior Oncology Dietitian (PhD). Based on the following patient data and calculated nutrition plan, generate:
-        1. A clinical rationale for the doctor (3 bullet points, highly technical).
-        2. Personal instructions for the patient (4 bullet points, simple and encouraging).
-        
-        Patient: ${JSON.stringify(patient)}
-        Generated Plan: ${JSON.stringify(plan)}
-        
-        Return ONLY a JSON object with keys "rationale" (Array) and "instructions" (Array).`
+        content: `You are a Senior Oncology Dietitian (PhD, RD) with 20 years of experience in cancer nutrition support. 
+You must generate a DYNAMIC, PATIENT-SPECIFIC clinical report based on the EXACT values provided below.
+
+CLINICAL RULES TO APPLY:
+- Cachexia: if weight loss > 5% OR albumin < 3.5 g/dL → use 35 kcal/kg, 1.8 g protein/kg (whey isolate preferred)
+- Renal risk: if creatinine > 1.3 → restrict protein to 0.8-1.0 g/kg, avoid high phosphorus
+- Hyperglycemia: if blood sugar > 126 mg/dL → use Palatinose (low GI), add chromium picolinate 400mcg
+- Hyponatremia: if sodium < 135 mEq/L → add 1-2g NaCl supplementation
+- Sarcopenia: if SMI < 45 (F) / 55 (M) OR handgrip < 27 (F) / 35 (M) → add leucine 3g/serving, HMB 3g/day
+- Enteral escalation: if oral intake deficit > 40% → strongly recommend enteral feeding
+- High inflammation: if CRP > 10 mg/L → add EPA 2-4g/day, prioritize anti-inflammatory nutrients
+- Elderly (age > 70): minimum protein 1.5 g/kg regardless of other factors
+- Liver risk: if ALT/AST elevated → avoid high-dose fat-soluble vitamins, reduce lipid load
+- Hepatic cancer: reduce protein to 1.0-1.2 g/kg, use BCAA supplementation
+- Bortezomib regimen: BLOCK all antioxidants (Vit C > 500mg, ALA)
+- Cisplatin/FOLFOX regimen: add alpha-lipoic acid 600mg for neuroprotection (unless Bortezomib)
+- All patients: Vitamin D 2000IU, Omega-3, Zinc 15-30mg, Selenium 50-100mcg baseline
+
+PATIENT DATA (use these EXACT values):
+Name: ${patient.name}, Age: ${patient.age}, Sex: ${patient.sex}
+Cancer: ${patient.cancer}, Regimen: ${patient.regimen}, Stage: ${patient.cancerStage}
+Weight: ${patient.weight}kg, Usual Weight: ${patient.usualWeight}kg, Height: ${patient.height}cm
+Weight Loss: ${patient.weightLossPercent}%, Albumin: ${patient.albumin} g/dL, CRP: ${patient.crp} mg/L
+Blood Sugar: ${patient.bloodSugar} mg/dL, Sodium: ${patient.sodium} mEq/L, Creatinine: ${patient.creatinine}
+Hemoglobin: ${patient.hemoglobin}, ALT: ${patient.alt}, AST: ${patient.ast}
+Feeding Method: ${patient.feedingMethod}, Oral Intake: ${100-(patient.reducedFoodIntake||0)}%
+SMI: ${patient.smi}, Handgrip: ${patient.handGrip}kg, BMI: ${plan.bmi}
+Comorbidities: ${JSON.stringify(patient.comorbidities)}
+Side Effects: ${JSON.stringify(patient.sideEffects)}
+Allergies: ${JSON.stringify(patient.allergies)}
+Cultural Preferences: ${patient.culturalPreferences}
+
+CALCULATED PLAN:
+Calories: ${plan.dailyCalories} kcal/day (${plan.kcalPerKg} kcal/kg)
+Protein: ${plan.dailyProtein} g/day (${plan.proteinPerKg} g/kg)
+Routing: ${plan.prescribedRoute}
+Cachexia Flag: ${plan.cachexia}
+Protein Type: ${plan.proteinType}
+Safety Alerts: ${JSON.stringify(plan.safetyAlerts)}
+
+GENERATE:
+1. "rationale": Array of 3 highly technical bullet points for the doctor. Each must reference SPECIFIC lab values, named biochemical pathways, and clinical guideline justification (ESPEN/ASPEN). Must be unique to THIS patient's exact data.
+2. "instructions": Array of 4 patient-friendly bullet points. Warm, encouraging, actionable. No jargon. Reference real specifics (e.g. actual foods, timing, what tube feeding means).
+
+Return ONLY a valid JSON object: { "rationale": [...], "instructions": [...] }`
       }],
     });
 

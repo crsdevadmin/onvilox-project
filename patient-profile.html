@@ -3249,6 +3249,12 @@
               try {
                 window.currentPlan = ensurePlan();
                 bind(window.currentPlan);
+                // AUTO-GENERATE Claude AI insight on page load (non-print mode only)
+                if (params.get('print') !== '1') {
+                  setTimeout(() => {
+                    generateClaudeInsight();
+                  }, 800); // Small delay to ensure DOM is fully rendered
+                }
               } catch (e) {
                 console.error("Initialization Failed:", e);
               }
