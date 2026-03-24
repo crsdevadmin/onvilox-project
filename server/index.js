@@ -162,8 +162,14 @@ ${contextStr}
 
 // --- ANTHROPIC (CLAUDE) INTEGRATION ---
 const Anthropic = require('@anthropic-ai/sdk');
+const rawKey = process.env.ANTHROPIC_API_KEY || '';
+console.log("ANTHROPIC_KEY_DIAGNOSTIC:", { 
+    length: rawKey.length, 
+    prefix: rawKey.substring(0, 7) 
+});
+
 const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
+  apiKey: rawKey,
 });
 
 app.post('/api/claude-report', async (req, res) => {
