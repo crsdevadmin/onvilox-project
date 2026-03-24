@@ -167,11 +167,16 @@ const anthropic = new Anthropic({
 });
 
 app.post('/api/claude-report', async (req, res) => {
-  console.log("CLAUDE_REQUEST_RECEIVED", { hasPatient: !!req.body.patient, hasPlan: !!req.body.plan });
+  // Debug to terminal: what did we actually get?
+  console.log("CLAUDE_INCOMING_DATA_KEYS:", Object.keys(req.body || {}));
+  
   const { patient, plan } = req.body;
   if (!patient || !plan) {
-    console.error("CLAUDE_ERROR: Context required.", req.body);
-    return res.status(400).json({ error: 'Context required.' });
+    return res.status(400).json({ 
+        error: 'Context required.', 
+        debug_keys: Object.keys(req.body || {}),
+        tip: 'Check if express.json() is active and headers are correct.'
+    });
   }
 
   try {

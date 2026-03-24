@@ -2160,10 +2160,13 @@
               const response = await fetch(`${CONFIG.API_BASE_URL}/api/claude-report`, {
                 method: 'POST',
                 headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': 'Bearer ' + localStorage.getItem('onvilox_token')
+                  'Content-Type': 'application/json; charset=utf-8',
+                  'X-Claude-Context': 'PatientReport'
                 },
-                body: JSON.stringify({ patient: window.patient, plan: window.currentPlan })
+                body: JSON.stringify({ 
+                    patient: window.patient, 
+                    plan: window.currentPlan.finalPlan || window.currentPlan 
+                })
               });
 
               const data = await response.json();
