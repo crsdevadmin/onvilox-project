@@ -198,54 +198,83 @@ app.post('/api/claude-report', async (req, res) => {
   try {
     const msg = await anthropic.messages.create({
       model: "claude-sonnet-4-5-20250929",
-      max_tokens: 1024,
+      max_tokens: 3000,
       messages: [{
         role: "user",
-        content: `You are a Senior Oncology Dietitian (PhD, RD) with 20 years of experience in cancer nutrition support. 
-You must generate a DYNAMIC, PATIENT-SPECIFIC clinical report based on the EXACT values provided below.
+        content: `You are a Senior Oncology Dietitian (PhD, RD) generating a structured clinical nutrition report for Onvilox Clinical Nutrition Systems.
+Generate a COMPREHENSIVE, PATIENT-SPECIFIC report based on EXACT values below.
 
-CLINICAL RULES TO APPLY:
-- Cachexia: if weight loss > 5% OR albumin < 3.5 g/dL → use 35 kcal/kg, 1.8 g protein/kg (whey isolate preferred)
-- Renal risk: if creatinine > 1.3 → restrict protein to 0.8-1.0 g/kg, avoid high phosphorus
-- Hyperglycemia: if blood sugar > 126 mg/dL → use Palatinose (low GI), add chromium picolinate 400mcg
-- Hyponatremia: if sodium < 135 mEq/L → add 1-2g NaCl supplementation
-- Sarcopenia: if SMI < 45 (F) / 55 (M) OR handgrip < 27 (F) / 35 (M) → add leucine 3g/serving, HMB 3g/day
-- Enteral escalation: if oral intake deficit > 40% → strongly recommend enteral feeding
-- High inflammation: if CRP > 10 mg/L → add EPA 2-4g/day, prioritize anti-inflammatory nutrients
-- Elderly (age > 70): minimum protein 1.5 g/kg regardless of other factors
-- Liver risk: if ALT/AST elevated → avoid high-dose fat-soluble vitamins, reduce lipid load
-- Hepatic cancer: reduce protein to 1.0-1.2 g/kg, use BCAA supplementation
-- Bortezomib regimen: BLOCK all antioxidants (Vit C > 500mg, ALA)
-- Cisplatin/FOLFOX regimen: add alpha-lipoic acid 600mg for neuroprotection (unless Bortezomib)
-- All patients: Vitamin D 2000IU, Omega-3, Zinc 15-30mg, Selenium 50-100mcg baseline
+CLINICAL RULES:
+- Cachexia: weight loss >5% OR albumin <3.5 → 35 kcal/kg, 1.8g protein/kg (whey isolate, leucine-rich)
+- No cachexia + ECOG 0-1: 25-30 kcal/kg, 1.2-1.5g protein/kg
+- Renal risk (creatinine >1.3): restrict protein 0.8-1.0g/kg, avoid phosphorus
+- HER2+/Trastuzumab/Pertuzumab: CoQ10 200mg/day, Omega-3 3g/day, Na <2g/day, LVEF monitoring
+- Docetaxel/Taxane: cap Vit C 500mg, NO ALA (antioxidant interference)
+- Bortezomib: BLOCK all antioxidants (Vit C >500mg AND ALA)
+- FOLFOX/Cisplatin/Carboplatin: ALA 600mg neuroprotection (unless Bortezomib), Mg supplementation, monitor Mg wasting
+- Hyperglycemia (BG>126 or HbA1c>5.7): Palatinose (low-GI), chromium picolinate 200-400mcg
+- Hyponatremia (Na<135): 1-2g NaCl supplementation
+- Sarcopenia (SMI<45F/55M or grip<27F/35M): leucine 3g/serving, HMB 3g/day
+- Anemia (Hb<12F/14M): iron 45-60mg elemental + B12 + folate
+- Low Vit D (<30): correction dose 2000-4000 IU/day
+- Inflammation (CRP>10): EPA 2-4g/day, anti-inflammatory focus
+- All patients: Vit D, Omega-3, Zinc 15-30mg, Selenium 50-100mcg, B-Complex baseline
 
-PATIENT DATA (use these EXACT values):
+PATIENT DATA (use EXACT values):
 Name: ${patient.name}, Age: ${patient.age}, Sex: ${patient.sex}
-Cancer: ${patient.cancer}, Regimen: ${patient.regimen}, Stage: ${patient.cancerStage}
+Cancer: ${patient.cancer}, Stage: ${patient.cancerStage}, Regimen: ${patient.regimen}
+ECOG: ${patient.ecogStatus}, Phase: ${patient.treatmentTypes}
 Weight: ${patient.weight}kg, Usual Weight: ${patient.usualWeight}kg, Height: ${patient.height}cm
-Weight Loss: ${patient.weightLossPercent}%, Albumin: ${patient.albumin} g/dL, CRP: ${patient.crp} mg/L
-Blood Sugar: ${patient.bloodSugar} mg/dL, Sodium: ${patient.sodium} mEq/L, Creatinine: ${patient.creatinine}
-Hemoglobin: ${patient.hemoglobin}, ALT: ${patient.alt}, AST: ${patient.ast}
-Feeding Method: ${patient.feedingMethod}, Oral Intake: ${100-(patient.reducedFoodIntake||0)}%
-SMI: ${patient.smi}, Handgrip: ${patient.handGrip}kg, BMI: ${plan.bmi}
-Comorbidities: ${JSON.stringify(patient.comorbidities)}
-Side Effects: ${JSON.stringify(patient.sideEffects)}
-Allergies: ${JSON.stringify(patient.allergies)}
-Cultural Preferences: ${patient.culturalPreferences}
+Weight Loss: ${patient.weightLossPercent}%, BMI: ${plan.bmi}
+Albumin: ${patient.albumin}g/dL, Prealbumin: ${patient.prealbumin || 'Not tested'}
+CRP: ${patient.crp}mg/L, Hemoglobin: ${patient.hemoglobin}g/dL
+Blood Sugar: ${patient.bloodSugar}mg/dL, HbA1c: ${patient.hba1c || 'Not tested'}
+Sodium: ${patient.sodium}mEq/L, Potassium: ${patient.potassium}mEq/L, Magnesium: ${patient.magnesium || 'Not tested'}mg/dL
+Creatinine: ${patient.creatinine}mg/dL, ALT: ${patient.alt}U/L, AST: ${patient.ast}U/L, Bilirubin: ${patient.bilirubin}mg/dL
+Vitamin D: ${patient.vitD}ng/mL, B12: ${patient.vitB12 || 'Not tested'}, Folate: ${patient.folate || 'Not tested'}, Zinc: ${patient.zinc || 'Not tested'}
+SMI: ${patient.smi}, Handgrip: ${patient.handGrip}kg, MUAC: ${patient.muac}cm, LVEF: ${patient.lvef || 'Not tested'}
+Feeding: ${patient.feedingMethod}, Oral Intake: ${100-(patient.reducedFoodIntake||0)}%
+Comorbidities: ${JSON.stringify(patient.comorbidities)}, Allergies: ${JSON.stringify(patient.allergies)}
+Side Effects: ${JSON.stringify(patient.sideEffects)}, Cultural Preferences: ${patient.culturalPreferences}
 
 CALCULATED PLAN:
-Calories: ${plan.dailyCalories} kcal/day (${plan.kcalPerKg} kcal/kg)
-Protein: ${plan.dailyProtein} g/day (${plan.proteinPerKg} g/kg)
-Routing: ${plan.prescribedRoute}
-Cachexia Flag: ${plan.cachexia}
-Protein Type: ${plan.proteinType}
+Calories: ${plan.dailyCalories}kcal/day (${plan.kcalPerKg}kcal/kg), Protein: ${plan.dailyProtein}g/day (${plan.proteinPerKg}g/kg)
+Route: ${plan.prescribedRoute}, Cachexia: ${plan.cachexia}, Protein Type: ${plan.proteinType}
 Safety Alerts: ${JSON.stringify(plan.safetyAlerts)}
 
-GENERATE:
-1. "rationale": Array of 3 highly technical bullet points for the doctor. Each must reference SPECIFIC lab values, named biochemical pathways, and clinical guideline justification (ESPEN/ASPEN). Must be unique to THIS patient's exact data.
-2. "instructions": Array of 4 patient-friendly bullet points. Warm, encouraging, actionable. No jargon. Reference real specifics (e.g. actual foods, timing, what tube feeding means).
+GENERATE this exact JSON structure:
+{
+  "rationale": [
+    "Technical bullet 1 for doctor - reference specific biomarkers, pathway names, ESPEN/ASPEN guideline numbers",
+    "Technical bullet 2 - specific drug-nutrient interaction with biochemical mechanism",
+    "Technical bullet 3 - outcome-focused clinical reasoning with specific targets"
+  ],
+  "instructions": [
+    "Patient-friendly instruction 1 - warm, specific, actionable (mention real foods/timing)",
+    "Patient-friendly instruction 2",
+    "Patient-friendly instruction 3",
+    "Patient-friendly instruction 4 - encouraging, hope-focused"
+  ],
+  "clinicalAlerts": [
+    {"type": "CARDIAC|GLYCEMIC|ANEMIA|DRUG|NUTRITION|RENAL", "level": "HIGH|MODERATE|LOW", "message": "Specific alert text referencing exact lab values"}
+  ],
+  "drugInteractions": [
+    {"drug": "Drug name", "interaction": "Specific nutrient/supplement that interacts", "advice": "Precise clinical advice with doses", "risk": "HIGH|MODERATE|LOW"}
+  ],
+  "micronutrientOrders": [
+    {"nutrient": "Nutrient name", "labValue": "e.g. 22 ng/mL or Not tested", "dose": "Specific dose with units", "rationale": "One-line clinical rationale", "status": "SUPPLEMENT|MONITOR|CAPPED|EXCLUDED|STANDARD|DEFICIENT|CARDIAC Rx|GLYCEMIC Rx"}
+  ],
+  "monitoringSchedule": [
+    {"frequency": "e.g. Every 2 weeks", "parameters": "What to measure", "threshold": "Action trigger value", "responsible": "Who monitors"}
+  ]
+}
 
-Return ONLY a valid JSON object: { "rationale": [...], "instructions": [...] }`
+Rules:
+- Reference EXACT lab values from patient data in every section
+- drugInteractions must ONLY include drugs from the actual regimen
+- clinicalAlerts must ONLY flag actual abnormal findings from patient labs
+- micronutrientOrders must be specific to this patient's deficiencies and regimen
+- Return ONLY valid JSON, no markdown, no extra text`
       }],
     });
 

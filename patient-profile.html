@@ -1204,6 +1204,62 @@
                 id="riskMonitor"></div>
               <div style="font-size:11px; color:#64748b; margin-top:4px; padding-left:14px; font-style:italic;"
                 id="riskNote"></div>
+
+              <!-- CLAUDE AI: Clinical Alerts Section -->
+              <div id="claudeAlertsSection" style="display:none; margin-top:20px;">
+                <div class="rs-title" style="font-size:9.5px; margin-bottom:8px;">⚡ Clinical Safety Alerts (AI)</div>
+                <div id="claudeAlertsList"></div>
+              </div>
+
+              <!-- CLAUDE AI: Drug-Nutrient Interactions Table -->
+              <div id="claudeDrugSection" style="display:none; margin-top:20px;">
+                <div class="rs-title" style="font-size:9.5px; margin-bottom:8px;">💊 Drug-Nutrient Interaction Guidance (AI)</div>
+                <table style="width:100%; border-collapse:collapse; font-size:10.5px;">
+                  <thead>
+                    <tr style="background:#f1f5f9;">
+                      <th style="padding:6px 8px; text-align:left; border:1px solid #e2e8f0; font-weight:700;">Drug</th>
+                      <th style="padding:6px 8px; text-align:left; border:1px solid #e2e8f0; font-weight:700;">Interaction</th>
+                      <th style="padding:6px 8px; text-align:left; border:1px solid #e2e8f0; font-weight:700;">Clinical Advice</th>
+                      <th style="padding:6px 8px; text-align:center; border:1px solid #e2e8f0; font-weight:700;">Risk</th>
+                    </tr>
+                  </thead>
+                  <tbody id="claudeDrugTable"></tbody>
+                </table>
+              </div>
+
+              <!-- CLAUDE AI: Micronutrient Orders Table -->
+              <div id="claudeMicroSection" style="display:none; margin-top:20px;">
+                <div class="rs-title" style="font-size:9.5px; margin-bottom:8px;">🧬 Micronutrient & Functional Support Orders (AI)</div>
+                <table style="width:100%; border-collapse:collapse; font-size:10.5px;">
+                  <thead>
+                    <tr style="background:#f1f5f9;">
+                      <th style="padding:6px 8px; text-align:left; border:1px solid #e2e8f0; font-weight:700;">Nutrient</th>
+                      <th style="padding:6px 8px; text-align:left; border:1px solid #e2e8f0; font-weight:700;">Lab Value</th>
+                      <th style="padding:6px 8px; text-align:left; border:1px solid #e2e8f0; font-weight:700;">Dose</th>
+                      <th style="padding:6px 8px; text-align:left; border:1px solid #e2e8f0; font-weight:700;">Rationale</th>
+                      <th style="padding:6px 8px; text-align:center; border:1px solid #e2e8f0; font-weight:700;">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="claudeMicroTable"></tbody>
+                </table>
+              </div>
+
+              <!-- CLAUDE AI: Monitoring Schedule Table -->
+              <div id="claudeMonitorSection" style="display:none; margin-top:20px;">
+                <div class="rs-title" style="font-size:9.5px; margin-bottom:8px;">📅 Monitoring & Reassessment Schedule (AI)</div>
+                <table style="width:100%; border-collapse:collapse; font-size:10.5px;">
+                  <thead>
+                    <tr style="background:#f1f5f9;">
+                      <th style="padding:6px 8px; text-align:left; border:1px solid #e2e8f0; font-weight:700;">Frequency</th>
+                      <th style="padding:6px 8px; text-align:left; border:1px solid #e2e8f0; font-weight:700;">Parameters</th>
+                      <th style="padding:6px 8px; text-align:left; border:1px solid #e2e8f0; font-weight:700;">Action Threshold</th>
+                      <th style="padding:6px 8px; text-align:left; border:1px solid #e2e8f0; font-weight:700;">Responsible</th>
+                    </tr>
+                  </thead>
+                  <tbody id="claudeMonitorTable"></tbody>
+                </table>
+              </div>
+
             </div>
           </div>
         </div>
@@ -2178,10 +2234,9 @@
               const data = await response.json();
               if (data.error) throw new Error(data.error);
 
-              // Update the UI with Claude's generated insights
+              // 1. Clinical Rationale
               const ratEl = document.getElementById('clinicalRationale');
               const instEl = document.getElementById('patientInstructions');
-
               if (Array.isArray(data.rationale)) {
                 ratEl.innerHTML = data.rationale.map(r => `<li>${r}</li>`).join('');
               }
@@ -2189,7 +2244,75 @@
                 instEl.innerHTML = data.instructions.map(i => `<li>${i}</li>`).join('');
               }
 
-              btn.innerHTML = '✨ Insight Updated!';
+              // 2. Clinical Alerts
+              if (Array.isArray(data.clinicalAlerts) && data.clinicalAlerts.length > 0) {
+                const alertColors = { HIGH: '#fee2e2', MODERATE: '#fff7ed', LOW: '#f0fdf4' };
+                const alertBorders = { HIGH: '#ef4444', MODERATE: '#f97316', LOW: '#22c55e' };
+                const alertIcons = { HIGH: '🚨', MODERATE: '⚠️', LOW: 'ℹ️' };
+                document.getElementById('claudeAlertsList').innerHTML = data.clinicalAlerts.map(a => `
+                  <div style="background:${alertColors[a.level]||'#f8fafc'}; border-left:4px solid ${alertBorders[a.level]||'#94a3b8'}; padding:8px 12px; margin-bottom:6px; border-radius:4px; font-size:10.5px;">
+                    <b>${alertIcons[a.level]||''} ${a.type}:</b> ${a.message}
+                  </div>`).join('');
+                document.getElementById('claudeAlertsSection').style.display = 'block';
+              }
+
+              // 3. Drug Interactions Table
+              if (Array.isArray(data.drugInteractions) && data.drugInteractions.length > 0) {
+                const riskColors = { HIGH: '#fee2e2', MODERATE: '#fff7ed', LOW: '#f0fdf4' };
+                const riskText = { HIGH: '#991b1b', MODERATE: '#9a3412', LOW: '#166534' };
+                document.getElementById('claudeDrugTable').innerHTML = data.drugInteractions.map(d => `
+                  <tr style="border-bottom:1px solid #e2e8f0;">
+                    <td style="padding:6px 8px; border:1px solid #e2e8f0; font-weight:600; color:#1e293b;">${d.drug}</td>
+                    <td style="padding:6px 8px; border:1px solid #e2e8f0; color:#475569;">${d.interaction}</td>
+                    <td style="padding:6px 8px; border:1px solid #e2e8f0; color:#1e40af; font-style:italic;">${d.advice}</td>
+                    <td style="padding:4px 8px; border:1px solid #e2e8f0; text-align:center;">
+                      <span style="background:${riskColors[d.risk]||'#f8fafc'}; color:${riskText[d.risk]||'#475569'}; padding:2px 8px; border-radius:8px; font-size:9.5px; font-weight:700;">${d.risk||'—'}</span>
+                    </td>
+                  </tr>`).join('');
+                document.getElementById('claudeDrugSection').style.display = 'block';
+              }
+
+              // 4. Micronutrient Orders Table
+              if (Array.isArray(data.micronutrientOrders) && data.micronutrientOrders.length > 0) {
+                const statusColors = {
+                  'DEFICIENT': '#fee2e2', 'SUPPLEMENT': '#fef3c7', 'CARDIAC Rx': '#ede9fe',
+                  'GLYCEMIC Rx': '#fce7f3', 'CAPPED': '#fff7ed', 'EXCLUDED': '#f1f5f9',
+                  'MONITOR': '#eff6ff', 'STANDARD': '#f0fdf4'
+                };
+                const statusText = {
+                  'DEFICIENT': '#991b1b', 'SUPPLEMENT': '#92400e', 'CARDIAC Rx': '#5b21b6',
+                  'GLYCEMIC Rx': '#9d174d', 'CAPPED': '#9a3412', 'EXCLUDED': '#475569',
+                  'MONITOR': '#1e40af', 'STANDARD': '#166534'
+                };
+                document.getElementById('claudeMicroTable').innerHTML = data.micronutrientOrders.map(m => {
+                  const bg = statusColors[m.status] || '#f8fafc';
+                  const tc = statusText[m.status] || '#475569';
+                  return `<tr style="border-bottom:1px solid #e2e8f0;">
+                    <td style="padding:6px 8px; border:1px solid #e2e8f0; font-weight:600;">${m.nutrient}</td>
+                    <td style="padding:6px 8px; border:1px solid #e2e8f0; color:#64748b;">${m.labValue||'—'}</td>
+                    <td style="padding:6px 8px; border:1px solid #e2e8f0; font-weight:600; color:#1e293b;">${m.dose}</td>
+                    <td style="padding:6px 8px; border:1px solid #e2e8f0; color:#475569; font-size:10px;">${m.rationale}</td>
+                    <td style="padding:4px 8px; border:1px solid #e2e8f0; text-align:center;">
+                      <span style="background:${bg}; color:${tc}; padding:2px 6px; border-radius:8px; font-size:9px; font-weight:700; white-space:nowrap;">${m.status}</span>
+                    </td>
+                  </tr>`;
+                }).join('');
+                document.getElementById('claudeMicroSection').style.display = 'block';
+              }
+
+              // 5. Monitoring Schedule Table
+              if (Array.isArray(data.monitoringSchedule) && data.monitoringSchedule.length > 0) {
+                document.getElementById('claudeMonitorTable').innerHTML = data.monitoringSchedule.map(m => `
+                  <tr style="border-bottom:1px solid #e2e8f0;">
+                    <td style="padding:6px 8px; border:1px solid #e2e8f0; font-weight:600; color:#1e293b; white-space:nowrap;">${m.frequency}</td>
+                    <td style="padding:6px 8px; border:1px solid #e2e8f0; color:#475569;">${m.parameters}</td>
+                    <td style="padding:6px 8px; border:1px solid #e2e8f0; color:#dc2626; font-size:10px;">${m.threshold}</td>
+                    <td style="padding:6px 8px; border:1px solid #e2e8f0; color:#1e40af; font-size:10px;">${m.responsible}</td>
+                  </tr>`).join('');
+                document.getElementById('claudeMonitorSection').style.display = 'block';
+              }
+
+              btn.innerHTML = '✨ Report Updated!';
               setTimeout(() => { btn.innerHTML = originalText; btn.disabled = false; }, 3000);
             } catch (err) {
               console.error("Claude Sync Error:", err);
