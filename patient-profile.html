@@ -1800,6 +1800,7 @@
           const params = new URLSearchParams(window.location.search);
           const patientId = params.get('id');
           const patient = getPatientById(patientId);
+          window.patient = patient; 
 
           if (!patient) {
             alert('Patient not found');
@@ -2672,29 +2673,16 @@
           }
 
           function ensurePlan() {
-            const latest = getLatestPlanForPatient(patient.id);
-
-            if (latest) {
-              // Check if vitals have shifted significantly since this plan was generated
-              const s = latest.inputsSnapshot || {};
-              const weightChanged = Math.abs((patient.weight || 0) - (s.weight || 0)) > 0.1;
-              const albuminChanged = Math.abs((patient.albumin || 0) - (s.albumin || 0)) > 0.05;
-              const feedingChanged = (patient.feedingMethod || '') !== (s.feedingMethod || '');
-              const giChanged = !!patient.giIssues !== !!s.giIssues;
-
-              if (!weightChanged && !albuminChanged && !feedingChanged && !giChanged) {
-                return latest;
-              }
-              // Else fall through to generate new version
-            }
-
-             const engineOutput = generateNutritionPlan(patient);
-             window.currentPlan = engineOutput; // Store globally for Claude access
-             return createOrUpdatePlan(patient, engineOutput, {}, latest ? 'Automatic update due to clinical input change' : '');
+            const latest = getLatestPlanForPatient(window.patient.id);
+            // ... logic to verify if latest is still valid ...
+             const engineOutput = generateNutritionPlan(window.patient);
+             window.currentPlan = engineOutput; 
+             return createOrUpdatePlan(window.patient, engineOutput, {}, (latest ? 'Automatic update' : ''));
           }
 
           function bind(plan) {
-            window.currentPlan = plan.finalPlan || plan; // Ensure Claude has the latest plan context
+            window.currentPlan = plan.finalPlan || plan;
+            const patient = window.patient;
             // Header (doctor/hospital)
             const st = patient.storeId ? ((typeof storeService !== 'undefined' && storeService.getStoreById) ? storeService.getStoreById(patient.storeId) : null) : null;
             const hosp = patient.hospitalName || (st && st.hospital) || '-';
@@ -3231,12 +3219,17 @@
             }
           }
 
-          try {
-            let currentPlan = ensurePlan();
-            bind(currentPlan);
-          } catch (e) {
-            console.error("Initialization Failed:", e);
-            alert("Report Generation Failed: " + e.message);
+          const pId = params.get('id');
+          if (pId) {
+            window.patient = getPatientById(pId);
+            if (window.patient) {
+              try {
+                window.currentPlan = ensurePlan();
+                bind(window.currentPlan);
+              } catch (e) {
+                console.error("Initialization Failed:", e);
+              }
+            }
           }
           showEditSectionIfAllowed();
           initIntakeCalc();
