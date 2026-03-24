@@ -119,7 +119,7 @@ app.post('/api/extract', async (req, res) => {
       ],
       response_format: { type: "json_object" }
     });
-    
+
     const data = JSON.parse(completion.choices[0].message.content);
     res.json({ success: true, data });
   } catch (error) {
@@ -152,7 +152,7 @@ ${contextStr}
         { role: "user", content: message }
       ]
     });
-    
+
     res.json({ reply: completion.choices[0].message.content });
   } catch (error) {
     console.error("OpenAI Chat Error:", error);
@@ -167,15 +167,19 @@ const anthropic = new Anthropic({
 });
 
 app.post('/api/claude-report', async (req, res) => {
+  console.log("CLAUDE_REQUEST_RECEIVED", { hasPatient: !!req.body.patient, hasPlan: !!req.body.plan });
   const { patient, plan } = req.body;
-  if (!patient || !plan) return res.status(400).json({ error: 'Context required.' });
+  if (!patient || !plan) {
+    console.error("CLAUDE_ERROR: Context required.", req.body);
+    return res.status(400).json({ error: 'Context required.' });
+  }
 
   try {
     const msg = await anthropic.messages.create({
       model: "claude-3-5-sonnet-20240620",
       max_tokens: 1024,
-      messages: [{ 
-        role: "user", 
+      messages: [{
+        role: "user",
         content: `You are a Senior Oncology Dietitian (PhD). Based on the following patient data and calculated nutrition plan, generate:
         1. A clinical rationale for the doctor (3 bullet points, highly technical).
         2. Personal instructions for the patient (4 bullet points, simple and encouraging).
@@ -186,7 +190,7 @@ app.post('/api/claude-report', async (req, res) => {
         Return ONLY a JSON object with keys "rationale" (Array) and "instructions" (Array).`
       }],
     });
-    
+
     // Extract JSON from Claude's response (handling potential markdown wrapping)
     const rawText = msg.content[0].text;
     const jsonStr = rawText.match(/{[\s\S]*}/)?.[0] || rawText;
