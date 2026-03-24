@@ -521,7 +521,7 @@
 
 <body>
 
-  <!-- INTERACTIVE AI CO-PILOT CHATBOT -->
+  <!-- INTERACTIVE CLAUDE AI ASSISTANT -->
   <div class="ai-chat-launcher" onclick="toggleChat()">
     <svg viewBox="0 0 24 24">
       <path
@@ -534,11 +534,11 @@
       <h4><svg style="width:16px; height:16px; fill:currentColor;" viewBox="0 0 24 24">
           <path
             d="M12,2A10,10 0 0,1 22,12A10,10 0 0,1 12,22A10,10 0 0,1 2,12A10,10 0 0,1 12,2M12,4A8,8 0 0,0 4,12C4,14.39 5,16.5 6.74,18L7,17.27C7.3,16.27 8.23,15.5 9.35,15.5H10.5V14.5A0.5,0.5 0 0,1 11,14H13A0.5,0.5 0 0,1 13.5,14.5V15.5H14.65C15.77,15.5 16.7,16.27 17,17.27L17.26,18C19,16.5 20,14.39 20,12A8,8 0 0,0 12,4M12.5,7A1.5,1.5 0 0,1 14,8.5A1.5,1.5 0 0,1 12.5,10A1.5,1.5 0 0,1 11,8.5A1.5,1.5 0 0,1 12.5,7M11,14.5A0.5,0.5 0 0,0 10.5,14H9A0.5,0.5 0 0,1 8.5,14.5V15.5H9.35C10.1,15.5 10.74,15.04 11,14.41V14.5M15.5,14.5A0.5,0.5 0 0,0 15,14H13.5A0.5,0.5 0 0,1 13,14.5V15.5H14.65C15,15.5 15.29,15.4 15.5,15.24V14.5Z" />
-        </svg> Onvilox Co-Pilot</h4>
+        </svg> ✨ Claude AI Assistant</h4>
       <div class="close-chat" onclick="toggleChat()">✕</div>
     </div>
     <div class="ai-chat-messages" id="chatMsgs">
-      <div class="msg msg-ai">👋 Hi! I'm your <b>Clinical Co-Pilot</b>.<br><br>
+      <div class="msg msg-ai">👋 Hi! I'm your <b>Claude AI Assistant</b>.<br><br>
         📋 <b>Paste clinical notes</b> and I'll fill the form automatically.<br>
         📎 <b>Upload a PDF report</b> using the 📎 button.<br>
         💬 <b>Ask me anything</b> about this patient's nutrition plan!
@@ -2463,7 +2463,7 @@
             } catch (err) { }
 
             if (foundCount > 0) {
-              addMessage(`AI Co-Pilot extracted ${foundCount} clinical fields:\n• ${foundItems.slice(0, 8).join('\n• ')}${foundItems.length > 8 ? '\n...and more.' : ''}\nForm updated!`, 'ai');
+              addMessage(`✅ Claude extracted ${foundCount} clinical fields:\n• ${foundItems.slice(0, 8).join('\n• ')}${foundCount > 8 ? `\n...and ${foundCount - 8} more` : ''}`, 'ai');
             } else {
               addMessage("I've analyzed the notes but couldn't find specific clinical markers to auto-fill. You can still enter them manually.", 'ai');
             }
