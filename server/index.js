@@ -172,6 +172,16 @@ const anthropic = new Anthropic({
   apiKey: rawKey,
 });
 
+// DIAGNOSTIC: List available models for this API key
+app.get('/api/list-models', async (req, res) => {
+  try {
+    const models = await anthropic.models.list();
+    res.json({ models: models.data.map(m => m.id) });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.post('/api/claude-report', async (req, res) => {
   // Debug to terminal: what did we actually get?
   console.log("CLAUDE_INCOMING_DATA_KEYS:", Object.keys(req.body || {}));
@@ -187,7 +197,7 @@ app.post('/api/claude-report', async (req, res) => {
 
   try {
     const msg = await anthropic.messages.create({
-      model: "claude-3-5-sonnet-20241022",
+      model: "claude-sonnet-4-5-20250929",
       max_tokens: 1024,
       messages: [{
         role: "user",
