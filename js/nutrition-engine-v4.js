@@ -162,15 +162,16 @@ function generateNutritionPlan(patient) {
 
   // --- STEP 6: SAFETY LAYER (PROTEIN CAP) ---
   if (hasRenalIssue) {
-    // KDIGO: 0.8g/kg strict limit. Any increase (e.g. to 1.0g/kg) requires documented medical override.
+    // KDIGO: 0.8g/kg strict limit is the highest priority safety rule.
     proteinPerKg = 0.8;
   } else {
-    if ((regimen.includes('folfirinox') || regimen.includes('platin')) && cachexia) {
+    if (age >= 70 && proteinPerKg < 1.5) {
+      proteinPerKg = 1.5;
+    }
+    if ((regimen.includes('folfirinox') || regimen.includes('platin')) && cachexia && proteinPerKg < 2.0) {
       proteinPerKg = 2.0;
     }
   }
-  
-  if (age >= 70 && proteinPerKg < 1.5 && !hasRenalIssue) proteinPerKg = 1.5;
 
   const baseDailyCalories = Math.round(weight * kcalPerKg);
   const baseDailyProtein = Math.round(weight * proteinPerKg);

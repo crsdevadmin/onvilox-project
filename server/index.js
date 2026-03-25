@@ -155,9 +155,13 @@ app.post('/api/claude-report', async (req, res) => {
   if (!patient || !plan) return res.status(400).json({ error: 'Context required.' });
 
   try {
-        const systemInstruction = `You are a Senior Oncology Dietitian (PhD, RD) generating a structured clinical nutrition report for Onvilox Clinical Nutrition Systems.
-Generate a PATIENT-SPECIFIC report. Keep rationales and instructions CONCISE (max 2-3 sentences each) to ensure the full report fits within the output buffer.
-Return ONLY valid JSON. START with '{' and END with '}'. Do not use markdown code blocks like \`\`\`json.`;
+        const systemInstruction = `You are a Senior Oncology Dietitian (PhD, RD) generating a structured clinical nutrition report for Onvilox.
+CRITICAL LOGIC SYNC:
+1. RENAL SAFETY: If patient has Renal Risk (CR > 1.3), you MUST prioritize the 0.8g/kg protein target. If the Engine's totalProteinDelivery (${plan.totalProteinDelivery}g) exceeds the Target (${plan.baseProtein}g), you MUST flag this as a critical safety override required.
+2. ESCALATION HARMONY: If you recommend "Enteral Tube Escalation" (Mandatory if intake <= 50%), you MUST suppress all "Oral Sipping" or "Cup" instructions. Instructions must focus on tube-feeding safety, flushing, and transition.
+3. VOLUME SAFETY: If Daily Calories > 1800, ensure instructions specify 4-5 small servings to prevent dumping syndrome/GI distress.
+4. MICRONUTRIENT CAPS: Do NOT recommend >1000mg Vit C or >2000 IU Vit D without explicit "Requires Oncology Clearance" side-notes, especially during active chemo.
+Return ONLY valid JSON. START with '{' and END with '}'.`;
 
     const msg = await anthropic.messages.create({
       model: "claude-3-5-sonnet-20241022",
@@ -189,23 +193,22 @@ CALCULATED PLAN: ${JSON.stringify(plan)}
 GENERATE exact JSON structure:
 {
   "rationale": [
-    "Clinical bullet 1 - Must reference if totalProteinDelivery (${plan.totalProteinDelivery}g) meets the target (${plan.baseProtein}g)",
+    "Clinical bullet 1 - Must reference if totalProteinDelivery (${plan.totalProteinDelivery}g) meets the target (${plan.baseProtein}g). Use 'Clinical Priority' tag.",
     "Clinical bullet 2 - Specific drug-nutrient interaction (e.g. Folate/5-FU or Oxaliplatin/Antioxidants)",
     "Clinical bullet 3 - Outcome-focused reasoning"
   ],
   "instructions": [
-    "Instruction 1 - Must use EXACTLY ${plan.servingsPerDay} servings as per the prescribed plan",
-    "Instruction 2 - Folate timing: If patient is on 5-FU/FOLFOX, specify taking Folate AWAY from chemo days (coordinate with oncology)",
+    "Instruction 1 - Use EXACTLY ${plan.servingsPerDay} servings as prescribed.",
+    "Instruction 2 - Folate/Chemo timing (if applicable)",
     "Instruction 3",
     "Instruction 4"
   ],
-  "clinicalAlerts": [{"type": "NUTRITION|GLYCEMIC|etc", "level": "HIGH|MODERATE|LOW", "message": "Short alert"}],
+  "clinicalAlerts": [{"type": "NUTRITION|GLYCEMIC|RENAL|etc", "level": "HIGH|MODERATE|LOW", "message": "Short alert"}],
   "drugInteractions": [{"drug": "Name", "interaction": "Details", "advice": "Advice", "risk": "Level"}],
   "micronutrientOrders": [{"nutrient": "Name", "labValue": "Value", "dose": "Dose", "rationale": "Short rationale", "status": "STATUS"}],
   "monitoringSchedule": [{"frequency": "Freq", "parameters": "Labs", "threshold": "Trigger", "responsible": "Owner"}]
 }
-IMPORTANT: Even if there are no high-risk flags, you MUST provide at least one baseline monitoring parameter and one general instruction to ensure the report is complete.
-Return ONLY valid JSON. No markdown.`
+IMPORTANT: If on Enteral/Escalation, REMOVE all oral sipping instructions. Return ONLY valid JSON. No markdown.`
       }],
     });
 
