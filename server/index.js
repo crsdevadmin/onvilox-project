@@ -156,12 +156,12 @@ app.post('/api/claude-report', async (req, res) => {
 
   try {
         const systemInstruction = `You are a Senior Oncology Dietitian (PhD, RD) generating a structured clinical nutrition report for Onvilox Clinical Nutrition Systems.
-Generate a COMPREHENSIVE, PATIENT-SPECIFIC report based on EXACT values provided.
-Return ONLY valid JSON. No markdown, no preambles.`;
+Generate a PATIENT-SPECIFIC report. Keep rationales and instructions CONCISE (max 2-3 sentences each) to ensure the full report fits within the output buffer.
+Return ONLY valid JSON. START with '{' and END with '}'. Do not use markdown code blocks like \`\`\`json.`;
 
     const msg = await anthropic.messages.create({
       model: "claude-sonnet-4-5-20250929",
-      max_tokens: 3500,
+      max_tokens: 8192,
       system: systemInstruction,
       messages: [{
         role: "user",
@@ -181,50 +181,18 @@ Return ONLY valid JSON. No markdown, no preambles.`;
 - Inflammation (CRP>10): EPA 2-4g/day.
 - All patients: Zinc 15-30mg, Selenium 50-100mcg, B-Complex.
 
-PATIENT DATA (use EXACT values):
-Name: ${patient.name}, Age: ${patient.age}, Sex: ${patient.sex}
-Cancer: ${patient.cancer}, Stage: ${patient.cancerStage}, Regimen: ${patient.regimen}
-ECOG: ${patient.ecogStatus}, Phase: ${JSON.stringify(patient.treatmentTypes)}
-Weight: ${patient.weight}kg, Usual Weight: ${patient.usualWeight}kg, Height: ${patient.height}cm
-Weight Loss: ${patient.weightLossPercent}%, BMI: ${plan.bmi}
-Albumin: ${patient.albumin}g/dL, CRP: ${patient.crp}mg/L, Hemoglobin: ${patient.hemoglobin}g/dL
-Blood Sugar: ${patient.bloodSugar}mg/dL, Creatinine: ${patient.creatinine}mg/dL
-ALT: ${patient.alt}U/L, AST: ${patient.ast}U/L, Bilirubin: ${patient.bilirubin}mg/dL
-Vitamin D: ${patient.vitD}ng/mL, Prealbumin: ${patient.prealbumin || 'Not tested'}, B12: ${patient.vitB12 || 'Not tested'}, Folate: ${patient.folate || 'Not tested'}, Zinc: ${patient.zinc || 'Not tested'}, Magnesium: ${patient.magnesium || 'Not tested'}
-SMI: ${patient.smi}, Handgrip: ${patient.handGrip}kg, MUAC: ${patient.muac}cm, LVEF: ${patient.lvef || 'Not tested'}
-Feeding: ${patient.feedingMethod}, Oral Intake: ${100-(patient.reducedFoodIntake||0)}%
-Comorbidities: ${JSON.stringify(patient.comorbidities)}, Side Effects: ${JSON.stringify(patient.sideEffects)}
-Allergies: ${JSON.stringify(patient.allergies)}, Genomic Markers: ${JSON.stringify(patient.genomicMarkers)}
+PATIENT DATA: ${JSON.stringify(patient)}
 
-CALCULATED PLAN:
-Calories: ${plan.dailyCalories}kcal/day, Protein: ${plan.dailyProtein}g/day
-Route: ${plan.prescribedRoute}, Cachexia: ${plan.cachexia}, Protein Type: ${plan.proteinType}
+CALCULATED PLAN: ${JSON.stringify(plan)}
 
 GENERATE exact JSON structure:
 {
-  "rationale": [
-    "Technical bullet 1 for doctor - reference specific biomarkers, pathway names, ESPEN/ASPEN guidelines",
-    "Technical bullet 2 - specific drug-nutrient interaction with biochemical mechanism",
-    "Technical bullet 3 - outcome-focused clinical reasoning"
-  ],
-  "instructions": [
-    "Patient-friendly instruction 1 - warm, specific, actionable (mention real foods/timing)",
-    "Patient-friendly instruction 2",
-    "Patient-friendly instruction 3",
-    "Patient-friendly instruction 4"
-  ],
-  "clinicalAlerts": [
-    {"type": "CARDIAC|GLYCEMIC|ANEMIA|DRUG|NUTRITION|RENAL", "level": "HIGH|MODERATE|LOW", "message": "Specific alert text referencing exact labs"}
-  ],
-  "drugInteractions": [
-    {"drug": "Drug name", "interaction": "Nutrient/supplement", "advice": "Clinical advice", "risk": "HIGH|MODERATE|LOW"}
-  ],
-  "micronutrientOrders": [
-    {"nutrient": "Name", "labValue": "Value", "dose": "Dose", "rationale": "Rationale", "status": "SUPPLEMENT|MONITOR|CAPPED|EXCLUDED|STANDARD|DEFICIENT|CARDIAC Rx|GLYCEMIC Rx"}
-  ],
-  "monitoringSchedule": [
-    {"frequency": "Frequency", "parameters": "Biomarkers", "threshold": "Action trigger", "responsible": "Owner"}
-  ]
+  "rationale": ["Concise clinical bullet 1", "Concise clinical bullet 2"],
+  "instructions": ["Actionable step 1", "Actionable step 2"],
+  "clinicalAlerts": [{"type": "NUTRITION|GLYCEMIC|etc", "level": "HIGH|MODERATE|LOW", "message": "Short alert"}],
+  "drugInteractions": [{"drug": "Name", "interaction": "Details", "advice": "Advice", "risk": "Level"}],
+  "micronutrientOrders": [{"nutrient": "Name", "labValue": "Value", "dose": "Dose", "rationale": "Short rationale", "status": "STATUS"}],
+  "monitoringSchedule": [{"frequency": "Freq", "parameters": "Labs", "threshold": "Trigger", "responsible": "Owner"}]
 }
 Return ONLY valid JSON. No markdown.`
       }],
