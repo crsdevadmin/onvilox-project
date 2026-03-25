@@ -2205,6 +2205,10 @@
             }
 
             if(!window.currentPlan) {
+                window.currentVersionedPlan = generateNutritionPlan(window.patient);
+            }
+
+            if(!window.currentVersionedPlan) {
                 alert("Critical Error: Nutrition plan calculation failed. Check patient weight/labs.");
                 return;
             }
@@ -2214,10 +2218,15 @@
             btn.disabled = true;
 
             try {
-              // Refresh plan context one last time to include any on-screen changes
+              // Refresh plan context one last time
+              let flatPlan = null;
               if (typeof generateNutritionPlan === 'function') {
-                window.currentPlan = generateNutritionPlan(window.patient);
+                flatPlan = generateNutritionPlan(window.patient);
+              } else if (window.currentVersionedPlan) {
+                flatPlan = window.currentVersionedPlan.finalPlan;
               }
+
+              if (!flatPlan) throw new Error("Could not determine nutrition plan for AI analysis.");
 
               const response = await fetch(`${CONFIG.API_BASE_URL}/api/claude-report`, {
                 method: 'POST',
@@ -2227,7 +2236,7 @@
                 },
                 body: JSON.stringify({ 
                     patient: window.patient, 
-                    plan: window.currentPlan.finalPlan || window.currentPlan 
+                    plan: flatPlan.finalPlan || flatPlan 
                 })
               });
 
@@ -2834,7 +2843,14 @@
           }
 
           function bind(plan) {
-            window.currentPlan = plan.finalPlan || plan;
+            if (!plan) return;
+            // Robust check: Ensure we have a versioned object with finalPlan
+            if (!plan.finalPlan) {
+              console.warn("bind() received flat plan, wrapping it.");
+              plan = { finalPlan: plan };
+            }
+            window.currentVersionedPlan = plan;
+            const fp = plan.finalPlan;
             const patient = window.patient;
             // Header (doctor/hospital)
             const st = patient.storeId ? ((typeof storeService !== 'undefined' && storeService.getStoreById) ? storeService.getStoreById(patient.storeId) : null) : null;
@@ -2917,7 +2933,7 @@
             setVal('pFolate', (patient.folate ? patient.folate + ' ng/mL' : '-'));
             setVal('pZinc', (patient.zinc ? patient.zinc + ' μg/dL' : '-'));
             setVal('pMagnesium', (patient.magnesium ? patient.magnesium + ' mg/dL' : '-'));
-            setVal('pMicrobiome', plan.finalPlan.micronutrients.microbiome || '-');
+            setVal('pMicrobiome', fp.micronutrients.microbiome || '-');
             setVal('pFat', (patient.fatPercent ? patient.fatPercent + ' %' : '-'));
             setVal('pSMI', (patient.smi ? patient.smi + ' cm²/m²' : '-'));
             setVal('pHandGrip', (patient.handGrip ? patient.handGrip + ' kg' : '-'));
@@ -2925,13 +2941,13 @@
             setVal('pVegetarian', (patient.vegetarian ? 'Vegetarian' : 'Non-Vegetarian'));
             setVal('pBSA', (patient.bsa ? patient.bsa + ' m²' : '-'));
             setVal('pLBM', (patient.leanBodyMass ? patient.leanBodyMass + ' kg' : '-'));
-            setVal('pSarcopenia', plan.finalPlan.sarcopenia ? 'YES (SMI/Grip Triggered)' : (patient.sarcopeniaStatus || 'None'));
+            setVal('pSarcopenia', fp.sarcopenia ? 'YES (SMI/Grip Triggered)' : (patient.sarcopeniaStatus || 'None'));
             setVal('pTumorBurden', patient.tumorBurden || 'Not Stated');
             setVal('pStage', patient.cancerStage || '-');
             setVal('pECOG', patient.ecogStatus || '0');
             setVal('pCancer_card', patient.cancer);
             setVal('pRegimen_card', patient.regimen);
-            setVal('pFeeding_header', plan.finalPlan.prescribedRoute);
+            setVal('pFeeding_header', fp.prescribedRoute);
             setVal('pMetastasis', patient.metastasisSites || 'None reported');
             setVal('pTreatments', (Array.isArray(patient.treatmentTypes) && patient.treatmentTypes.length) ? patient.treatmentTypes.join(', ') : 'None Reported');
             setVal('pCultural', patient.culturalPreferences || 'Not Reported');
@@ -2986,7 +3002,7 @@
             setVal('pWL', (patient.weightLossPercent ?? '-') + ' %');
             setVal('pCancer_header', patient.cancer);
             setVal('pRegimen_header', patient.regimen);
-            setVal('pFeeding', plan.finalPlan.prescribedRoute);
+            setVal('pFeeding', fp.prescribedRoute);
             setVal('pAlbumin', patient.albumin + ' g/dL');
             setVal('pCRP_val', (patient.crp || 0) + ' mg/L');
 
@@ -3008,10 +3024,10 @@
             // Bind Safety Alerts (V5) - Prioritized
             const safetyBlock = document.getElementById('safetyAlertsBlock');
             const safetyList = document.getElementById('safetyAlertsList');
-            if (plan.finalPlan.safetyAlerts && plan.finalPlan.safetyAlerts.length > 0) {
+            if (fp.safetyAlerts && fp.safetyAlerts.length > 0) {
               safetyBlock.style.display = 'block';
               // Sort: danger > warning > info
-              const sortedAlerts = [...plan.finalPlan.safetyAlerts].sort((a, b) => {
+              const sortedAlerts = [...fp.safetyAlerts].sort((a, b) => {
                 const order = { danger: 0, warning: 1, info: 2 };
                 return (order[a.level] || 99) - (order[b.level] || 99);
               });
@@ -3035,14 +3051,14 @@
             // Bind Drug Interactions if any
             const drugSec = document.getElementById('drugSection');
             const drugBody = document.getElementById('drugInteractionsBody');
-            const hasHighRisk = plan.finalPlan.hasHighRiskRegimen;
+            const hasHighRisk = fp.hasHighRiskRegimen;
 
-            if (hasHighRisk || (plan.finalPlan.interactions && plan.finalPlan.interactions.length > 0)) {
+            if (hasHighRisk || (fp.interactions && fp.interactions.length > 0)) {
               drugSec.style.display = 'block';
-              if (hasHighRisk && (!plan.finalPlan.interactions || plan.finalPlan.interactions.length === 0)) {
+              if (hasHighRisk && (!fp.interactions || fp.interactions.length === 0)) {
                 drugBody.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:20px; color:#64748b;">Mandatory safety screening active for this regimen. No specific flags.</td></tr>';
               } else {
-                drugBody.innerHTML = plan.finalPlan.interactions.map(i => `
+                drugBody.innerHTML = fp.interactions.map(i => `
           <tr>
             <td style="font-weight:700; color:#0e2247;">${i.drug}</td>
             <td>${i.effect}</td>
@@ -3054,7 +3070,7 @@
               drugSec.style.display = 'none';
             }
 
-            const fp = plan.finalPlan;
+
 
             const totalKcal = fp.totalDailyCalories || fp.dailyCalories;
             const totalPro = fp.totalDailyProtein || fp.dailyProtein;
@@ -3380,13 +3396,14 @@
             window.patient = getPatientById(pId);
             if (window.patient) {
               try {
-                window.currentPlan = ensurePlan();
-                bind(window.currentPlan);
+                window.currentVersionedPlan = ensurePlan();
+                bind(window.currentVersionedPlan);
                 
                 // AUTO-GENERATE or LOAD Claude AI insight
                 if (params.get('print') !== '1') {
-                  if (window.currentPlan.claudeInsights) {
-                    renderClaudeInsight(window.currentPlan.claudeInsights, true); // true = skip persistence
+                  const cp = window.currentVersionedPlan;
+                  if (cp && cp.claudeInsights) {
+                    renderClaudeInsight(cp.claudeInsights, true); // true = skip persistence
                   } else {
                     setTimeout(() => {
                       generateClaudeInsight();
@@ -3878,10 +3895,11 @@
             if (!data) return;
             
             // Persist for future page loads
-            if (!skipPersistence && window.currentPlan) {
-              window.currentPlan.claudeInsights = data;
+            const cp = window.currentVersionedPlan;
+            if (!skipPersistence && cp && cp.id) {
+              cp.claudeInsights = data;
               if (typeof updatePlan === 'function') {
-                updatePlan(window.currentPlan);
+                updatePlan(cp);
               } else {
                 updatePatient(window.patient); 
               }

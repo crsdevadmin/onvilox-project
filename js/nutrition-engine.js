@@ -427,19 +427,23 @@ function generateNutritionPlan(patient) {
   function buildFormulationOptions(targets) {
     if (typeof IngredientLibrary === 'undefined') return null;
     const { macroProtein, macroCarbs, macroFat, proteinType, bloodSugar, cachexia, crp } = targets;
-    let selectedProtein = IngredientLibrary.find(i => i.id === 'whey_isolate');
-    if (proteinType.toLowerCase().includes('hydrolyzed') || proteinType.toLowerCase().includes('peptide')) {
-      selectedProtein = IngredientLibrary.find(i => i.id === 'whey_hydrolyzed');
-    } else if (proteinType.toLowerCase().includes('plant')) {
-      selectedProtein = IngredientLibrary.find(i => i.id === 'pea_protein');
+    
+    // Null safety for Library lookups
+    const getIng = (id) => IngredientLibrary.find(i => i.id === id) || { name: id, pPerGram: 1, cPerGram: 1, fPerGram: 1, healingRationale: '' };
+
+    let selectedProtein = getIng('whey_isolate');
+    if (proteinType && (proteinType.toLowerCase().includes('hydrolyzed') || proteinType.toLowerCase().includes('peptide'))) {
+      selectedProtein = getIng('whey_hydrolyzed');
+    } else if (proteinType && proteinType.toLowerCase().includes('plant')) {
+      selectedProtein = getIng('pea_protein');
     }
 
     const isDiabeticCarb = isDiabetic || bloodSugar > 100;
-    let selectedCarb = IngredientLibrary.find(i => i.id === 'palatinose');
-    if (!isDiabeticCarb && !cachexia) selectedCarb = IngredientLibrary.find(i => i.id === 'maltodextrin');
+    let selectedCarb = getIng('palatinose');
+    if (!isDiabeticCarb && !cachexia) selectedCarb = getIng('maltodextrin');
 
-    const selectedFat = IngredientLibrary.find(i => i.id === 'mct_powder');
-    const selectedOmega = IngredientLibrary.find(i => i.id === 'omega3_powder');
+    const selectedFat = getIng('mct_powder');
+    const selectedOmega = getIng('omega3_powder');
 
     const pGrams = Math.round(macroProtein / (selectedProtein.pPerGram || 1));
     const carbsFromProtein = pGrams * (selectedProtein.cPerGram || 0);
@@ -448,7 +452,7 @@ function generateNutritionPlan(patient) {
     const neededFat = Math.max(0, macroFat - fatFromProtein);
     const cGrams = Math.round(neededCarbs / (selectedCarb.cPerGram || 1));
     const fGrams = Math.round(neededFat / (selectedFat.fPerGram || 1));
-    const oGrams = (crp > 5 || cachexia || cancer.includes('pancreatic')) ? 1.3 : 0.7; 
+    const oGrams = (crp > 5 || cachexia || (cancer && cancer.includes('pancreatic'))) ? 1.3 : 0.7; 
 
     return {
       protein: { id: selectedProtein.id, name: selectedProtein.name, grams: pGrams, rationale: selectedProtein.healingRationale },
@@ -456,7 +460,7 @@ function generateNutritionPlan(patient) {
       fat: { id: selectedFat.id, name: selectedFat.name, grams: fGrams, rationale: "Metabolic energy without glycemic load" },
       omega: (oGrams > 0) ? { id: 'omega3_powder', name: 'Omega-3 Powder', grams: oGrams, rationale: "Anti-inflammatory / EPA support." } : null,
       bcaa: (patient.alt > 50 || patient.ast > 50 || patient.bilirubin > 1.2) ? { id: 'bcaa_powder', name: 'BCAA (2:1:1 Mix)', grams: 20, rationale: "Hepatic Protection dose." } : null,
-      glutamine: (pGrams > 0 && (patient.giIssues || sideEffects.includes('Mucositis') || regimen.includes('folfirinox') || hasIBD)) ? { id: 'glutamine', name: 'L-Glutamine powder', grams: 10, rationale: "Mucosal protection." } : null
+      glutamine: (pGrams > 0 && (patient.giIssues || (sideEffects && sideEffects.includes('Mucositis')) || (regimen && regimen.includes('folfirinox')) || hasIBD)) ? { id: 'glutamine', name: 'L-Glutamine powder', grams: 10, rationale: "Mucosal protection." } : null
     };
   }
 
@@ -496,21 +500,26 @@ function generateNutritionPlan(patient) {
     
     // 1. Patient Complexity Penalties
     baseProb -= (riskScore * 5);
-    const ecogNum = parseInt(ecoG) || 0;
+    const ecogNum = parseInt(ecoG || 0);
     baseProb -= (ecogNum * 10);
     if (tumorBurden === 'High' || tumorBurden === 'Bulky') baseProb -= 10;
     
     // 2. Intake Deficit vs. Plan Adequacy
     const intakeDeficit = 100 - (parseInt(intake) || 100);
     if (intakeDeficit > 20) {
-      const isAggressive = (plan.dailyProtein / (plan.proteinPerKg * patient.weight) > 0.9) || plan.prescribedRoute.includes('Enteral');
-      if (isAggressive) baseProb -= (intakeDeficit * 0.2); 
-      else baseProb -= (intakeDeficit * 0.6);
+      if (plan && plan.dailyProtein && plan.proteinPerKg && patient && patient.weight) {
+        const isAggressive = (plan.dailyProtein / (plan.proteinPerKg * patient.weight) > 0.9) || 
+                            (plan.prescribedRoute && plan.prescribedRoute.includes('Enteral'));
+        if (isAggressive) baseProb -= (intakeDeficit * 0.2); 
+        else baseProb -= (intakeDeficit * 0.6);
+      } else {
+        baseProb -= (intakeDeficit * 0.4); // Fallback penalty
+      }
     }
 
     // 3. Therapeutic Boosts
-    if (plan.proteinPerKg >= 1.5) baseProb += 8;
-    if (plan.micronutrients.epa && plan.micronutrients.epa !== 'None') baseProb += 4;
+    if (plan && plan.proteinPerKg >= 1.5) baseProb += 8;
+    if (plan && plan.micronutrients && plan.micronutrients.epa && plan.micronutrients.epa !== 'None') baseProb += 4;
     
     const finalProb = Math.min(95, Math.max(15, baseProb));
     return {
