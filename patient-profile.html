@@ -1201,8 +1201,6 @@
               <div class="rs-title" style="font-size:9.5px; margin-top:20px;">Manufacturing Alerts (Store)</div>
               <ul class="rrat" id="manufacturingAlerts" style="font-size:11.5px; color:#dc2626; font-weight:600;"></ul>
 
-              <div style="font-size:11px; color:#64748b; margin-top:10px; padding-left:14px; font-style:italic;"
-                id="riskMonitor"></div>
               <div style="font-size:11px; color:#64748b; margin-top:4px; padding-left:14px; font-style:italic;"
                 id="riskNote"></div>
 
@@ -1260,6 +1258,9 @@
                   <tbody id="claudeMonitorTable"></tbody>
                 </table>
               </div>
+
+          </div>
+        </div>
 
             </div>
           </div>
@@ -3891,7 +3892,6 @@
             const cp = window.currentVersionedPlan;
             if (!skipPersistence && cp && cp.id) {
               cp.claudeInsights = data;
-              // Direct save to avoid potential save/reset loops in some envs
               const allPlans = getPlans();
               const idx = allPlans.findIndex(p => p.id === cp.id);
               if (idx !== -1) {
@@ -3901,18 +3901,23 @@
               }
             }
 
+            // 1. Rationale (Prepend with cleanup)
             const crEl = document.getElementById('clinicalRationale');
             if (crEl && data.rationale && data.rationale.length > 0) {
+              crEl.querySelectorAll('.ai-insight').forEach(el => el.remove());
               const aiHtml = data.rationale.map(r => `<li class="ai-insight" style="color:#6d28d9; font-weight:600;">✨ ${r}</li>`).join('');
               crEl.innerHTML = aiHtml + crEl.innerHTML;
             }
 
+            // 2. Instructions (Prepend with cleanup)
             const piEl = document.getElementById('patientInstructions');
             if (piEl && data.instructions && data.instructions.length > 0) {
+              piEl.querySelectorAll('.ai-insight').forEach(el => el.remove());
               const aiHtml = data.instructions.map(t => `<li class="ai-insight" style="color:#6d28d9; font-weight:600; margin-bottom:4px;">✨ ${t}</li>`).join('');
               piEl.innerHTML = aiHtml + piEl.innerHTML;
             }
 
+            // 3. Clinical Alerts Section
             const alertsSec = document.getElementById('claudeAlertsSection');
             const alertsList = document.getElementById('claudeAlertsList');
             if (alertsSec && alertsList && data.clinicalAlerts && data.clinicalAlerts.length > 0) {
