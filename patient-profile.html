@@ -3770,6 +3770,141 @@
                 window.print();
               });
           }
+
+          // ============================================================
+          // CLAUDE AI REPORT GENERATION (claude-sonnet-4-5)
+          // ============================================================
+          async function generateClaudeInsight() {
+            const btn = document.getElementById('btnClaude');
+            if (!window.patient || !window.currentPlan) return;
+
+            if (btn) {
+              btn.disabled = true;
+              btn.innerHTML = '⏳ Consulting Claude AI...';
+              btn.style.opacity = '0.7';
+            }
+
+            const fp = window.currentPlan.finalPlan || window.currentPlan;
+            const bmi = fp.bmi != null ? fp.bmi : (function () {
+              const h = parseFloat(window.patient.height) / 100;
+              return Math.round((parseFloat(window.patient.weight) / (h * h)) * 10) / 10;
+            })();
+
+            const payload = {
+              patient: {
+                name: window.patient.name, age: window.patient.age, sex: window.patient.sex,
+                weight: window.patient.weight, height: window.patient.height,
+                usualWeight: window.patient.usualWeight,
+                weightLossPercent: window.patient.weightLossPercent || 0,
+                uhic: window.patient.uhic, cancer: window.patient.cancer,
+                cancerStage: window.patient.cancerStage, regimen: window.patient.regimen,
+                ecogStatus: window.patient.ecogStatus, treatmentTypes: window.patient.treatmentTypes,
+                feedingMethod: window.patient.feedingMethod,
+                reducedFoodIntake: window.patient.reducedFoodIntake || 0,
+                albumin: window.patient.albumin, prealbumin: window.patient.prealbumin,
+                crp: window.patient.crp, hemoglobin: window.patient.hemoglobin,
+                bloodSugar: window.patient.bloodSugar, hba1c: window.patient.hba1c,
+                sodium: window.patient.sodium, potassium: window.patient.potassium,
+                magnesium: window.patient.magnesium, creatinine: window.patient.creatinine,
+                alt: window.patient.alt, ast: window.patient.ast, bilirubin: window.patient.bilirubin,
+                vitD: window.patient.vitD, vitB12: window.patient.vitB12,
+                folate: window.patient.folate, zinc: window.patient.zinc,
+                smi: window.patient.smi, handGrip: window.patient.handGrip,
+                muac: window.patient.muac, lvef: window.patient.lvef,
+                comorbidities: window.patient.comorbidities || [],
+                allergies: window.patient.allergies || [],
+                sideEffects: window.patient.sideEffects || [],
+                culturalPreferences: window.patient.culturalPreferences,
+                genomicMarkers: window.patient.genomicMarkers || [],
+                tumorBurden: window.patient.tumorBurden,
+                sarcopeniaStatus: window.patient.sarcopeniaStatus
+              },
+              plan: {
+                bmi: bmi, dailyCalories: fp.dailyCalories, kcalPerKg: fp.kcalPerKg,
+                dailyProtein: fp.dailyProtein, proteinPerKg: fp.proteinPerKg,
+                prescribedRoute: fp.prescribedRoute, cachexia: fp.cachexia,
+                proteinType: fp.proteinType, safetyAlerts: fp.safetyAlerts || []
+              }
+            };
+
+            try {
+              const apiBase = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL)
+                ? CONFIG.API_BASE_URL : 'http://localhost:3000';
+              const response = await fetch(`${apiBase}/api/claude-report`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+              });
+              if (!response.ok) {
+                const errData = await response.json().catch(() => ({}));
+                throw new Error(errData.error || `HTTP ${response.status}`);
+              }
+              const data = await response.json();
+              renderClaudeInsight(data);
+              if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = '✅ Claude Insights Loaded';
+                btn.style.opacity = '1';
+                btn.style.background = '#15803d';
+                btn.style.borderColor = '#166534';
+                setTimeout(() => {
+                  btn.innerHTML = '✨ Refine with Claude Sonnet 4.5';
+                  btn.style.background = '#6d28d9';
+                  btn.style.borderColor = '#5b21b6';
+                }, 4000);
+              }
+            } catch (error) {
+              console.error('Claude Report Error:', error);
+              if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = '⚠️ Retry Claude AI';
+                btn.style.opacity = '1';
+                btn.style.background = '#b45309';
+                btn.style.borderColor = '#92400e';
+              }
+            }
+          }
+
+          function renderClaudeInsight(data) {
+            const crEl = document.getElementById('clinicalRationale');
+            if (crEl && data.rationale && data.rationale.length > 0)
+              crEl.innerHTML = data.rationale.map(r => `<li>${r}</li>`).join('');
+
+            const piEl = document.getElementById('patientInstructions');
+            if (piEl && data.instructions && data.instructions.length > 0)
+              piEl.innerHTML = data.instructions.map(t => `<li style="margin-bottom:4px;">${t}</li>`).join('');
+
+            const alertsSec = document.getElementById('claudeAlertsSection');
+            const alertsList = document.getElementById('claudeAlertsList');
+            if (alertsSec && alertsList && data.clinicalAlerts && data.clinicalAlerts.length > 0) {
+              const lv = { HIGH:{ bg:'#fff0f0',border:'#ef4444',text:'#991b1b',icon:'🚨' }, MODERATE:{ bg:'#fffbeb',border:'#f59e0b',text:'#92400e',icon:'⚠️' }, LOW:{ bg:'#f0fdf4',border:'#22c55e',text:'#166534',icon:'ℹ️' } };
+              alertsList.innerHTML = data.clinicalAlerts.map(a => { const s=lv[a.level]||lv.LOW; return `<div style="background:${s.bg};border:1px solid ${s.border};color:${s.text};padding:9px 12px;border-radius:6px;margin-bottom:7px;font-size:11px;font-weight:600;display:flex;align-items:flex-start;gap:8px;"><span style="font-size:1.1em;flex-shrink:0;">${s.icon}</span><span><b>${a.type}:</b> ${a.message}</span></div>`; }).join('');
+              alertsSec.style.display = 'block';
+            }
+
+            const drugSec = document.getElementById('claudeDrugSection');
+            const drugTbl = document.getElementById('claudeDrugTable');
+            if (drugSec && drugTbl && data.drugInteractions && data.drugInteractions.length > 0) {
+              const rc = { HIGH:'#dc2626', MODERATE:'#d97706', LOW:'#16a34a' };
+              drugTbl.innerHTML = data.drugInteractions.map(d => `<tr><td style="padding:7px 8px;border:1px solid #e2e8f0;font-weight:700;color:#0e2247;">${d.drug}</td><td style="padding:7px 8px;border:1px solid #e2e8f0;">${d.interaction}</td><td style="padding:7px 8px;border:1px solid #e2e8f0;font-style:italic;color:#1e40af;">${d.advice}</td><td style="padding:7px 8px;border:1px solid #e2e8f0;text-align:center;"><span style="background:${rc[d.risk]||'#64748b'}22;color:${rc[d.risk]||'#64748b'};font-size:9.5px;font-weight:800;padding:2px 8px;border-radius:999px;text-transform:uppercase;">${d.risk||'N/A'}</span></td></tr>`).join('');
+              drugSec.style.display = 'block';
+            }
+
+            const microSec = document.getElementById('claudeMicroSection');
+            const microTbl = document.getElementById('claudeMicroTable');
+            if (microSec && microTbl && data.micronutrientOrders && data.micronutrientOrders.length > 0) {
+              const sc = { SUPPLEMENT:'#0284c7', DEFICIENT:'#dc2626', MONITOR:'#d97706', CAPPED:'#9333ea', EXCLUDED:'#ef4444', STANDARD:'#64748b', 'CARDIAC Rx':'#0e2247', 'GLYCEMIC Rx':'#b45309' };
+              microTbl.innerHTML = data.micronutrientOrders.map(m => { const col=sc[m.status]||'#64748b'; return `<tr><td style="padding:7px 8px;border:1px solid #e2e8f0;font-weight:700;color:#0e2247;">${m.nutrient}</td><td style="padding:7px 8px;border:1px solid #e2e8f0;color:#475569;">${m.labValue||'—'}</td><td style="padding:7px 8px;border:1px solid #e2e8f0;font-weight:600;">${m.dose}</td><td style="padding:7px 8px;border:1px solid #e2e8f0;font-size:10.5px;color:#334155;">${m.rationale}</td><td style="padding:7px 8px;border:1px solid #e2e8f0;text-align:center;"><span style="background:${col}22;color:${col};font-size:9px;font-weight:800;padding:2px 7px;border-radius:999px;text-transform:uppercase;white-space:nowrap;">${m.status}</span></td></tr>`; }).join('');
+              microSec.style.display = 'block';
+            }
+
+            const monSec = document.getElementById('claudeMonitorSection');
+            const monTbl = document.getElementById('claudeMonitorTable');
+            if (monSec && monTbl && data.monitoringSchedule && data.monitoringSchedule.length > 0) {
+              monTbl.innerHTML = data.monitoringSchedule.map(m => `<tr><td style="padding:7px 8px;border:1px solid #e2e8f0;font-weight:700;color:#0e2247;">${m.frequency}</td><td style="padding:7px 8px;border:1px solid #e2e8f0;">${m.parameters}</td><td style="padding:7px 8px;border:1px solid #e2e8f0;color:#dc2626;font-weight:600;">${m.threshold}</td><td style="padding:7px 8px;border:1px solid #e2e8f0;color:#475569;">${m.responsible}</td></tr>`).join('');
+              monSec.style.display = 'block';
+            }
+          }
         </script>
 </body>
 

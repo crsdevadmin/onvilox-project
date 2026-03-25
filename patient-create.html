@@ -66,7 +66,8 @@
     <div class="msg msg-ai">👋 Hi! I'm <b>Claude AI</b>.<br><br>
       📋 <b>Paste clinical notes</b> and I'll auto-fill all the patient fields.<br>
       📎 <b>Upload a PDF</b> using the 📎 button to extract from a medical report.<br>
-      💬 <b>Type anything</b> like "65yr male, lung cancer, 58kg" and I'll do the rest!
+      🩺 <b>Ask any oncology question</b> — drug interactions, guidelines, dosing, side effects — I'll answer!<br>
+      💬 <b>Type clinical data</b> like "65yr male, lung cancer, 58kg" and I'll fill the form automatically!
     </div>
   </div>
   <div class="ai-chat-input-area">
@@ -949,15 +950,81 @@ function sendChatMessage() {
   addMessage(text, 'user');
   input.value = '';
 
-  const typing = addTyping();
+  // Detect if this looks like a clinical data paste OR an oncology question
+  const isQuestion = isOncologyQuestion(text);
 
-  setTimeout(async () => {
-    typing.remove();
-    await runAiExtraction(text);
-    addMessage('✅ Form filled! Review the fields and submit when ready.', 'ai');
-    // Auto-close after 2 seconds
-    setTimeout(() => toggleChat(), 2000);
-  }, 800);
+  if (isQuestion) {
+    // Route to Claude /api/chat for oncology Q&A
+    const typing = addTyping();
+    askClaudeOncology(text).then(reply => {
+      typing.remove();
+      addMessageHtml(reply, 'ai');
+    }).catch(() => {
+      typing.remove();
+      addMessage('Sorry, I could not reach the AI. Please check your server connection.', 'ai');
+    });
+  } else {
+    // Route to local regex extraction + form auto-fill
+    const typing = addTyping();
+    setTimeout(async () => {
+      typing.remove();
+      await runAiExtraction(text);
+      addMessage('✅ Form filled! Review the fields and submit when ready.', 'ai');
+    }, 800);
+  }
+}
+
+function isOncologyQuestion(text) {
+  const lower = text.toLowerCase().trim();
+  // Questions end with ?, start with question words, or are short typed queries
+  if (lower.endsWith('?')) return true;
+  if (/^(what|how|why|when|which|is|can|should|does|do|explain|tell me|give me|list|compare|difference|meaning|define|recommend|best|safe|help)\b/.test(lower)) return true;
+  // If text has very few numbers and is sentence-like, treat as Q&A
+  const numCount = (text.match(/\d+/g) || []).length;
+  const wordCount = text.split(/\s+/).length;
+  if (wordCount < 20 && numCount < 3) return true;
+  return false;
+}
+
+async function askClaudeOncology(question) {
+  const apiBase = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL)
+    ? CONFIG.API_BASE_URL : 'http://localhost:3000';
+
+  // Build minimal patient context from current form state
+  const ctx = {
+    cancer: document.getElementById('cancerInput')?.value || null,
+    regimen: document.getElementById('regimenInput')?.value || null,
+    age: document.getElementById('age')?.value || null,
+    sex: document.getElementById('sex')?.value || null,
+    weight: document.getElementById('weight')?.value || null,
+    albumin: document.getElementById('albumin')?.value || null,
+    crp: document.getElementById('crp')?.value || null
+  };
+
+  const response = await fetch(`${apiBase}/api/chat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message: question, contextObj: ctx })
+  });
+
+  if (!response.ok) throw new Error('API error');
+  const data = await response.json();
+  return data.reply || 'No response from AI.';
+}
+
+// Supports HTML formatting in AI messages
+function addMessageHtml(htmlText, type) {
+  const container = document.getElementById('chatMsgs');
+  const msg = document.createElement('div');
+  msg.className = `msg msg-${type}`;
+  // Convert markdown-style bold (**text**) to <b>
+  const formatted = htmlText
+    .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>')
+    .replace(/\n/g, '<br>');
+  msg.innerHTML = formatted;
+  container.appendChild(msg);
+  container.scrollTop = container.scrollHeight;
+  return msg;
 }
 
 // --- PDF EXTRACTION LOGIC ---
@@ -1240,6 +1307,7 @@ function runAiExtraction(rawText) {
 
 
 
+<script src="js/config.js"></script>
 <script src="js/theme.js"></script>
 </body>
 </html>
