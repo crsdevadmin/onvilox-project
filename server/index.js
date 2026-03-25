@@ -165,21 +165,21 @@ Return ONLY valid JSON. No markdown, no preambles.`;
       system: systemInstruction,
       messages: [{
         role: "user",
-        content: `CLINICAL RULES:
-- Cachexia: weight loss >5% OR albumin <3.5 -> 35 kcal/kg, 1.8g protein/kg (whey isolate, leucine-rich)
-- No cachexia + ECOG 0-1: 25-30 kcal/kg, 1.2-1.5g protein/kg
-- Renal risk (creatinine >1.3): restrict protein 0.8-1.0g/kg, avoid phosphorus
-- HER2+/Trastuzumab/Pertuzumab: CoQ10 200mg/day, Omega-3 3g/day, Na <2g/day, LVEF monitoring
-- Docetaxel/Taxane: cap Vit C 500mg, NO ALA (antioxidant interference)
-- Bortezomib: BLOCK all antioxidants (Vit C >500mg AND ALA)
-- FOLFOX/Cisplatin/Carboplatin: ALA 600mg neuroprotection (unless Bortezomib), Mg supplementation, monitor Mg wasting
-- Hyperglycemia (BG>126 or HbA1c>5.7): Palatinose (low-GI), chromium picolinate 200-400mcg
-- Hyponatremia (Na<135): 1-2g NaCl supplementation
-- Sarcopenia (SMI<45F/55M or grip<27F/35M): leucine 3g/serving, HMB 3g/day
-- Anemia (Hb<12F/14M): iron 45-60mg elemental + B12 + folate
-- Low Vit D (<30): correction dose 2000-4000 IU/day
-- Inflammation (CRP>10): EPA 2-4g/day, anti-inflammatory focus
-- All patients: Vit D, Omega-3, Zinc 15-30mg, Selenium 50-100mcg, B-Complex baseline
+        content: `CLINICAL RULES (EXACT MATCH REQUIRED):
+- Tier 3 (Severe/Cachexia): Weight loss >=10% OR albumin <3.5 OR Sarcopenia OR Bulky Tumor -> 35 kcal/kg, 1.8g protein/kg.
+- Tier 2 (Moderate Risk): Weight loss 5-10% OR ECOG >=2 OR Age >=70 -> 30 kcal/kg, 1.8g protein/kg.
+- Tier 1 (Baseline/Stable): No risk factors above -> 25 kcal/kg, 1.4g protein/kg.
+- Supplement Logic: If Oral Intake > 50%, formulation is a GAP-FILLING SUPPLEMENT (Calories = Deficit Portion). If <=50% or Enteral, it is FULL REPLACEMENT.
+- Renal Risk (Creatinine >1.3): Protein strictly capped at 0.8g/kg.
+- Glycemic Safety: If T2DM/High BS (>180) AND no HbA1c exists -> Add "CRITICAL: HbA1c Screening Required" alert.
+- Sodium Safety: For Hyponatremia (Na<135) -> "Target 1-2g NaCl; [SAFETY] Cap correction at +8–10 mEq/L per 24h to avoid ODS."
+- Antioxidant Safety: For FOLFOX/Oxaliplatin -> High-dose Vit C (>1000mg) or ALA (600mg) REQUIRES Oncologist Clearance. Do not recommend automatically.
+- Bortezomib: BLOCK all antioxidants (Vit C > 500mg and ALA).
+- Sarcopenia (SMI<45F/55M or grip<27F/35M): leucine 3g/serving, HMB 3g/day.
+- Anemia (Hb<12F/14M): iron 45-60mg elemental + B12 + folate.
+- Low Vit D (<30): correction dose 2000-4000 IU/day.
+- Inflammation (CRP>10): EPA 2-4g/day.
+- All patients: Zinc 15-30mg, Selenium 50-100mcg, B-Complex.
 
 PATIENT DATA (use EXACT values):
 Name: ${patient.name}, Age: ${patient.age}, Sex: ${patient.sex}

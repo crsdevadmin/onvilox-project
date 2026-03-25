@@ -129,16 +129,23 @@ function generateNutritionPlan(patient) {
   if (riskScore >= 4) nutritionRisk = 'High';
   else if (riskScore >= 2) nutritionRisk = 'Moderate';
 
-  const cachexia = albumin < 3.5 || weightLossPercent >= 10 || bmi < 18.5 || crp > 10 || sarcopenia;
-
   const sideEffects = (Array.isArray(patient.sideEffects) ? patient.sideEffects : []).map(s => s.toLowerCase());
   const hasNausea = sideEffects.some(s => s.includes('nausea') || s.includes('vomit'));
   const hasAppetiteLoss = sideEffects.some(s => s.includes('appetite') || s.includes('satiety'));
   const hasMucositis = sideEffects.some(s => s.includes('mucositis') || s.includes('mouth sore'));
 
-  var kcalPerKg = cachexia ? 35 : 30;
-  if (hasAppetiteLoss) kcalPerKg = Math.max(kcalPerKg, 32); // Ensure high density for low volume
-  var proteinPerKg = (cachexia || tumorBurden) ? 1.8 : 1.4;
+  const cachexia = albumin < 3.5 || weightLossPercent >= 10 || bmi < 18.5 || crp > 10 || sarcopenia || tumorBurden;
+  const moderateRisk = weightLossPercent >= 5 || ecog >= 2 || age >= 70;
+
+  let kcalPerKg = 25; // Tier 1: Baseline Stable
+  if (cachexia) {
+    kcalPerKg = 35; // Tier 3: Severe / Cachectic
+  } else if (moderateRisk) {
+    kcalPerKg = 30; // Tier 2: Moderate Risk
+  }
+  
+  if (hasAppetiteLoss) kcalPerKg = Math.max(kcalPerKg, 32); 
+  var proteinPerKg = (cachexia || moderateRisk) ? 1.8 : 1.4;
 
   // --- STEP 6: SAFETY LAYER (PROTEIN CAP) ---
   if (hasRenalIssue) {
@@ -186,19 +193,22 @@ function generateNutritionPlan(patient) {
     safetyStatus.renal = { level: 'warning', message: 'LOW CREATININE ALERT: Potential muscle wasting; verify SMI/Grip.' };
   }
 
-  if (bloodSugar > 180) {
-    safetyStatus.metabolic = { level: 'danger', message: `HYPERGLYCEMIA ALERT: Blood Sugar ${bloodSugar}. Diabetic (Low-Carb) protocol active.` };
-    if (!patient.hba1c) safetyStatus.metabolic.message += " (Note: HbA1c missing)";
+  if (bloodSugar > 180 || (isDiabetic && bloodSugar > 140)) {
+    safetyStatus.metabolic = { level: 'danger', message: `HYPERGLYCEMIA ALERT: Blood Sugar ${bloodSugar}. Diabetic protocol active.` };
+    if (!patient.hba1c || patient.hba1c === 0) {
+      safetyStatus.metabolic.level = 'danger';
+      safetyStatus.metabolic.message += " [CRITICAL] HbA1c missing; glycemic control depth unknown. Immediate Hba1c screening required.";
+    }
   }
 
   // ECOG vs Activity Contradiction
   if (ecog === 0 && (patient.activityLevel || '').toLowerCase().includes('sedentary')) {
-    safetyStatus.metabolic = { level: 'warning', message: "CLINICAL CONTRADICTION: ECOG 0 (Active) while Activity is Sedentary. Verify performance status." };
+    safetyStatus.metabolic = { level: 'warning', message: "CLINICAL CONTRADICTION: ECOG 0 (Fully Active) vs Sedentary activity. [SAFETY] Verify patient performance status." };
   }
 
   if (patient.sodium > 0 && patient.sodium < 135) {
     const naLevel = patient.sodium < 130 ? 'danger' : 'warning';
-    safetyStatus.electrolyte = { level: naLevel, message: `HYPONATREMIA ALERT: Sodium ${patient.sodium}. NaCl 1-2g target in formulation.` };
+    safetyStatus.electrolyte = { level: naLevel, message: `HYPONATREMIA ALERT: Sodium ${patient.sodium}. Target 1-2g NaCl; [SAFETY] Cap correction at +8–10 mEq/L per 24 hours to avoid ODS.` };
   } else if (patient.potassium > 5.0) {
     const kLevel = patient.potassium > 5.5 ? 'danger' : 'warning';
     safetyStatus.electrolyte = { level: kLevel, message: `HYPERKALEMIA ALERT: Potassium ${patient.potassium}. Low-K formulation required.` };
@@ -214,9 +224,10 @@ function generateNutritionPlan(patient) {
   if (lowerRegimen.includes('lenalidomide') || lowerRegimen.includes('revlimid')) drugs.push("Lenalidomide");
   
   const hasBortezomib = drugs.includes("Bortezomib") || lowerCancer.includes('myeloma');
+  const hasPlatin = lowerRegimen.includes('platin') || lowerRegimen.includes('folfox') || lowerRegimen.includes('folfirinox');
   
-  if (drugs.length > 0 || lowerCancer.includes('myeloma')) {
-    let msg = `DRUG INTERACTION: ${drugs.join(', ') || 'Bortezomib/Myeloma'} protocol active.`;
+  if (drugs.length > 0 || lowerCancer.includes('myeloma') || hasPlatin) {
+    let msg = `DRUG INTERACTION: ${drugs.join(', ') || (hasPlatin ? 'Platinum-based' : 'Bortezomib/Myeloma')} protocol monitored.`;
     
     // Check for existing supplements that might interfere
     const existingSupplements = (Array.isArray(patient.existingSupplements) ? patient.existingSupplements : []).map(s => s.toLowerCase());
@@ -225,9 +236,15 @@ function generateNutritionPlan(patient) {
     if (hasBortezomib) {
       msg += " Antioxidant cap (Vit C < 500mg, No ALA) enforced.";
       if (hasExistingAntioxidants) {
-        safetyStatus.drug = { level: 'danger', message: `CRITICAL DRUG CLASH: High-dose antioxidants (Vit C/ALA) found in current patient list. This interferes with Bortezomib. Discontinue immediately.` };
+        safetyStatus.drug = { level: 'danger', message: `CRITICAL DRUG CLASH: High-dose antioxidants (Vit C/ALA) found. Interferes with Bortezomib. Discontinue immediately.` };
       } else {
         safetyStatus.drug = { level: 'warning', message: msg };
+      }
+    } else if (hasPlatin) {
+      if (hasExistingAntioxidants) {
+        safetyStatus.drug = { level: 'warning', message: `OXALIPLATIN SAFETY: High-dose antioxidants (Vit C/ALA) detected during Platinum chemo. Requires Oncologist Clearance to ensure treatment efficacy.` };
+      } else {
+        safetyStatus.drug = { level: 'info', message: "Drug Safety: Platinum-based chemo screened. No immediate antioxidant clashes." };
       }
     } else {
       msg += " Nutrients adjusted for safety.";
@@ -368,11 +385,20 @@ function generateNutritionPlan(patient) {
 
   const rationale = [];
   if (hasRenalIssue) {
-    rationale.push(`<b>Renal Safety (Strict):</b> Protein capped at ${proteinPerKg} g/kg to protect kidney function (KDIGO guidelines), prioritizing renal safety over aggressive muscle loading.`);
+    rationale.push(`<b>Renal Safety (Strict):</b> Protein capped at ${proteinPerKg} g/kg to protect kidney function (KDIGO), prioritizing safety over aggressive muscle loading.`);
   } else if (cachexia) {
-    rationale.push(`<b>Clinical (Energy):</b> Target at 35 kcal/kg/day for hypermetabolic cachexia.`);
+    rationale.push(`<b>Clinical (Hypermetabolic):</b> Target at 35 kcal/kg/day prescribed for established Cachexia.`);
+  } else if (moderateRisk) {
+    rationale.push(`<b>Clinical (Moderate Risk):</b> Target at 30 kcal/kg/day prescribed for 5-10% weight loss or ECOG 2.`);
   } else {
-    rationale.push(`<b>Clinical (Energy):</b> Maintenance at 25-30 kcal/kg/day.`);
+    rationale.push(`<b>Clinical (Maintenance):</b> Target at 25 kcal/kg/day for stable oncology maintenance.`);
+  }
+
+  // Deficit Rationale
+  if (!isFullReplacement && reducedFoodIntake > 0) {
+    rationale.push(`<b>Supplement Strategy:</b> Patient is maintaining ${actualIntake}% oral intake. Formulation is prescribed as a <b>${reducedFoodIntake}% supplement</b> to fill the nutritional gap (Target: ${baseDailyCalories} kcal; Prescription: ${dailyCalories} kcal).`);
+  } else {
+    rationale.push(`<b>Full Replacement:</b> Therapeutic logic requires 100% target coverage via formulation (Enteral/Escalation pathway).`);
   }
   
   if (patient.potassium > 5.0) {
