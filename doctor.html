@@ -5,6 +5,13 @@
   <title>Dashboard - Onvilox</title>
   <script src="js/config.js"></script>
   <link rel="stylesheet" href="css/app.css?v=2.0">
+  <style>
+    @keyframes pulse {
+      0% { opacity: 1; }
+      50% { opacity: 0.5; }
+      100% { opacity: 1; }
+    }
+  </style>
 </head>
 <body>
 
@@ -114,6 +121,7 @@
 <script src="js/patient-store.js"></script>
 <script src="js/nutrition-engine-v4.js"></script>
 <script src="js/manufacturing.js"></script>
+<script src="js/ai-report-service.js"></script>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
@@ -126,6 +134,9 @@ const me = auth.getCurrentUser();
 // Top-right role pill
 const rolePill = document.getElementById('rolePill');
 if(rolePill) rolePill.textContent = me.role;
+
+// In-memory tracker for AI background tasks
+const __aiTriggers = {};
 
 // Filters
 let searchQuery = '';
@@ -215,6 +226,24 @@ function render(){
       preview = generateNutritionPlan(patientForCalc);
     } catch(e){ /* ignore */ }
 
+    const latestPlan = getLatestPlanForPatient(p.id);
+    const hasAI = !!(latestPlan && latestPlan.claudeInsights);
+    const aiStatus = hasAI ? '<span class="status ready" style="background:#dcfce7; color:#166534; font-size:10px; margin-left:5px;">AI READY</span>' : '<span class="status processing" style="background:#fef9c3; color:#854d0e; font-size:10px; margin-left:5px; animation: pulse 1.5s infinite;">ANALYZING...</span>';
+
+    // Auto-trigger AI if missing
+    if (!hasAI && !__aiTriggers[p.id]) {
+      __aiTriggers[p.id] = true;
+      aiReportService.generateInsights(p, latestPlan || generateNutritionPlan(p)).then(data => {
+        const planToUpdate = latestPlan || createOrUpdatePlan(p, generateNutritionPlan(p), {}, 'Auto-trigger from dashboard');
+        planToUpdate.claudeInsights = data;
+        updatePlan(planToUpdate);
+        render(); // Re-render to show "READY"
+      }).catch(err => {
+        console.error("Dashboard AI Trigger Failed:", err);
+        delete __aiTriggers[p.id];
+      });
+    }
+
     const mainRow = document.createElement('tr');
     mainRow.className = 'patient-row';
     mainRow.style.cursor = 'pointer';
@@ -225,13 +254,13 @@ function render(){
       <td>${p.uhic}</td>
       <td>${p.cancer}</td>
       <td>${p.createdDate || '-'}</td>
-      <td><span class="status ${statusClass}">${status}</span></td>
+      <td><span class="status ${statusClass}">${status}</span>${aiStatus}</td>
       <td>
         <div class="action-row" onclick="event.stopPropagation();" style="display:flex; gap:8px;">
-          <a href="patient-profile.html?id=${p.id}" class="btn-primary" style="padding: 6px 10px; border-radius: 6px; display:flex; align-items:center; justify-content:center;" title="Edit / Report">
+          <a href="patient-profile.html?id=${p.id}" class="btn-primary" style="padding: 6px 10px; border-radius: 6px; display:flex; align-items:center; justify-content:center; ${!hasAI ? 'opacity:0.5; pointer-events:none;' : ''}" title="${hasAI ? 'Edit / Report' : 'Analyzing clinical data...'}">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207 11.207 2.5zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293l6.5-6.5zm-9.761 5.175-.106.106-1.528 3.821 3.821-1.528.106-.106A.5.5 0 0 1 5 12.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.468-.325z"/></svg>
           </a>
-          <button class="btn-secondary" onclick="openPdf('${p.id}')" style="padding: 6px 10px; border-radius: 6px; display:flex; align-items:center; justify-content:center;" title="Download PDF">
+          <button class="btn-secondary" onclick="openPdf('${p.id}')" style="padding: 6px 10px; border-radius: 6px; display:flex; align-items:center; justify-content:center; ${!hasAI ? 'opacity:0.5; pointer-events:none;' : ''}" title="${hasAI ? 'Download PDF' : 'Analyzing clinical data...'}">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/><path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/></svg>
           </button>
           ${approveBtn}

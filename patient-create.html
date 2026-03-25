@@ -685,8 +685,8 @@ function submitPatient(){
     // 3. Create baseline versioned plan (without AI insights yet)
     createOrUpdatePlan(saved, engineOutput, {}, 'Initial automated baseline');
     
-    // 4. Fast Redirect to Profile (where AI will trigger asynchronously)
-    window.location.href = `patient-profile.html?id=${saved.id}`;
+    // 4. Fast Redirect to Dashboard (where AI will trigger/status will show)
+    window.location.href = 'doctor.html';
   } catch (err) {
     console.error("Clinical Save Error:", err);
     alert("Error saving patient: " + err.message);
