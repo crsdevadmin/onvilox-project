@@ -323,9 +323,8 @@ function generateNutritionPlan(patient) {
   const tolerance = (patient.proteinTolerance || '').toLowerCase();
 
   if (tolerance === 'gi' || cancer.includes('pancreatic') || hasIBD || hasNausea) proteinType = 'Hydrolyzed whey';
-  else if (tolerance === 'mucositis' || hasMucositis) proteinType = 'Peptide formulas';
+  else if (tolerance === 'mucositis' || hasMucositis || (patient.feedingMethod || '').toLowerCase().includes('enteral')) proteinType = 'Peptide formulas';
   else if (tolerance === 'lactose') proteinType = 'Plant proteins (pea / rice)';
-  else if ((patient.feedingMethod || '').toLowerCase().includes('enteral')) proteinType = 'Peptide formulas';
 
   const interactions = [];
   if (regimen.includes('cisplatin')) {
@@ -403,7 +402,8 @@ function generateNutritionPlan(patient) {
   if (!isFullReplacement && reducedFoodIntake > 0) {
     rationale.push(`<b>Supplement Strategy:</b> Patient is maintaining ${actualIntake}% oral intake (Est. ${estimatedDietaryProtein}g dietary protein). Formulation is a <b>${reducedFoodIntake}% supplement</b> (${dailyProtein}g). <b>Total Delivery: ${totalProteinDelivery}g/day</b> (Target: ${baseDailyProtein}g).`);
   } else {
-    rationale.push(`<b>Full Replacement:</b> Therapeutic logic requires 100% target coverage via formulation (Enteral/Escalation pathway).`);
+    const intakeNote = isFullReplacement ? `(Intake: ${actualIntake}% ≤ 50%)` : "";
+    rationale.push(`<b>Full Replacement ${intakeNote}:</b> Therapeutic logic requires 100% target coverage (${baseDailyCalories} kcal) via formulation to ensure stabilization.`);
   }
   
   if (patient.potassium > 5.0) {
@@ -414,7 +414,7 @@ function generateNutritionPlan(patient) {
   }
   if (isDiabetic || (patient.bloodSugar > 180)) {
     const reason = patient.bloodSugar > 180 ? 'Hyperglycemia detected' : 'T2DM history';
-    rationale.push(`<b>Glycemic Control:</b> ${reason}. Low-GI Palatinose matrix used. <b>[REQUIRED]</b> HbA1c screening within 48h to assess chronic control depth.`);
+    rationale.push(`<b>Glycemic Control:</b> ${reason}. Low-GI <b>Palatinose</b> matrix used to minimize glycemic spikes. <b>[REQUIRED]</b> HbA1c screening within 48h to assess chronic control depth.`);
   }
 
   if (!hasRenalIssue && proteinPerKg >= 1.8) {
