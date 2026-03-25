@@ -234,26 +234,26 @@ function generateNutritionPlan(patient) {
   if (chemFlags.platin || chemFlags.bortezomib) {
     let msg = `DRUG INTERACTION: ${drugs.join(', ') || (chemFlags.platin ? 'Platinum-based' : 'Bortezomib/Myeloma')} protocol monitored.`;
     
-    // Check for existing supplements that might interfere
+    // Check for existing supplements AND system prescriptions
     const existingSupplements = (Array.isArray(patient.existingSupplements) ? patient.existingSupplements : []).map(s => s.toLowerCase());
     const hasExistingAntioxidants = existingSupplements.some(s => s.includes('vitamin c') || s.includes('alpha lipoic acid') || s.includes('ala'));
+    
+    const isPrescribingHighVitC = micronutrients.vitC && parseInt(micronutrients.vitC) > 1000;
+    const isPrescribingALA = micronutrients.ala && micronutrients.ala !== 'None' && micronutrients.ala !== null;
+    const hasActiveAntioxidants = hasExistingAntioxidants || isPrescribingHighVitC || isPrescribingALA;
 
     if (chemFlags.bortezomib) {
-      msg += " Antioxidant cap (Vit C < 500mg, No ALA) enforced.";
-      if (hasExistingAntioxidants) {
-        safetyStatus.drug = { level: 'danger', message: `CRITICAL DRUG CLASH: High-dose antioxidants (Vit C/ALA) found. Interferes with Bortezomib. Discontinue immediately.` };
+      if (hasActiveAntioxidants) {
+        safetyStatus.drug = { level: 'danger', message: "CRITICAL DRUG CLASH: High-dose antioxidants (Vit C/ALA) found. Neutralizes Bortezomib efficacy. Discontinue immediately." };
       } else {
-        safetyStatus.drug = { level: 'warning', message: msg };
+        safetyStatus.drug = { level: 'warning', message: msg + " Antioxidant cap (Vit C < 500mg, No ALA) enforced." };
       }
     } else if (chemFlags.platin) {
-      if (hasExistingAntioxidants) {
-        safetyStatus.drug = { level: 'warning', message: `OXALIPLATIN SAFETY: High-dose antioxidants (Vit C/ALA) detected during Platinum chemo. Requires Oncologist Clearance to ensure treatment efficacy.` };
+      if (hasActiveAntioxidants) {
+        safetyStatus.drug = { level: 'warning', message: `OXALIPLATIN SAFETY: High-dose antioxidants${isPrescribingHighVitC ? ' (Vit C >1000mg)' : ''}${isPrescribingALA ? ' (ALA 600mg)' : ''} detected. Requires Oncologist Clearance.` };
       } else {
         safetyStatus.drug = { level: 'info', message: "Drug Safety: Platinum-based chemo screened. No immediate antioxidant clashes." };
       }
-    } else {
-      msg += " Nutrients adjusted for safety.";
-      safetyStatus.drug = { level: 'warning', message: msg };
     }
   } else {
     safetyStatus.drug = { level: 'info', message: 'Drug Interference: Screened for major antioxidant-chemo clashes (Bortezomib/Cisplatin). No flags.' };
@@ -436,7 +436,12 @@ function generateNutritionPlan(patient) {
 
     let selectedProtein = getIng('whey_isolate');
     if (proteinType && (proteinType.toLowerCase().includes('hydrolyzed') || proteinType.toLowerCase().includes('peptide'))) {
-      selectedProtein = getIng('whey_hydrolyzed');
+      const hydroIng = getIng('whey_hydrolyzed');
+      if (hydroIng) {
+        selectedProtein = hydroIng;
+      } else {
+        console.error("CRITICAL: whey_hydrolyzed missing from IngredientLibrary!");
+      }
     } else if (proteinType && proteinType.toLowerCase().includes('plant')) {
       selectedProtein = getIng('pea_protein');
     }

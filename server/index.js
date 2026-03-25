@@ -78,6 +78,11 @@ app.post('/api/patients', authenticateToken, async (req, res) => {
 
 // AI configuration is handled by Anthropic SDK below
 
+// --- ANTHROPIC (CLAUDE) INTEGRATION ---
+const Anthropic = require('@anthropic-ai/sdk');
+const rawKey = process.env.ANTHROPIC_API_KEY || '';
+const anthropic = new Anthropic({ apiKey: rawKey });
+
 // Prompt for mapping Clinical Data
 const extractionSystemPrompt = `You are an expert Oncology Assistant. 
 Extract clinical parameters from the provided text/PDF and return a precise JSON object.
@@ -138,11 +143,6 @@ Patient Context: ${contextStr}`;
   }
 });
 
-// --- ANTHROPIC (CLAUDE) INTEGRATION ---
-const Anthropic = require('@anthropic-ai/sdk');
-const rawKey = process.env.ANTHROPIC_API_KEY || '';
-const anthropic = new Anthropic({ apiKey: rawKey });
-
 app.get('/api/list-models', async (req, res) => {
   try {
     const models = await anthropic.models.list();
@@ -155,11 +155,11 @@ app.post('/api/claude-report', async (req, res) => {
   if (!patient || !plan) return res.status(400).json({ error: 'Context required.' });
 
   try {
-        const systemInstruction = `You are a Senior Oncology Dietitian (PhD, RD) generating a structured clinical nutrition report for Onvilox.
+    const systemInstruction = `You are a Senior Oncology Dietitian (PhD, RD) generating a structured clinical nutrition report for Onvilox.
 CRITICAL LOGIC SYNC:
-1. RENAL SAFETY: If patient has Renal Risk (CR > 1.3), you MUST prioritize the 0.8g/kg protein target. If the Engine's totalProteinDelivery (${plan.totalProteinDelivery}g) exceeds the Target (${plan.baseProtein}g), you MUST flag this as a critical safety override required.
-2. ESCALATION HARMONY: If you recommend "Enteral Tube Escalation" (Mandatory if intake <= 50%), you MUST suppress all "Oral Sipping" or "Cup" instructions. Instructions must focus on tube-feeding safety, flushing, and transition.
-3. VOLUME SAFETY: If Daily Calories > 1800, ensure instructions specify 4-5 small servings to prevent dumping syndrome/GI distress.
+1. RENAL SAFETY: If patient has Renal Risk (CR > 1.3), you MUST prioritize the 0.8g/kg protein target.
+2. ESCALATION HARMONY: If route is 'Enteral', ensure instructions focus on tube-feeding safety (Rinse, Rate, Position).
+3. VOLUME SAFETY: Cap initial enteral rate at 20-40ml/hr if patient has severe weight loss or low albumin.
 4. MICRONUTRIENT CAPS: Do NOT recommend >1000mg Vit C or >2000 IU Vit D without explicit "Requires Oncology Clearance" side-notes, especially during active chemo.
 Return ONLY valid JSON. START with '{' and END with '}'.`;
 
@@ -169,46 +169,36 @@ Return ONLY valid JSON. START with '{' and END with '}'.`;
       system: systemInstruction,
       messages: [{
         role: "user",
-        content: `CLINICAL RULES (EXACT MATCH REQUIRED):
-- Tier 3 (Severe/Cachexia): Weight loss >=10% OR albumin <3.5 OR Sarcopenia OR Bulky Tumor -> 35 kcal/kg, 1.8g protein/kg.
-- Tier 2 (Moderate Risk): Weight loss 5-10% OR ECOG >=2 OR Age >=70 -> 30 kcal/kg, 1.8g protein/kg.
-- Tier 1 (Baseline/Stable): No risk factors above -> 25 kcal/kg, 1.4g protein/kg.
-- Supplement Logic: If Oral Intake > 50%, formulation is a GAP-FILLING SUPPLEMENT (Calories = Deficit Portion). If <=50% or Enteral, it is FULL REPLACEMENT.
-- Renal Risk (Creatinine >1.3): Protein strictly capped at 0.8g/kg.
-- Glycemic Safety: If T2DM/High BS (>180) AND no HbA1c exists -> Add "CRITICAL: HbA1c Screening Required" alert.
-- Sodium Safety: For Hyponatremia (Na<135) -> "Target 1-2g NaCl; [SAFETY] Cap correction at +8–10 mEq/L per 24h to avoid ODS."
-- Antioxidant Safety: For FOLFOX/Oxaliplatin -> High-dose Vit C (>1000mg) or ALA (600mg) REQUIRES Oncologist Clearance. Do not recommend automatically.
-- Bortezomib: BLOCK all antioxidants (Vit C > 500mg and ALA).
-- Sarcopenia (SMI<45F/55M or grip<27F/35M): leucine 3g/serving, HMB 3g/day.
-- Anemia (Hb<12F/14M): iron 45-60mg elemental + B12 + folate.
-- Low Vit D (<30): correction dose 2000-4000 IU/day.
-- Inflammation (CRP>10): EPA 2-4g/day.
-- All patients: Zinc 15-30mg, Selenium 50-100mcg, B-Complex.
+        content: `MANDATORY CLINICAL SAFETY RULES:
+- Antioxidant Safety (FOLFOX/Oxaliplatin): High-dose Vit C (>1000mg) or ALA (600mg) REQUIRES Oncologist Clearance. It must be flagged as "CAPPED" or "EXCLUDED" in micronutrientOrders until cleared.
+- Antioxidant Safety (Bortezomib/Velcade): Vit C > 500mg or any ALA is CONTRAINDICATED. Must be "EXCLUDED" immediately.
+- Renal Risk (Creatinine >1.3): Protein MUST be capped at 0.8g/kg. 
+- Sarcopenia (SMI < 7.0 M / 5.7 F): Confirmation of "Sarcopenic Cachexia" is mandatory in rationale.
+- Glycemic: HbA1c missing + BG > 180 -> Status: CAPPED. Rationale: Screening required.
+- Enteral Escalation: If intake <= 50%, instructions must focus 100% on tube-feeding protocol. Remove oral instructions.
 
-PATIENT DATA: ${JSON.stringify(patient)}
+PATIENT DATA: ${JSON.stringify(patient, null, 2)}
 
-CALCULATED PLAN: ${JSON.stringify(plan)}
-(Note: totalProteinDelivery includes ONS + Estimated Dietary Intake. servingsPerDay is MANDATORY to use in instructions).
+ENGINE CALCULATIONS: ${JSON.stringify(plan, null, 2)}
 
-GENERATE exact JSON structure:
+GENERATE JSON STRUCTURE:
 {
-  "rationale": [
-    "Clinical bullet 1 - Must reference if totalProteinDelivery (${plan.totalProteinDelivery}g) meets the target (${plan.baseProtein}g). Use 'Clinical Priority' tag.",
-    "Clinical bullet 2 - Specific drug-nutrient interaction (e.g. Folate/5-FU or Oxaliplatin/Antioxidants)",
-    "Clinical bullet 3 - Outcome-focused reasoning"
+  "rationale": ["Clinical logic - must mention ${plan.totalProteinDelivery}g vs ${plan.baseProtein}g target"],
+  "instructions": ["Step 1", "Step 2"],
+  "clinicalAlerts": [
+    {"type": "Nutrition/Glycemic/Electrolyte/Drug/GI/Hematology", "level": "HIGH/MODERATE/LOW", "message": "Clear specific action guidance"}
   ],
-  "instructions": [
-    "Instruction 1 - Use EXACTLY ${plan.servingsPerDay} servings as prescribed.",
-    "Instruction 2 - Folate/Chemo timing (if applicable)",
-    "Instruction 3",
-    "Instruction 4"
+  "drugInteractions": [
+    {"drug": "Name", "interaction": "Effect", "advice": "Clinical action", "risk": "HIGH/MODERATE/LOW"}
   ],
-  "clinicalAlerts": [{"type": "NUTRITION|GLYCEMIC|RENAL|etc", "level": "HIGH|MODERATE|LOW", "message": "Short alert"}],
-  "drugInteractions": [{"drug": "Name", "interaction": "Details", "advice": "Advice", "risk": "Level"}],
-  "micronutrientOrders": [{"nutrient": "Name", "labValue": "Value", "dose": "Dose", "rationale": "Short rationale", "status": "STATUS"}],
-  "monitoringSchedule": [{"frequency": "Freq", "parameters": "Labs", "threshold": "Trigger", "responsible": "Owner"}]
+  "micronutrientOrders": [
+    {"nutrient": "Name", "labValue": "Value", "dose": "Prescription", "rationale": "Clinical logic", "status": "SUPPLEMENT/DEFICIENT/MONITOR/CAPPED/EXCLUDED"}
+  ],
+  "monitoringSchedule": [
+    {"frequency": "e.g. Weekly", "parameters": "Labs to check", "threshold": "Trigger level", "responsible": "Clinic/Patient"}
+  ]
 }
-IMPORTANT: If on Enteral/Escalation, REMOVE all oral sipping instructions. Return ONLY valid JSON. No markdown.`
+IMPORTANT: Return ONLY valid JSON. No markdown preamble.`
       }],
     });
 

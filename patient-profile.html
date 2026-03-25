@@ -2838,11 +2838,22 @@
             const latest = getLatestPlanForPatient(window.patient.id);
             if (latest) {
               const fp = latest.finalPlan || latest.engineOutput || latest;
-              if (fp && fp.dailyCalories > 0) return latest;
+              const hasRecipe = fp.recipe && Array.isArray(fp.recipe) && fp.recipe.length > 0;
+              const hasSafety = fp.safetyAlerts && Array.isArray(fp.safetyAlerts) && fp.safetyAlerts.length > 0;
+              
+              // Only return if it has calories AND a valid recipe/safety (unless it's a 0-calorie edge case)
+              if (fp && fp.dailyCalories > 0 && hasRecipe && hasSafety) return latest;
             }
-            console.log("No valid plan found or plan is empty. Re-generating...");
+            console.log("Plan invalid or empty recipe/safety found. Re-generating to apply latest engine fixes...");
             const engineOutput = generateNutritionPlan(window.patient);
-            return createOrUpdatePlan(window.patient, engineOutput, {}, 'Auto-repair: Missing data detected');
+            
+            const prevInsights = (latest && latest.claudeInsights) ? latest.claudeInsights : null;
+            const newPlan = createOrUpdatePlan(window.patient, engineOutput, {}, 'Auto-repair: Engine hardening applied');
+            if (prevInsights) {
+               newPlan.claudeInsights = prevInsights;
+               updatePlan(newPlan);
+            }
+            return newPlan;
           }
 
           function bind(plan) {
@@ -3880,10 +3891,13 @@
             const cp = window.currentVersionedPlan;
             if (!skipPersistence && cp && cp.id) {
               cp.claudeInsights = data;
-              if (typeof updatePlan === 'function') {
-                updatePlan(cp);
-              } else {
-                updatePatient(window.patient); 
+              // Direct save to avoid potential save/reset loops in some envs
+              const allPlans = getPlans();
+              const idx = allPlans.findIndex(p => p.id === cp.id);
+              if (idx !== -1) {
+                allPlans[idx] = cp;
+                localStorage.setItem('onvilox_plans', JSON.stringify(allPlans));
+                console.log("Claude insights persisted to plan:", cp.id);
               }
             }
 
