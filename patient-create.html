@@ -4,7 +4,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta charset="UTF-8">
   <title>Create Patient - Onvilox</title>
-  <link rel="stylesheet" href="css/app.css?v=2.0">
+  <script src="js/config.js"></script>
+  <link rel="stylesheet" href="css/app.css?v=2.1">
   <!-- PDF.js library for client-side extraction -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
   <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';</script>
@@ -56,21 +57,6 @@
 <div class="ai-chat-launcher" onclick="toggleChat()">
   <svg viewBox="0 0 24 24"><path d="M12,2A10,10 0 0,1 22,12A10,10 0 0,1 12,22A10,10 0 0,1 2,12A10,10 0 0,1 12,2M12,4A8,8 0 0,0 4,12C4,14.39 5,16.5 6.74,18L7,17.27C7.3,16.27 8.23,15.5 9.35,15.5H10.5V14.5A0.5,0.5 0 0,1 11,14H13A0.5,0.5 0 0,1 13.5,14.5V15.5H14.65C15.77,15.5 16.7,16.27 17,17.27L17.26,18C19,16.5 20,14.39 20,12A8,8 0 0,0 12,4M12.5,7A1.5,1.5 0 0,1 14,8.5A1.5,1.5 0 0,1 12.5,10A1.5,1.5 0 0,1 11,8.5A1.5,1.5 0 0,1 12.5,7M11,14.5A0.5,0.5 0 0,0 10.5,14H9A0.5,0.5 0 0,1 8.5,14.5V15.5H9.35C10.1,15.5 10.74,15.04 11,14.41V14.5M15.5,14.5A0.5,0.5 0 0,0 15,14H13.5A0.5,0.5 0 0,1 13,14.5V15.5H14.65C15,15.5 15.29,15.4 15.5,15.24V14.5Z"/></svg>
 </div>
-
-<script>
-  // BULLETPROOF DEFINITION
-  window.toggleIntakeUI = function() {
-    console.log("Onvilox UI Trace: toggleIntakeUI v2.1 triggered");
-    const method = document.getElementById('feedingMethod')?.value || '';
-    const panel = document.getElementById('intakeAssessmentPanel');
-    if (!panel) return;
-    if (method.includes('Oral')) {
-      panel.style.display = 'block';
-    } else {
-      panel.style.display = 'none';
-    }
-  };
-</script>
 
 <div class="ai-chat-window" id="aiChatWindow">
   <div class="ai-chat-header">
@@ -551,7 +537,6 @@
 </div>
 </div>
 
-<script src="js/config.js"></script>
 <script src="js/storage.js"></script>
 <script src="js/seed.js"></script>
 <script src="js/auth.js"></script>
@@ -560,17 +545,6 @@
 <script src="js/form-loader.js"></script>
 <script src="js/patient-store.js"></script>
 <script src="js/intake-calculator.js"></script>
-<script src="js/nutrition-engine-v4.js"></script>
-<script src="js/ai-report-service.js"></script>
-<script src="js/theme.js"></script>
-
-<!-- LOADING OVERLAY -->
-<div id="aiLoadingOverlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:10000; flex-direction:column; align-items:center; justify-content:center; color:white; font-family: 'Outfit', sans-serif; backdrop-filter: blur(8px);">
-  <div style="width: 50px; height: 50px; border: 4px solid #3b82f6; border-top-color: transparent; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 24px;"></div>
-  <style>@keyframes spin { to { transform: rotate(360deg); } }</style>
-  <h3 id="aiLoadingStatus" style="font-size: 20px; font-weight: 800; margin-bottom: 8px; letter-spacing: -0.02em;">Generating Clinical Insights...</h3>
-  <p style="color:rgba(255,255,255,0.6); font-size:14px; font-weight: 500;">Consulting Claude 4.5 Sonnet for expert oncology guidance.</p>
-</div>
 
 <script>
 auth.requireRole(['DOCTOR','ASSISTANT']);
@@ -602,7 +576,7 @@ function updateCompletenessScore() {
   if (score) score.innerText = pct + '%';
 }
 
-async function submitPatient(){
+function submitPatient(){
   const fields = [
     { id: "patientName", name: "Patient Name" },
     { id: "uhic", name: "UHIC Code" },
@@ -641,15 +615,6 @@ async function submitPatient(){
     return;
   }
 
-  const me = auth.getCurrentUser();
-  if(me.role === 'ASSISTANT'){
-    const docId = mappingService.getDoctorForAssistant(me.id);
-    if(!docId){
-      document.getElementById('errorBox').innerText = 'Assistant is not mapped to a Doctor. Admin must map Assistant → Doctor.';
-      return;
-    }
-  }
-
   const patient = {
     name: document.getElementById('patientName').value,
     uhic: document.getElementById('uhic').value,
@@ -675,63 +640,56 @@ async function submitPatient(){
     giIssues: (document.getElementById('giIssues').value === 'true'),
     cancer: document.getElementById('cancerInput').value,
     regimen: document.getElementById('regimenInput').value,
-    albumin: parseFloat(document.getElementById('albumin').value),
-    crp: parseFloat(document.getElementById('crp').value || 0),
-    muac: parseFloat(document.getElementById('muac').value || 0),
-    creatinine: parseFloat(document.getElementById('creatinine').value || 0),
-    alt: parseFloat(document.getElementById('alt').value || 0),
-    ast: parseFloat(document.getElementById('ast').value || 0),
-    bilirubin: parseFloat(document.getElementById('bilirubin').value || 0),
-    bloodSugar: parseFloat(document.getElementById('bloodSugar').value || 0),
-    tsh: parseFloat(document.getElementById('tsh').value || 0),
-    hemoglobin: parseFloat(document.getElementById('hemoglobin').value || 0),
-    prealbumin: parseFloat(document.getElementById('prealbumin').value || 0),
-    vitD: parseFloat(document.getElementById('vitD').value || 0),
-    vitB12: parseFloat(document.getElementById('vitB12').value || 0),
-    folate: parseFloat(document.getElementById('folate').value || 0),
-    zinc: parseFloat(document.getElementById('zinc').value || 0),
-    magnesium: parseFloat(document.getElementById('magnesium').value || 0),
-    sodium: parseFloat(document.getElementById('sodium').value || 0),
-    potassium: parseFloat(document.getElementById('potassium').value || 0),
-    urea: parseFloat(document.getElementById('urea').value || 0),
-    feedingMethod: document.getElementById('feedingMethod').value,
-    treatmentTypes: tagsToArray('treatmentTags'),
     comorbidities: tagsToArray('comorbidityTags'),
     sideEffects: tagsToArray('sideEffectTags'),
-    genomicMarkers: tagsToArray('genomicMarkersTags'),
-    allergies: tagsToArray('allergyTags'),
-    culturalPreferences: document.getElementById('culturalPreferences').value,
+    treatmentTypes: tagsToArray('treatmentTags'),
     existingSupplements: tagsToArray('supplementTags'),
-    notes: document.getElementById('notes').value,
-    cancerStage: document.getElementById('cancerStage').value,
-    ecogStatus: parseInt(document.getElementById('ecogStatus').value || 0),
-    tumorBurden: document.getElementById('tumorBurden').value,
+    genomicMarkers: tagsToArray('genomicMarkersTags'),
     metastasisSites: tagsToArray('metastasisTags'),
-    isVegetarian: document.getElementById('isVegetarian') ? (document.getElementById('isVegetarian').value === 'true') : false
+    feedingMethod: document.getElementById('feedingMethod').value,
+    tumorBurden: document.getElementById('tumorBurden').value,
+    ecogStatus: parseInt(document.getElementById('ecogStatus').value || 0),
+    cancerStage: document.getElementById('cancerStage').value,
+    culturalPreferences: document.getElementById('culturalPreferences').value,
+    notes: document.getElementById('notes').value,
+    hospitalName: document.getElementById('hospitalName') ? document.getElementById('hospitalName').value : '',
+    albumin: parseFloat(document.getElementById('albumin').value) || 0,
+    prealbumin: parseFloat(document.getElementById('prealbumin').value) || 0,
+    crp: parseFloat(document.getElementById('crp').value) || 0,
+    creatinine: parseFloat(document.getElementById('creatinine').value) || 0,
+    alt: parseFloat(document.getElementById('alt').value) || 0,
+    ast: parseFloat(document.getElementById('ast').value) || 0,
+    bilirubin: parseFloat(document.getElementById('bilirubin').value) || 0,
+    bloodSugar: parseFloat(document.getElementById('bloodSugar').value) || 0,
+    hba1c: parseFloat(document.getElementById('hba1c').value) || 0,
+    hemoglobin: parseFloat(document.getElementById('hemoglobin').value) || 0,
+    tsh: parseFloat(document.getElementById('tsh').value) || 0,
+    vitD: parseFloat(document.getElementById('vitD').value) || 0,
+    vitB12: parseFloat(document.getElementById('vitB12').value) || 0,
+    folate: parseFloat(document.getElementById('folate').value) || 0,
+    zinc: parseFloat(document.getElementById('zinc').value) || 0,
+    magnesium: parseFloat(document.getElementById('magnesium').value) || 0,
+    sodium: parseFloat(document.getElementById('sodium').value) || 0,
+    potassium: parseFloat(document.getElementById('potassium').value) || 0,
+    urea: parseFloat(document.getElementById('urea').value) || 0,
+    lastUpdate: new Date().toISOString()
   };
 
-  savePatient(patient);
-
-  // Trigger AI Report Generation immediately
-  const overlay = document.getElementById('aiLoadingOverlay');
-  if (overlay) overlay.style.display = 'flex';
-
   try {
-    const engineOutput = generateNutritionPlan(patient);
-    const plan = createOrUpdatePlan(patient, engineOutput, {}, 'Initial formulation');
+    // 1. Initial save of patient to get ID
+    const saved = savePatient(patient);
     
-    // Wait for AI Insights
-    const insights = await aiReportService.generateInsights(patient, engineOutput);
+    // 2. Generate deterministic nutrition plan immediately
+    const engineOutput = generateNutritionPlan(saved);
     
-    // Attach insights to the plan and save
-    plan.claudeInsights = insights;
-    updatePlan(plan);
+    // 3. Create baseline versioned plan (without AI insights yet)
+    createOrUpdatePlan(saved, engineOutput, {}, 'Initial automated baseline');
     
-    window.location.href = 'patient-profile.html?id=' + patient.id;
+    // 4. Fast Redirect to Profile (where AI will trigger asynchronously)
+    window.location.href = `patient-profile.html?id=${saved.id}`;
   } catch (err) {
-    console.error("AI Generation Error:", err);
-    // Fallback: Just go to the profile, it will retry there
-    window.location.href = 'patient-profile.html?id=' + patient.id;
+    console.error("Clinical Save Error:", err);
+    alert("Error saving patient: " + err.message);
   }
 }
 
@@ -866,17 +824,6 @@ function initIntakeCalc() {
   selects.forEach(s => {
     s.innerHTML = `<option value="">Select Food Item...</option>${options}`;
   });
-}
-
-function toggleIntakeUI() {
-  const method = document.getElementById('feedingMethod')?.value || '';
-  const panel = document.getElementById('intakeAssessmentPanel');
-  if (!panel) return;
-  if (method.includes('Oral')) {
-    panel.style.display = 'block';
-  } else {
-    panel.style.display = 'none';
-  }
 }
 
 function updateBSAAuto() {
@@ -1127,16 +1074,38 @@ function applyExtractionData(data) {
 
 function runAiExtraction(text) { /* Retired */ }
 
+window.toggleIntakeUI = function() {
+  const method = document.getElementById('feedingMethod')?.value;
+  const block = document.getElementById('intakeGapBlock');
+  if (!block) return;
+  if (method === 'Enteral Feeding (Total)') {
+    block.style.display = 'none';
+  } else {
+    block.style.display = 'block';
+  }
+};
+
 window.onload = function() {
-  console.log("Onvilox UI Trace: window.onload v2.1 executing");
   if (typeof initIntakeCalc === 'function') initIntakeCalc();
-  if (typeof window.toggleIntakeUI === 'function') window.toggleIntakeUI();
+  window.toggleIntakeUI();
   if (typeof updateCompletenessScore === 'function') updateCompletenessScore();
+  console.log("Onvilox Clinical Entry Ready (v2.1)");
 };
 </script>
 
 
 
+  <!-- AI GENERATION OVERLAY -->
+  <div id="aiLoadingOverlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(10,22,40,0.95); z-index:10000; flex-direction:column; align-items:center; justify-content:center; color:#fff; font-family:'Manrope', sans-serif; text-align:center;">
+    <div class="spinner" style="width:60px; height:60px; border:6px solid #1e293b; border-top:6px solid #6d28d9; border-radius:50%; animation:spin 1s linear infinite; margin-bottom:24px;"></div>
+    <h2 style="font-size:32px; font-weight:800; margin:0 0 10px 0; background:linear-gradient(to right, #8b5cf6, #ec4899); -webkit-background-clip:text; -webkit-text-fill-color:transparent;">Consulting Claude AI 4.5 Sonnet</h2>
+    <p style="font-size:18px; color:#94a3b8; max-width:500px; line-height:1.6;">Generating high-precision clinical insights and drug-nutrient safety analysis for this patient...</p>
+    <style>@keyframes spin { 0% { transform:rotate(0deg); } 100% { transform:rotate(360deg); } }</style>
+  </div>
+  
+  <script src="js/nutrition-engine-v4.js"></script>
+  <script src="js/ai-report-service.js"></script>
+  <script src="js/theme.js"></script>
 </body>
 </html>
 
