@@ -184,7 +184,7 @@ Return ONLY valid JSON. No markdown, no preambles.`;
 PATIENT DATA (use EXACT values):
 Name: ${patient.name}, Age: ${patient.age}, Sex: ${patient.sex}
 Cancer: ${patient.cancer}, Stage: ${patient.cancerStage}, Regimen: ${patient.regimen}
-ECOG: ${patient.ecogStatus}, Phase: ${patient.treatmentTypes}
+ECOG: ${patient.ecogStatus}, Phase: ${JSON.stringify(patient.treatmentTypes)}
 Weight: ${patient.weight}kg, Usual Weight: ${patient.usualWeight}kg, Height: ${patient.height}cm
 Weight Loss: ${patient.weightLossPercent}%, BMI: ${plan.bmi}
 Albumin: ${patient.albumin}g/dL, CRP: ${patient.crp}mg/L, Hemoglobin: ${patient.hemoglobin}g/dL
@@ -242,7 +242,10 @@ Return ONLY valid JSON. No markdown.`
     res.json(data);
   } catch (error) {
     console.error("Claude Report Error:", error);
-    res.status(500).json({ error: 'Claude failed to generate insight.', detail: error.message });
+    res.status(500).json({ 
+      error: `Claude Error: ${error.message}`, 
+      detail: error.stack 
+    });
   }
 });
 
