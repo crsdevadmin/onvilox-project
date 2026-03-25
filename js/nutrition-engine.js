@@ -407,10 +407,11 @@ function generateNutritionPlan(patient) {
     rationale.push(`<b>Electrolyte Safety:</b> Potassium-free formula matrix selected due to active Hyperkalemia.`);
   }
   if (patient.sodium > 0 && patient.sodium < 135) {
-    rationale.push(`<b>Electrolyte Safety:</b> Added 1-2g target Sodium Chloride to daily regimen for Hyponatremia correction.`);
+    rationale.push(`<b>Electrolyte Safety:</b> Added 1-2g target Sodium Chloride for Hyponatremia. <b>[CRITICAL]</b> Cap correction at <b>+8-10 mEq/L per 24h</b> to prevent Osmotic Demyelination (ODS).`);
   }
-  if (isDiabetic) {
-    rationale.push(`<b>Glycemic Control:</b> Modified carbohydrate load and transitioned to low-glycemic index Palatinose source.`);
+  if (isDiabetic || (patient.bloodSugar > 180)) {
+    const reason = patient.bloodSugar > 180 ? 'Hyperglycemia detected' : 'T2DM history';
+    rationale.push(`<b>Glycemic Control:</b> ${reason}. Low-GI Palatinose matrix used. <b>[REQUIRED]</b> HbA1c screening within 48h to assess chronic control depth.`);
   }
 
   if (!hasRenalIssue && proteinPerKg >= 1.8) {
@@ -459,57 +460,72 @@ function generateNutritionPlan(patient) {
     };
   }
 
-  const patientInstructions = (actualIntake <= 50) ? [
-    "URGENT: Oral intake is insufficient (<50%). Transition to Enteral Tube Feeding recommended.",
-    "Do not attempt to 'sip' large volumes if nausea or early satiety is present.",
-    "Consult medical team for immediate nutrition escalation protocol."
-  ] : [
-    "Mix powder thoroughly with 200-250ml of liquid.",
-    "Consume slowly over 20-30 minutes.",
-    "Small frequent sips improve tolerance."
+  // Patient Instructions Enrichment
+  const patientInstructions = [
+    `Consume EXACTLY ${servingsPerDay} servings per day to meet your therapeutic target.`,
+    `Divide intake into ${servingsPerDay} separate doses between meals for maximum absorption.`,
+    `Mix with 200ml cold water; consume slowly over 20 minutes to prevent GI distress.`
   ];
 
-  // V3 Outcome Prediction Engine - Unified Logic
-  function calculateOutcomePrediction(riskScore, ecoG, intake, tumorBurden) {
-    let baseProb = 98; // Default "ideal" probability
+  if (patient.sodium > 0 && patient.sodium < 135) {
+    patientInstructions.push("Sodium Support: Add 1-2g salt via bouillon, pickles, or salted snacks to your daily diet.");
+  }
+  if (hasOxaliplatin) {
+    patientInstructions.push("<b>Chemo Safety:</b> STOP high-dose Vitamin C (>1000mg) or ALA while on Oxaliplatin unless oncology clears it.");
+  }
+  if ((patient.regimen || '').includes('5-FU') || (patient.regimen || '').includes('FOLFOX')) {
+    patientInstructions.push("Folate Timing: Ensure supplemental Folate is taken AWAY from chemotherapy infusion days.");
+  }
+  if (sarcopenia) {
+    patientInstructions.push("Anabolic Support: Formulation is enriched with Leucine/BCAAs. Maintain light walking daily to stimulate muscle synthesis.");
+  }
+  if (patient.giIssues) {
+    patientInstructions.push("GI Management: Sip slowly, use probiotics, and avoid lactose if diarrhea persists.");
+  }
+  if (actualIntake <= 50) {
+    patientInstructions.push("URGENT: Oral intake is insufficient (<50%). Transition to Enteral Tube Feeding recommended.");
+    patientInstructions.push("Do not attempt to 'sip' large volumes if nausea or early satiety is present.");
+    patientInstructions.push("Consult medical team for immediate nutrition escalation protocol.");
+  } else {
+    patientInstructions.push("Small frequent sips improve tolerance.");
+  }
+
+  // V3 Outcome Prediction Engine - Therapeutic-Aware Logic
+  function calculateOutcomePrediction(riskScore, ecoG, intake, tumorBurden, plan) {
+    let baseProb = 95; 
     
-    // Risk Score Impact
-    baseProb -= (riskScore * 6);
-    
-    // Performance Status Impact (ECOG)
+    // 1. Patient Complexity Penalties
+    baseProb -= (riskScore * 5);
     const ecogNum = parseInt(ecoG) || 0;
-    baseProb -= (ecogNum * 12);
+    baseProb -= (ecogNum * 10);
+    if (tumorBurden === 'High' || tumorBurden === 'Bulky') baseProb -= 10;
     
-    // Intake Deficit Impact
+    // 2. Intake Deficit vs. Plan Adequacy
     const intakeDeficit = 100 - (parseInt(intake) || 100);
-    if (intakeDeficit > 50) baseProb -= 25;
-    else if (intakeDeficit > 25) baseProb -= 15;
+    if (intakeDeficit > 20) {
+      const isAggressive = (plan.dailyProtein / (plan.proteinPerKg * patient.weight) > 0.9) || plan.prescribedRoute.includes('Enteral');
+      if (isAggressive) baseProb -= (intakeDeficit * 0.2); 
+      else baseProb -= (intakeDeficit * 0.6);
+    }
+
+    // 3. Therapeutic Boosts
+    if (plan.proteinPerKg >= 1.5) baseProb += 8;
+    if (plan.micronutrients.epa && plan.micronutrients.epa !== 'None') baseProb += 4;
     
-    // Tumor Burden Impact
-    if (tumorBurden === 'High (Bulky)') baseProb -= 20;
-    else if (tumorBurden === 'Moderate') baseProb -= 8;
-    
-    // Floor the probability
-    const finalProb = Math.max(10, baseProb);
-    
-    let description = "";
-    if (finalProb >= 85) description = "Excellent prognosis for weight stabilization.";
-    else if (finalProb >= 70) description = "Good probability; requires strict target adherence.";
-    else if (finalProb >= 50) description = "Guarded; high risk of continued cachexia without enteral intervention.";
-    else if (finalProb >= 30) description = "Severe risk; guarded prognosis requiring aggressive CDSS intervention.";
-    else description = "Critical risk; metabolic stabilization is primary goal.";
-    
+    const finalProb = Math.min(95, Math.max(15, baseProb));
     return {
-      percentage: finalProb,
-      description: description,
-      timeframe: "4 weeks (standard protocol window)"
+      percentage: Math.round(finalProb),
+      timeframe: "4 weeks (Target Stabilization Cycle)",
+      description: finalProb < 40 ? "High clinical complexity requires immediate nutrition escalation." : "Therapeutic coverage is optimized for weight stabilization."
     };
   }
 
-  const outcomePrediction = calculateOutcomePrediction(riskScore, patient.ecogStatus, patient.reducedFoodIntake, patient.tumorBurden);
+  const outcomePredictionData = calculateOutcomePrediction(riskScore, patient.ecogStatus, reducedFoodIntake, patient.tumorBurden, {
+    dailyProtein, proteinPerKg, prescribedRoute: (actualIntake <= 50) ? "Enteral" : "Oral", micronutrients
+  });
 
   const outcomes = {
-    weightStabilization: `${outcomePrediction.percentage}% Probability`,
+    weightStabilization: `${outcomePredictionData.percentage}% Probability`,
     musclePreservation: (sarcopenia || proteinPerKg >= 1.8) ? "Clinically improved" : "Likely Maintained",
     organProtection: (hasRenalIssue || alt > 50) ? "Safety Protocols Active" : "Standard"
   };
@@ -530,7 +546,7 @@ function generateNutritionPlan(patient) {
     prescribedRoute: (actualIntake <= 50) ? "Enteral Tube Feeding (Escalation)" : (actualIntake <= 75 ? "Oral Nutrition Supplements (ONS)" : "Oral Feeding (Maintenance)"),
     baseEnergy: baseDailyCalories,
     baseProtein: baseDailyProtein,
-    outcomePrediction,
+    outcomePrediction: outcomePredictionData,
     recipe: buildFormulationOptions({ macroProtein, macroCarbs, macroFat, proteinType, bloodSugar, cachexia, crp }),
     reportNotes: {
       basis: 'V5 Multi-System Engine (ESMO/ESPEN/ASCO/KDIGO guidelines).'

@@ -3382,11 +3382,16 @@
               try {
                 window.currentPlan = ensurePlan();
                 bind(window.currentPlan);
-                // AUTO-GENERATE Claude AI insight on page load (non-print mode only)
+                
+                // AUTO-GENERATE or LOAD Claude AI insight
                 if (params.get('print') !== '1') {
-                  setTimeout(() => {
-                    generateClaudeInsight();
-                  }, 800); // Small delay to ensure DOM is fully rendered
+                  if (window.currentPlan.claudeInsights) {
+                    renderClaudeInsight(window.currentPlan.claudeInsights, true); // true = skip persistence
+                  } else {
+                    setTimeout(() => {
+                      generateClaudeInsight();
+                    }, 800);
+                  }
                 }
               } catch (e) {
                 console.error("Initialization Failed:", e);
@@ -3869,7 +3874,15 @@
             }
           }
 
-          function renderClaudeInsight(data) {
+          function renderClaudeInsight(data, skipPersistence) {
+            if (!data) return;
+            
+            // Persist for future page loads
+            if (!skipPersistence && window.currentPlan) {
+              window.currentPlan.claudeInsights = data;
+              updatePatient(window.patient); 
+            }
+
             const crEl = document.getElementById('clinicalRationale');
             if (crEl && data.rationale && data.rationale.length > 0)
               crEl.innerHTML = data.rationale.map(r => `<li>${r}</li>`).join('');
