@@ -76,11 +76,7 @@ app.post('/api/patients', authenticateToken, async (req, res) => {
   }
 });
 
-// --- OPENAI INTEGRATION ---
-const { OpenAI } = require('openai');
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-});
+// AI configuration is handled by Anthropic SDK below
 
 // Prompt for mapping Clinical Data
 const extractionSystemPrompt = `
@@ -111,19 +107,21 @@ app.post('/api/extract', async (req, res) => {
   if (!pdfText) return res.status(400).json({ error: 'No text provided.' });
 
   try {
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+    const msg = await anthropic.messages.create({
+      model: "claude-3-5-sonnet-20241022",
+      max_tokens: 2000,
+      system: extractionSystemPrompt,
       messages: [
-        { role: "system", content: extractionSystemPrompt },
-        { role: "user", content: `Here is the raw clinical text to extract from:\n\n${pdfText}` }
+        { role: "user", content: `Here is the raw clinical text to extract from:\n\n${pdfText}\n\nReturn ONLY a JSON object.` }
       ],
-      response_format: { type: "json_object" }
     });
 
-    const data = JSON.parse(completion.choices[0].message.content);
+    const rawText = msg.content[0].text;
+    const jsonStr = rawText.match(/{[\s\S]*}/)?.[0] || rawText;
+    const data = JSON.parse(jsonStr);
     res.json({ success: true, data });
   } catch (error) {
-    console.error("OpenAI Extraction Error:", error);
+    console.error("Claude Extraction Error:", error);
     res.status(500).json({ error: 'Failed to extract data using AI.' });
   }
 });
@@ -145,17 +143,18 @@ Current Patient Context:
 ${contextStr}
 `;
 
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+    const msg = await anthropic.messages.create({
+      model: "claude-3-5-sonnet-20241022",
+      max_tokens: 1000,
+      system: systemPrompt,
       messages: [
-        { role: "system", content: systemPrompt },
         { role: "user", content: message }
-      ]
+      ],
     });
 
-    res.json({ reply: completion.choices[0].message.content });
+    res.json({ reply: msg.content[0].text });
   } catch (error) {
-    console.error("OpenAI Chat Error:", error);
+    console.error("Claude Chat Error:", error);
     res.status(500).json({ error: 'Failed to generate AI response.' });
   }
 });
