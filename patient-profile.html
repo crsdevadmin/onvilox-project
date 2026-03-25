@@ -2826,10 +2826,11 @@
 
           function ensurePlan() {
             const latest = getLatestPlanForPatient(window.patient.id);
-            // ... logic to verify if latest is still valid ...
+            if (latest) {
+              return latest;
+            }
             const engineOutput = generateNutritionPlan(window.patient);
-            window.currentPlan = engineOutput;
-            return createOrUpdatePlan(window.patient, engineOutput, {}, (latest ? 'Automatic update' : ''));
+            return createOrUpdatePlan(window.patient, engineOutput, {}, 'Initial formulation');
           }
 
           function bind(plan) {
