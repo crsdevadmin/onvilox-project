@@ -177,3 +177,9 @@ function createOrUpdatePlan(patient, engineOutput, overrides, overrideNotes){
   savePlan(plan);
   return plan;
 }
+
+function updatePlan(updated) {
+  let plans = getPlans();
+  plans = plans.map(p => p.id === updated.id ? updated : p);
+  db.setTable('nutrition_plans', plans);
+}

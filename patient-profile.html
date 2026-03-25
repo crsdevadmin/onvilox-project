@@ -3880,7 +3880,11 @@
             // Persist for future page loads
             if (!skipPersistence && window.currentPlan) {
               window.currentPlan.claudeInsights = data;
-              updatePatient(window.patient); 
+              if (typeof updatePlan === 'function') {
+                updatePlan(window.currentPlan);
+              } else {
+                updatePatient(window.patient); 
+              }
             }
 
             const crEl = document.getElementById('clinicalRationale');
