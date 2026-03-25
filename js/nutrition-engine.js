@@ -38,9 +38,27 @@ function generateNutritionPlan(patient) {
     if (gripLow) sarcopenia = true;
   }
 
-  const tumorBurden = patient.tumorBurden === 'High (Bulky)';
   const comorbidities = Array.isArray(patient.comorbidities) ? patient.comorbidities : [];
-  const isDiabetic = (comorbidities.some(c => c.toLowerCase().includes('diabetes')) || bloodSugar > 180);
+  const lowerComorbidities = comorbidities.map(c => c.toLowerCase());
+  const sideEffects = (Array.isArray(patient.sideEffects) ? patient.sideEffects : []).map(s => s.toLowerCase());
+  
+  var isDiabetic = (lowerComorbidities.some(c => c.includes('diabetes') || c.includes('t2dm')) || bloodSugar > 180);
+  var hasIBD = lowerComorbidities.some(c => c.includes('ibd') || c.includes('crohn') || c.includes('colitis'));
+  var hasRenalIssue = lowerComorbidities.some(c => c.includes('renal') || c.includes('kidney') || c.includes('ckd') || c.includes('nephro')) || creatinine > 1.3 || urea >= 40;
+  
+  var hasNausea = sideEffects.some(s => s.includes('nausea') || s.includes('vomit'));
+  var hasAppetiteLoss = sideEffects.some(s => s.includes('appetite') || s.includes('satiety'));
+  var hasMucositis = sideEffects.some(s => s.includes('mucositis') || s.includes('mouth sore') || regimen.includes('5-fu') || regimen.includes('folfirinox'));
+  
+  var hasPlatin = regimen.includes('platin') || regimen.includes('folfox') || regimen.includes('folfirinox');
+  var hasOxaliplatin = regimen.includes('oxaliplatin') || regimen.includes('folfox') || regimen.includes('folfirinox');
+  
+  var drugs = [];
+  if (regimen.includes('cisplatin')) drugs.push("Cisplatin");
+  if (regimen.includes('bortezomib') || regimen.includes('velcade') || regimen.includes('vrd') || regimen.includes('vcd')) drugs.push("Bortezomib");
+  if (regimen.includes('lenalidomide') || regimen.includes('revlimid')) drugs.push("Lenalidomide");
+  
+  var hasBortezomib = (drugs.includes("Bortezomib") || cancer.includes('myeloma'));
   
   const nutritionRiskReasons = [];
   let riskScore = 0;
@@ -70,9 +88,6 @@ function generateNutritionPlan(patient) {
   }
 
   // Comorbidities / Organ Function
-  const lowerComorbidities = comorbidities.map(c => c.toLowerCase());
-  const hasRenalIssue = lowerComorbidities.some(c => c.includes('renal') || c.includes('kidney') || c.includes('ckd') || c.includes('nephro')) || creatinine > 1.3 || urea >= 40;
-  const hasIBD = lowerComorbidities.some(c => c.includes('ibd') || c.includes('crohn') || c.includes('colitis'));
   const hasCardiac = lowerComorbidities.some(c => c.includes('cardiac'));
 
   if (hasRenalIssue) {
@@ -129,10 +144,7 @@ function generateNutritionPlan(patient) {
   if (riskScore >= 4) nutritionRisk = 'High';
   else if (riskScore >= 2) nutritionRisk = 'Moderate';
 
-  const sideEffects = (Array.isArray(patient.sideEffects) ? patient.sideEffects : []).map(s => s.toLowerCase());
-  const hasNausea = sideEffects.some(s => s.includes('nausea') || s.includes('vomit'));
-  const hasAppetiteLoss = sideEffects.some(s => s.includes('appetite') || s.includes('satiety'));
-  const hasMucositis = sideEffects.some(s => s.includes('mucositis') || s.includes('mouth sore'));
+  const tumorBurden = patient.tumorBurden === 'High (Bulky)';
 
   const cachexia = albumin < 3.5 || weightLossPercent >= 10 || bmi < 18.5 || crp > 10 || sarcopenia || tumorBurden;
   const moderateRisk = weightLossPercent >= 5 || ecog >= 2 || age >= 70;
@@ -217,18 +229,7 @@ function generateNutritionPlan(patient) {
   }
 
   // --- Enhanced Drug Detection (Step 6 Safety) ---
-  const lowerRegimen = regimen.toLowerCase();
-  const lowerCancer = cancer.toLowerCase();
-  
-  const drugs = [];
-  if (lowerRegimen.includes('cisplatin')) drugs.push("Cisplatin");
-  if (lowerRegimen.includes('bortezomib') || lowerRegimen.includes('velcade') || lowerRegimen.includes('vrd') || lowerRegimen.includes('vcd')) drugs.push("Bortezomib");
-  if (lowerRegimen.includes('lenalidomide') || lowerRegimen.includes('revlimid')) drugs.push("Lenalidomide");
-  
-  const hasBortezomib = drugs.includes("Bortezomib") || lowerCancer.includes('myeloma');
-  const hasPlatin = lowerRegimen.includes('platin') || lowerRegimen.includes('folfox') || lowerRegimen.includes('folfirinox');
-  
-  if (drugs.length > 0 || lowerCancer.includes('myeloma') || hasPlatin) {
+  if (hasPlatin || hasBortezomib) {
     let msg = `DRUG INTERACTION: ${drugs.join(', ') || (hasPlatin ? 'Platinum-based' : 'Bortezomib/Myeloma')} protocol monitored.`;
     
     // Check for existing supplements that might interfere
@@ -325,25 +326,25 @@ function generateNutritionPlan(patient) {
   else if ((patient.feedingMethod || '').toLowerCase().includes('enteral')) proteinType = 'Peptide formulas';
 
   const interactions = [];
-  if (lowerRegimen.includes('cisplatin')) {
+  if (regimen.includes('cisplatin')) {
     interactions.push({ drug: "Cisplatin", effect: "Renal Magnesium Wasting", advice: "Mandatory Magnesium protocol; monitor creatinine closely." });
   }
-  if (lowerRegimen.includes('taxane') || lowerRegimen.includes('paclitaxel') || lowerRegimen.includes('docetaxel')) {
+  if (regimen.includes('taxane') || regimen.includes('paclitaxel') || regimen.includes('docetaxel')) {
     interactions.push({ drug: "Taxanes", effect: "Peripheral Neuropathy focus", advice: "ALA and B-Complex optimized." });
   }
-  if (lowerRegimen.includes('5-fu') || lowerRegimen.includes('capecitabine') || lowerRegimen.includes('folfirinox')) {
+  if (regimen.includes('5-fu') || regimen.includes('capecitabine') || regimen.includes('folfirinox')) {
     interactions.push({ drug: "Fluoropyrimidines", effect: "Mucositis / GI Toxicity risk", advice: "Glutamine and peptide protein prioritized." });
   }
-  if (lowerRegimen.includes('irinotecan')) {
+  if (regimen.includes('irinotecan')) {
     interactions.push({ drug: "Irinotecan", effect: "Severe Diarrhea", advice: "Early mucosal support focus." });
   }
   if (hasBortezomib) {
     interactions.push({ drug: "Bortezomib (Velcade)", effect: "Antioxidant & B6 Interference", advice: "Avoid high-dose Vit C, ALA, and high-dose B6. If ALA is required for neuropathy, restrict to non-Bortezomib days ONLY with oncologist approval." });
   }
-  if (lowerRegimen.includes('lenalidomide') || lowerRegimen.includes('revlimid') || lowerRegimen.includes('vrd')) {
+  if (regimen.includes('lenalidomide') || regimen.includes('revlimid') || regimen.includes('vrd')) {
     interactions.push({ drug: "Lenalidomide (Revlimid)", effect: "VTE/Antiplatelet Risk", advice: "Monitor Omega-3 dosing due to mild antiplatelet effects." });
   }
-  if (lowerRegimen.includes('pemetrexed') || lowerRegimen.includes('methotrexate')) {
+  if (regimen.includes('pemetrexed') || regimen.includes('methotrexate')) {
     interactions.push({ drug: "Antifolates (e.g. Pemetrexed)", effect: "Folate Antagonism", advice: "Strict adherence to explicit folate supplementation protocol required." });
   }
 
@@ -551,7 +552,7 @@ function generateNutritionPlan(patient) {
     outcomes, interactions,
     enteralProtocol, electrolyteStrategy, reassessmentProtocol,
     hasRenalIssue,
-    hasHighRiskRegimen: (hasBortezomib || lowerRegimen.includes('cisplatin') || lowerRegimen.includes('platin') || lowerRegimen.includes('lenalidomide')),
+    hasHighRiskRegimen: (hasBortezomib || regimen.includes('cisplatin') || regimen.includes('platin') || regimen.includes('lenalidomide')),
     prescribedRoute: (actualIntake <= 50) ? "Enteral Tube Feeding (Escalation)" : (actualIntake <= 75 ? "Oral Nutrition Supplements (ONS)" : "Oral Feeding (Maintenance)"),
     baseEnergy: baseDailyCalories,
     baseProtein: baseDailyProtein,
