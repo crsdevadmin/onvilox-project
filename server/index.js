@@ -99,7 +99,7 @@ app.post('/api/extract', async (req, res) => {
 
   try {
     const msg = await anthropic.messages.create({
-      model: "claude-sonnet-4-5-20250929",
+      model: "claude-3-5-sonnet-20241022",
       max_tokens: 2000,
       system: extractionSystemPrompt,
       messages: [{ role: "user", content: `Extract from:\n\n${pdfText}` }],
@@ -125,7 +125,7 @@ Use ESMO/ASCO guidelines. Keep answers under 3 sentences unless asked for detail
 Patient Context: ${contextStr}`;
 
     const msg = await anthropic.messages.create({
-      model: "claude-sonnet-4-5-20250929",
+      model: "claude-3-5-sonnet-20241022",
       max_tokens: 1000,
       system: systemPrompt,
       messages: [{ role: "user", content: message }],
@@ -160,7 +160,7 @@ Generate a PATIENT-SPECIFIC report. Keep rationales and instructions CONCISE (ma
 Return ONLY valid JSON. START with '{' and END with '}'. Do not use markdown code blocks like \`\`\`json.`;
 
     const msg = await anthropic.messages.create({
-      model: "claude-sonnet-4-5-20250929",
+      model: "claude-3-5-sonnet-20241022",
       max_tokens: 8192,
       system: systemInstruction,
       messages: [{
