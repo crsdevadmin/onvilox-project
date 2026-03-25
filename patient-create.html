@@ -548,11 +548,9 @@
 <script>
 auth.requireRole(['DOCTOR','ASSISTANT']);
 
-// BSA is handled by updateBSAAuto and listeners on weight/height
-
 function tagsToArray(containerId){
   const c = document.getElementById(containerId);
-  if (!c) return []; // Return empty array if container is missing
+  if (!c) return [];
   return [...c.children].map(el => el.dataset.value);
 }
 
@@ -616,51 +614,23 @@ function submitPatient(){
     return;
   }
 
-  // assistants must be mapped
   const me = auth.getCurrentUser();
   if(me.role === 'ASSISTANT'){
     const docId = mappingService.getDoctorForAssistant(me.id);
     if(!docId){
-      document.getElementById('errorBox').innerText = 'Assistant is not mapped to a Doctor. Admin must map Assistant â†’ Doctor.';
+      document.getElementById('errorBox').innerText = 'Assistant is not mapped to a Doctor. Admin must map Assistant → Doctor.';
       return;
     }
   }
 
-  const patientNameEl = document.getElementById('patientName');
-  const uhicEl = document.getElementById('uhic');
-  const ageEl = document.getElementById('age');
-  const sexEl = document.getElementById('sex');
-  const usualWeightEl = document.getElementById('usualWeight');
-  const weightEl = document.getElementById('weight');
-  const heightEl = document.getElementById('height');
-  const giIssuesEl = document.getElementById('giIssues');
-  const cancerInputEl = document.getElementById('cancerInput');
-  const regimenInputEl = document.getElementById('regimenInput');
-  const albuminEl = document.getElementById('albumin');
-  const crpEl = document.getElementById('crp');
-  const muacEl = document.getElementById('muac');
-  const feedingMethodEl = document.getElementById('feedingMethod');
-  const allergiesEl = document.getElementById('allergies');
-  const notesEl = document.getElementById('notes');
-  
-  // Advanced fields
-  const cancerStageEl = document.getElementById('cancerStage');
-  const ecogStatusEl = document.getElementById('ecogStatus');
-  const creatinineEl = document.getElementById('creatinine');
-  const altEl = document.getElementById('alt');
-  const astEl = document.getElementById('ast');
-  const bilirubinEl = document.getElementById('bilirubin');
-  const metastasisSitesEl = document.getElementById('metastasisSites');
-  const isVegetarianEl = document.getElementById('isVegetarian');
-
   const patient = {
-    name: patientNameEl.value,
-    uhic: uhicEl.value,
-    age: parseInt(ageEl.value),
-    sex: sexEl.value,
-    usualWeight: parseFloat(usualWeightEl.value),
-    weight: parseFloat(weightEl.value),
-    height: parseFloat(heightEl.value),
+    name: document.getElementById('patientName').value,
+    uhic: document.getElementById('uhic').value,
+    age: parseInt(document.getElementById('age').value),
+    sex: document.getElementById('sex').value,
+    usualWeight: parseFloat(document.getElementById('usualWeight').value),
+    weight: parseFloat(document.getElementById('weight').value),
+    height: parseFloat(document.getElementById('height').value),
     bsa: parseFloat(document.getElementById('bsa').value || 0),
     leanBodyMass: parseFloat(document.getElementById('leanBodyMass').value || 0),
     fatPercent: parseFloat(document.getElementById('fatPercent').value || 0),
@@ -669,22 +639,22 @@ function submitPatient(){
     sarcopeniaStatus: document.getElementById('sarcopeniaStatus').value,
     activityLevel: document.getElementById('activityLevel').value,
     weightLossPercent: (() => {
-      const uw = parseFloat(usualWeightEl.value);
-      const cw = parseFloat(weightEl.value);
-      if(uw > 0 && cw > 0 && cw < uw) return round1(((uw - cw) / uw) * 100);
+      const uw = parseFloat(document.getElementById('usualWeight').value);
+      const cw = parseFloat(document.getElementById('weight').value);
+      if(uw > 0 && cw > 0 && cw < uw) return Math.round(((uw - cw) / uw) * 1000) / 10;
       return 0;
     })(),
     reducedFoodIntake: parseFloat(document.getElementById('reducedFoodIntake').value) || 0,
-    giIssues: (giIssuesEl.value === 'true'),
-    cancer: cancerInputEl.value,
-    regimen: regimenInputEl.value,
-    albumin: parseFloat(albuminEl.value),
-    crp: parseFloat(crpEl.value || 0),
-    muac: parseFloat(muacEl.value || 0),
-    creatinine: parseFloat(creatinineEl.value || 0),
-    alt: parseFloat(altEl.value || 0),
-    ast: parseFloat(astEl.value || 0),
-    bilirubin: parseFloat(bilirubinEl.value || 0),
+    giIssues: (document.getElementById('giIssues').value === 'true'),
+    cancer: document.getElementById('cancerInput').value,
+    regimen: document.getElementById('regimenInput').value,
+    albumin: parseFloat(document.getElementById('albumin').value),
+    crp: parseFloat(document.getElementById('crp').value || 0),
+    muac: parseFloat(document.getElementById('muac').value || 0),
+    creatinine: parseFloat(document.getElementById('creatinine').value || 0),
+    alt: parseFloat(document.getElementById('alt').value || 0),
+    ast: parseFloat(document.getElementById('ast').value || 0),
+    bilirubin: parseFloat(document.getElementById('bilirubin').value || 0),
     bloodSugar: parseFloat(document.getElementById('bloodSugar').value || 0),
     tsh: parseFloat(document.getElementById('tsh').value || 0),
     hemoglobin: parseFloat(document.getElementById('hemoglobin').value || 0),
@@ -697,7 +667,7 @@ function submitPatient(){
     sodium: parseFloat(document.getElementById('sodium').value || 0),
     potassium: parseFloat(document.getElementById('potassium').value || 0),
     urea: parseFloat(document.getElementById('urea').value || 0),
-    feedingMethod: feedingMethodEl.value,
+    feedingMethod: document.getElementById('feedingMethod').value,
     treatmentTypes: tagsToArray('treatmentTags'),
     comorbidities: tagsToArray('comorbidityTags'),
     sideEffects: tagsToArray('sideEffectTags'),
@@ -705,29 +675,16 @@ function submitPatient(){
     allergies: tagsToArray('allergyTags'),
     culturalPreferences: document.getElementById('culturalPreferences').value,
     existingSupplements: tagsToArray('supplementTags'),
-    notes: notesEl.value,
-    cancerStage: cancerStageEl.value,
-    ecogStatus: parseInt(ecogStatusEl.value || 0),
+    notes: document.getElementById('notes').value,
+    cancerStage: document.getElementById('cancerStage').value,
+    ecogStatus: parseInt(document.getElementById('ecogStatus').value || 0),
     tumorBurden: document.getElementById('tumorBurden').value,
-    palliativeStage: document.getElementById('palliativeStage')?.value || 'Not Stated',
     metastasisSites: tagsToArray('metastasisTags'),
-    isVegetarian: isVegetarianEl ? (isVegetarianEl.value === 'true') : false
+    isVegetarian: document.getElementById('isVegetarian') ? (document.getElementById('isVegetarian').value === 'true') : false
   };
 
   savePatient(patient);
   window.location.href = 'doctor.html';
-}
-
-function syncWeightLossFromForm(){
-  updateBSAAuto();
-}
-
-function toggleIntakeUI() {
-  const method = document.getElementById('feedingMethod').value;
-  const panel = document.getElementById('intakeAssessmentPanel');
-  if(!panel) return;
-  // Show only if "Oral Feeding (Normal Diet)"
-  panel.style.display = (method === 'Oral Feeding (Normal Diet)') ? 'block' : 'none';
 }
 
 function updateLabStatus(id, val) {
@@ -736,8 +693,7 @@ function updateLabStatus(id, val) {
   const num = parseFloat(val);
   if(isNaN(num)) { badge.style.display = 'none'; return; }
 
-  let status = '', label = '', cls = '';
-  
+  let status = '', cls = '';
   if(id === 'albumin') {
     if(num < 3.5) { status = 'Low'; cls = 'status-danger'; }
     else if(num > 5.5) { status = 'High'; cls = 'status-warn'; }
@@ -763,36 +719,13 @@ function updateLabStatus(id, val) {
     else if(num < 70) { status = 'Low'; cls = 'status-danger'; }
     else if(num > 100) { status = 'Elevated'; cls = 'status-warn'; }
     else { status = 'Normal'; cls = 'status-normal'; }
-  } else if(id === 'tsh') {
-    if(num > 4.0) { status = 'High'; cls = 'status-warn'; }
-    else if(num < 0.4) { status = 'Low'; cls = 'status-warn'; }
-    else { status = 'Normal'; cls = 'status-normal'; }
   } else if(id === 'hemoglobin') {
     if(num < 12) { status = 'Low'; cls = 'status-danger'; }
     else if(num > 18) { status = 'High'; cls = 'status-warn'; }
     else { status = 'Normal'; cls = 'status-normal'; }
-  } else if(id === 'prealbumin') {
-    if(num < 15) { status = 'Low'; cls = 'status-danger'; }
-    else if(num > 36) { status = 'High'; cls = 'status-warn'; }
-    else { status = 'Normal'; cls = 'status-normal'; }
   } else if(id === 'vitD') {
     if(num < 20) { status = 'Deficiency'; cls = 'status-danger'; }
     else if(num < 30) { status = 'Insuff.'; cls = 'status-warn'; }
-    else if(num > 100) { status = 'High'; cls = 'status-warn'; }
-    else { status = 'Normal'; cls = 'status-normal'; }
-  } else if(id === 'vitB12') {
-    if(num < 200) { status = 'Low'; cls = 'status-danger'; }
-    else if(num > 900) { status = 'High'; cls = 'status-warn'; }
-    else { status = 'Normal'; cls = 'status-normal'; }
-  } else if(id === 'folate') {
-    if(num < 3.1) { status = 'Low'; cls = 'status-danger'; }
-    else if(num > 17.5) { status = 'High'; cls = 'status-warn'; }
-    else { status = 'Normal'; cls = 'status-normal'; }
-  } else if(id === 'zinc' || id === 'magnesium') {
-    const min = (id === 'zinc') ? 60 : 1.7;
-    const max = (id === 'zinc') ? 120 : 2.2;
-    if(num < min) { status = 'Low'; cls = 'status-danger'; }
-    else if(num > max) { status = 'High'; cls = 'status-warn'; }
     else { status = 'Normal'; cls = 'status-normal'; }
   } else if(id === 'muac') {
     if(num < 23) { status = 'Low'; cls = 'status-danger'; }
@@ -804,14 +737,6 @@ function updateLabStatus(id, val) {
   } else if(id === 'potassium') {
     if(num < 3.5) { status = 'Low'; cls = 'status-danger'; }
     else if(num > 5.1) { status = 'High'; cls = 'status-danger'; }
-    else { status = 'Normal'; cls = 'status-normal'; }
-  } else if(id === 'hba1c') {
-    if(num >= 6.5) { status = 'Diabetes'; cls = 'status-danger'; }
-    else if(num >= 5.7) { status = 'Prediabetes'; cls = 'status-warn'; }
-    else { status = 'Normal'; cls = 'status-normal'; }
-  } else if(id === 'urea') {
-    if(num < 15) { status = 'Low'; cls = 'status-warn'; }
-    else if(num > 45) { status = 'High'; cls = 'status-danger'; }
     else { status = 'Normal'; cls = 'status-normal'; }
   }
 
@@ -836,7 +761,6 @@ function addIntakeRow() {
   row.style.alignItems = 'center';
   
   const options = FoodLibrary.map(f => `<option value="${f.id}">${f.name} (${f.avgKcal} kcal)</option>`).join('');
-  
   row.innerHTML = `
     <select class="intake-food" onchange="updateIntakeCalc()" style="padding:8px; font-size:13px;">
       <option value="">Select Food Item...</option>
@@ -860,7 +784,6 @@ function updateIntakeCalc() {
   const w = parseFloat(document.getElementById('weight').value || 0);
   const sexVal = (document.getElementById('sex').value || '').toLowerCase();
   
-  // Minimal IBW for creation panel
   let ibw = w;
   if (h > 60) {
       const extra = (h * 0.393701) - 60;
@@ -868,10 +791,9 @@ function updateIntakeCalc() {
   }
   
   const alb = parseFloat(document.getElementById('albumin').value || 4);
-  const cachexia = (alb < 3.5); // Simplified for creation
-  const targetKcal = Math.round(ibw * (cachexia ? 35 : 30));
-
+  const targetKcal = Math.round(ibw * (alb < 3.5 ? 35 : 30));
   const res = calculateIntakeGap(targetKcal, meals);
+  
   document.getElementById('calcActualKcal').innerText = `${res.actualIntake} kcal`;
   document.getElementById('calcGapKcal').innerText = `${res.deficitKcal} kcal`;
   document.getElementById('calcIntakePct').innerText = `${res.intakePercent}%`;
@@ -886,6 +808,7 @@ function applyIntakeToForm() {
       epFI.value = res.deficitPercent;
       epFI.classList.add('ai-filled');
       setTimeout(() => epFI.classList.remove('ai-filled'), 2000);
+      updateCompletenessScore();
     }
 }
 
@@ -897,24 +820,19 @@ function initIntakeCalc() {
   });
 }
 
-function round1(n){ return Math.round(n*10)/10; }
-
 function updateBSAAuto() {
   const h = parseFloat(document.getElementById('height').value);
   const w = parseFloat(document.getElementById('weight').value);
   const bsaEl = document.getElementById('bsa');
   if (h > 0 && w > 0) {
-    const bsa = Math.sqrt((h * w) / 3600);
-    bsaEl.value = bsa.toFixed(2);
+    bsaEl.value = Math.sqrt((h * w) / 3600).toFixed(2);
   } else {
     bsaEl.value = '';
   }
+  updateCompletenessScore();
 }
 
-initIntakeCalc();
-toggleIntakeUI();
-
-// --- CHATBOT LOGIC ---
+// --- CHATBOT & AI LOGIC ---
 function toggleChat() {
   const win = document.getElementById('aiChatWindow');
   const isOpening = win.style.display !== 'flex';
@@ -946,110 +864,88 @@ function sendChatMessage() {
   const input = document.getElementById('chatInput');
   const text = input.value.trim();
   if(!text) return;
-
   addMessage(text, 'user');
   input.value = '';
 
-  // Detect if this looks like a clinical data paste OR an oncology question
-  const isQuestion = isOncologyQuestion(text);
-
-  if (isQuestion) {
-    // Route to Claude /api/chat for oncology Q&A
+  if (isOncologyQuestion(text)) {
     const typing = addTyping();
     askClaudeOncology(text).then(reply => {
       typing.remove();
       addMessageHtml(reply, 'ai');
     }).catch(() => {
       typing.remove();
-      addMessage('Sorry, I could not reach the AI. Please check your server connection.', 'ai');
+      addMessage('Sorry, I couldn\'t reach the AI. Please check server connection.', 'ai');
     });
   } else {
-    // Route to local regex extraction + form auto-fill
     const typing = addTyping();
-    setTimeout(async () => {
+    extractClinicalData(text).then(data => {
       typing.remove();
-      await runAiExtraction(text);
-      addMessage('✅ Form filled! Review the fields and submit when ready.', 'ai');
-    }, 800);
+      if (data) {
+        applyExtractionData(data);
+        addMessage('✅ Clinical data extracted and filled! Review and submit.', 'ai');
+      } else {
+        addMessage('I read the text but found no clinical markers.', 'ai');
+      }
+    }).catch(err => {
+      typing.remove();
+      addMessage('Extraction failed. Please fill fields manually.', 'ai');
+    });
   }
 }
 
 function isOncologyQuestion(text) {
   const lower = text.toLowerCase().trim();
-  // Questions end with ?, start with question words, or are short typed queries
   if (lower.endsWith('?')) return true;
   if (/^(what|how|why|when|which|is|can|should|does|do|explain|tell me|give me|list|compare|difference|meaning|define|recommend|best|safe|help)\b/.test(lower)) return true;
-  // If text has very few numbers and is sentence-like, treat as Q&A
   const numCount = (text.match(/\d+/g) || []).length;
   const wordCount = text.split(/\s+/).length;
-  if (wordCount < 20 && numCount < 3) return true;
-  return false;
+  return (wordCount < 20 && numCount < 3);
 }
 
 async function askClaudeOncology(question) {
-  const apiBase = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL)
-    ? CONFIG.API_BASE_URL : 'http://localhost:3000';
-
-  // Build minimal patient context from current form state
+  const apiBase = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : 'http://localhost:3000';
   const ctx = {
     cancer: document.getElementById('cancerInput')?.value || null,
     regimen: document.getElementById('regimenInput')?.value || null,
-    age: document.getElementById('age')?.value || null,
-    sex: document.getElementById('sex')?.value || null,
-    weight: document.getElementById('weight')?.value || null,
-    albumin: document.getElementById('albumin')?.value || null,
-    crp: document.getElementById('crp')?.value || null
+    age: document.getElementById('age')?.value || null
   };
-
   const response = await fetch(`${apiBase}/api/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ message: question, contextObj: ctx })
   });
-
-  if (!response.ok) throw new Error('API error');
   const data = await response.json();
   return data.reply || 'No response from AI.';
 }
 
-// Supports HTML formatting in AI messages
 function addMessageHtml(htmlText, type) {
   const container = document.getElementById('chatMsgs');
   const msg = document.createElement('div');
   msg.className = `msg msg-${type}`;
-  // Convert markdown-style bold (**text**) to <b>
-  const formatted = htmlText
-    .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>')
-    .replace(/\n/g, '<br>');
-  msg.innerHTML = formatted;
+  msg.innerHTML = htmlText.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br>');
   container.appendChild(msg);
   container.scrollTop = container.scrollHeight;
   return msg;
 }
 
-// --- PDF EXTRACTION LOGIC ---
-function triggerFileUpload() {
-  document.getElementById('pdfUpload').click();
-}
+function triggerFileUpload() { document.getElementById('pdfUpload').click(); }
 
 async function handlePdfUpload(event) {
   const file = event.target.files[0];
   if (!file) return;
-
   addMessage(`Uploading ${file.name}...`, 'user');
   const typing = addTyping();
-
   try {
     const text = await extractTextFromPdf(file);
     typing.remove();
-    addMessage(`I've read the report. Extracting clinical data...`, 'ai');
-    
-    // Run extraction on the full text
-    runAiExtraction(text);
-  } catch (error) {
+    addMessage(`Reading report...`, 'ai');
+    extractClinicalData(text).then(data => {
+      if (data) applyExtractionData(data);
+      addMessage('✅ Lab report extraction complete!', 'ai');
+    });
+  } catch (e) {
     typing.remove();
-    addMessage("Sorry, I couldn't read that PDF. Please try pasting the text instead.", 'ai');
-    console.error(error);
+    addMessage("Couldn't read PDF.", 'ai');
   }
 }
 
@@ -1057,252 +953,126 @@ async function extractTextFromPdf(file) {
   const arrayBuffer = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
   let fullText = "";
-
   for (let i = 1; i <= pdf.numPages; i++) {
     const page = await pdf.getPage(i);
     const content = await page.getTextContent();
-    const strings = content.items.map(item => item.str);
-    fullText += strings.join(" ") + "\n";
+    fullText += content.items.map(item => item.str).join(" ") + "\n";
   }
   return fullText;
 }
 
-function runAiExtraction(rawText) {
-  const text = rawText.toLowerCase();
-  const numPattern = '(?:is|at|was|of|recorded at)?\\s*:?\\s*([-+]?\\d+\\.?\\d*)';
-  
-  // Basic Demographics
-  const nameMatch = rawText.match(/(?:name|patient)\s*(?:is|:)?\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)/);
-  const ageMatch = text.match(/(\d+)\s*(?:years|yrs|yo|age)/) || text.match(/(?:age\s*(?:is|:)?\s*)(\d+)/);
-  const sexMatch = text.match(/\b(male|female|man|woman|boy|girl)\b/i);
-  const heightMatch = text.match(new RegExp('height' + numPattern)) || text.match(/(\d+)\s*cm/);
-  const uhicMatch = text.match(/(?:uhic|id|code)\s*(?:is|:)?\s*([a-z0-9-]+)/i);
+async function extractClinicalData(text) {
+  const apiBase = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : 'http://localhost:3000';
+  const response = await fetch(`${apiBase}/api/extract`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pdfText: text })
+  });
+  const res = await response.json();
+  return res.data;
+}
 
-  // Advanced Regex for labs and vitals
-  const extractions = {
-    name: nameMatch ? nameMatch[1] : null,
-    age: ageMatch ? ageMatch[1] : null,
-    sex: sexMatch ? (['male','man','boy'].includes(sexMatch[1].toLowerCase()) ? 'Male' : 'Female') : null,
-    uhic: uhicMatch ? uhicMatch[1].toUpperCase() : null,
-    height: heightMatch ? heightMatch[1] : null,
-    weight: text.match(new RegExp('weight' + numPattern))?.[1] || text.match(/(\d+\.?\d*)\s*kg/)?.[1],
-    uw: text.match(new RegExp('usual weight' + numPattern))?.[1] || text.match(new RegExp('uw' + numPattern))?.[1],
-    albumin: text.match(new RegExp('albumin' + numPattern))?.[1] || text.match(new RegExp('alb' + numPattern))?.[1],
-    crp: text.match(new RegExp('crp' + numPattern))?.[1],
-    creatinine: text.match(new RegExp('creatinine' + numPattern))?.[1] || text.match(new RegExp('cr' + numPattern))?.[1],
-    urea: text.match(new RegExp('urea' + numPattern))?.[1] || text.match(new RegExp('bun' + numPattern))?.[1],
-    sodium: text.match(new RegExp('sodium' + numPattern))?.[1] || text.match(new RegExp('na\\+?' + numPattern))?.[1],
-    potassium: text.match(new RegExp('potassium' + numPattern))?.[1] || text.match(new RegExp('k\\+?' + numPattern))?.[1],
-    bloodSugar: text.match(new RegExp('(?:blood sugar|glucose|rbs|fbs|bs|bg)(?:\\s*\\([^)]*\\))?' + numPattern))?.[1],
-    hemoglobin: text.match(new RegExp('(?:hemoglobin|hb)' + numPattern))?.[1],
-    alt: text.match(new RegExp('(?:alt|sgpt)' + numPattern))?.[1],
-    ast: text.match(new RegExp('(?:ast|sgot)' + numPattern))?.[1],
-    bilirubin: text.match(new RegExp('(?:bilirubin|bil)' + numPattern))?.[1],
-    vitD: text.match(new RegExp('(?:vitamin d|vit d|25-oh vit d)' + numPattern))?.[1],
-    vitB12: text.match(new RegExp('(?:vitamin b12|vit b12|b12)' + numPattern))?.[1],
-    folate: text.match(new RegExp('folate' + numPattern))?.[1],
-    zinc: text.match(new RegExp('zinc' + numPattern))?.[1],
-    magnesium: text.match(new RegExp('(?:magnesium|mg)' + numPattern))?.[1],
-    hba1c: text.match(new RegExp('(?:hba1c|a1c|glycated hemoglobin)' + numPattern))?.[1],
-    muac: text.match(new RegExp('(?:muac|mid-arm circumference)' + numPattern))?.[1],
-    prealbumin: text.match(new RegExp('(?:prealbumin|pab)' + numPattern))?.[1],
-    lbm: text.match(new RegExp('(?:lean body mass|lbm)' + numPattern))?.[1],
-    smi: text.match(new RegExp('(?:skeletal muscle index|smi)' + numPattern))?.[1],
-    grip: text.match(new RegExp('(?:hand grip|grip strength|grip)' + numPattern))?.[1],
-    stage: text.match(/(?:stage|grade)\s*[:\-]?\s*([ivx]+|[1-4])/i)?.[1],
-    feeding: (() => {
-      if (text.includes('oral') && text.includes('diet')) return 'Oral Feeding (Normal Diet)';
-      if (text.includes('ons') || text.includes('supplement')) return 'Oral Nutrition Supplements (ONS)';
-      if (text.includes('nasogastric') || text.includes('ng')) return 'Enteral Feeding - Nasogastric Tube (NG)';
-      if (text.includes('peg')) return 'Enteral Feeding - PEG Tube';
-      if (text.includes('tpn') || text.includes('parenteral')) return 'Parenteral Nutrition (TPN)';
-      return null;
-    })(),
-    gi: (() => {
-      const gic = text.match(/(?:gi|bowel|ibd|stomach|gut)\s*[:\-]?\s*(normal|no|none|negative|good)/i);
-      if (gic) return false;
-      return text.includes('vomiting') || text.includes('nausea') || text.includes('diarrhea') || text.includes('bloating') || text.includes('constipation');
-    })(),
-    comorbidities: (() => {
-      const seg = rawText.match(/comorbidities[\s\S]*?(?=\n\n|⸻|🌍|$)/i);
-      if (!seg) return [];
-      const lines = seg[0].split(/\n/);
-      let items = [];
-      lines.forEach(l => {
-        const parts = l.split(/[•\-\*]/).map(p => p.trim()).filter(Boolean);
-        if (parts.length > 0 && !parts[0].toLowerCase().includes('comorbidities')) items.push(...parts);
-        else if (parts.length > 1) items.push(...parts.slice(1));
-      });
-      return items;
-    })(),
-    sideEffects: (() => {
-      const seg = rawText.match(/(?:side\s*effects|important)[\s\S]*?(?=\n\n|⸻|🧫|🌍|$)/i);
-      if (!seg) return [];
-      const lines = seg[0].split(/\n/);
-      let items = [];
-      lines.forEach(l => {
-        const parts = l.split(/[•\-\*]/).map(p => p.trim()).filter(Boolean);
-        const header = parts[0].toLowerCase();
-        if (parts.length > 0 && !header.includes('side') && !header.includes('important')) items.push(...parts);
-        else if (parts.length > 1) items.push(...parts.slice(1));
-      });
-      return items;
-    })(),
-    reducedIntake: (() => {
-      const actualMatch = text.match(/(?:actual )?food intake\s*[:\-]?\s*(\d+)\s*%?/i);
-      if (actualMatch) return String(100 - parseInt(actualMatch[1], 10));
-      const reducedMatch = text.match(/(?:reduced food intake|intake deficit|intake deficiat|intake gap)\s*[:\-]?\s*(\d+)\s*%?/i);
-      if (reducedMatch) return reducedMatch[1];
-      const backwardMatch = text.match(/(\d+)\s*%?\s*(?:reduced food intake|intake deficit|intake deficiat|intake gap)/i);
-      return backwardMatch ? backwardMatch[1] : null;
-    })()
-  };
-
-  let foundCount = 0;
-  const foundItems = [];
-  const highlight = (id, label, val) => {
+function applyExtractionData(data) {
+  if (!data) return;
+  const highlight = (id) => {
     const el = document.getElementById(id);
-    if(!el) return;
-    el.classList.add('ai-filled');
-    setTimeout(() => el.classList.remove('ai-filled'), 3000);
-    if(label && val) foundItems.push(`${label}: ${val}`);
+    if(el) { el.classList.add('ai-filled'); setTimeout(() => el.classList.remove('ai-filled'), 3000); }
   };
-
-  const mapField = (extKey, id, label) => {
-    if (extractions[extKey]) {
-      document.getElementById(id).value = extractions[extKey];
-      highlight(id, label, extractions[extKey]);
-      if (typeof updateLabStatus === 'function') updateLabStatus(id, extractions[extKey]);
-    if (id === 'height' || id === 'weight') updateBSAAuto();
-      foundCount++;
+  const setVal = (id, val) => {
+    const el = document.getElementById(id);
+    if (el && val !== null && val !== undefined) {
+      el.value = val;
+      highlight(id);
+      if (typeof updateLabStatus === 'function') updateLabStatus(id, val);
     }
   };
 
-  mapField('name', 'patientName', 'Name');
-  mapField('uhic', 'uhic', 'UHIC');
-  mapField('age', 'age', 'Age');
-  mapField('sex', 'sex', 'Sex');
-  mapField('height', 'height', 'Height');
-  mapField('weight', 'weight', 'Weight');
-  mapField('uw', 'usualWeight', 'Usual Weight');
-  mapField('reducedIntake', 'reducedFoodIntake', 'Reduced Intake %');
-  mapField('albumin', 'albumin', 'Albumin');
-  mapField('crp', 'crp', 'CRP');
-  mapField('creatinine', 'creatinine', 'Creatinine');
-  mapField('urea', 'urea', 'Urea');
-  mapField('sodium', 'sodium', 'Sodium');
-  mapField('potassium', 'potassium', 'Potassium');
-  mapField('bloodSugar', 'bloodSugar', 'Blood Sugar');
-  mapField('hemoglobin', 'hemoglobin', 'Hemoglobin');
-  mapField('alt', 'alt', 'ALT');
-  mapField('ast', 'ast', 'AST');
-  mapField('bilirubin', 'bilirubin', 'Bilirubin');
-  mapField('vitD', 'vitD', 'Vitamin D');
-  mapField('vitB12', 'vitB12', 'Vitamin B12');
-  mapField('folate', 'folate', 'Folate');
-  mapField('zinc', 'zinc', 'Zinc');
-  mapField('magnesium', 'magnesium', 'Magnesium');
-  mapField('hba1c', 'hba1c', 'HbA1c');
-  mapField('muac', 'muac', 'MUAC');
-  mapField('prealbumin', 'prealbumin', 'Prealbumin');
-  mapField('lbm', 'leanBodyMass', 'Lean Body Mass');
-  mapField('smi', 'smi', 'SMI');
-  mapField('grip', 'handGrip', 'Hand Grip');
-  mapField('feeding', 'feedingMethod', 'Feeding Method');
+  setVal('patientName', data.name);
+  setVal('uhic', data.uhic);
+  setVal('age', data.age);
+  setVal('sex', data.sex);
+  setVal('height', data.height);
+  setVal('weight', data.weight);
+  setVal('usualWeight', data.usualWeight);
+  setVal('reducedFoodIntake', data.reducedFoodIntake);
+  setVal('albumin', data.albumin);
+  setVal('crp', data.crp);
+  setVal('creatinine', data.creatinine);
+  setVal('bloodSugar', data.bloodSugar);
+  setVal('hemoglobin', data.hemoglobin);
+  setVal('alt', data.alt);
+  setVal('ast', data.ast);
+  setVal('bilirubin', data.bilirubin);
+  setVal('vitD', data.vitD);
+  setVal('vitB12', data.vitB12);
+  setVal('folate', data.folate);
+  setVal('zinc', data.zinc);
+  setVal('magnesium', data.magnesium);
+  setVal('hba1c', data.hba1c);
+  setVal('muac', data.muac);
+  setVal('prealbumin', data.prealbumin);
+  setVal('tsh', data.tsh);
+  setVal('sodium', data.sodium);
+  setVal('potassium', data.potassium);
+  setVal('urea', data.urea);
 
-  if (extractions.stage) {
-    const s = extractions.stage.toUpperCase();
-    let stageVal = '';
-    if (s === 'I' || s === '1') stageVal = 'Stage I';
-    else if (s === 'II' || s === '2') stageVal = 'Stage II';
-    else if (s === 'III' || s === '3') stageVal = 'Stage III';
-    else if (s === 'IV' || s === '4') stageVal = 'Stage IV';
-    if (stageVal) {
-      document.getElementById('cancerStage').value = stageVal;
-      highlight('cancerStage', 'Stage', stageVal);
-      foundCount++;
-    }
-  }
-
-  if (extractions.gi !== null) { 
-    document.getElementById('giIssues').value = String(!!extractions.gi); 
-    highlight('giIssues', 'GI Issues', extractions.gi ? 'Symptomatic' : 'Normal'); 
-    foundCount++; 
-  }
-
-  if (extractions.comorbidities?.length > 0) {
-    extractions.comorbidities.forEach(c => addTag(c, 'comorbidityTags'));
-    foundItems.push(`Comorbidities: ${extractions.comorbidities.join(', ')}`);
-    foundCount += extractions.comorbidities.length;
-  }
-
-  if (extractions.sideEffects?.length > 0) {
-    extractions.sideEffects.forEach(s => addTag(s, 'sideEffectTags'));
-    foundItems.push(`Side Effects: ${extractions.sideEffects.join(', ')}`);
-    foundCount += extractions.sideEffects.length;
-  }
-
-  // Dynamic Cancer Mapping using Master Data
-  let resolvedCancer = null;
-
-  // 1. Explicit search for keywords in cancer names from master data
-  const cancerKeys = Object.keys(cancerRegimenMap);
-  for (const cancerKey of cancerKeys) {
-    // Generate keywords from the key (e.g., "Lung Cancer – NSCLC" -> ["lung", "cancer", "nsclc"])
-    const keywords = cancerKey.toLowerCase().split(/[\s–\-]+/).filter(k => k.length > 3);
-    
-    // Check if any significant keyword matches the text
-    const matchesKeyword = keywords.some(k => text.includes(k));
-    
-    if (matchesKeyword) {
-      if (cancerKey.toLowerCase().includes('liver') && text.includes('liver function')) continue;
-      resolvedCancer = cancerKey;
-      break;
-    }
-  }
-
-  // 2. Fallback: Precise word boundaries for short terms like 'HCC', 'CML'
-  if (!resolvedCancer) {
-    const shortTerms = { 'hcc': 'Liver Cancer – Advanced HCC', 'cml': 'Leukemia – CML', 'all': 'Leukemia – ALL', 'nsclc': 'Lung Cancer – NSCLC' };
-    for (const [term, key] of Object.entries(shortTerms)) {
-      if (new RegExp('\\b' + term + '\\b', 'i').test(text)) {
-        resolvedCancer = key;
-        break;
+  if (data.cancer) {
+    const input = document.getElementById('cancerInput');
+    if (input) {
+      input.value = data.cancer;
+      highlight('cancerInput');
+      if (typeof filterCancerList === 'function') {
+         const match = Object.keys(cancerRegimenMap).find(k => k.toLowerCase().includes(data.cancer.toLowerCase()));
+         if (match) {
+            input.value = match;
+            if (typeof selectCancer === 'function') selectCancer(match);
+         }
       }
     }
   }
-
-  if (resolvedCancer) {
-    if(typeof selectCancer === 'function') selectCancer(resolvedCancer);
-    else document.getElementById('cancerInput').value = resolvedCancer;
-    highlight('cancerInput', 'Cancer', resolvedCancer);
-    foundCount++;
+  if (data.regimen) {
+    const rInput = document.getElementById('regimenInput');
+    if (rInput) {
+       rInput.value = data.regimen;
+       highlight('regimenInput');
+       if (typeof selectRegimen === 'function') {
+          const rList = cancerRegimenMap[document.getElementById('cancerInput').value] || [];
+          const match = rList.find(r => r.toLowerCase().includes(data.regimen.toLowerCase()));
+          if (match) selectRegimen(match);
+       }
+    }
   }
 
-  // Genomic Markers
-  const markersFound = [];
-  const markerList = ['MTHFR', 'BRCA1/2', 'EGFR', 'ALK', 'KRAS', 'HER2', 'PD-L1', 'MSI-High'];
-  markerList.forEach(m => {
-    if (text.includes(m.toLowerCase().split('-')[0])) markersFound.push(m);
-  });
+  setVal('cancerStage', data.cancerStage);
+  setVal('ecogStatus', data.ecogStatus);
+  setVal('tumorBurden', data.tumorBurden);
+  setVal('sarcopeniaStatus', data.sarcopeniaStatus);
+  setVal('activityLevel', data.activityLevel);
+  setVal('feedingMethod', data.feedingMethod);
 
-  if (markersFound.length > 0) {
-    markersFound.forEach(m => addTag(m, 'genomicMarkersTags'));
-    foundItems.push(`Genomic Markers: ${markersFound.join(', ')}`);
-    foundCount += markersFound.length;
-  }
+  const addArrayTags = (arr, containerId) => {
+    if (Array.isArray(arr)) arr.forEach(item => { if (typeof addTag === 'function') addTag(item, containerId); });
+  };
+  addArrayTags(data.comorbidities, 'comorbidityTags');
+  addArrayTags(data.sideEffects, 'sideEffectTags');
+  addArrayTags(data.genomicMarkers, 'genomicMarkersTags');
+  addArrayTags(data.allergies, 'allergyTags');
+  addArrayTags(data.treatmentTypes, 'treatmentTags');
+  addArrayTags(data.existingSupplements, 'supplementTags');
+  addArrayTags(data.metastasisSites, 'metastasisTags');
 
-  if (foundCount > 0) {
-    addMessage(`Onvilox Regex Extracted ${foundCount} item(s):\n* ${foundItems.join('\n* ')}\n\n(API integration disabled per team request)`, 'ai');
-    if(typeof syncWeightLossFromForm === 'function') syncWeightLossFromForm();
-  } else {
-    addMessage("I couldn't find specific clinical markers in that. Could you provide a weight, albumin level, or cancer type?", 'ai');
-  }
+  if (data.giIssues !== undefined) setVal('giIssues', String(data.giIssues));
+  if (data.height || data.weight) updateBSAAuto();
+  updateCompletenessScore();
 }
 
-  window.onload = function() {
-    updateCompletenessScore(); // V3 Init
-  };
+function runAiExtraction(text) { /* Retired */ }
+
+window.onload = function() {
+  initIntakeCalc();
+  toggleIntakeUI();
+  updateCompletenessScore();
+};
 </script>
 
 
