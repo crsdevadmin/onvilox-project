@@ -167,15 +167,17 @@ function generateNutritionPlan(patient) {
   const actualIntake = 100 - (reducedFoodIntake || 0);
   
   // CRITICAL FIX: If the patient is Renal, Enteral, or Escalated, we always target 100% 
-  // to ensure they receive the full therapeutic dose (e.g. 0.8g/kg) without it being 
-  // further restricted by an estimated oral intake gap.
   const isFullReplacement = (patient.feedingMethod || '').toLowerCase().includes('enteral') || (actualIntake <= 50) || hasRenalIssue;
   
   const dailyCalories = isFullReplacement ? baseDailyCalories : Math.round(baseDailyCalories * (reducedFoodIntake / 100));
   const dailyProtein = isFullReplacement ? baseDailyProtein : Math.round(baseDailyProtein * (reducedFoodIntake / 100));
 
+  // Estimate dietary contribution from the PARTIAL intake (e.g. 60%)
+  const estimatedDietaryProtein = isFullReplacement ? 0 : Math.round((weight * 0.8) * (actualIntake / 100));
+  const totalProteinDelivery = dailyProtein + estimatedDietaryProtein;
+
   const totalDailyCalories = dailyCalories;
-  const totalDailyProtein = dailyProtein;
+  const totalDailyProtein = totalProteinDelivery; // FIXED: Now reflects TOTAL delivery
   
   // V3 Safety Engine (Step 6) - Exactly 6 Categories
   const safetyStatus = {
@@ -396,7 +398,7 @@ function generateNutritionPlan(patient) {
 
   // Deficit Rationale
   if (!isFullReplacement && reducedFoodIntake > 0) {
-    rationale.push(`<b>Supplement Strategy:</b> Patient is maintaining ${actualIntake}% oral intake. Formulation is prescribed as a <b>${reducedFoodIntake}% supplement</b> to fill the nutritional gap (Target: ${baseDailyCalories} kcal; Prescription: ${dailyCalories} kcal).`);
+    rationale.push(`<b>Supplement Strategy:</b> Patient is maintaining ${actualIntake}% oral intake (Est. ${estimatedDietaryProtein}g dietary protein). Formulation is a <b>${reducedFoodIntake}% supplement</b> (${dailyProtein}g). <b>Total Delivery: ${totalProteinDelivery}g/day</b> (Target: ${baseDailyProtein}g).`);
   } else {
     rationale.push(`<b>Full Replacement:</b> Therapeutic logic requires 100% target coverage via formulation (Enteral/Escalation pathway).`);
   }
@@ -515,6 +517,7 @@ function generateNutritionPlan(patient) {
   return {
     cachexia, sarcopenia, bmi: Math.round(bmi * 10) / 10, kcalPerKg, proteinPerKg,
     servingsPerDay, totalDailyCalories, totalDailyProtein,
+    estimatedDietaryProtein, totalProteinDelivery,
     dailyCalories, dailyProtein, perServingCalories, perServingProtein,
     proteinType, dailyCarbs, dailyFat, macroProtein, macroCarbs, macroFat,
     micronutrients, rationale, nutritionRisk, nutritionRiskScore: riskScore,

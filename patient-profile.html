@@ -3058,7 +3058,10 @@
 
             const totalKcal = fp.totalDailyCalories || fp.dailyCalories;
             const totalPro = fp.totalDailyProtein || fp.dailyProtein;
-            setVal('totalDailyTarget', totalKcal + ' kcal / ' + totalPro + ' g Protein');
+            const proteinText = (fp.estimatedDietaryProtein > 0)
+              ? `${totalPro}g Total (Diet: ${fp.estimatedDietaryProtein}g + ONS: ${fp.dailyProtein}g)`
+              : `${totalPro}g Total (Full Replacement)`;
+            setVal('totalDailyTarget', totalKcal + ' kcal / ' + proteinText);
 
             setVal('dailyCalories', fp.dailyCalories + ' kcal');
             setVal('perServingCalories', fp.perServingCalories + ' kcal');

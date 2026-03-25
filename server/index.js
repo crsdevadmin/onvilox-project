@@ -184,11 +184,21 @@ Return ONLY valid JSON. START with '{' and END with '}'. Do not use markdown cod
 PATIENT DATA: ${JSON.stringify(patient)}
 
 CALCULATED PLAN: ${JSON.stringify(plan)}
+(Note: totalProteinDelivery includes ONS + Estimated Dietary Intake. servingsPerDay is MANDATORY to use in instructions).
 
 GENERATE exact JSON structure:
 {
-  "rationale": ["Concise clinical bullet 1", "Concise clinical bullet 2"],
-  "instructions": ["Actionable step 1", "Actionable step 2"],
+  "rationale": [
+    "Clinical bullet 1 - Must reference if totalProteinDelivery (${plan.totalProteinDelivery}g) meets the target (${plan.baseProtein}g)",
+    "Clinical bullet 2 - Specific drug-nutrient interaction (e.g. Folate/5-FU or Oxaliplatin/Antioxidants)",
+    "Clinical bullet 3 - Outcome-focused reasoning"
+  ],
+  "instructions": [
+    "Instruction 1 - Must use EXACTLY ${plan.servingsPerDay} servings as per the prescribed plan",
+    "Instruction 2 - Folate timing: If patient is on 5-FU/FOLFOX, specify taking Folate AWAY from chemo days (coordinate with oncology)",
+    "Instruction 3",
+    "Instruction 4"
+  ],
   "clinicalAlerts": [{"type": "NUTRITION|GLYCEMIC|etc", "level": "HIGH|MODERATE|LOW", "message": "Short alert"}],
   "drugInteractions": [{"drug": "Name", "interaction": "Details", "advice": "Advice", "risk": "Level"}],
   "micronutrientOrders": [{"nutrient": "Name", "labValue": "Value", "dose": "Dose", "rationale": "Short rationale", "status": "STATUS"}],
