@@ -50,15 +50,16 @@ function generateNutritionPlan(patient) {
   var hasAppetiteLoss = sideEffects.some(s => s.includes('appetite') || s.includes('satiety'));
   var hasMucositis = sideEffects.some(s => s.includes('mucositis') || s.includes('mouth sore') || regimen.includes('5-fu') || regimen.includes('folfirinox'));
   
-  var hasPlatin = regimen.includes('platin') || regimen.includes('folfox') || regimen.includes('folfirinox');
-  var hasOxaliplatin = regimen.includes('oxaliplatin') || regimen.includes('folfox') || regimen.includes('folfirinox');
+  var chemFlags = {
+    platin: regimen.includes('platin') || regimen.includes('folfox') || regimen.includes('folfirinox'),
+    oxaliplatin: regimen.includes('oxaliplatin') || regimen.includes('folfox') || regimen.includes('folfirinox'),
+    bortezomib: (regimen.includes('bortezomib') || regimen.includes('velcade') || regimen.includes('vrd') || regimen.includes('vcd')) || cancer.includes('myeloma')
+  };
   
   var drugs = [];
   if (regimen.includes('cisplatin')) drugs.push("Cisplatin");
-  if (regimen.includes('bortezomib') || regimen.includes('velcade') || regimen.includes('vrd') || regimen.includes('vcd')) drugs.push("Bortezomib");
+  if (chemFlags.bortezomib) drugs.push("Bortezomib");
   if (regimen.includes('lenalidomide') || regimen.includes('revlimid')) drugs.push("Lenalidomide");
-  
-  var hasBortezomib = (drugs.includes("Bortezomib") || cancer.includes('myeloma'));
   
   const nutritionRiskReasons = [];
   let riskScore = 0;
@@ -229,21 +230,21 @@ function generateNutritionPlan(patient) {
   }
 
   // --- Enhanced Drug Detection (Step 6 Safety) ---
-  if (hasPlatin || hasBortezomib) {
-    let msg = `DRUG INTERACTION: ${drugs.join(', ') || (hasPlatin ? 'Platinum-based' : 'Bortezomib/Myeloma')} protocol monitored.`;
+  if (chemFlags.platin || chemFlags.bortezomib) {
+    let msg = `DRUG INTERACTION: ${drugs.join(', ') || (chemFlags.platin ? 'Platinum-based' : 'Bortezomib/Myeloma')} protocol monitored.`;
     
     // Check for existing supplements that might interfere
     const existingSupplements = (Array.isArray(patient.existingSupplements) ? patient.existingSupplements : []).map(s => s.toLowerCase());
     const hasExistingAntioxidants = existingSupplements.some(s => s.includes('vitamin c') || s.includes('alpha lipoic acid') || s.includes('ala'));
 
-    if (hasBortezomib) {
+    if (chemFlags.bortezomib) {
       msg += " Antioxidant cap (Vit C < 500mg, No ALA) enforced.";
       if (hasExistingAntioxidants) {
         safetyStatus.drug = { level: 'danger', message: `CRITICAL DRUG CLASH: High-dose antioxidants (Vit C/ALA) found. Interferes with Bortezomib. Discontinue immediately.` };
       } else {
         safetyStatus.drug = { level: 'warning', message: msg };
       }
-    } else if (hasPlatin) {
+    } else if (chemFlags.platin) {
       if (hasExistingAntioxidants) {
         safetyStatus.drug = { level: 'warning', message: `OXALIPLATIN SAFETY: High-dose antioxidants (Vit C/ALA) detected during Platinum chemo. Requires Oncologist Clearance to ensure treatment efficacy.` };
       } else {
@@ -338,7 +339,7 @@ function generateNutritionPlan(patient) {
   if (regimen.includes('irinotecan')) {
     interactions.push({ drug: "Irinotecan", effect: "Severe Diarrhea", advice: "Early mucosal support focus." });
   }
-  if (hasBortezomib) {
+  if (chemFlags.bortezomib) {
     interactions.push({ drug: "Bortezomib (Velcade)", effect: "Antioxidant & B6 Interference", advice: "Avoid high-dose Vit C, ALA, and high-dose B6. If ALA is required for neuropathy, restrict to non-Bortezomib days ONLY with oncologist approval." });
   }
   if (regimen.includes('lenalidomide') || regimen.includes('revlimid') || regimen.includes('vrd')) {
@@ -350,7 +351,7 @@ function generateNutritionPlan(patient) {
 
   const micronutrients = {
     vitD: hasRenalIssue ? '2000 IU/day (Renal Cap)' : (vitD > 0 && vitD < 20 ? '4000–6000 IU/day' : (vitD < 30 ? '2000–4000 IU/day' : '1000–2000 IU/day')),
-    vitC: hasBortezomib ? '500 mg/day (Antioxidant Cap for Bortezomib)' : (hasRenalIssue ? '500 mg/day (Renal Cap)' : ((crp > 5 || tumorBurden) && !hasBortezomib ? '2000 mg/day' : '1000 mg/day')),
+    vitC: chemFlags.bortezomib ? '500 mg/day (Antioxidant Cap for Bortezomib)' : (hasRenalIssue ? '500 mg/day (Renal Cap)' : ((crp > 5 || tumorBurden) && !chemFlags.bortezomib ? '2000 mg/day' : '1000 mg/day')),
     zinc: zinc > 0 && zinc < 60 ? '15–25 mg/day (Correction Protocol) + 2mg Copper' : '15 mg/day',
     omega3: (crp > 5 || cachexia || cancer.includes('pancreatic')) ? '3–4 g/day' : '2 g/day',
     epa: (cachexia || tumorBurden || cancer.includes('pancreatic')) ? '2.2 - 3.0 g EPA/day' : 'None',
@@ -366,7 +367,7 @@ function generateNutritionPlan(patient) {
       return (patient.folate > 0 && patient.folate < 3 || hemoglobin < 10) ? '5 mg/day' : (regimen.includes('pemetrexed') || regimen.includes('methotrexate') ? '1 mg/day (per oncology protocol)' : '1.0 mg/day');
     })(),
     chromium: isDiabetic ? '400 mcg/day (Glycemic monitoring protocol active)' : null,
-    ala: (isDiabetic && !hasBortezomib) ? '600 mg/day' : null,
+    ala: (isDiabetic && !chemFlags.bortezomib) ? '600 mg/day' : null,
     microbiome: (regimen.includes('folfirinox') || hasIBD) ? 'Soluble Fiber + Probiotic' : null,
     iron: (hemoglobin > 0 && hemoglobin < 10) ? '100 mg elemental iron + B12 support' : null
   };
@@ -475,7 +476,7 @@ function generateNutritionPlan(patient) {
   if (patient.sodium > 0 && patient.sodium < 135) {
     patientInstructions.push("Sodium Support: Add 1-2g salt via bouillon, pickles, or salted snacks to your daily diet.");
   }
-  if (hasOxaliplatin) {
+  if (chemFlags.oxaliplatin) {
     patientInstructions.push("<b>Chemo Safety:</b> STOP high-dose Vitamin C (>1000mg) or ALA while on Oxaliplatin unless oncology clears it.");
   }
   if ((patient.regimen || '').includes('5-FU') || (patient.regimen || '').includes('FOLFOX')) {
@@ -552,7 +553,7 @@ function generateNutritionPlan(patient) {
     outcomes, interactions,
     enteralProtocol, electrolyteStrategy, reassessmentProtocol,
     hasRenalIssue,
-    hasHighRiskRegimen: (hasBortezomib || regimen.includes('cisplatin') || regimen.includes('platin') || regimen.includes('lenalidomide')),
+    hasHighRiskRegimen: (chemFlags.bortezomib || regimen.includes('cisplatin') || regimen.includes('platin') || regimen.includes('lenalidomide')),
     prescribedRoute: (actualIntake <= 50) ? "Enteral Tube Feeding (Escalation)" : (actualIntake <= 75 ? "Oral Nutrition Supplements (ONS)" : "Oral Feeding (Maintenance)"),
     baseEnergy: baseDailyCalories,
     baseProtein: baseDailyProtein,
