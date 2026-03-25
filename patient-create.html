@@ -536,6 +536,7 @@
 </div>
 </div>
 
+<script src="js/config.js"></script>
 <script src="js/storage.js"></script>
 <script src="js/seed.js"></script>
 <script src="js/auth.js"></script>
@@ -544,6 +545,17 @@
 <script src="js/form-loader.js"></script>
 <script src="js/patient-store.js"></script>
 <script src="js/intake-calculator.js"></script>
+<script src="js/nutrition-engine-v4.js"></script>
+<script src="js/ai-report-service.js"></script>
+<script src="js/theme.js"></script>
+
+<!-- LOADING OVERLAY -->
+<div id="aiLoadingOverlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:10000; flex-direction:column; align-items:center; justify-content:center; color:white; font-family: 'Outfit', sans-serif; backdrop-filter: blur(8px);">
+  <div style="width: 50px; height: 50px; border: 4px solid #3b82f6; border-top-color: transparent; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 24px;"></div>
+  <style>@keyframes spin { to { transform: rotate(360deg); } }</style>
+  <h3 id="aiLoadingStatus" style="font-size: 20px; font-weight: 800; margin-bottom: 8px; letter-spacing: -0.02em;">Generating Clinical Insights...</h3>
+  <p style="color:rgba(255,255,255,0.6); font-size:14px; font-weight: 500;">Consulting Claude 4.5 Sonnet for expert oncology guidance.</p>
+</div>
 
 <script>
 auth.requireRole(['DOCTOR','ASSISTANT']);
@@ -575,7 +587,7 @@ function updateCompletenessScore() {
   if (score) score.innerText = pct + '%';
 }
 
-function submitPatient(){
+async function submitPatient(){
   const fields = [
     { id: "patientName", name: "Patient Name" },
     { id: "uhic", name: "UHIC Code" },
@@ -684,7 +696,28 @@ function submitPatient(){
   };
 
   savePatient(patient);
-  window.location.href = 'doctor.html';
+
+  // Trigger AI Report Generation immediately
+  const overlay = document.getElementById('aiLoadingOverlay');
+  if (overlay) overlay.style.display = 'flex';
+
+  try {
+    const engineOutput = generateNutritionPlan(patient);
+    const plan = createOrUpdatePlan(patient, engineOutput, {}, 'Initial formulation');
+    
+    // Wait for AI Insights
+    const insights = await aiReportService.generateInsights(patient, engineOutput);
+    
+    // Attach insights to the plan and save
+    plan.claudeInsights = insights;
+    updatePlan(plan);
+    
+    window.location.href = 'patient-profile.html?id=' + patient.id;
+  } catch (err) {
+    console.error("AI Generation Error:", err);
+    // Fallback: Just go to the profile, it will retry there
+    window.location.href = 'patient-profile.html?id=' + patient.id;
+  }
 }
 
 function updateLabStatus(id, val) {
@@ -818,6 +851,17 @@ function initIntakeCalc() {
   selects.forEach(s => {
     s.innerHTML = `<option value="">Select Food Item...</option>${options}`;
   });
+}
+
+function toggleIntakeUI() {
+  const method = document.getElementById('feedingMethod')?.value || '';
+  const panel = document.getElementById('intakeAssessmentPanel');
+  if (!panel) return;
+  if (method.includes('Oral')) {
+    panel.style.display = 'block';
+  } else {
+    panel.style.display = 'none';
+  }
 }
 
 function updateBSAAuto() {
@@ -1077,8 +1121,6 @@ window.onload = function() {
 
 
 
-<script src="js/config.js"></script>
-<script src="js/theme.js"></script>
 </body>
 </html>
 
