@@ -79,28 +79,19 @@ app.post('/api/patients', authenticateToken, async (req, res) => {
 // AI configuration is handled by Anthropic SDK below
 
 // Prompt for mapping Clinical Data
-const extractionSystemPrompt = `
-You are an expert Oncology Assistant. 
-Extract the following clinical parameters from the provided text/PDF content and return a precise JSON object matching this schema.
-Return ONLY valid JSON. If a value is unknown, return null (or an empty string if string expected).
-Fields to extract (match formatting exactly):
-{
+const extractionSystemPrompt = `You are an expert Oncology Assistant. 
+Extract clinical parameters from the provided text/PDF and return a precise JSON object.
+Return ONLY valid JSON. If unknown, return null.
+Schema: {
   "name": "String", "age": "Number", "sex": "Male/Female", "weight": "Number (kg)", "height": "Number (cm)", 
-  "usualWeight": "Number (kg)", "uhic": "String (Hospital ID)", "cancer": "String (e.g. Pancreatic Cancer)",
-  "regimen": "String", "feedingMethod": "String", "tumorBurden": "String", "sarcopeniaStatus": "String",
-  "cancerStage": "String", "ecogStatus": "Number", "activityLevel": "String",
-  "reducedFoodIntake": "Number (The % deficit, e.g. if intake is 20%, gap is 80)",
-  "albumin": "Number (g/dL)", "crp": "Number (mg/L)", "muac": "Number (cm)", "creatinine": "Number",
-  "alt": "Number", "ast": "Number", "bilirubin": "Number", "bloodSugar": "Number",
-  "sodium": "Number", "potassium": "Number", "urea": "Number", "tsh": "Number",
-  "prealbumin": "Number", "hemoglobin": "Number", "vitD": "Number", "vitB12": "Number", 
-  "folate": "Number", "zinc": "Number", "magnesium": "Number",
-  "leanBodyMass": "Number", "fatPercent": "Number", "smi": "Number", "handGrip": "Number", "bsa": "Number",
-  "giIssues": "Boolean", "allergies": "Array of Strings", "existingSupplements": "Array of Strings",
-  "comorbidities": "Array of Strings", "sideEffects": "Array of Strings", "genomicMarkers": "Array of Strings",
-  "treatmentTypes": "Array of Strings"
-}
-`;
+  "usualWeight": "Number (kg)", "uhic": "String", "cancer": "String", "regimen": "String", "feedingMethod": "String",
+  "tumorBurden": "String", "sarcopeniaStatus": "String", "cancerStage": "String", "ecogStatus": "Number", "activityLevel": "String",
+  "reducedFoodIntake": "Number (%)", "albumin": "Number", "crp": "Number", "muac": "Number", "creatinine": "Number",
+  "alt": "Number", "ast": "Number", "bilirubin": "Number", "bloodSugar": "Number", "sodium": "Number", "potassium": "Number",
+  "urea": "Number", "tsh": "Number", "prealbumin": "Number", "hemoglobin": "Number", "vitD": "Number", "vitB12": "Number", 
+  "folate": "Number", "zinc": "Number", "magnesium": "Number", "hba1c": "Number", "giIssues": "Boolean",
+  "allergies": [], "existingSupplements": [], "comorbidities": [], "sideEffects": [], "genomicMarkers": [], "treatmentTypes": []
+}`;
 
 app.post('/api/extract', async (req, res) => {
   const { pdfText } = req.body;
@@ -111,15 +102,12 @@ app.post('/api/extract', async (req, res) => {
       model: "claude-sonnet-4-5-20250929",
       max_tokens: 2000,
       system: extractionSystemPrompt,
-      messages: [
-        { role: "user", content: `Here is the raw clinical text to extract from:\n\n${pdfText}\n\nReturn ONLY a JSON object.` }
-      ],
+      messages: [{ role: "user", content: `Extract from:\n\n${pdfText}` }],
     });
 
     const rawText = msg.content[0].text;
     const jsonStr = rawText.match(/{[\s\S]*}/)?.[0] || rawText;
-    const data = JSON.parse(jsonStr);
-    res.json({ success: true, data });
+    res.json({ success: true, data: JSON.parse(jsonStr) });
   } catch (error) {
     console.error("Claude Extraction Error:", error);
     res.status(500).json({ error: 'Failed to extract data using AI.' });
@@ -131,25 +119,16 @@ app.post('/api/chat', async (req, res) => {
   if (!message) return res.status(400).json({ error: 'No message provided.' });
 
   try {
-    let contextStr = "No patient context provided.";
-    if (contextObj) {
-      contextStr = JSON.stringify(contextObj);
-    }
-
+    const contextStr = contextObj ? JSON.stringify(contextObj) : "No context.";
     const systemPrompt = `You are a clinical oncology nutrition assistant (Onvilox AI Co-pilot).
-You assist clinicians in filling out forms, evaluating outcomes, and answering oncology nutrition questions.
-Use ESMO and ASCO guidelines. Never prescribe medication. Keep answers very concise and professional (under 3 sentences unless asked for details).
-Current Patient Context:
-${contextStr}
-`;
+Use ESMO/ASCO guidelines. Keep answers under 3 sentences unless asked for detail.
+Patient Context: ${contextStr}`;
 
     const msg = await anthropic.messages.create({
       model: "claude-sonnet-4-5-20250929",
       max_tokens: 1000,
       system: systemPrompt,
-      messages: [
-        { role: "user", content: message }
-      ],
+      messages: [{ role: "user", content: message }],
     });
 
     res.json({ reply: msg.content[0].text });
@@ -162,49 +141,32 @@ ${contextStr}
 // --- ANTHROPIC (CLAUDE) INTEGRATION ---
 const Anthropic = require('@anthropic-ai/sdk');
 const rawKey = process.env.ANTHROPIC_API_KEY || '';
-console.log("ANTHROPIC_KEY_DIAGNOSTIC:", { 
-    length: rawKey.length, 
-    prefix: rawKey.substring(0, 7) 
-});
+const anthropic = new Anthropic({ apiKey: rawKey });
 
-const anthropic = new Anthropic({
-  apiKey: rawKey,
-});
-
-// DIAGNOSTIC: List available models for this API key
 app.get('/api/list-models', async (req, res) => {
   try {
     const models = await anthropic.models.list();
     res.json({ models: models.data.map(m => m.id) });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.post('/api/claude-report', async (req, res) => {
-  // Debug to terminal: what did we actually get?
-  console.log("CLAUDE_INCOMING_DATA_KEYS:", Object.keys(req.body || {}));
-  
   const { patient, plan } = req.body;
-  if (!patient || !plan) {
-    return res.status(400).json({ 
-        error: 'Context required.', 
-        debug_keys: Object.keys(req.body || {}),
-        tip: 'Check if express.json() is active and headers are correct.'
-    });
-  }
+  if (!patient || !plan) return res.status(400).json({ error: 'Context required.' });
 
   try {
+        const systemInstruction = `You are a Senior Oncology Dietitian (PhD, RD) generating a structured clinical nutrition report for Onvilox Clinical Nutrition Systems.
+Generate a COMPREHENSIVE, PATIENT-SPECIFIC report based on EXACT values provided.
+Return ONLY valid JSON. No markdown, no preambles.`;
+
     const msg = await anthropic.messages.create({
       model: "claude-sonnet-4-5-20250929",
-      max_tokens: 3000,
+      max_tokens: 3500,
+      system: systemInstruction,
       messages: [{
         role: "user",
-        content: `You are a Senior Oncology Dietitian (PhD, RD) generating a structured clinical nutrition report for Onvilox Clinical Nutrition Systems.
-Generate a COMPREHENSIVE, PATIENT-SPECIFIC report based on EXACT values below.
-
-CLINICAL RULES:
-- Cachexia: weight loss >5% OR albumin <3.5 → 35 kcal/kg, 1.8g protein/kg (whey isolate, leucine-rich)
+        content: `CLINICAL RULES:
+- Cachexia: weight loss >5% OR albumin <3.5 -> 35 kcal/kg, 1.8g protein/kg (whey isolate, leucine-rich)
 - No cachexia + ECOG 0-1: 25-30 kcal/kg, 1.2-1.5g protein/kg
 - Renal risk (creatinine >1.3): restrict protein 0.8-1.0g/kg, avoid phosphorus
 - HER2+/Trastuzumab/Pertuzumab: CoQ10 200mg/day, Omega-3 3g/day, Na <2g/day, LVEF monitoring
@@ -225,66 +187,62 @@ Cancer: ${patient.cancer}, Stage: ${patient.cancerStage}, Regimen: ${patient.reg
 ECOG: ${patient.ecogStatus}, Phase: ${patient.treatmentTypes}
 Weight: ${patient.weight}kg, Usual Weight: ${patient.usualWeight}kg, Height: ${patient.height}cm
 Weight Loss: ${patient.weightLossPercent}%, BMI: ${plan.bmi}
-Albumin: ${patient.albumin}g/dL, Prealbumin: ${patient.prealbumin || 'Not tested'}
-CRP: ${patient.crp}mg/L, Hemoglobin: ${patient.hemoglobin}g/dL
-Blood Sugar: ${patient.bloodSugar}mg/dL, HbA1c: ${patient.hba1c || 'Not tested'}
-Sodium: ${patient.sodium}mEq/L, Potassium: ${patient.potassium}mEq/L, Magnesium: ${patient.magnesium || 'Not tested'}mg/dL
-Creatinine: ${patient.creatinine}mg/dL, ALT: ${patient.alt}U/L, AST: ${patient.ast}U/L, Bilirubin: ${patient.bilirubin}mg/dL
-Vitamin D: ${patient.vitD}ng/mL, B12: ${patient.vitB12 || 'Not tested'}, Folate: ${patient.folate || 'Not tested'}, Zinc: ${patient.zinc || 'Not tested'}
+Albumin: ${patient.albumin}g/dL, CRP: ${patient.crp}mg/L, Hemoglobin: ${patient.hemoglobin}g/dL
+Blood Sugar: ${patient.bloodSugar}mg/dL, Creatinine: ${patient.creatinine}mg/dL
+ALT: ${patient.alt}U/L, AST: ${patient.ast}U/L, Bilirubin: ${patient.bilirubin}mg/dL
+Vitamin D: ${patient.vitD}ng/mL, Prealbumin: ${patient.prealbumin || 'Not tested'}, B12: ${patient.vitB12 || 'Not tested'}, Folate: ${patient.folate || 'Not tested'}, Zinc: ${patient.zinc || 'Not tested'}, Magnesium: ${patient.magnesium || 'Not tested'}
 SMI: ${patient.smi}, Handgrip: ${patient.handGrip}kg, MUAC: ${patient.muac}cm, LVEF: ${patient.lvef || 'Not tested'}
 Feeding: ${patient.feedingMethod}, Oral Intake: ${100-(patient.reducedFoodIntake||0)}%
-Comorbidities: ${JSON.stringify(patient.comorbidities)}, Allergies: ${JSON.stringify(patient.allergies)}
-Side Effects: ${JSON.stringify(patient.sideEffects)}, Cultural Preferences: ${patient.culturalPreferences}
+Comorbidities: ${JSON.stringify(patient.comorbidities)}, Side Effects: ${JSON.stringify(patient.sideEffects)}
+Allergies: ${JSON.stringify(patient.allergies)}, Genomic Markers: ${JSON.stringify(patient.genomicMarkers)}
 
 CALCULATED PLAN:
-Calories: ${plan.dailyCalories}kcal/day (${plan.kcalPerKg}kcal/kg), Protein: ${plan.dailyProtein}g/day (${plan.proteinPerKg}g/kg)
+Calories: ${plan.dailyCalories}kcal/day, Protein: ${plan.dailyProtein}g/day
 Route: ${plan.prescribedRoute}, Cachexia: ${plan.cachexia}, Protein Type: ${plan.proteinType}
-Safety Alerts: ${JSON.stringify(plan.safetyAlerts)}
 
-GENERATE this exact JSON structure:
+GENERATE exact JSON structure:
 {
   "rationale": [
-    "Technical bullet 1 for doctor - reference specific biomarkers, pathway names, ESPEN/ASPEN guideline numbers",
+    "Technical bullet 1 for doctor - reference specific biomarkers, pathway names, ESPEN/ASPEN guidelines",
     "Technical bullet 2 - specific drug-nutrient interaction with biochemical mechanism",
-    "Technical bullet 3 - outcome-focused clinical reasoning with specific targets"
+    "Technical bullet 3 - outcome-focused clinical reasoning"
   ],
   "instructions": [
     "Patient-friendly instruction 1 - warm, specific, actionable (mention real foods/timing)",
     "Patient-friendly instruction 2",
     "Patient-friendly instruction 3",
-    "Patient-friendly instruction 4 - encouraging, hope-focused"
+    "Patient-friendly instruction 4"
   ],
   "clinicalAlerts": [
-    {"type": "CARDIAC|GLYCEMIC|ANEMIA|DRUG|NUTRITION|RENAL", "level": "HIGH|MODERATE|LOW", "message": "Specific alert text referencing exact lab values"}
+    {"type": "CARDIAC|GLYCEMIC|ANEMIA|DRUG|NUTRITION|RENAL", "level": "HIGH|MODERATE|LOW", "message": "Specific alert text referencing exact labs"}
   ],
   "drugInteractions": [
-    {"drug": "Drug name", "interaction": "Specific nutrient/supplement that interacts", "advice": "Precise clinical advice with doses", "risk": "HIGH|MODERATE|LOW"}
+    {"drug": "Drug name", "interaction": "Nutrient/supplement", "advice": "Clinical advice", "risk": "HIGH|MODERATE|LOW"}
   ],
   "micronutrientOrders": [
-    {"nutrient": "Nutrient name", "labValue": "e.g. 22 ng/mL or Not tested", "dose": "Specific dose with units", "rationale": "One-line clinical rationale", "status": "SUPPLEMENT|MONITOR|CAPPED|EXCLUDED|STANDARD|DEFICIENT|CARDIAC Rx|GLYCEMIC Rx"}
+    {"nutrient": "Name", "labValue": "Value", "dose": "Dose", "rationale": "Rationale", "status": "SUPPLEMENT|MONITOR|CAPPED|EXCLUDED|STANDARD|DEFICIENT|CARDIAC Rx|GLYCEMIC Rx"}
   ],
   "monitoringSchedule": [
-    {"frequency": "e.g. Every 2 weeks", "parameters": "What to measure", "threshold": "Action trigger value", "responsible": "Who monitors"}
+    {"frequency": "Frequency", "parameters": "Biomarkers", "threshold": "Action trigger", "responsible": "Owner"}
   ]
 }
-
-Rules:
-- Reference EXACT lab values from patient data in every section
-- drugInteractions must ONLY include drugs from the actual regimen
-- clinicalAlerts must ONLY flag actual abnormal findings from patient labs
-- micronutrientOrders must be specific to this patient's deficiencies and regimen
-- Return ONLY valid JSON, no markdown, no extra text`
+Return ONLY valid JSON. No markdown.`
       }],
     });
 
-    // Extract JSON from Claude's response (handling potential markdown wrapping)
     const rawText = msg.content[0].text;
-    const jsonStr = rawText.match(/{[\s\S]*}/)?.[0] || rawText;
-    const data = JSON.parse(jsonStr);
+    let data;
+    try {
+      const jsonStr = rawText.match(/{[\s\S]*}/)?.[0] || rawText;
+      data = JSON.parse(jsonStr);
+    } catch (e) {
+      console.error("JSON PARSE FAILED:", rawText);
+      throw new Error("Invalid JSON from AI");
+    }
     res.json(data);
   } catch (error) {
-    console.error("Claude Error:", error);
-    res.status(500).json({ error: 'Claude failed to generate clinical insight.' });
+    console.error("Claude Report Error:", error);
+    res.status(500).json({ error: 'Claude failed to generate insight.', detail: error.message });
   }
 });
 
