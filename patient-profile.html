@@ -489,6 +489,11 @@
         margin: 0;
         max-width: none;
       }
+
+      .rs, .rg, .rt, .ai-panel, .rtrace {
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+      }
     }
 
     .ai-panel {
@@ -1201,6 +1206,8 @@
               <div class="rs-title" style="font-size:9.5px; margin-top:20px;">Manufacturing Alerts (Store)</div>
               <ul class="rrat" id="manufacturingAlerts" style="font-size:11.5px; color:#dc2626; font-weight:600;"></ul>
 
+              <div style="font-size:11px; color:#64748b; margin-top:10px; padding-left:14px; font-style:italic;"
+                id="riskMonitor"></div>
               <div style="font-size:11px; color:#64748b; margin-top:4px; padding-left:14px; font-style:italic;"
                 id="riskNote"></div>
 
@@ -2718,6 +2725,10 @@
             const note = document.getElementById('epNotes')?.value || 'User updated clinical inputs';
             const newPlan = createOrUpdatePlan(patient, engineOutput, {}, note);
 
+            // Sync Oncology labels explicitly before bind
+            setVal('pCancer_header', patient.cancer);
+            setVal('pRegimen_header', patient.regimen);
+
             bind(newPlan);
             alert('Patient details updated and plan recalculated.');
           }
@@ -2788,6 +2799,18 @@
               bsaEl.value = bsa.toFixed(2);
             } else {
               bsaEl.value = '';
+            }
+
+            // Sync Oncology labels to header in real-time for PDF/UI consistency
+            const c = document.getElementById('epCancer')?.value;
+            const r = document.getElementById('epRegimen')?.value;
+            if (c) {
+               setVal('pCancer_header', c);
+               setVal('pCancer_card', c);
+            }
+            if (r) {
+               setVal('pRegimen_header', r);
+               setVal('pRegimen_card', r);
             }
           }
 
@@ -3749,7 +3772,7 @@
             }
           });
 
-          function downloadNutritionPDF(autoClose) {
+          async function downloadNutritionPDF(autoClose) {
             // Step 1: Mandatory Data Validation
             if (!validateMandatoryData()) return;
 
@@ -3759,55 +3782,68 @@
               return;
             }
 
-            // Step 2: Sync current form oncology data to the report UI before export
-            const currentCancer = document.getElementById('epCancer')?.value;
-            const currentRegimen = document.getElementById('epRegimen')?.value;
-            if (currentCancer) {
-              setVal('pCancer_header', currentCancer);
-              setVal('pCancer_card', currentCancer);
-            }
-            if (currentRegimen) {
-              setVal('pRegimen_header', currentRegimen);
-              setVal('pRegimen_card', currentRegimen);
+            // Step 2: Show Loading State on Button
+            const dlBtn = document.getElementById('downloadPdfBtn');
+            const originalBtnHtml = dlBtn ? dlBtn.innerHTML : '';
+            if (dlBtn) {
+              dlBtn.disabled = true;
+              dlBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Generating Secure PDF...';
             }
 
-            // Make sure the export source is visible before rendering.
-            const root = document.getElementById('pdfExportRoot');
-            if (root) { root.style.display = 'block'; }
+            // Step 3: Explicitly ensure AI sections are visible (if they have data)
+            const aiPlan = window.currentVersionedPlan;
+            if (aiPlan && aiPlan.claudeInsights) {
+               console.log("Forcing AI visibility for PDF export...");
+               renderClaudeInsight(aiPlan.claudeInsights, true); // Force re-render to DOM
+            }
 
-            const source = document.getElementById('pdfExportRoot') || document.querySelector('.container.page .card') || document.body;
+            // Give the browser 1 second to "settle" and render all dynamic styles/content
+            await new Promise(resolve => setTimeout(resolve, 1000));
+
+            // Step 4: Setup Export Source
+            const source = document.getElementById('pdfExportRoot');
+            if (!source) {
+              alert("Export Error: PDF root container not found.");
+              return;
+            }
+
             const filename = buildPdfFileName();
-
             const opts = {
               margin: [10, 10, 10, 10],
               filename: filename,
-              image: { type: 'jpeg', quality: 0.98 },
-              html2canvas: { scale: 2, useCORS: true, scrollY: 0 },
+              image: { type: 'jpeg', quality: 1.0 },
+              html2canvas: { 
+                scale: 2, 
+                useCORS: true, 
+                logging: false, 
+                letterRendering: true,
+                allowTaint: true
+              },
               jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
             };
 
-            // Hide the download button(s) inside the exported PDF.
-            const buttons = Array.from(document.querySelectorAll('button'));
-            const prevDisplay = buttons.map(b => b.style.display);
-            buttons.forEach(b => {
-              const t = (b.innerText || '').toLowerCase();
-              if (t.includes('download pdf')) b.style.display = 'none';
-            });
+            // Hide the download button(s) and other UI junk inside the exported PDF
+            const buttons = Array.from(document.querySelectorAll('button, .no-print, .ai-chat-launcher'));
+            const prevDisplays = buttons.map(b => b.style.display);
+            buttons.forEach(b => b.style.display = 'none');
 
-            html2pdf()
-              .set(opts)
-              .from(source)
-              .save()
-              .then(() => {
-                buttons.forEach((b, i) => b.style.display = prevDisplay[i]);
-                if (autoClose) {
-                  setTimeout(() => { try { window.close(); } catch (e) { } }, 400);
-                }
-              })
-              .catch(() => {
-                buttons.forEach((b, i) => b.style.display = prevDisplay[i]);
-                window.print();
-              });
+            try {
+              await html2pdf().set(opts).from(source).save();
+              console.log("PDF Export Successful");
+            } catch (err) {
+              console.error("PDF Export Failed:", err);
+              window.print();
+            } finally {
+              // Restore UI
+              buttons.forEach((b, i) => b.style.display = prevDisplays[i]);
+              if (dlBtn) {
+                dlBtn.disabled = false;
+                dlBtn.innerHTML = originalBtnHtml;
+              }
+              if (autoClose) {
+                setTimeout(() => { try { window.close(); } catch (e) { } }, 500);
+              }
+            }
           }
 
           // ============================================================
