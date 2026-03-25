@@ -3849,7 +3849,11 @@
                 bmi: bmi, dailyCalories: fp.dailyCalories, kcalPerKg: fp.kcalPerKg,
                 dailyProtein: fp.dailyProtein, proteinPerKg: fp.proteinPerKg,
                 prescribedRoute: fp.prescribedRoute, cachexia: fp.cachexia,
-                proteinType: fp.proteinType, safetyAlerts: fp.safetyAlerts || []
+                proteinType: fp.proteinType, safetyAlerts: fp.safetyAlerts || [],
+                interactions: fp.interactions || [],
+                micronutrients: fp.micronutrients || {},
+                outcomes: fp.outcomes || {},
+                recipe: fp.recipe || {}
               }
             };
 
@@ -3906,12 +3910,16 @@
             }
 
             const crEl = document.getElementById('clinicalRationale');
-            if (crEl && data.rationale && data.rationale.length > 0)
-              crEl.innerHTML = data.rationale.map(r => `<li>${r}</li>`).join('');
+            if (crEl && data.rationale && data.rationale.length > 0) {
+              const aiHtml = data.rationale.map(r => `<li class="ai-insight" style="color:#6d28d9; font-weight:600;">✨ ${r}</li>`).join('');
+              crEl.innerHTML = aiHtml + crEl.innerHTML;
+            }
 
             const piEl = document.getElementById('patientInstructions');
-            if (piEl && data.instructions && data.instructions.length > 0)
-              piEl.innerHTML = data.instructions.map(t => `<li style="margin-bottom:4px;">${t}</li>`).join('');
+            if (piEl && data.instructions && data.instructions.length > 0) {
+              const aiHtml = data.instructions.map(t => `<li class="ai-insight" style="color:#6d28d9; font-weight:600; margin-bottom:4px;">✨ ${t}</li>`).join('');
+              piEl.innerHTML = aiHtml + piEl.innerHTML;
+            }
 
             const alertsSec = document.getElementById('claudeAlertsSection');
             const alertsList = document.getElementById('claudeAlertsList');

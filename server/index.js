@@ -204,6 +204,7 @@ GENERATE exact JSON structure:
   "micronutrientOrders": [{"nutrient": "Name", "labValue": "Value", "dose": "Dose", "rationale": "Short rationale", "status": "STATUS"}],
   "monitoringSchedule": [{"frequency": "Freq", "parameters": "Labs", "threshold": "Trigger", "responsible": "Owner"}]
 }
+IMPORTANT: Even if there are no high-risk flags, you MUST provide at least one baseline monitoring parameter and one general instruction to ensure the report is complete.
 Return ONLY valid JSON. No markdown.`
       }],
     });
