@@ -1009,6 +1009,12 @@ function applyExtractionData(data) {
   setVal('potassium', data.potassium);
   setVal('urea', data.urea);
 
+  // Body Composition
+  setVal('leanBodyMass', data.leanBodyMass);
+  setVal('smi', data.smi);
+  setVal('handGrip', data.handGrip);
+  setVal('fatPercent', data.fatPercent);
+
   if (data.cancer) {
     const input = document.getElementById('cancerInput');
     if (input) {

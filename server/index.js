@@ -146,7 +146,11 @@ app.post('/api/chat', async (req, res) => {
       "name": "string", "age": number, "sex": "Male/Female", "weight": number, "height": number, "usualWeight": number,
       "uhic": "string", "cancer": "string", "regimen": "string", "cancerStage": "string", "tumorBurden": "string",
       "reducedFoodIntake": number, "albumin": number, "crp": number, "creatinine": number, "hemoglobin": number,
-      "bloodSugar": number, "muac": number, "sarcopeniaStatus": "Yes/No", "activityLevel": "string",
+      "bloodSugar": number, "hba1c": number, "alt": number, "ast": number, "bilirubin": number, "tsh": number,
+      "sodium": number, "potassium": number, "urea": number, "muac": number, "prealbumin": number,
+      "vitD": number, "vitB12": number, "folate": number, "zinc": number, "magnesium": number,
+      "sarcopeniaStatus": "Yes/No", "activityLevel": "string", "ecogStatus": number, "leanBodyMass": number,
+      "smi": number, "handGrip": number, "fatPercent": number, "feedingMethod": "string", "giIssues": boolean,
       "comorbidities": [], "sideEffects": [], "existingSupplements": [], "allergies": [], "metastasisSites": [], "genomicMarkers": []
     }
 
