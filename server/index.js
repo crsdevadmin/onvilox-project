@@ -105,17 +105,27 @@ app.post('/api/extract', async (req, res) => {
   try {
     const msg = await anthropic.messages.create({
       model: "claude-3-5-sonnet-20241022",
-      max_tokens: 2000,
+      max_tokens: 1000,
       system: extractionSystemPrompt,
       messages: [{ role: "user", content: `Extract from:\n\n${pdfText}` }],
     });
 
     const rawText = msg.content[0].text;
-    const jsonStr = rawText.match(/{[\s\S]*}/)?.[0] || rawText;
-    res.json({ success: true, data: JSON.parse(jsonStr) });
+    let extracted;
+    try {
+      const jsonStr = rawText.match(/{[\s\S]*}/)?.[0] || rawText;
+      extracted = JSON.parse(jsonStr);
+    } catch (parseError) {
+      console.error("JSON Parse Error in Extraction:", rawText);
+      return res.status(422).json({ error: 'AI returned malformed data. Please try again.' });
+    }
+    res.json({ success: true, data: extracted });
   } catch (error) {
+    if (error.status === 429) {
+      return res.status(429).json({ error: 'AI Rate Limit exceeded. Please wait a moment.' });
+    }
     console.error("Claude Extraction Error:", error);
-    res.status(500).json({ error: 'Failed to extract data using AI.' });
+    res.status(500).json({ error: 'Internal AI failure.' });
   }
 });
 
@@ -140,7 +150,7 @@ app.post('/api/chat', async (req, res) => {
 
     const msg = await anthropic.messages.create({
       model: "claude-3-5-sonnet-20241022",
-      max_tokens: 1500,
+      max_tokens: 800,
       system: systemPrompt,
       messages: [{ role: "user", content: message }],
     });
@@ -203,7 +213,7 @@ app.post('/api/claude-report', async (req, res) => {
 
     const msg = await anthropic.messages.create({
       model: "claude-3-5-sonnet-20241022",
-      max_tokens: 8192,
+      max_tokens: 1200,
       system: systemInstruction,
       messages: [{
         role: "user",

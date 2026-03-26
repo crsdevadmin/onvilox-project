@@ -866,62 +866,44 @@ function addTyping() {
   return typing;
 }
 
-function sendChatMessage() {
+async function sendChatMessage() {
   const input = document.getElementById('chatInput');
   const text = input.value.trim();
   if(!text) return;
   addMessage(text, 'user');
   input.value = '';
 
-  if (isOncologyQuestion(text)) {
-    const typing = addTyping();
-    askClaudeOncology(text).then(reply => {
-      typing.remove();
-      addMessageHtml(reply, 'ai');
-    }).catch(() => {
-      typing.remove();
-      addMessage('Sorry, I couldn\'t reach the AI. Please check server connection.', 'ai');
+  const typing = addTyping();
+  try {
+    const apiBase = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : '';
+    const ctx = {
+      cancer: document.getElementById('cancerInput')?.value || null,
+      regimen: document.getElementById('regimenInput')?.value || null,
+      age: document.getElementById('age')?.value || null
+    };
+
+    const response = await fetch(`${apiBase}/api/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: text, contextObj: ctx })
     });
-  } else {
-    const typing = addTyping();
-    extractClinicalData(text).then(data => {
-      typing.remove();
-      if (data) {
-        applyExtractionData(data);
-        addMessage('✅ Clinical data extracted and filled! Review and submit.', 'ai');
-      } else {
-        addMessage('I read the text but found no clinical markers.', 'ai');
-      }
-    }).catch(err => {
-      typing.remove();
-      addMessage('Extraction failed. Please fill fields manually.', 'ai');
-    });
+    
+    const data = await response.json();
+    typing.remove();
+
+    if (data.reply) {
+        addMessageHtml(data.reply, 'ai');
+    }
+
+    if (data.extractedData) {
+        console.log("AI Detected Clinical Data:", data.extractedData);
+        applyExtractionData(data.extractedData);
+        addMessage('✨ Clinical data detected! Patient form has been auto-populated.', 'ai');
+    }
+  } catch (err) {
+    typing.remove();
+    addMessage('Sorry, I couldn\'t reach the AI. Please check server connection.', 'ai');
   }
-}
-
-function isOncologyQuestion(text) {
-  const lower = text.toLowerCase().trim();
-  if (lower.endsWith('?')) return true;
-  if (/^(what|how|why|when|which|is|can|should|does|do|explain|tell me|give me|list|compare|difference|meaning|define|recommend|best|safe|help)\b/.test(lower)) return true;
-  const numCount = (text.match(/\d+/g) || []).length;
-  const wordCount = text.split(/\s+/).length;
-  return (wordCount < 20 && numCount < 3);
-}
-
-async function askClaudeOncology(question) {
-  const apiBase = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : 'http://localhost:3000';
-  const ctx = {
-    cancer: document.getElementById('cancerInput')?.value || null,
-    regimen: document.getElementById('regimenInput')?.value || null,
-    age: document.getElementById('age')?.value || null
-  };
-  const response = await fetch(`${apiBase}/api/chat`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message: question, contextObj: ctx })
-  });
-  const data = await response.json();
-  return data.reply || 'No response from AI.';
 }
 
 function addMessageHtml(htmlText, type) {
@@ -945,12 +927,23 @@ async function handlePdfUpload(event) {
     const text = await extractTextFromPdf(file);
     typing.remove();
     addMessage(`Reading report...`, 'ai');
-    extractClinicalData(text).then(data => {
-      if (data) applyExtractionData(data);
-      addMessage('✅ Lab report extraction complete!', 'ai');
+    
+    // Use the same unified chat extraction for consistency
+    const apiBase = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : '';
+    const response = await fetch(`${apiBase}/api/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: `Extract medical data from this text:\n\n${text}`, contextObj: {} })
     });
+    const data = await response.json();
+    if (data.extractedData) {
+        applyExtractionData(data.extractedData);
+        addMessage('✅ Lab report extraction complete!', 'ai');
+    } else {
+        addMessage('Extracted text but found no clinical markers.', 'ai');
+    }
   } catch (e) {
-    typing.remove();
+    if (typing) typing.remove();
     addMessage("Couldn't read PDF.", 'ai');
   }
 }
@@ -965,17 +958,6 @@ async function extractTextFromPdf(file) {
     fullText += content.items.map(item => item.str).join(" ") + "\n";
   }
   return fullText;
-}
-
-async function extractClinicalData(text) {
-  const apiBase = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : 'http://localhost:3000';
-  const response = await fetch(`${apiBase}/api/extract`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ pdfText: text })
-  });
-  const res = await response.json();
-  return res.data;
 }
 
 function applyExtractionData(data) {
@@ -993,6 +975,7 @@ function applyExtractionData(data) {
     }
   };
 
+  // MAPPING: These IDs are specific to patient-create.html
   setVal('patientName', data.name);
   setVal('uhic', data.uhic);
   setVal('age', data.age);
@@ -1028,7 +1011,8 @@ function applyExtractionData(data) {
       input.value = data.cancer;
       highlight('cancerInput');
       if (typeof filterCancerList === 'function') {
-         const match = Object.keys(cancerRegimenMap).find(k => k.toLowerCase().includes(data.cancer.toLowerCase()));
+         // Try to find best match in master-data
+         const match = Object.keys(cancerRegimenMap || {}).find(k => k.toLowerCase().includes(data.cancer.toLowerCase()));
          if (match) {
             input.value = match;
             if (typeof selectCancer === 'function') selectCancer(match);
@@ -1041,7 +1025,7 @@ function applyExtractionData(data) {
     if (rInput) {
        rInput.value = data.regimen;
        highlight('regimenInput');
-       if (typeof selectRegimen === 'function') {
+       if (typeof selectRegimen === 'function' && typeof cancerRegimenMap !== 'undefined') {
           const rList = cancerRegimenMap[document.getElementById('cancerInput').value] || [];
           const match = rList.find(r => r.toLowerCase().includes(data.regimen.toLowerCase()));
           if (match) selectRegimen(match);
