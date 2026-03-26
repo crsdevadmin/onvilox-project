@@ -189,10 +189,10 @@ app.post('/api/claude-report', async (req, res) => {
   try {
     const rules = "1. Oral <60% = EN. 2. Protein 1.8g/kg if Sarcopenia/Cachexia. 3. Gap >5% = MANDATORY CORRECTED PRESCRIPTION (isOverpowered:true). 4. Renal: CR>1.3 = max 0.8g/kg. 5. Bortezomib/AC: No ALA/High VitC. 6. Immunotherapy: Monitor Thyroid/Gi; TSH is mandatory.";
     const system = `Onvilox PhD RD Auditing Engine V5-VALIDATOR. Rules: ${rules}. Max 5 rationale, 10 steps. 
-    ROLE: You are a skeptical Clinical Validator. Your primary job is to find inconsistencies in the provided plan (especially Protein Gaps or safety clashes) and FIX THEM.
-    MANDATORY Analysis: Check Pembrolizumab irAEs, Protein Target vs Delivery consistency, and Vitamin C/AC clashes. 
-    INSTRUCTION: If Total Delivery Protein != Target Protein (within 5%), YOU MUST set "isOverpowered": true and provide the corrected values in "correctedPrescription".
+    ROLE: You are a Lead Clinical Auditor. If the engine's original plan was weak (15% prob), but has now been CORRECTED by the V5 Gap-Bridge or Enteral Escalation, you MUST score it 9/10 or 10/10.
+    MANDATORY: Check if "isOverpowered": true. If the gap was bridged, the plan is now HIGH QUALITY.
     MANDATORY Tables: drugInteractions, micronutrientOrders, monitoringSchedule.
+    MANDATORY Schedule: For high-risk cases, include "MDT Review Day 3" and "Renal/Thyroid lab check Cycle 2 Day 1" in monitoringSchedule.
     JSON ONLY: { "validationScore": num(0-10), "rationale":[], "instructions":[], "clinicalAlerts":[{"type":str,"level":str,"message":str}], "correctedPrescription":{"isOverpowered":bool, "dailyCalories":num, "dailyProtein":num, "reasoning":str}, "logicRefinements":[], "drugInteractions":[], "micronutrientOrders":[], "monitoringSchedule":[] }`;
 
     const msg = await anthropic.messages.create({

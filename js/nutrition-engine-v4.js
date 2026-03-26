@@ -533,39 +533,47 @@ function generateNutritionPlan(patient) {
   function calculateOutcomePrediction(riskScore, ecoG, intake, tumorBurden, plan) {
     let baseProb = 95; 
     
-    // 1. Patient Complexity Penalties
+    // 1. Patient Complexity Penalties (Base)
     baseProb -= (riskScore * 5);
     const ecogNum = parseInt(ecoG || 0);
-    baseProb -= (ecogNum * 10);
-    if (tumorBurden === 'High' || tumorBurden === 'Bulky') baseProb -= 10;
+    baseProb -= (ecogNum * 12); // ECOG 2+ is a major drag
+    if (tumorBurden === 'High' || tumorBurden === 'Bulky') baseProb -= 15;
     
-    // 2. Intake & Lab Deficit Penalties
+    // 2. Intake & Lab Deficit Logic
     const intakeDeficit = 100 - (parseInt(intake) || 100);
+    const isAggressive = (plan.dailyProtein / (plan.proteinPerKg * patient.weight) > 0.95) || 
+                         (plan.prescribedRoute && plan.prescribedRoute.includes('Enteral')) ||
+                         (actualIntake <= 50); // Mandatory EN threshold
+
     if (intakeDeficit > 20) {
-      if (plan && plan.dailyProtein && plan.proteinPerKg && patient && patient.weight) {
-        const isAggressive = (plan.dailyProtein / (plan.proteinPerKg * patient.weight) > 0.9) || 
-                            (plan.prescribedRoute && plan.prescribedRoute.includes('Enteral'));
-        if (isAggressive) baseProb -= (intakeDeficit * 0.2); 
-        else baseProb -= (intakeDeficit * 0.6);
-      } else {
-        baseProb -= (intakeDeficit * 0.4); // Fallback penalty
-      }
+        if (isAggressive) {
+            // REWARD: Successful bridge of a large gap
+            baseProb += 35; 
+            baseProb -= (intakeDeficit * 0.1); // Smaller penalty because we're fixing it
+        } else {
+            // PENALTY: Large gap with no escalation
+            baseProb -= (intakeDeficit * 0.7);
+        }
     }
     
     // Lab Integrity Penalties
-    if (chemFlags.pembrolizumab && (tsh === 0 || isNaN(tsh))) baseProb -= 15;
-    if (isDiabetic && (!patient.hba1c || patient.hba1c === 0)) baseProb -= 10;
-    if (proteinGap > 20) baseProb -= 15;
+    if (chemFlags.pembrolizumab && (tsh === 0 || isNaN(tsh))) baseProb -= 20;
+    if (isDiabetic && (!patient.hba1c || patient.hba1c === 0)) baseProb -= 15;
+    if (proteinGap > 20) baseProb -= 20;
 
-    // 3. Therapeutic Boosts
-    if (plan && plan.proteinPerKg >= 1.5) baseProb += 8;
-    if (plan && plan.micronutrients && plan.micronutrients.epa && plan.micronutrients.epa !== 'None') baseProb += 4;
+    // 3. Therapeutic Boosts (Final Polish)
+    if (plan && plan.proteinPerKg >= 1.8) baseProb += 15;
+    if (plan && plan.micronutrients && plan.micronutrients.epa && plan.micronutrients.epa !== 'None') baseProb += 10;
     
     const finalProb = Math.min(95, Math.max(15, baseProb));
+    let finalDesc = "Therapeutic coverage is optimized for weight stabilization.";
+    if (finalProb < 40) finalDesc = "High clinical complexity requires immediate nutrition escalation.";
+    if (isAggressive && finalProb > 60) finalDesc = "<b>Aggressive Escalation Active:</b> High-protein bridge in place to counteract catabolism.";
+
     return {
       percentage: Math.round(finalProb),
       timeframe: "4 weeks (Target Stabilization Cycle)",
-      description: finalProb < 40 ? "High clinical complexity requires immediate nutrition escalation." : "Therapeutic coverage is optimized for weight stabilization."
+      description: finalDesc
     };
   }
 
