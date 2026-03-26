@@ -2165,18 +2165,6 @@
             const typing = addTyping();
 
             try {
-              const isExtraction = text.length >= 150 || text.toLowerCase().includes('extract') || text.toLowerCase().includes('patient');
-
-              if (isExtraction) {
-                await runAiExtraction(text);
-                typing.remove();
-                addMessage('✅ Clinical data extracted and form populated! Regenerating report...', 'ai');
-                // Auto-close chat after extraction success and re-run Claude
-                setTimeout(() => {
-                  toggleChat();
-                  generateClaudeInsight();
-                }, 2000);
-              } else {
                 const response = await fetch(`${CONFIG.API_BASE_URL}/api/chat`, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
@@ -2185,11 +2173,54 @@
                 const data = await response.json();
                 typing.remove();
                 addMessage(data.reply || data.error || 'Server error', 'ai');
-              }
+
+                if (data.extractedData) {
+                    console.log("AI Detected Clinical Data:", data.extractedData);
+                    applyExtractedData(data.extractedData);
+                    addMessage('✨ Clinical data detected! Form has been auto-populated.', 'ai');
+                }
             } catch (err) {
               typing.remove();
               console.error(err);
               addMessage('⚠️ Cannot connect to AI Server. Please ensure the backend is running.', 'danger');
+            }
+          }
+
+          function applyExtractedData(data) {
+            if (!data) return;
+            const mapping = {
+               name: 'epName', age: 'epAge', sex: 'epSex', weight: 'epWeight', height: 'epHeight',
+               usualWeight: 'epUW', reducedFoodIntake: 'epFoodIntake', albumin: 'epAlbumin',
+               crp: 'epCRP', creatinine: 'epCreatinine', alt: 'epALT', ast: 'epAST',
+               bilirubin: 'epBilirubin', bloodSugar: 'epBloodSugar', sodium: 'epSodium',
+               potassium: 'epPotassium', urea: 'epUrea', tsh: 'epTSH', prealbumin: 'epPrealbumin',
+               hemoglobin: 'epHemoglobin', vitD: 'epVitD', vitB12: 'epVitB12', folate: 'epFolate',
+               zinc: 'epZinc', magnesium: 'epMagnesium', hba1c: 'epHbA1c',
+               cancer: 'epCancer', regimen: 'epRegimen', cancerStage: 'epStage',
+               tumorBurden: 'epTumorBurden', feedingMethod: 'epFeeding', giIssues: 'epGi',
+               ecogStatus: 'epECOG', activityLevel: 'epActivityLevel', 
+               sarcopeniaStatus: 'epSarcopenia', muac: 'epMUAC'
+            };
+
+            let count = 0;
+            Object.keys(data).forEach(key => {
+              const val = data[key];
+              const id = mapping[key];
+              if (id && val !== null && val !== undefined) {
+                const el = document.getElementById(id);
+                if (el) {
+                  el.value = val;
+                  el.classList.add('ai-filled');
+                  setTimeout(() => el.classList.remove('ai-filled'), 3000);
+                  if (typeof updateLabStatus === 'function') updateLabStatus(id, val);
+                  if (id === 'epHeight' || id === 'epWeight') updateBSAAuto();
+                  count++;
+                }
+              }
+            });
+            if (count > 0) {
+              window.patient = { ...window.patient, ...data };
+              savePatient(window.patient);
             }
           }
 

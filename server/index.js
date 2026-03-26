@@ -126,17 +126,39 @@ app.post('/api/chat', async (req, res) => {
   try {
     const contextStr = contextObj ? JSON.stringify(contextObj) : "No context.";
     const systemPrompt = `You are a clinical oncology nutrition assistant (Onvilox AI Co-pilot).
-Use ESMO/ASCO guidelines. Keep answers under 3 sentences unless asked for detail.
-Patient Context: ${contextStr}`;
+    Use ESMO/ASCO guidelines. Keep answers under 3 sentences unless asked for detail.
+    Patient Context: ${contextStr}
+
+    EXTRACTION ROLE:
+    If the user's message contains new clinical values (weight, albumin, cancer type, etc.), you must ALSO extract them into a JSON object.
+    
+    Response format:
+    {
+      "reply": "Your conversational answer here.",
+      "extractedData": { ... fields from extractionSchema if found, otherwise null ... }
+    }`;
 
     const msg = await anthropic.messages.create({
       model: "claude-3-5-sonnet-20241022",
-      max_tokens: 1000,
+      max_tokens: 1500,
       system: systemPrompt,
       messages: [{ role: "user", content: message }],
     });
 
-    res.json({ reply: msg.content[0].text });
+    const rawText = msg.content[0].text;
+    let data;
+    try {
+      const jsonMatch = rawText.match(/{[\s\S]*}/);
+      if (jsonMatch) {
+         data = JSON.parse(jsonMatch[0]);
+      } else {
+         data = { reply: rawText, extractedData: null };
+      }
+    } catch (e) {
+      data = { reply: rawText, extractedData: null };
+    }
+    
+    res.json(data);
   } catch (error) {
     console.error("Claude Chat Error:", error);
     res.status(500).json({ error: 'Failed to generate AI response.' });
