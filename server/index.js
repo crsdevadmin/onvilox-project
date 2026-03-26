@@ -142,7 +142,7 @@ app.post('/api/chat', async (req, res) => {
     Format: { "reply": "Short answer (<3 sentences)", "extractedData": { ...found values... } }`;
 
     const msg = await anthropic.messages.create({
-      model: "claude-haiku-4-5-20251001",
+      model: "claude-3-5-haiku-20241022",
       max_tokens: 1000,
       system: systemPrompt,
       messages: [{ role: "user", content: message }],
@@ -151,17 +151,21 @@ app.post('/api/chat', async (req, res) => {
     const rawText = msg.content[0].text;
     let data;
     try {
-      // Hardened Parser: Detect ```json blocks first
-      const codeBlockMatch = rawText.match(/```json\n([\s\S]*?)\n```/);
-      const jsonCandidate = codeBlockMatch ? codeBlockMatch[1] : (rawText.match(/{[\s\S]*}/)?.[0] || rawText);
+      // Robust Parser: Try code blocks, then greedy braces, then the whole string
+      const jsonCandidate = (rawText.match(/```json\s*(\{[\s\S]*?\})\s*```/)?.[1]) || 
+                            (rawText.match(/{[\s\S]*}/)?.[0]) || 
+                            rawText;
       data = JSON.parse(jsonCandidate);
       
-      // If the AI returned ONLY the extraction object, wrap it
-      if (!data.reply && data.name) {
-          data = { reply: "Extraction complete.", extractedData: data };
+      // Map result to standard Schema { reply, extractedData }
+      if (!data.reply && (data.name || data.extractedData)) {
+          data = { 
+            reply: data.reply || "Clinical data extracted successfully.", 
+            extractedData: data.extractedData || data 
+          };
       }
     } catch (e) {
-      console.warn("AI Parser Fallback triggered for raw text:", rawText.slice(0, 100));
+      console.warn("AI Parser Error:", e.message);
       data = { reply: rawText, extractedData: null };
     }
     res.json(data);
