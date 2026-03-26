@@ -44,6 +44,28 @@ function getPatientById(id) {
   return patients.find(p => p.id == id);
 }
 
+function deletePatient(id) {
+  // 1. Remove Patient Record
+  let patients = getPatients();
+  patients = patients.filter(p => p.id !== id);
+  savePatients(patients);
+
+  // 2. Cascade: Remove associated Nutrition Plans
+  let plans = getPlans();
+  plans = plans.filter(p => p.patientId !== id);
+  db.setTable('nutrition_plans', plans);
+
+  // 3. Cascade: Remove associated Manufacturing Jobs
+  if (typeof manufacturingService !== 'undefined' && manufacturingService.getJobs) {
+     let jobs = manufacturingService.getJobs();
+     jobs = jobs.filter(j => j.patientId !== id);
+     db.setTable('manufacturing_jobs', jobs);
+  }
+  
+  console.log("Patient and associated data deleted:", id);
+  return true;
+}
+
 function addAssessment(patientId, formData) {
   const patient = getPatientById(patientId);
   if (!patient) return null;

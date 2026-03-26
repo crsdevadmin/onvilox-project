@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html>
+
 <head>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard - Onvilox</title>
@@ -7,250 +8,260 @@
   <link rel="stylesheet" href="css/app.css?v=2.0">
   <style>
     @keyframes pulse {
-      0% { opacity: 1; }
-      50% { opacity: 0.5; }
-      100% { opacity: 1; }
+      0% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: 0.5;
+      }
+
+      100% {
+        opacity: 1;
+      }
     }
   </style>
 </head>
+
 <body>
 
-<div class="topbar">
-  <div class="logo">Onvilox</div>
-  <div class="nav">
-    <span class="nav-pill" id="rolePill">DOCTOR</span>
-    <a href="#" onclick="auth.logout()">Logout</a>
-    <button id="themeToggleBtn" onclick="toggleTheme()" class="theme-toggle-btn" style="margin-left: 20px;">
-      <span id="themeIcon">🌙</span> <span id="themeLabel">Dark</span>
-    </button>
-  </div>
-</div>
-
-
-<div class="container page">
-
-  <div class="page-header">
-    <div>
-      <h1 id="title" class="page-title">My Patients</h1>
-      <div class="page-subtitle">Quickly review, approve and generate reports.</div>
+  <div class="topbar">
+    <div class="logo">Onvilox</div>
+    <div class="nav">
+      <span class="nav-pill" id="rolePill">DOCTOR</span>
+      <a href="#" onclick="auth.logout()">Logout</a>
+      <button id="themeToggleBtn" onclick="toggleTheme()" class="theme-toggle-btn" style="margin-left: 20px;">
+        <span id="themeIcon">🌙</span> <span id="themeLabel">Dark</span>
+      </button>
     </div>
+  </div>
 
-    <div class="toolbar">
-      <div class="toolbar-field">
-        <label class="sr-only" for="searchBox">Search</label>
-        <input id="searchBox" class="input input-sm" type="search" placeholder="Search name / UHIC" autocomplete="off">
+
+  <div class="container page">
+
+    <div class="page-header">
+      <div>
+        <h1 id="title" class="page-title">My Patients</h1>
+        <div class="page-subtitle">Quickly review, approve and generate reports.</div>
       </div>
 
-      <div class="toolbar-field">
-        <label class="sr-only" for="statusFilter">Status</label>
-        <select id="statusFilter" class="input input-sm">
-          <option value="ALL">All Status</option>
-          <option value="CREATED">Created</option>
-          <option value="APPROVED">Approved</option>
-          <option value="PROCESSING">Processing</option>
-          <option value="READY">Ready</option>
-          <option value="DISPATCHED">Dispatched</option>
-          <option value="DELIVERED">Delivered</option>
-        </select>
-      </div>
+      <div class="toolbar">
+        <div class="toolbar-field">
+          <label class="sr-only" for="searchBox">Search</label>
+          <input id="searchBox" class="input input-sm" type="search" placeholder="Search name / UHIC"
+            autocomplete="off">
+        </div>
 
-      <a class="btn-primary btn-sm" href="Patient-Create-STABLE-V3.html">+ Create Patient</a>
-    </div>
-  </div>
+        <div class="toolbar-field">
+          <label class="sr-only" for="statusFilter">Status</label>
+          <select id="statusFilter" class="input input-sm">
+            <option value="ALL">All Status</option>
+            <option value="CREATED">Created</option>
+            <option value="APPROVED">Approved</option>
+            <option value="PROCESSING">Processing</option>
+            <option value="READY">Ready</option>
+            <option value="DISPATCHED">Dispatched</option>
+            <option value="DELIVERED">Delivered</option>
+          </select>
+        </div>
 
-  <div class="kpis">
-    <div class="kpi-card">
-      <div class="kpi-label">Total</div>
-      <div class="kpi-value" id="kpiTotal">0</div>
-    </div>
-    <div class="kpi-card">
-      <div class="kpi-label">Pending Approval</div>
-      <div class="kpi-value" id="kpiPending">0</div>
-    </div>
-    <div class="kpi-card">
-      <div class="kpi-label">In Progress</div>
-      <div class="kpi-value" id="kpiProgress">0</div>
-    </div>
-    <div class="kpi-card">
-      <div class="kpi-label">Ready / Delivered</div>
-      <div class="kpi-value" id="kpiReady">0</div>
-    </div>
-  </div>
-
-  <div class="card">
-    <table class="table">
-      <thead>
-        <tr>
-          <th>Patient</th>
-          <th>UHIC</th>
-          <th>Cancer</th>
-          <th>Created</th>
-          <th>Status</th>
-          <th class="th-actions">Actions</th>
-        </tr>
-      </thead>
-      <tbody id="patientTable"></tbody>
-    </table>
-  </div>
-
-</div>
-
-
-<!-- QR Modal -->
-<div id="qrOverlay" class="modal-overlay" onclick="closeQr()">
-  <div class="modal" onclick="event.stopPropagation();">
-    <div class="modal-header">
-      <h3 class="modal-title" id="qrTitle">Patient QR</h3>
-      <button class="modal-close" aria-label="Close" onclick="closeQr()">×</button>
-    </div>
-    <div class="modal-body">
-      <div id="qrBox" style="display:flex;justify-content:center;padding:10px 0;"></div>
-      <div style="text-align:center;color:#6b7280;font-size:13px;" id="qrHint">Scan to view patient summary</div>
-      <div class="modal-actions" style="justify-content:center;">
-        <button class="btn-secondary" onclick="copyQrLink()">Copy Link</button>
-        <button class="btn-primary" onclick="openQrLink()">Open Link</button>
+        <a class="btn-primary btn-sm" href="Patient-Create-STABLE-V3.html">+ Create Patient</a>
       </div>
     </div>
+
+    <div class="kpis">
+      <div class="kpi-card">
+        <div class="kpi-label">Total</div>
+        <div class="kpi-value" id="kpiTotal">0</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Pending Approval</div>
+        <div class="kpi-value" id="kpiPending">0</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">In Progress</div>
+        <div class="kpi-value" id="kpiProgress">0</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Ready / Delivered</div>
+        <div class="kpi-value" id="kpiReady">0</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Patient</th>
+            <th>UHIC</th>
+            <th>Cancer</th>
+            <th>Created</th>
+            <th>Status</th>
+            <th class="th-actions">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="patientTable"></tbody>
+      </table>
+    </div>
+
   </div>
-</div>
-
-<script src="js/storage.js"></script>
-<script src="js/seed.js"></script>
-<script src="js/auth.js"></script>
-<script src="js/mappings.js"></script>
-<script src="js/patient-store.js"></script>
-<script src="js/nutrition-engine-v4.js"></script>
-<script src="js/manufacturing.js"></script>
-<script src="js/ai-report-service.js"></script>
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-
-<script>
-console.log("ONVILOX_STABLE_V4_FIXED_LOADED");
-// INTAKE CALCULATOR LOGIC
-auth.requireRole(['DOCTOR','ASSISTANT']);
-const me = auth.getCurrentUser();
-
-// Top-right role pill
-const rolePill = document.getElementById('rolePill');
-if(rolePill) rolePill.textContent = me.role;
-
-// In-memory tracker for AI background tasks
-const __aiTriggers = {};
-
-// Filters
-let searchQuery = '';
-let statusQuery = 'ALL';
-
-const searchBox = document.getElementById('searchBox');
-const statusFilter = document.getElementById('statusFilter');
-
-if(searchBox){
-  searchBox.addEventListener('input', (e) => {
-    searchQuery = (e.target.value || '').trim().toLowerCase();
-    render();
-  });
-}
-
-if(statusFilter){
-  statusFilter.addEventListener('change', (e) => {
-    statusQuery = e.target.value || 'ALL';
-    render();
-  });
-}
 
 
-if(me.role === 'ASSISTANT'){
-  document.getElementById('title').innerText = "Doctor's Patients";
-}
+  <!-- QR Modal -->
+  <div id="qrOverlay" class="modal-overlay" onclick="closeQr()">
+    <div class="modal" onclick="event.stopPropagation();">
+      <div class="modal-header">
+        <h3 class="modal-title" id="qrTitle">Patient QR</h3>
+        <button class="modal-close" aria-label="Close" onclick="closeQr()">×</button>
+      </div>
+      <div class="modal-body">
+        <div id="qrBox" style="display:flex;justify-content:center;padding:10px 0;"></div>
+        <div style="text-align:center;color:#6b7280;font-size:13px;" id="qrHint">Scan to view patient summary</div>
+        <div class="modal-actions" style="justify-content:center;">
+          <button class="btn-secondary" onclick="copyQrLink()">Copy Link</button>
+          <button class="btn-primary" onclick="openQrLink()">Open Link</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
+  <script src="js/storage.js"></script>
+  <script src="js/seed.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/mappings.js"></script>
+  <script src="js/patient-store.js"></script>
+  <script src="js/nutrition-engine-v4.js"></script>
+  <script src="js/manufacturing.js"></script>
+  <script src="js/ai-report-service.js"></script>
 
-function render(){
-  const table = document.getElementById('patientTable');
-  table.innerHTML = '';
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
-  let doctorId = me.id;
-  if(me.role === 'ASSISTANT'){
-    doctorId = mappingService.getDoctorForAssistant(me.id);
-  }
+  <script>
+    console.log("ONVILOX_STABLE_V4_FIXED_LOADED");
+    // INTAKE CALCULATOR LOGIC
+    auth.requireRole(['DOCTOR', 'ASSISTANT']);
+    const me = auth.getCurrentUser();
 
-  const patients = getPatients().filter(p => p.assignedDoctorId === doctorId);
-  patients.sort((a,b)=> (b.createdAt||'').localeCompare(a.createdAt||''));
+    // Top-right role pill
+    const rolePill = document.getElementById('rolePill');
+    if (rolePill) rolePill.textContent = me.role;
 
-  // KPI counts (based on all patients for this doctor)
-  const total = patients.length;
-  const pending = patients.filter(p => (p.status || 'CREATED') === 'CREATED').length;
-  const progress = patients.filter(p => ['APPROVED','PROCESSING','DISPATCHED'].includes(p.status || '')).length;
-  const ready = patients.filter(p => ['READY','DELIVERED'].includes(p.status || '')).length;
+    // In-memory tracker for AI background tasks
+    const __aiTriggers = {};
 
-  const setKpi = (id, val) => {
-    const el = document.getElementById(id);
-    if(el) el.textContent = String(val);
-  };
-  setKpi('kpiTotal', total);
-  setKpi('kpiPending', pending);
-  setKpi('kpiProgress', progress);
-  setKpi('kpiReady', ready);
+    // Filters
+    let searchQuery = '';
+    let statusQuery = 'ALL';
 
-  // Apply filters for table view
-  const filtered = patients.filter(p => {
-    const status = p.status || 'CREATED';
-    if(statusQuery !== 'ALL' && status !== statusQuery) return false;
+    const searchBox = document.getElementById('searchBox');
+    const statusFilter = document.getElementById('statusFilter');
 
-    if(searchQuery){
-      const name = (p.name || '').toLowerCase();
-      const uhic = (p.uhic || '').toLowerCase();
-      if(!name.includes(searchQuery) && !uhic.includes(searchQuery)) return false;
-    }
-    return true;
-  });
-
-  filtered.forEach(p => {
-    const status = p.status || 'CREATED';
-    const statusClass = status.toLowerCase();
-
-
-    // Compute a quick nutrition preview (engine output). Full plan/overrides live in Patient-Profile-STABLE-V3.html; page.
-    let preview = null;
-    try {
-      const patientForCalc = Object.assign({}, p, {
-        weight: parseFloat(p.weight),
-        height: parseFloat(p.height),
-        albumin: parseFloat(p.albumin),
-        weightLossPercent: parseFloat(p.weightLossPercent || 0),
-        giIssues: !!p.giIssues
-      });
-      preview = generateNutritionPlan(patientForCalc);
-    } catch(e){ /* ignore */ }
-
-    const latestPlan = getLatestPlanForPatient(p.id);
-    const hasAI = !!(latestPlan && latestPlan.claudeInsights);
-    const aiStatus = hasAI ? '<span class="status ready" style="background:#dcfce7; color:#166534; font-size:10px; margin-left:5px;">AI READY</span>' : '<span class="status processing" style="background:#fef9c3; color:#854d0e; font-size:10px; margin-left:5px; animation: pulse 1.5s infinite;">ANALYZING...</span>';
-
-    const approveBtn = (me.role === 'DOCTOR' && status === 'CREATED')
-      ? `<a href="Patient-Profile-STABLE-V3.html?id=${p.id}&review=1" class="btn-warning" style="padding: 6px 10px; border-radius: 6px; display:flex; align-items:center; justify-content:center; ${!hasAI ? 'opacity:0.5; pointer-events:none;' : ''}" title="${hasAI ? 'Review & Approve' : 'Analyzing clinical data...'}" onclick="event.stopPropagation();"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M10.97 4.97a.75.75 0 0 1 1.07 1.05l-3.99 4.99a.75.75 0 0 1-1.08.02L4.324 8.384a.75.75 0 1 1 1.06-1.06l2.094 2.093 3.473-4.425a.267.267 0 0 1 .02-.022z"/></svg></a>`
-      : '';
-
-    // Auto-trigger AI if missing
-    if (!hasAI && !__aiTriggers[p.id]) {
-      __aiTriggers[p.id] = true;
-      aiReportService.generateInsights(p, latestPlan || generateNutritionPlan(p)).then(data => {
-        const planToUpdate = latestPlan || createOrUpdatePlan(p, generateNutritionPlan(p), {}, 'Auto-trigger from dashboard');
-        planToUpdate.claudeInsights = data;
-        updatePlan(planToUpdate);
-        render(); // Re-render to show "READY"
-      }).catch(err => {
-        console.error("Dashboard AI Trigger Failed:", err);
-        delete __aiTriggers[p.id];
+    if (searchBox) {
+      searchBox.addEventListener('input', (e) => {
+        searchQuery = (e.target.value || '').trim().toLowerCase();
+        render();
       });
     }
 
-    const mainRow = document.createElement('tr');
-    mainRow.className = 'patient-row';
-    mainRow.style.cursor = 'pointer';
-    mainRow.onclick = () => toggleDetails(p.id);
+    if (statusFilter) {
+      statusFilter.addEventListener('change', (e) => {
+        statusQuery = e.target.value || 'ALL';
+        render();
+      });
+    }
 
-    mainRow.innerHTML = `
+
+    if (me.role === 'ASSISTANT') {
+      document.getElementById('title').innerText = "Doctor's Patients";
+    }
+
+
+    function render() {
+      const table = document.getElementById('patientTable');
+      table.innerHTML = '';
+
+      let doctorId = me.id;
+      if (me.role === 'ASSISTANT') {
+        doctorId = mappingService.getDoctorForAssistant(me.id);
+      }
+
+      const patients = getPatients().filter(p => p.assignedDoctorId === doctorId);
+      patients.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+
+      // KPI counts (based on all patients for this doctor)
+      const total = patients.length;
+      const pending = patients.filter(p => (p.status || 'CREATED') === 'CREATED').length;
+      const progress = patients.filter(p => ['APPROVED', 'PROCESSING', 'DISPATCHED'].includes(p.status || '')).length;
+      const ready = patients.filter(p => ['READY', 'DELIVERED'].includes(p.status || '')).length;
+
+      const setKpi = (id, val) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = String(val);
+      };
+      setKpi('kpiTotal', total);
+      setKpi('kpiPending', pending);
+      setKpi('kpiProgress', progress);
+      setKpi('kpiReady', ready);
+
+      // Apply filters for table view
+      const filtered = patients.filter(p => {
+        const status = p.status || 'CREATED';
+        if (statusQuery !== 'ALL' && status !== statusQuery) return false;
+
+        if (searchQuery) {
+          const name = (p.name || '').toLowerCase();
+          const uhic = (p.uhic || '').toLowerCase();
+          if (!name.includes(searchQuery) && !uhic.includes(searchQuery)) return false;
+        }
+        return true;
+      });
+
+      filtered.forEach(p => {
+        const status = p.status || 'CREATED';
+        const statusClass = status.toLowerCase();
+
+
+        // Compute a quick nutrition preview (engine output). Full plan/overrides live in Patient-Profile-STABLE-V3.html; page.
+        let preview = null;
+        try {
+          const patientForCalc = Object.assign({}, p, {
+            weight: parseFloat(p.weight),
+            height: parseFloat(p.height),
+            albumin: parseFloat(p.albumin),
+            weightLossPercent: parseFloat(p.weightLossPercent || 0),
+            giIssues: !!p.giIssues
+          });
+          preview = generateNutritionPlan(patientForCalc);
+        } catch (e) { /* ignore */ }
+
+        const latestPlan = getLatestPlanForPatient(p.id);
+        const hasAI = !!(latestPlan && latestPlan.claudeInsights);
+        const aiStatus = hasAI ? '<span class="status ready" style="background:#dcfce7; color:#166534; font-size:10px; margin-left:5px;">AI READY</span>' : '<span class="status processing" style="background:#fef9c3; color:#854d0e; font-size:10px; margin-left:5px; animation: pulse 1.5s infinite;">ANALYZING...</span>';
+
+        const approveBtn = (me.role === 'DOCTOR' && status === 'CREATED')
+          ? `<a href="Patient-Profile-STABLE-V3.html?id=${p.id}&review=1" class="btn-warning" style="padding: 6px 10px; border-radius: 6px; display:flex; align-items:center; justify-content:center; ${!hasAI ? 'opacity:0.5; pointer-events:none;' : ''}" title="${hasAI ? 'Review & Approve' : 'Analyzing clinical data...'}" onclick="event.stopPropagation();"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M10.97 4.97a.75.75 0 0 1 1.07 1.05l-3.99 4.99a.75.75 0 0 1-1.08.02L4.324 8.384a.75.75 0 1 1 1.06-1.06l2.094 2.093 3.473-4.425a.267.267 0 0 1 .02-.022z"/></svg></a>`
+          : '';
+
+        // Auto-trigger AI if missing
+        if (!hasAI && !__aiTriggers[p.id]) {
+          __aiTriggers[p.id] = true;
+          aiReportService.generateInsights(p, latestPlan || generateNutritionPlan(p)).then(data => {
+            const planToUpdate = latestPlan || createOrUpdatePlan(p, generateNutritionPlan(p), {}, 'Auto-trigger from dashboard');
+            planToUpdate.claudeInsights = data;
+            updatePlan(planToUpdate);
+            render(); // Re-render to show "READY"
+          }).catch(err => {
+            console.error("Dashboard AI Trigger Failed:", err);
+            delete __aiTriggers[p.id];
+          });
+        }
+
+        const mainRow = document.createElement('tr');
+        mainRow.className = 'patient-row';
+        mainRow.style.cursor = 'pointer';
+        mainRow.onclick = () => toggleDetails(p.id);
+
+        mainRow.innerHTML = `
       <td><button class="linklike" onclick="showQr(\'${p.id}\');event.stopPropagation();" title="Show QR for patient">${p.name}</button></td>
       <td>${p.uhic}</td>
       <td>${p.cancer}</td>
@@ -264,16 +275,19 @@ function render(){
           <button class="btn-secondary" onclick="openPdf('${p.id}')" style="padding: 6px 10px; border-radius: 6px; display:flex; align-items:center; justify-content:center; ${!hasAI ? 'opacity:0.5; pointer-events:none;' : ''}" title="${hasAI ? 'Download PDF' : 'Analyzing clinical data...'}">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/><path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/></svg>
           </button>
+          <button class="btn-secondary" onclick="confirmDelete('${p.id}', '${p.name.replace(/'/g, "\\'")}')" style="padding: 6px 10px; border-radius: 6px; display:flex; align-items:center; justify-content:center; color:#dc2626;" title="Delete Patient Record">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg>
+          </button>
           ${approveBtn}
         </div>
       </td>
     `;
-    table.appendChild(mainRow);
+        table.appendChild(mainRow);
 
-    const detailsRow = document.createElement('tr');
-    detailsRow.id = `details_${p.id}`;
-    detailsRow.style.display = 'none';
-    detailsRow.innerHTML = `
+        const detailsRow = document.createElement('tr');
+        detailsRow.id = `details_${p.id}`;
+        detailsRow.style.display = 'none';
+        detailsRow.innerHTML = `
       <td colspan="6">
         <div class="card" style="margin:10px 0 0 0; box-shadow:none; border:1px solid #e5e7eb;">
           <div style="display:flex; gap:24px; flex-wrap:wrap;">
@@ -303,93 +317,102 @@ function render(){
         </div>
       </td>
     `;
-    table.appendChild(detailsRow);
-  });
-}
+        table.appendChild(detailsRow);
+      });
+    }
 
-function toggleDetails(id){
-  const el = document.getElementById('details_' + id);
-  if(!el) return;
-  el.style.display = (el.style.display === 'none' ? 'table-row' : 'none');
-}
-
-
-render();
+    function toggleDetails(id) {
+      const el = document.getElementById('details_' + id);
+      if (!el) return;
+      el.style.display = (el.style.display === 'none' ? 'table-row' : 'none');
+    }
 
 
-let __qrCurrentLink = '';
-
-function getBaseUrlForQr(){
-  try{
-    const cfg = localStorage.getItem('onvilox_public_base_url');
-    if(cfg && /^https?:\/\//i.test(cfg)) return cfg.replace(/\/$/,'');
-  }catch(e){}
-  
-  // Always use an absolute URL so phones can scan
-  let base = window.location.origin;
-  
-  if(base === 'null' || base === 'file://'){
-    return 'http://192.168.1.8:8000'; // Fallback
-  }
-  
-  const path = window.location.pathname;
-  const dir = path.substring(0, path.lastIndexOf('/'));
-  return base + dir;
-}
-
-function buildQrLink(patientId){
-  const base = getBaseUrlForQr();
-  return `${base}/patient-qr.html?id=${encodeURIComponent(patientId)}`;
-}
+    render();
 
 
-function showQr(patientId){
-  const p = getPatientById(patientId);
-  const title = p ? `QR for ${p.name}` : 'Patient QR';
-  document.getElementById('qrTitle').innerText = title;
+    let __qrCurrentLink = '';
 
-  const link = buildQrLink(patientId);
-  __qrCurrentLink = link;
+    function getBaseUrlForQr() {
+      try {
+        const cfg = localStorage.getItem('onvilox_public_base_url');
+        if (cfg && /^https?:\/\//i.test(cfg)) return cfg.replace(/\/$/, '');
+      } catch (e) { }
 
-  const box = document.getElementById('qrBox');
-  box.innerHTML = '';
-  new QRCode(box, { text: link, width: 220, height: 220 });
+      // Always use an absolute URL so phones can scan
+      let base = window.location.origin;
 
-  const isFile = (window.location.origin === 'null');
-  if(isFile && !localStorage.getItem('onvilox_public_base_url')){
-    document.getElementById('qrHint').innerText = 'Warning: Local URLs cannot be scanned by phones. Ensure you are running this on a reachable IP address (e.g. your WiFi IP) and set localStorage key "onvilox_public_base_url".';
-  }else{
-    document.getElementById('qrHint').innerText = 'Scan to view patient report';
-  }
-  document.getElementById('qrOverlay').style.display = 'flex';
-}
+      if (base === 'null' || base === 'file://') {
+        return 'http://192.168.1.8:8000'; // Fallback
+      }
 
-function closeQr(){
-  const ov = document.getElementById('qrOverlay');
-  if(ov) ov.style.display = 'none';
-}
+      const path = window.location.pathname;
+      const dir = path.substring(0, path.lastIndexOf('/'));
+      return base + dir;
+    }
 
-async function copyQrLink(){
-  if(!__qrCurrentLink) return;
-  try{
-    await navigator.clipboard.writeText(__qrCurrentLink);
-    document.getElementById('qrHint').innerText = 'Link copied ✅';
-  }catch(e){
-    prompt('Copy this link:', __qrCurrentLink);
-  }
-}
+    function buildQrLink(patientId) {
+      const base = getBaseUrlForQr();
+      return `${base}/patient-qr.html?id=${encodeURIComponent(patientId)}`;
+    }
 
-function openQrLink(){
-  if(!__qrCurrentLink) return;
-  window.open(__qrCurrentLink, '_blank', 'noopener');
-}
 
-function openPdf(patientId){
-  const url = `Patient-Profile-STABLE-V3.html?id=${encodeURIComponent(patientId)}&print=1&v=cache_bust_${Date.now()}`;
-  window.open(url, '_blank', 'noopener');
-}
-</script>
+    function showQr(patientId) {
+      const p = getPatientById(patientId);
+      const title = p ? `QR for ${p.name}` : 'Patient QR';
+      document.getElementById('qrTitle').innerText = title;
 
-<script src="js/theme.js"></script>
+      const link = buildQrLink(patientId);
+      __qrCurrentLink = link;
+
+      const box = document.getElementById('qrBox');
+      box.innerHTML = '';
+      new QRCode(box, { text: link, width: 220, height: 220 });
+
+      const isFile = (window.location.origin === 'null');
+      if (isFile && !localStorage.getItem('onvilox_public_base_url')) {
+        document.getElementById('qrHint').innerText = 'Warning: Local URLs cannot be scanned by phones. Ensure you are running this on a reachable IP address (e.g. your WiFi IP) and set localStorage key "onvilox_public_base_url".';
+      } else {
+        document.getElementById('qrHint').innerText = 'Scan to view patient report';
+      }
+      document.getElementById('qrOverlay').style.display = 'flex';
+    }
+
+    function closeQr() {
+      const ov = document.getElementById('qrOverlay');
+      if (ov) ov.style.display = 'none';
+    }
+
+    async function copyQrLink() {
+      if (!__qrCurrentLink) return;
+      try {
+        await navigator.clipboard.writeText(__qrCurrentLink);
+        document.getElementById('qrHint').innerText = 'Link copied ✅';
+      } catch (e) {
+        prompt('Copy this link:', __qrCurrentLink);
+      }
+    }
+
+    function openQrLink() {
+      if (!__qrCurrentLink) return;
+      window.open(__qrCurrentLink, '_blank', 'noopener');
+    }
+
+    function openPdf(patientId) {
+      const url = `Patient-Profile-STABLE-V3.html?id=${encodeURIComponent(patientId)}&print=1&v=cache_bust_${Date.now()}`;
+      window.open(url, '_blank', 'noopener');
+    }
+
+    function confirmDelete(id, name) {
+      if (confirm(`CRITICAL ACTION: Are you sure you want to permanently delete the record for "${name}"? This will also remove all their nutrition plans and manufacturing history.`)) {
+        if (deletePatient(id)) {
+           render(); // Refresh the list
+        }
+      }
+    }
+  </script>
+
+  <script src="js/theme.js"></script>
 </body>
+
 </html>
