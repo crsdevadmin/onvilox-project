@@ -139,7 +139,7 @@ app.post('/api/chat', async (req, res) => {
     Format: { "reply": "Short answer (<3 sentences)", "extractedData": { ...found values... } }`;
 
     const msg = await anthropic.messages.create({
-      model: "claude-haiku-4-5-20251001",
+      model: "claude-3-haiku-20240307",
       max_tokens: 1000,
       system: systemPrompt,
       messages: [{ role: "user", content: message }],
@@ -177,7 +177,7 @@ app.post('/api/claude-report', async (req, res) => {
     JSON ONLY: { "rationale":[], "instructions":[], "clinicalAlerts":[{"type":str,"level":str,"message":str}], "correctedPrescription":{"isOverpowered":bool, "dailyCalories":num, "dailyProtein":num}, "logicRefinements":[] }`;
 
     const msg = await anthropic.messages.create({
-      model: "claude-sonnet-4-6",
+      model: "claude-3-5-sonnet-20240620",
       max_tokens: 3000,
       system: system,
       messages: [{
