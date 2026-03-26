@@ -134,31 +134,9 @@ app.post('/api/chat', async (req, res) => {
   if (!message) return res.status(400).json({ error: 'No message provided.' });
 
   try {
-    const contextStr = contextObj ? JSON.stringify(contextObj) : "No context.";
-    const systemPrompt = `You are a clinical oncology nutrition assistant (Onvilox AI Co-pilot) running on Claude 4.6.
-    Use ESMO/ASCO guidelines.
-    
-    EXTRACTION ROLE:
-    If the user's message contains clinical values (vitals, labs, cancer specs, anthropometry), extract them into a precise JSON object alongside your reply.
-    
-    SCHEMA FOR extractedData:
-    {
-      "name": "string", "age": number, "sex": "Male/Female", "weight": number, "height": number, "usualWeight": number,
-      "uhic": "string", "cancer": "string", "regimen": "string", "cancerStage": "string", "tumorBurden": "string",
-      "reducedFoodIntake": number, "albumin": number, "crp": number, "creatinine": number, "hemoglobin": number,
-      "bloodSugar": number, "hba1c": number, "alt": number, "ast": number, "bilirubin": number, "tsh": number,
-      "sodium": number, "potassium": number, "urea": number, "muac": number, "prealbumin": number,
-      "vitD": number, "vitB12": number, "folate": number, "zinc": number, "magnesium": number,
-      "sarcopeniaStatus": "Yes/No", "activityLevel": "string", "ecogStatus": number, "leanBodyMass": number,
-      "smi": number, "handGrip": number, "fatPercent": number, "feedingMethod": "string", "giIssues": boolean,
-      "comorbidities": [], "sideEffects": [], "existingSupplements": [], "allergies": [], "metastasisSites": [], "genomicMarkers": []
-    }
-
-    Response format (Strict JSON):
-    {
-      "reply": "Conversational reply under 4 sentences.",
-      "extractedData": { ... entire schema above with found values, null otherwise ... }
-    }`;
+    const systemPrompt = `Onvilox AI Copilot (PhD/RD). Goal: Extract clinical data.
+    Schema: { "name":str, "age":num, "sex":"M/F", "weight":num, "height":num, "usualWeight":num, "reducedFoodIntake":num, "albumin":num, "crp":num, "cancer":str, "regimen":str, "creatinine":num, "alt":num, "ast":num, "bilirubin":num, "bloodSugar":num, "sodium":num, "potassium":num, "urea":num, "muac":num, "prealbumin":num, "vitD":num, "vitB12":num, "folate":num, "zinc":num, "magnesium":num, "sarcopeniaStatus":str, "activityLevel":str, "ecogStatus":num, "leanBodyMass":num, "smi":num, "handGrip":num, "fatPercent":num, "feedingMethod":str, "giIssues":bool, "comorbidities":[], "sideEffects":[], "existingSupplements":[], "allergies":[], "metastasisSites":[], "genomicMarkers":[] }
+    Format: { "reply": "Short answer (<3 sentences)", "extractedData": { ...found values... } }`;
 
     const msg = await anthropic.messages.create({
       model: "claude-haiku-4-5-20251001",
@@ -171,19 +149,14 @@ app.post('/api/chat', async (req, res) => {
     let data;
     try {
       const jsonMatch = rawText.match(/{[\s\S]*}/);
-      if (jsonMatch) {
-         data = JSON.parse(jsonMatch[0]);
-      } else {
-         data = { reply: rawText, extractedData: null };
-      }
+      data = jsonMatch ? JSON.parse(jsonMatch[0]) : { reply: rawText, extractedData: null };
     } catch (e) {
       data = { reply: rawText, extractedData: null };
     }
-    
     res.json(data);
   } catch (error) {
     console.error("Claude Chat Error:", error);
-    res.status(500).json({ error: 'Failed to generate AI response.' });
+    res.status(500).json({ error: 'Failed' });
   }
 });
 
@@ -199,100 +172,37 @@ app.post('/api/claude-report', async (req, res) => {
   if (!patient || !plan) return res.status(400).json({ error: 'Context required.' });
 
   try {
-    const ESPEN_ONCOLOGY_2024 = `
-    1. INTAKE THRESHOLD: If oral intake is PERSISTENTLY < 60% of requirements, Enteral Nutrition (EN) via tube feeding MUST be assessed.
-    2. PROTEIN TARGET: Target 1.8g/kg for patients with Sarcopenia, Cachexia, or active Platinum-based/FOLFOX/VRD chemo. 
-    3. THE GAP RULE: If the engine leaves a >20% calorie/protein gap by assuming the patient will eat the rest orally (especially when intake < 65%), the AI must increase the supplement dose to Full Replacement (100% of target).
-    4. SKEPTICISM: Verbal reports of '55% intake' are unvalidated. Treat <70% oral intake as 'High Risk' in reports.
-    `;
-
-    const systemInstruction = `You are the Final Sign-off Oncology Clinician (PhD, RD) for Onvilox.
-    Your mission is to AUDIT the deterministic engine and CORRECT it where it drifts from ESPEN 2024 / ASCO guidelines.
-    
-    ${ESPEN_ONCOLOGY_2024}
-
-    AUDIT PROTOCOL:
-    - Compare RAW_PATIENT_DATA vs ENGINE_CALCULATIONS.
-    - If the engine under-prescribes, AUTHORIZED to 'Overpower'.
-    - CONCISENESS: Limit 'rationale' to top 5 points. Limit 'instructions' to top 10 actionable steps.
-    - MANDATORY TABLES: You MUST always provide 'drugInteractions', 'micronutrientOrders', and 'monitoringSchedule'. These are not optional. If none apply, return an empty array [].
-    - If you overpower, you must include a "CLINICAL OVERPOWER" alert.
-    
-    CRITICAL SAFETY (NON-NEGOTIABLES):
-    1. RENAL SAFETY: If CR > 1.3, absolute CAP at 0.8g/kg.
-    2. ANTIOXIDANT SAFETY: Absolute exclusion of ALA/Vit C > 500mg for Bortezomib.
-    3. ANTIOXIDANT SAFETY: CAP Vit C at 500mg for Platinum-based until cleared.
-    
-    Return ONLY valid JSON. START with '{' and END with '}'.`;
+    const rules = "1. Oral <60% = EN. 2. Protein 1.8g/kg if Sarcopenia. 3. Gap >20% = 100% replace. 4. Renal: CR>1.3 = max 0.8g/kg. 5. Bortezomib: No ALA/VitC. 6. Platinum: VitC <500mg.";
+    const system = `Onvilox PhD RD Auditing Engine. Rules: ${rules}. Max 5 rationale, 10 steps. Tables: drugInteractions, micronutrientOrders, monitoringSchedule.
+    JSON ONLY: { "rationale":[], "instructions":[], "clinicalAlerts":[{"type":str,"level":str,"message":str}], "correctedPrescription":{"isOverpowered":bool, "dailyCalories":num, "dailyProtein":num}, "logicRefinements":[] }`;
 
     const msg = await anthropic.messages.create({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 4000,
-      system: systemInstruction,
+      model: "claude-sonnet-4-6",
+      max_tokens: 3000,
+      system: system,
       messages: [{
         role: "user",
-        content: `AUDIT TASK:
-        Review the Patient Data and Engine Draft. Identify gaps in Calorie/Protein delivery or Escalation Timing.
-        
-        PATIENT DATA: ${JSON.stringify(patient, null, 2)}
-        ENGINE CALCULATIONS: ${JSON.stringify(plan, null, 2)}
-        
-        REQUIRED JSON STRUCTURE:
-        {
-          "rationale": ["Detailed clinical audit - must cite ESPEN 2024 if overriding engine"],
-          "instructions": ["Step-by-step patient guidance"],
-          "clinicalAlerts": [
-            {"type": "Nutrition/Engine-Audit/Drug/GI", "level": "HIGH/MODERATE/LOW", "message": "Clear specific action guidance"}
-          ],
-          "correctedPrescription": {
-             "isOverpowered": boolean,
-             "dailyCalories": number,
-             "dailyProtein": number,
-             "reasoning": "Specify why the engine default was corrected"
-          },
-          "logicRefinements": [
-             "Specific instruction for developers to update the engine code based on your clinical audit findings"
-          ],
-          "drugInteractions": [...],
-          "micronutrientOrders": [...],
-          "monitoringSchedule": [...]
-        }`
-      }],
+        content: `AUDIT: Patient: ${JSON.stringify(patient)} Plan: ${JSON.stringify(plan)}`
+      }]
     });
 
     const rawText = msg.content[0].text;
     let data;
     try {
-      // Find the JSON block
       const jsonMatch = rawText.match(/{[\s\S]*}/);
-      if (!jsonMatch) throw new Error("No JSON found");
-      
+      if (!jsonMatch) throw new Error("No JSON");
       let jsonStr = jsonMatch[0];
-      
-      // If the JSON is slightly truncated (e.g. missing trailing braces), try a basic repair
-      const openBraces = (jsonStr.match(/{/g) || []).length;
-      const closeBraces = (jsonStr.match(/}/g) || []).length;
-      if (openBraces > closeBraces) {
-         jsonStr += "}".repeat(openBraces - closeBraces);
-      }
-      
+      const open = (jsonStr.match(/{/g) || []).length;
+      const close = (jsonStr.match(/}/g) || []).length;
+      if (open > close) jsonStr += "}".repeat(open - close);
       data = JSON.parse(jsonStr);
     } catch (e) {
-      console.error("REPORT PARSE FAILED. Raw Response:", rawText);
-      // Fallback: If it's a total failure, send the raw text as a rationale
-      data = { 
-        rationale: ["AI error: Report was too long for the current token limit. Technical repair attempted."],
-        instructions: ["Please re-generate the report or check server logs."],
-        clinicalAlerts: [{ type: "SYSTEM", level: "HIGH", message: "AI response truncated" }]
-      };
+      data = { rationale: ["Analysis too complex/long for current token limit."], instructions: ["Check logs."], clinicalAlerts: [] };
     }
     res.json(data);
   } catch (error) {
     console.error("Claude Report Error:", error);
-    res.status(500).json({ 
-      error: `Claude Error: ${error.message}`, 
-      detail: error.stack 
-    });
+    res.status(500).json({ error: error.message });
   }
 });
 
