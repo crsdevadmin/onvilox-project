@@ -427,7 +427,7 @@ function generateNutritionPlan(patient) {
 
   // Deficit Rationale
   if (!isFullReplacement && reducedFoodIntake > 0) {
-    rationale.push(`<b>Supplement Strategy:</b> Patient is maintaining ${actualIntake}% oral intake (Est. ${estimatedDietaryProtein}g dietary protein). Formulation is a <b>${reducedFoodIntake}% supplement</b> (${dailyProtein}g). <b>Total Delivery: ${totalProteinDelivery}g/day</b> (Target: ${baseDailyProtein}g).`);
+    rationale.push(`<b>Supplement Strategy:</b> Patient is maintaining ${actualIntake}% oral intake (Est. ${estimatedDietaryProtein}g dietary protein). Prescription bridges the shortfall with <b>${prescribedProtein}g protein/day</b>. <b>Total Delivery: ${totalProteinDelivery}g/day</b> (Target: ${baseDailyProtein}g).`);
   } else {
     const intakeNote = isFullReplacement ? `(Intake: ${actualIntake}% ≤ 50%)` : "";
     rationale.push(`<b>Full Replacement ${intakeNote}:</b> Therapeutic logic requires 100% target coverage (${baseDailyCalories} kcal) via formulation to ensure stabilization.`);
