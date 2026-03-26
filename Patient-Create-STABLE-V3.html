@@ -1050,6 +1050,32 @@ function applyExtractionData(data) {
   setVal('activityLevel', data.activityLevel);
   setVal('feedingMethod', data.feedingMethod);
 
+  // FUZZY MAPPING & RED FLAG INGESTION
+  let extendedNotes = data.notes || "";
+  
+  // 1. Capture non-standard AI keys (like Red Flags or extra clinical data)
+  Object.keys(data).forEach(key => {
+    if (key.includes('RED_FLAGS') || key.includes('Risk') || key.includes('Additional')) {
+        const val = data[key];
+        const content = typeof val === 'object' ? JSON.stringify(val, null, 2) : String(val);
+        extendedNotes += `\n\n[CLINICAL ALERT]: ${content}`;
+    }
+    // Fuzzy match for common AI variations
+    if (key === 'dietaryPreferences' && !data.culturalPreferences) setVal('culturalPreferences', data[key]);
+    if (key === 'bowelPattern' && !data.giIssues) {
+        setVal('giIssues', 'true');
+        extendedNotes += `\nBowel Pattern: ${data[key]}`;
+    }
+  });
+
+  if (extendedNotes) {
+      const notesEl = document.getElementById('notes');
+      if (notesEl) {
+          notesEl.value = (notesEl.value + "\n" + extendedNotes).trim();
+          highlight('notes');
+      }
+  }
+
   const addArrayTags = (arr, containerId) => {
     if (Array.isArray(arr)) arr.forEach(item => { if (typeof addTag === 'function') addTag(item, containerId); });
   };
