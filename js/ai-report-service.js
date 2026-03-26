@@ -60,7 +60,7 @@ const aiReportService = {
      * Calls the Claude AI API to generate clinical insights.
      */
     generateInsights: async function(patient, plan) {
-        const apiBase = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : 'http://localhost:3000';
+        const apiBase = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : '';
         const payload = this.preparePayload(patient, plan);
 
         try {
