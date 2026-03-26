@@ -1,6 +1,6 @@
 /**
  * Onvilox AI Report Service
- * Shared logic for Claude 4.5 Sonnet Clinical Reporting
+ * Shared logic for Claude 3.5 Sonnet Clinical Reporting
  */
 
 const aiReportService = {
