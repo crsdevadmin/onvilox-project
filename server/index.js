@@ -105,8 +105,8 @@ app.post('/api/extract', async (req, res) => {
 
   try {
     const msg = await anthropic.messages.create({
-      model: "claude-sonnet-4-6",
-      max_tokens: 1000,
+      model: "claude-3-5-sonnet-20241022",
+      max_tokens: 2000,
       system: extractionSystemPrompt,
       messages: [{ role: "user", content: `Extract from:\n\n${pdfText}` }],
     });
@@ -179,24 +179,51 @@ app.post('/api/chat', async (req, res) => {
           throw new Error("No JSON braces found");
       }
       
-      // Post-Process: Handle cases where AI didn't nest extractedData correctly
-      if (!data.reply && (data.name || data.weight || data.cancer)) {
-          // AI returned a flat object instead of {reply, extractedData}
-          data = { 
-            reply: "Clinical data extracted successfully.", 
-            extractedData: data 
+      // Structural Normalization: Ensure { reply, extractedData } exists
+      const commonKeys = ['name', 'age', 'weight', 'height', 'cancer', 'regimen', 'albumin', 'crp', 'notes'];
+      
+      if (data.extractedData && typeof data.extractedData === 'object') {
+          // Already have extractedData, but make sure it's not JUST a reply
+          data.reply = data.reply || data.extractedData.reply || "Clinical extraction complete.";
+      } else {
+          // Flattened response or mixed response
+          const reply = data.reply || "Clinical extraction complete.";
+          const extracted = { ...data };
+          delete extracted.reply;
+          
+          // Check if it actually contains clinical keys
+          const hasKeys = commonKeys.some(k => extracted[k] !== undefined);
+          
+          data = {
+              reply: reply,
+              extractedData: hasKeys ? extracted : null
           };
       }
     } catch (e) {
       console.warn("AI Parser Error:", e.message);
-      // Fallback: Check for any JSON-like object anywhere in the text
+      // Fallback: Greedy match outermost braces
       try {
-          const greedyMatch = rawText.match(/\{[\s\S]*\}/)?.[0];
-          data = JSON.parse(greedyMatch || "{}");
+          const match = rawText.match(/\{[\s\S]*\}/)?.[0];
+          if (match) {
+              const parsed = JSON.parse(match);
+              const { reply, ...rest } = (parsed.extractedData || parsed);
+              data = { 
+                  reply: parsed.reply || reply || "Extraction fallback successful.", 
+                  extractedData: Object.keys(rest).length > 0 ? rest : null
+              };
+          } else {
+              throw new Error("No braces in fallback");
+          }
       } catch (e2) {
           data = { reply: rawText, extractedData: null };
       }
     }
+    
+    // Final check for empty objects
+    if (data.extractedData && Object.keys(data.extractedData).length === 0) {
+        data.extractedData = null;
+    }
+
     res.json(data);
   } catch (error) {
     console.error("Claude Chat Error:", error);
@@ -225,7 +252,7 @@ app.post('/api/claude-report', async (req, res) => {
     JSON ONLY: { "validationScore": num(0-10), "rationale":[], "instructions":[], "clinicalAlerts":[{"type":str,"level":str,"message":str}], "correctedPrescription":{"isOverpowered":bool, "dailyCalories":num, "dailyProtein":num, "reasoning":str}, "logicRefinements":[], "drugInteractions":[], "micronutrientOrders":[], "monitoringSchedule":[] }`;
 
     const msg = await anthropic.messages.create({
-      model: "claude-sonnet-4-6",
+      model: "claude-3-5-sonnet-20241022",
       max_tokens: 3000,
       system: system,
       messages: [{
