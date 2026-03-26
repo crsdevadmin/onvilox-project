@@ -1179,6 +1179,10 @@
                 </div>
                 <div style="display:flex; align-items:center; gap:20px;">
                   <div id="outcomePct" style="font-size:32px; font-weight:800; color:#0ea5e9; min-width:80px;">0%</div>
+                  <div style="border-left:2px solid #e0f2fe; padding-left:15px;">
+                      <div id="aiValidationScore" style="font-size:24px; font-weight:900; color:#6d28d9; line-height:1;">--</div>
+                      <div style="font-size:9px; font-weight:800; color:#6d28d9; text-transform:uppercase; margin-top:2px;">Clinical Validation</div>
+                  </div>
                   <div style="flex:1;">
                     <div style="font-weight:600; color:#1e293b; font-size:12.5px;" id="outcomeTitle">Standard Forecast
                     </div>
@@ -3880,6 +3884,13 @@
                 updatePlan(cp);
                 console.log("Claude insights persisted to plan via updatePlan:", cp.id);
               }
+            }
+
+            // 0. Validation Score
+            const vsEl = document.getElementById('aiValidationScore');
+            if (vsEl && data.validationScore !== undefined) {
+                vsEl.innerText = `${data.validationScore}/10`;
+                vsEl.style.color = data.validationScore >= 9 ? '#16a34a' : (data.validationScore >= 7 ? '#d97706' : '#dc2626');
             }
 
             // 1. Rationale (Prepend with cleanup)

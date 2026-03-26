@@ -172,12 +172,13 @@ app.post('/api/claude-report', async (req, res) => {
   if (!patient || !plan) return res.status(400).json({ error: 'Context required.' });
 
   try {
-    const rules = "1. Oral <60% = EN. 2. Protein 1.8g/kg if Sarcopenia/Cachexia. 3. Gap >20% = Flag as Internal Inconsistency. 4. Renal: CR>1.3 = max 0.8g/kg. 5. Bortezomib/AC: No ALA/High VitC. 6. Immunotherapy: Monitor Thyroid/Gi; TSH is mandatory.";
-    const system = `Onvilox PhD RD Auditing Engine V5. Rules: ${rules}. Max 5 rationale, 10 steps. 
+    const rules = "1. Oral <60% = EN. 2. Protein 1.8g/kg if Sarcopenia/Cachexia. 3. Gap >5% = MANDATORY CORRECTED PRESCRIPTION (isOverpowered:true). 4. Renal: CR>1.3 = max 0.8g/kg. 5. Bortezomib/AC: No ALA/High VitC. 6. Immunotherapy: Monitor Thyroid/Gi; TSH is mandatory.";
+    const system = `Onvilox PhD RD Auditing Engine V5-VALIDATOR. Rules: ${rules}. Max 5 rationale, 10 steps. 
+    ROLE: You are a skeptical Clinical Validator. Your primary job is to find inconsistencies in the provided plan (especially Protein Gaps or safety clashes) and FIX THEM.
     MANDATORY Analysis: Check Pembrolizumab irAEs, Protein Target vs Delivery consistency, and Vitamin C/AC clashes. 
+    INSTRUCTION: If Total Delivery Protein != Target Protein (within 5%), YOU MUST set "isOverpowered": true and provide the corrected values in "correctedPrescription".
     MANDATORY Tables: drugInteractions, micronutrientOrders, monitoringSchedule.
-    Always provide at least 1-2 standard rows per table for clinical completeness.
-    JSON ONLY: { "rationale":[], "instructions":[], "clinicalAlerts":[{"type":str,"level":str,"message":str}], "correctedPrescription":{"isOverpowered":bool, "dailyCalories":num, "dailyProtein":num}, "logicRefinements":[], "drugInteractions":[], "micronutrientOrders":[], "monitoringSchedule":[] }`;
+    JSON ONLY: { "validationScore": num(0-10), "rationale":[], "instructions":[], "clinicalAlerts":[{"type":str,"level":str,"message":str}], "correctedPrescription":{"isOverpowered":bool, "dailyCalories":num, "dailyProtein":num, "reasoning":str}, "logicRefinements":[], "drugInteractions":[], "micronutrientOrders":[], "monitoringSchedule":[] }`;
 
     const msg = await anthropic.messages.create({
       model: "claude-sonnet-4-6",

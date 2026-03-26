@@ -192,7 +192,17 @@ function generateNutritionPlan(patient) {
 
   // Estimate dietary contribution from the PARTIAL intake (e.g. 60%)
   const estimatedDietaryProtein = isFullReplacement ? 0 : Math.round((weight * 0.8) * (actualIntake / 100));
-  const totalProteinDelivery = dailyProtein + estimatedDietaryProtein;
+  
+  // BRIDGE THE GAP: Ensure prescription covers whatever the diet is missing to reach 100% target
+  let prescribedProtein = dailyProtein;
+  if (!isFullReplacement) {
+    const deliveryGap = baseDailyProtein - (dailyProtein + estimatedDietaryProtein);
+    if (deliveryGap > 0) {
+      prescribedProtein += deliveryGap;
+    }
+  }
+
+  const totalProteinDelivery = prescribedProtein + estimatedDietaryProtein;
 
   const totalDailyCalories = dailyCalories;
   const totalDailyProtein = totalProteinDelivery; 
