@@ -1768,10 +1768,11 @@
           </div>
         </div> <!-- end .container.page -->
 
-        <div style="text-align: center; margin-top: 20px; display:flex; gap:12px; justify-content:center;"
+        <div style="text-align: center; margin-top: 20px; display:flex; gap:12px; justify-content:center; align-items:center;"
           class="no-print">
           <button class="btn-warning" onclick="enableFollowUpMode()">Log Follow-up</button>
           <button id="downloadPdfBtn" class="btn-primary" onclick="downloadNutritionPDF()">Download PDF</button>
+          <button class="btn-secondary" style="background:#475569; border-color:#334155; color:white; font-size:11px;" onclick="forceRegenerateAudit()">🔄 Regenerate Audit</button>
         </div>
 
         <script src="js/storage.js"></script>
@@ -4010,6 +4011,37 @@
               monSec.style.display = 'block';
             }
           }
+
+          async function forceRegenerateAudit() {
+            if (!confirm("This will clear cached AI insights and trigger a fresh STABLE-V3 analysis. Use this to fix truncated reports or apply latest engine rules. Proceed?")) return;
+            const cp = window.currentVersionedPlan;
+            if (cp) {
+              delete cp.claudeInsights;
+              if (typeof updatePlan === 'function') updatePlan(cp);
+            }
+            // Clear UI immediately
+            ['claudeAlertsSection', 'claudeDrugSection', 'claudeMicroSection', 'claudeMonitorSection'].forEach(id => {
+              const el = document.getElementById(id); if (el) el.style.display = 'none';
+            });
+            const cr = document.getElementById('clinicalRationale');
+            if (cr) Array.from(cr.querySelectorAll('.ai-insight')).forEach(el => el.remove());
+            const pi = document.getElementById('patientInstructions');
+            if (pi) Array.from(pi.querySelectorAll('.ai-insight')).forEach(el => el.remove());
+
+            await generateClaudeInsight();
+          }
+
+          function cleanupOldVersions() {
+             if(!window.patient) return;
+             const allPlans = getPlans().filter(p => p.patientId === window.patient.id);
+             if (allPlans.length > 5) {
+                console.log("Auto-Cleanup: Purging excessive health history versions...");
+                const kept = allPlans.sort((a,b) => (b.version||0) - (a.version||0)).slice(0, 3);
+                const otherPatientsPlans = getPlans().filter(p => p.patientId !== window.patient.id);
+                localStorage.setItem('onvilox_nutrition_plans', JSON.stringify([...otherPatientsPlans, ...kept]));
+             }
+          }
+          setTimeout(cleanupOldVersions, 3000);
         </script>
 </body>
 
