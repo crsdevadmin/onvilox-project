@@ -105,7 +105,7 @@ app.post('/api/extract', async (req, res) => {
 
   try {
     const msg = await anthropic.messages.create({
-      model: "claude-3-5-sonnet-20241022",
+      model: "claude-3-5-sonnet-20240620",
       max_tokens: 2000,
       system: extractionSystemPrompt,
       messages: [{ role: "user", content: `Extract from:\n\n${pdfText}` }],
@@ -142,7 +142,7 @@ app.post('/api/chat', async (req, res) => {
     Format: { "reply": "Short answer (<3 sentences)", "extractedData": { ...found values... } }`;
 
     const msg = await anthropic.messages.create({
-      model: "claude-3-5-haiku-20241022",
+      model: "claude-3-haiku-20240307",
       max_tokens: 4000,
       system: systemPrompt,
       messages: [{ role: "user", content: message }],
@@ -252,7 +252,7 @@ app.post('/api/claude-report', async (req, res) => {
     JSON ONLY: { "validationScore": num(0-10), "rationale":[], "instructions":[], "clinicalAlerts":[{"type":str,"level":str,"message":str}], "correctedPrescription":{"isOverpowered":bool, "dailyCalories":num, "dailyProtein":num, "reasoning":str}, "logicRefinements":[], "drugInteractions":[], "micronutrientOrders":[], "monitoringSchedule":[] }`;
 
     const msg = await anthropic.messages.create({
-      model: "claude-3-5-sonnet-20241022",
+      model: "claude-3-5-sonnet-20240620",
       max_tokens: 3000,
       system: system,
       messages: [{
