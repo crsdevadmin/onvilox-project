@@ -213,8 +213,9 @@ app.post('/api/claude-report', async (req, res) => {
 
     AUDIT PROTOCOL:
     - Compare RAW_PATIENT_DATA vs ENGINE_CALCULATIONS.
-    - If the engine under-prescribes (e.g. 55% intake patient getting only 800kcal), you are AUTHORIZED to 'Overpower' and provide a corrected prescription in the JSON.
-    - If you overpower, you must include a "CLINICAL OVERPOWER" alert in the alerts list.
+    - If the engine under-prescribes, AUTHORIZED to 'Overpower'.
+    - CONCISENESS: Limit 'rationale' to top 5 points. Limit 'instructions' to top 8 actionable steps.
+    - If you overpower, you must include a "CLINICAL OVERPOWER" alert.
     
     CRITICAL SAFETY (NON-NEGOTIABLES):
     1. RENAL SAFETY: If CR > 1.3, absolute CAP at 0.8g/kg.
@@ -225,7 +226,7 @@ app.post('/api/claude-report', async (req, res) => {
 
     const msg = await anthropic.messages.create({
       model: "claude-sonnet-4-6",
-      max_tokens: 1200,
+      max_tokens: 4000,
       system: systemInstruction,
       messages: [{
         role: "user",
@@ -261,11 +262,28 @@ app.post('/api/claude-report', async (req, res) => {
     const rawText = msg.content[0].text;
     let data;
     try {
-      const jsonStr = rawText.match(/{[\s\S]*}/)?.[0] || rawText;
+      // Find the JSON block
+      const jsonMatch = rawText.match(/{[\s\S]*}/);
+      if (!jsonMatch) throw new Error("No JSON found");
+      
+      let jsonStr = jsonMatch[0];
+      
+      // If the JSON is slightly truncated (e.g. missing trailing braces), try a basic repair
+      const openBraces = (jsonStr.match(/{/g) || []).length;
+      const closeBraces = (jsonStr.match(/}/g) || []).length;
+      if (openBraces > closeBraces) {
+         jsonStr += "}".repeat(openBraces - closeBraces);
+      }
+      
       data = JSON.parse(jsonStr);
     } catch (e) {
-      console.error("JSON PARSE FAILED:", rawText);
-      throw new Error("Invalid JSON from AI");
+      console.error("REPORT PARSE FAILED. Raw Response:", rawText);
+      // Fallback: If it's a total failure, send the raw text as a rationale
+      data = { 
+        rationale: ["AI error: Report was too long for the current token limit. Technical repair attempted."],
+        instructions: ["Please re-generate the report or check server logs."],
+        clinicalAlerts: [{ type: "SYSTEM", level: "HIGH", message: "AI response truncated" }]
+      };
     }
     res.json(data);
   } catch (error) {
