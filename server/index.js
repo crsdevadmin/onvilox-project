@@ -143,7 +143,7 @@ app.post('/api/chat', async (req, res) => {
 
     const msg = await anthropic.messages.create({
       model: "claude-3-5-haiku-20241022",
-      max_tokens: 1000,
+      max_tokens: 4000,
       system: systemPrompt,
       messages: [{ role: "user", content: message }],
     });
@@ -151,22 +151,51 @@ app.post('/api/chat', async (req, res) => {
     const rawText = msg.content[0].text;
     let data;
     try {
-      // Robust Parser: Try code blocks, then greedy braces, then the whole string
-      const jsonCandidate = (rawText.match(/```json\s*(\{[\s\S]*?\})\s*```/)?.[1]) || 
-                            (rawText.match(/{[\s\S]*}/)?.[0]) || 
-                            rawText;
-      data = JSON.parse(jsonCandidate);
+      // Robust Parser V5.1: Find the OUTERMOST curly braces
+      let start = rawText.indexOf('{');
+      let end = rawText.lastIndexOf('}');
       
-      // Map result to standard Schema { reply, extractedData }
-      if (!data.reply && (data.name || data.extractedData)) {
+      if (start !== -1) {
+          let jsonCandidate = (end !== -1 && end > start) ? 
+                              rawText.substring(start, end + 1) : 
+                              rawText.substring(start);
+          
+          // Truncation Recovery: If JSON is cut off, try to close it
+          let openBraces = (jsonCandidate.match(/\{/g) || []).length;
+          let closeBraces = (jsonCandidate.match(/\}/g) || []).length;
+          while (closeBraces < openBraces) {
+              jsonCandidate += "}";
+              closeBraces++;
+          }
+
+          try {
+              data = JSON.parse(jsonCandidate);
+          } catch (e) {
+              // Last ditch: try to fix common truncation at end of string
+              const fixed = jsonCandidate.replace(/,\s*$/, "").replace(/\"$/, "").trim();
+              data = JSON.parse(fixed + "}".repeat(openBraces - (fixed.match(/\}/g) || []).length));
+          }
+      } else {
+          throw new Error("No JSON braces found");
+      }
+      
+      // Post-Process: Handle cases where AI didn't nest extractedData correctly
+      if (!data.reply && (data.name || data.weight || data.cancer)) {
+          // AI returned a flat object instead of {reply, extractedData}
           data = { 
-            reply: data.reply || "Clinical data extracted successfully.", 
-            extractedData: data.extractedData || data 
+            reply: "Clinical data extracted successfully.", 
+            extractedData: data 
           };
       }
     } catch (e) {
       console.warn("AI Parser Error:", e.message);
-      data = { reply: rawText, extractedData: null };
+      // Fallback: Check for any JSON-like object anywhere in the text
+      try {
+          const greedyMatch = rawText.match(/\{[\s\S]*\}/)?.[0];
+          data = JSON.parse(greedyMatch || "{}");
+      } catch (e2) {
+          data = { reply: rawText, extractedData: null };
+      }
     }
     res.json(data);
   } catch (error) {
