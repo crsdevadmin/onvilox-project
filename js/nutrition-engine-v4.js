@@ -210,7 +210,64 @@ function generateNutritionPlan(patient) {
   const proteinGap = Math.max(0, baseDailyProtein - totalDailyProtein);
   const isGapCritical = (proteinGap / baseDailyProtein) > 0.2;
   
-  // V3 Safety Engine (Step 6) - Exactly 6 Categories
+  // --- STEP 5: MICRONUTRIENTS & DRUG INTERACTIONS ---
+  const interactions = [];
+  if (regimen.includes('cisplatin')) {
+    interactions.push({ drug: "Cisplatin", effect: "Renal Magnesium Wasting", advice: "Mandatory Magnesium protocol; monitor creatinine closely." });
+  }
+  if (regimen.includes('taxane') || regimen.includes('paclitaxel') || regimen.includes('docetaxel')) {
+    interactions.push({ drug: "Taxanes", effect: "Peripheral Neuropathy focus", advice: "ALA and B-Complex optimized." });
+  }
+  if (regimen.includes('5-fu') || regimen.includes('capecitabine') || regimen.includes('folfirinox')) {
+    interactions.push({ drug: "Fluoropyrimidines", effect: "Mucositis / GI Toxicity risk", advice: "Glutamine and peptide protein prioritized." });
+  }
+  if (regimen.includes('irinotecan')) {
+    interactions.push({ drug: "Irinotecan", effect: "Severe Diarrhea", advice: "Early mucosal support focus." });
+  }
+  if (chemFlags.bortezomib) {
+    interactions.push({ drug: "Bortezomib (Velcade)", effect: "Antioxidant & B6 Interference", advice: "Avoid high-dose Vit C, ALA, and high-dose B6. If ALA is required for neuropathy, restrict to non-Bortezomib days ONLY with oncologist approval." });
+  }
+  if (regimen.includes('lenalidomide') || regimen.includes('revlimid') || regimen.includes('vrd')) {
+    interactions.push({ drug: "Lenalidomide (Revlimid)", effect: "VTE/Antiplatelet Risk", advice: "Monitor Omega-3 dosing due to mild antiplatelet effects." });
+  }
+  if (regimen.includes('pemetrexed') || regimen.includes('methotrexate')) {
+    interactions.push({ drug: "Antifolates (e.g. Pemetrexed)", effect: "Folate Antagonism", advice: "Strict adherence to explicit folate supplementation protocol required." });
+  }
+  if (chemFlags.pembrolizumab) {
+    interactions.push({ drug: "Pembrolizumab (Keytruda)", effect: "Immune-Related Enterocolitis/Thyroiditis", advice: "Monitor for diarrhea >3/day or severe fatigue. Measure TSH every cycle." });
+  }
+
+  const micronutrients = {
+    vitD: hasRenalIssue ? '2000 IU/day (Renal Cap)' : (vitD > 0 && vitD < 20 ? '4000–6000 IU/day' : (vitD < 30 ? '2000–4000 IU/day' : '1000–2000 IU/day')),
+    vitC: (chemFlags.bortezomib || chemFlags.ac) ? '500 mg/day (Antioxidant Cap for Safety)' : (hasRenalIssue ? '500 mg/day (Renal Cap)' : ((crp > 5 || tumorBurden) && !chemFlags.bortezomib ? '2000 mg/day' : '1000 mg/day')),
+    zinc: zinc > 0 && zinc < 60 ? '15–25 mg/day (Correction Protocol) + 2mg Copper' : '15 mg/day',
+    omega3: (crp > 5 || cachexia || cancer.includes('pancreatic')) ? '3–4 g/day' : '2 g/day',
+    epa: (cachexia || tumorBurden || cancer.includes('pancreatic')) ? '2.2 - 3.0 g EPA/day' : 'None',
+    leucine: (sarcopenia || tumorBurden || ecog >= 2) ? '5 g/day' : '3 g/day',
+    glutamine: (patient.giIssues || hasMucositis || hasNausea || regimen.includes('folfirinox') || hasIBD) ? '30 g/day' : 'Consider if GI toxicity persists',
+    bcaa: (alt > 50 || ast > 50 || bilirubin > 1.2) ? '20 g/day for Hepatic Protection' : (sarcopenia ? '10 g/day' : null),
+    magnesium: (patient.magnesium < 1.7 || regimen.includes('cisplatin')) ? '400 mg (Correction Protocol)' : 'Standard',
+    bComplex: (regimen.includes('taxane') || regimen.includes('folfirinox')) ? 'High-potency B-Complex' : 'Standard dose',
+    folate: (() => {
+      const markers = (patient.genomicMarkers || []);
+      const hasMthfr = markers.some(m => m.includes('MTHFR'));
+      if (hasMthfr) return '5 mg/day (Methylfolate)';
+      return (patient.folate > 0 && patient.folate < 3 || hemoglobin < 10) ? '5 mg/day' : (regimen.includes('pemetrexed') || regimen.includes('methotrexate') ? '1 mg/day (per oncology protocol)' : '1.0 mg/day');
+    })(),
+    chromium: isDiabetic ? '400 mcg/day (Glycemic monitoring protocol active)' : null,
+    ala: (isDiabetic && !chemFlags.bortezomib) ? '600 mg/day' : null,
+    microbiome: (regimen.includes('folfirinox') || hasIBD) ? 'Soluble Fiber + Probiotic' : null,
+    iron: (hemoglobin > 0 && hemoglobin < 10) ? '100 mg elemental iron + B12 support' : null
+  };
+
+  if (cancer.includes('myeloma')) {
+    micronutrients.calcium = '1000-1200 mg/day (Note: Requires Ionized Ca monitoring for hypercalcemia risk)';
+    if (vitD > 0 && vitD < 30) {
+      micronutrients.vitD = (vitD < 20) ? '5000 IU/day (Correction Phase; Myeloma Bone Protocol)' : (hasRenalIssue ? '2000 IU/day' : '4000 IU/day');
+    }
+  }
+
+  // --- STEP 6: VERSIONED SAFETY ENGINE ---
   const safetyStatus = {
     renal: { level: 'info', message: 'Renal Safety: Normal (CR < 1.3)' },
     metabolic: { level: 'info', message: 'Metabolic Safety: Stable BS (< 180)' },
@@ -349,62 +406,6 @@ function generateNutritionPlan(patient) {
   else if (tolerance === 'mucositis' || hasMucositis || (patient.feedingMethod || '').toLowerCase().includes('enteral')) proteinType = 'Peptide formulas';
   else if (tolerance === 'lactose') proteinType = 'Plant proteins (pea / rice)';
 
-  const interactions = [];
-  if (regimen.includes('cisplatin')) {
-    interactions.push({ drug: "Cisplatin", effect: "Renal Magnesium Wasting", advice: "Mandatory Magnesium protocol; monitor creatinine closely." });
-  }
-  if (regimen.includes('taxane') || regimen.includes('paclitaxel') || regimen.includes('docetaxel')) {
-    interactions.push({ drug: "Taxanes", effect: "Peripheral Neuropathy focus", advice: "ALA and B-Complex optimized." });
-  }
-  if (regimen.includes('5-fu') || regimen.includes('capecitabine') || regimen.includes('folfirinox')) {
-    interactions.push({ drug: "Fluoropyrimidines", effect: "Mucositis / GI Toxicity risk", advice: "Glutamine and peptide protein prioritized." });
-  }
-  if (regimen.includes('irinotecan')) {
-    interactions.push({ drug: "Irinotecan", effect: "Severe Diarrhea", advice: "Early mucosal support focus." });
-  }
-  if (chemFlags.bortezomib) {
-    interactions.push({ drug: "Bortezomib (Velcade)", effect: "Antioxidant & B6 Interference", advice: "Avoid high-dose Vit C, ALA, and high-dose B6. If ALA is required for neuropathy, restrict to non-Bortezomib days ONLY with oncologist approval." });
-  }
-  if (regimen.includes('lenalidomide') || regimen.includes('revlimid') || regimen.includes('vrd')) {
-    interactions.push({ drug: "Lenalidomide (Revlimid)", effect: "VTE/Antiplatelet Risk", advice: "Monitor Omega-3 dosing due to mild antiplatelet effects." });
-  }
-  if (regimen.includes('pemetrexed') || regimen.includes('methotrexate')) {
-    interactions.push({ drug: "Antifolates (e.g. Pemetrexed)", effect: "Folate Antagonism", advice: "Strict adherence to explicit folate supplementation protocol required." });
-  }
-  if (chemFlags.pembrolizumab) {
-    interactions.push({ drug: "Pembrolizumab (Keytruda)", effect: "Immune-Related Enterocolitis/Thyroiditis", advice: "Monitor for diarrhea >3/day or severe fatigue. Measure TSH every cycle." });
-  }
-
-  const micronutrients = {
-    vitD: hasRenalIssue ? '2000 IU/day (Renal Cap)' : (vitD > 0 && vitD < 20 ? '4000–6000 IU/day' : (vitD < 30 ? '2000–4000 IU/day' : '1000–2000 IU/day')),
-    vitC: (chemFlags.bortezomib || chemFlags.ac) ? '500 mg/day (Antioxidant Cap for Safety)' : (hasRenalIssue ? '500 mg/day (Renal Cap)' : ((crp > 5 || tumorBurden) && !chemFlags.bortezomib ? '2000 mg/day' : '1000 mg/day')),
-    zinc: zinc > 0 && zinc < 60 ? '15–25 mg/day (Correction Protocol) + 2mg Copper' : '15 mg/day',
-    omega3: (crp > 5 || cachexia || cancer.includes('pancreatic')) ? '3–4 g/day' : '2 g/day',
-    epa: (cachexia || tumorBurden || cancer.includes('pancreatic')) ? '2.2 - 3.0 g EPA/day' : 'None',
-    leucine: (sarcopenia || tumorBurden || ecog >= 2) ? '5 g/day' : '3 g/day',
-    glutamine: (patient.giIssues || hasMucositis || hasNausea || regimen.includes('folfirinox') || hasIBD) ? '30 g/day' : 'Consider if GI toxicity persists',
-    bcaa: (alt > 50 || ast > 50 || bilirubin > 1.2) ? '20 g/day for Hepatic Protection' : (sarcopenia ? '10 g/day' : null),
-    magnesium: (patient.magnesium < 1.7 || regimen.includes('cisplatin')) ? '400 mg (Correction Protocol)' : 'Standard',
-    bComplex: (regimen.includes('taxane') || regimen.includes('folfirinox')) ? 'High-potency B-Complex' : 'Standard dose',
-    folate: (() => {
-      const markers = (patient.genomicMarkers || []);
-      const hasMthfr = markers.some(m => m.includes('MTHFR'));
-      if (hasMthfr) return '5 mg/day (Methylfolate)';
-      return (patient.folate > 0 && patient.folate < 3 || hemoglobin < 10) ? '5 mg/day' : (regimen.includes('pemetrexed') || regimen.includes('methotrexate') ? '1 mg/day (per oncology protocol)' : '1.0 mg/day');
-    })(),
-    chromium: isDiabetic ? '400 mcg/day (Glycemic monitoring protocol active)' : null,
-    ala: (isDiabetic && !chemFlags.bortezomib) ? '600 mg/day' : null,
-    microbiome: (regimen.includes('folfirinox') || hasIBD) ? 'Soluble Fiber + Probiotic' : null,
-    iron: (hemoglobin > 0 && hemoglobin < 10) ? '100 mg elemental iron + B12 support' : null
-  };
-
-  if (cancer.includes('myeloma')) {
-    micronutrients.calcium = '1000-1200 mg/day (Note: Requires Ionized Ca monitoring for hypercalcemia risk)';
-    if (vitD > 0 && vitD < 30) {
-      // Myeloma Bone Protocol overrides renal cap for severe deficiency (correction phase)
-      micronutrients.vitD = (vitD < 20) ? '5000 IU/day (Correction Phase; Myeloma Bone Protocol)' : (hasRenalIssue ? '2000 IU/day' : '4000 IU/day');
-    }
-  }
 
   const flavorProfile = (() => {
     if (hasNausea || sideEffects.some(s => s.includes('taste'))) {
