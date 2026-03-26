@@ -3935,8 +3935,12 @@
 
                     const auditNote = `[AI AUDITOR OVERPOWER] ${cpAudit.reasoning}`;
                     const syncedPlan = createOrUpdatePlan(window.patient, engineOutput, overrides, auditNote);
-                    window.currentPlan = syncedPlan;
+                    window.currentVersionedPlan = syncedPlan;
                     bind(syncedPlan); // This updates Production Specs and Serving Admin tables
+                    
+                    // SAVE BACK TO STORAGE IMMEDIATELY
+                    updatePlan(syncedPlan);
+                    console.log("AI AUDITOR: Clinical correction persisted immediately.");
                 }
 
                 // 3. Add a badge to the header
