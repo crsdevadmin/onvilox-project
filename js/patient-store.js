@@ -161,6 +161,17 @@ function createOrUpdatePlan(patient, engineOutput, overrides, overrideNotes){
     treatmentTypes: patient.treatmentTypes
   };
   const finalPlan = Object.assign({}, engineOutput, overrides || {});
+  
+  // If inputs are identical and no significant overrides change, update the existing plan instead of new version
+  if (existing && JSON.stringify(existing.inputsSnapshot) === JSON.stringify(inputsSnapshot)) {
+    existing.finalPlan = finalPlan;
+    existing.engineOutput = engineOutput;
+    existing.overrides = Object.assign(existing.overrides || {}, overrides || {});
+    existing.overrideNotes = (existing.overrideNotes || '') + (overrideNotes ? "; " + overrideNotes : "");
+    updatePlan(existing);
+    return existing;
+  }
+
   const plan = {
     id: db.uid('plan'),
     patientId: patient.id,
