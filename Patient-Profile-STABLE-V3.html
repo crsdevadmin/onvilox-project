@@ -3990,24 +3990,38 @@
 
             const drugSec = document.getElementById('claudeDrugSection');
             const drugTbl = document.getElementById('claudeDrugTable');
-            if (drugSec && drugTbl && data.drugInteractions && data.drugInteractions.length > 0) {
-              const rc = { HIGH:'#dc2626', MODERATE:'#d97706', LOW:'#16a34a' };
-              drugTbl.innerHTML = data.drugInteractions.map(d => `<tr><td style="padding:7px 8px;border:1px solid #e2e8f0;font-weight:700;color:#0e2247;">${d.drug}</td><td style="padding:7px 8px;border:1px solid #e2e8f0;">${d.interaction}</td><td style="padding:7px 8px;border:1px solid #e2e8f0;font-style:italic;color:#1e40af;">${d.advice}</td><td style="padding:7px 8px;border:1px solid #e2e8f0;text-align:center;"><span style="background:${rc[d.risk]||'#64748b'}22;color:${rc[d.risk]||'#64748b'};font-size:9.5px;font-weight:800;padding:2px 8px;border-radius:999px;text-transform:uppercase;">${d.risk||'N/A'}</span></td></tr>`).join('');
+            if (drugSec && drugTbl) {
+              const rows = data.drugInteractions && data.drugInteractions.length > 0
+                ? data.drugInteractions.map(d => {
+                    const rc = { HIGH:'#dc2626', MODERATE:'#d97706', LOW:'#16a34a' };
+                    return `<tr><td style="padding:7px 8px;border:1px solid #e2e8f0;font-weight:700;color:#0e2247;">${d.drug}</td><td style="padding:7px 8px;border:1px solid #e2e8f0;">${d.interaction}</td><td style="padding:7px 8px;border:1px solid #e2e8f0;font-style:italic;color:#1e40af;">${d.advice}</td><td style="padding:7px 8px;border:1px solid #e2e8f0;text-align:center;"><span style="background:${rc[d.risk]||'#64748b'}22;color:${rc[d.risk]||'#64748b'};font-size:9.5px;font-weight:800;padding:2px 8px;border-radius:999px;text-transform:uppercase;">${d.risk||'N/A'}</span></td></tr>`;
+                  }).join('')
+                : `<tr><td colspan="4" style="padding:15px;text-align:center;color:#64748b;font-style:italic;">No significant clinical drug-nutrient interactions identified.</td></tr>`;
+              drugTbl.innerHTML = rows;
               drugSec.style.display = 'block';
             }
 
             const microSec = document.getElementById('claudeMicroSection');
             const microTbl = document.getElementById('claudeMicroTable');
-            if (microSec && microTbl && data.micronutrientOrders && data.micronutrientOrders.length > 0) {
-              const sc = { SUPPLEMENT:'#0284c7', DEFICIENT:'#dc2626', MONITOR:'#d97706', CAPPED:'#9333ea', EXCLUDED:'#ef4444', STANDARD:'#64748b', 'CARDIAC Rx':'#0e2247', 'GLYCEMIC Rx':'#b45309' };
-              microTbl.innerHTML = data.micronutrientOrders.map(m => { const col=sc[m.status]||'#64748b'; return `<tr><td style="padding:7px 8px;border:1px solid #e2e8f0;font-weight:700;color:#0e2247;">${m.nutrient}</td><td style="padding:7px 8px;border:1px solid #e2e8f0;color:#475569;">${m.labValue||'—'}</td><td style="padding:7px 8px;border:1px solid #e2e8f0;font-weight:600;">${m.dose}</td><td style="padding:7px 8px;border:1px solid #e2e8f0;font-size:10.5px;color:#334155;">${m.rationale}</td><td style="padding:7px 8px;border:1px solid #e2e8f0;text-align:center;"><span style="background:${col}22;color:${col};font-size:9px;font-weight:800;padding:2px 7px;border-radius:999px;text-transform:uppercase;white-space:nowrap;">${m.status}</span></td></tr>`; }).join('');
+            if (microSec && microTbl) {
+              const rows = data.micronutrientOrders && data.micronutrientOrders.length > 0
+                ? data.micronutrientOrders.map(m => {
+                    const sc = { SUPPLEMENT:'#0284c7', DEFICIENT:'#dc2626', MONITOR:'#d97706', CAPPED:'#9333ea', EXCLUDED:'#ef4444', STANDARD:'#64748b', 'CARDIAC Rx':'#0e2247', 'GLYCEMIC Rx':'#b45309' };
+                    const col = sc[m.status]||'#64748b';
+                    return `<tr><td style="padding:7px 8px;border:1px solid #e2e8f0;font-weight:700;color:#0e2247;">${m.nutrient}</td><td style="padding:7px 8px;border:1px solid #e2e8f0;color:#475569;">${m.labValue||'—'}</td><td style="padding:7px 8px;border:1px solid #e2e8f0;font-weight:600;">${m.dose}</td><td style="padding:7px 8px;border:1px solid #e2e8f0;font-size:10.5px;color:#334155;">${m.rationale}</td><td style="padding:7px 8px;border:1px solid #e2e8f0;text-align:center;"><span style="background:${col}22;color:${col};font-size:9px;font-weight:800;padding:2px 7px;border-radius:999px;text-transform:uppercase;white-space:nowrap;">${m.status}</span></td></tr>`;
+                  }).join('')
+                : `<tr><td colspan="5" style="padding:15px;text-align:center;color:#64748b;font-style:italic;">No therapeutic micronutrient interventions required beyond standard protocols.</td></tr>`;
+              microTbl.innerHTML = rows;
               microSec.style.display = 'block';
             }
 
             const monSec = document.getElementById('claudeMonitorSection');
             const monTbl = document.getElementById('claudeMonitorTable');
-            if (monSec && monTbl && data.monitoringSchedule && data.monitoringSchedule.length > 0) {
-              monTbl.innerHTML = data.monitoringSchedule.map(m => `<tr><td style="padding:7px 8px;border:1px solid #e2e8f0;font-weight:700;color:#0e2247;">${m.frequency}</td><td style="padding:7px 8px;border:1px solid #e2e8f0;">${m.parameters}</td><td style="padding:7px 8px;border:1px solid #e2e8f0;color:#dc2626;font-weight:600;">${m.threshold}</td><td style="padding:7px 8px;border:1px solid #e2e8f0;color:#475569;">${m.responsible}</td></tr>`).join('');
+            if (monSec && monTbl) {
+              const rows = data.monitoringSchedule && data.monitoringSchedule.length > 0
+                ? data.monitoringSchedule.map(m => `<tr><td style="padding:7px 8px;border:1px solid #e2e8f0;font-weight:700;color:#0e2247;">${m.frequency}</td><td style="padding:7px 8px;border:1px solid #e2e8f0;">${m.parameters}</td><td style="padding:7px 8px;border:1px solid #e2e8f0;color:#dc2626;font-weight:600;">${m.threshold}</td><td style="padding:7px 8px;border:1px solid #e2e8f0;color:#475569;">${m.responsible}</td></tr>`).join('')
+                : `<tr><td colspan="4" style="padding:15px;text-align:center;color:#64748b;font-style:italic;">Standard weekly clinical monitoring and weight reassessment plan applies.</td></tr>`;
+              monTbl.innerHTML = rows;
               monSec.style.display = 'block';
             }
           }
