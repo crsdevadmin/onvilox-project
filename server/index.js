@@ -86,7 +86,8 @@ const anthropic = new Anthropic({ apiKey: rawKey });
 // Prompt for mapping Clinical Data
 const extractionSystemPrompt = `You are an expert Oncology Assistant. 
 Extract clinical parameters from the provided text/PDF and return a precise JSON object.
-Return ONLY valid JSON. If unknown, return null.
+Return ONLY valid JSON. START with '{' and END with '}'. NO preamble, NO markdown code blocks, NO headers.
+If unknown, return null.
 Schema: {
   "name": "String", "age": "Number", "sex": "Male/Female", "weight": "Number (kg)", "height": "Number (cm)", 
   "usualWeight": "Number (kg)", "uhic": "String", "cancer": "String", "regimen": "String", "feedingMethod": "String",
@@ -148,9 +149,17 @@ app.post('/api/chat', async (req, res) => {
     const rawText = msg.content[0].text;
     let data;
     try {
-      const jsonMatch = rawText.match(/{[\s\S]*}/);
-      data = jsonMatch ? JSON.parse(jsonMatch[0]) : { reply: rawText, extractedData: null };
+      // Hardened Parser: Detect ```json blocks first
+      const codeBlockMatch = rawText.match(/```json\n([\s\S]*?)\n```/);
+      const jsonCandidate = codeBlockMatch ? codeBlockMatch[1] : (rawText.match(/{[\s\S]*}/)?.[0] || rawText);
+      data = JSON.parse(jsonCandidate);
+      
+      // If the AI returned ONLY the extraction object, wrap it
+      if (!data.reply && data.name) {
+          data = { reply: "Extraction complete.", extractedData: data };
+      }
     } catch (e) {
+      console.warn("AI Parser Fallback triggered for raw text:", rawText.slice(0, 100));
       data = { reply: rawText, extractedData: null };
     }
     res.json(data);
