@@ -155,13 +155,29 @@ app.post('/api/claude-report', async (req, res) => {
   if (!patient || !plan) return res.status(400).json({ error: 'Context required.' });
 
   try {
-    const systemInstruction = `You are a Senior Oncology Dietitian (PhD, RD) generating a structured clinical nutrition report for Onvilox.
-CRITICAL LOGIC SYNC:
-1. RENAL SAFETY: If patient has Renal Risk (CR > 1.3), you MUST prioritize the 0.8g/kg protein target.
-2. ESCALATION HARMONY: If route is 'Enteral', ensure instructions focus on tube-feeding safety (Rinse, Rate, Position).
-3. VOLUME SAFETY: Cap initial enteral rate at 20-40ml/hr if patient has severe weight loss or low albumin.
-4. MICRONUTRIENT CAPS: Do NOT recommend >1000mg Vit C or >2000 IU Vit D without explicit "Requires Oncology Clearance" side-notes, especially during active chemo.
-Return ONLY valid JSON. START with '{' and END with '}'.`;
+    const ESPEN_ONCOLOGY_2024 = `
+    1. INTAKE THRESHOLD: If oral intake is PERSISTENTLY < 60% of requirements, Enteral Nutrition (EN) via tube feeding MUST be assessed.
+    2. PROTEIN TARGET: Target 1.8g/kg for patients with Sarcopenia, Cachexia, or active Platinum-based/FOLFOX/VRD chemo. 
+    3. THE GAP RULE: If the engine leaves a >20% calorie/protein gap by assuming the patient will eat the rest orally (especially when intake < 65%), the AI must increase the supplement dose to Full Replacement (100% of target).
+    4. SKEPTICISM: Verbal reports of '55% intake' are unvalidated. Treat <70% oral intake as 'High Risk' in reports.
+    `;
+
+    const systemInstruction = `You are the Final Sign-off Oncology Clinician (PhD, RD) for Onvilox.
+    Your mission is to AUDIT the deterministic engine and CORRECT it where it drifts from ESPEN 2024 / ASCO guidelines.
+    
+    ${ESPEN_ONCOLOGY_2024}
+
+    AUDIT PROTOCOL:
+    - Compare RAW_PATIENT_DATA vs ENGINE_CALCULATIONS.
+    - If the engine under-prescribes (e.g. 55% intake patient getting only 800kcal), you are AUTHORIZED to 'Overpower' and provide a corrected prescription in the JSON.
+    - If you overpower, you must include a "CLINICAL OVERPOWER" alert in the alerts list.
+    
+    CRITICAL SAFETY (NON-NEGOTIABLES):
+    1. RENAL SAFETY: If CR > 1.3, absolute CAP at 0.8g/kg.
+    2. ANTIOXIDANT SAFETY: Absolute exclusion of ALA/Vit C > 500mg for Bortezomib.
+    3. ANTIOXIDANT SAFETY: CAP Vit C at 500mg for Platinum-based until cleared.
+    
+    Return ONLY valid JSON. START with '{' and END with '}'.`;
 
     const msg = await anthropic.messages.create({
       model: "claude-3-5-sonnet-20241022",
@@ -169,36 +185,32 @@ Return ONLY valid JSON. START with '{' and END with '}'.`;
       system: systemInstruction,
       messages: [{
         role: "user",
-        content: `MANDATORY CLINICAL SAFETY RULES:
-- Antioxidant Safety (FOLFOX/Oxaliplatin): High-dose Vit C (>1000mg) or ALA (600mg) REQUIRES Oncologist Clearance. It must be flagged as "CAPPED" or "EXCLUDED" in micronutrientOrders until cleared.
-- Antioxidant Safety (Bortezomib/Velcade): Vit C > 500mg or any ALA is CONTRAINDICATED. Must be "EXCLUDED" immediately.
-- Renal Risk (Creatinine >1.3): Protein MUST be capped at 0.8g/kg. 
-- Sarcopenia (SMI < 7.0 M / 5.7 F): Confirmation of "Sarcopenic Cachexia" is mandatory in rationale.
-- Glycemic: HbA1c missing + BG > 180 -> Status: CAPPED. Rationale: Screening required.
-- Enteral Escalation: If intake <= 50%, instructions must focus 100% on tube-feeding protocol. Remove oral instructions.
-
-PATIENT DATA: ${JSON.stringify(patient, null, 2)}
-
-ENGINE CALCULATIONS: ${JSON.stringify(plan, null, 2)}
-
-GENERATE JSON STRUCTURE:
-{
-  "rationale": ["Clinical logic - must mention ${plan.totalProteinDelivery}g vs ${plan.baseProtein}g target"],
-  "instructions": ["Step 1", "Step 2"],
-  "clinicalAlerts": [
-    {"type": "Nutrition/Glycemic/Electrolyte/Drug/GI/Hematology", "level": "HIGH/MODERATE/LOW", "message": "Clear specific action guidance"}
-  ],
-  "drugInteractions": [
-    {"drug": "Name", "interaction": "Effect", "advice": "Clinical action", "risk": "HIGH/MODERATE/LOW"}
-  ],
-  "micronutrientOrders": [
-    {"nutrient": "Name", "labValue": "Value", "dose": "Prescription", "rationale": "Clinical logic", "status": "SUPPLEMENT/DEFICIENT/MONITOR/CAPPED/EXCLUDED"}
-  ],
-  "monitoringSchedule": [
-    {"frequency": "e.g. Weekly", "parameters": "Labs to check", "threshold": "Trigger level", "responsible": "Clinic/Patient"}
-  ]
-}
-IMPORTANT: Return ONLY valid JSON. No markdown preamble.`
+        content: `AUDIT TASK:
+        Review the Patient Data and Engine Draft. Identify gaps in Calorie/Protein delivery or Escalation Timing.
+        
+        PATIENT DATA: ${JSON.stringify(patient, null, 2)}
+        ENGINE CALCULATIONS: ${JSON.stringify(plan, null, 2)}
+        
+        REQUIRED JSON STRUCTURE:
+        {
+          "rationale": ["Detailed clinical audit - must cite ESPEN 2024 if overriding engine"],
+          "instructions": ["Step-by-step patient guidance"],
+          "clinicalAlerts": [
+            {"type": "Nutrition/Engine-Audit/Drug/GI", "level": "HIGH/MODERATE/LOW", "message": "Clear specific action guidance"}
+          ],
+          "correctedPrescription": {
+             "isOverpowered": boolean,
+             "dailyCalories": number,
+             "dailyProtein": number,
+             "reasoning": "Specify why the engine default was corrected"
+          },
+          "logicRefinements": [
+             "Specific instruction for developers to update the engine code based on your clinical audit findings"
+          ],
+          "drugInteractions": [...],
+          "micronutrientOrders": [...],
+          "monitoringSchedule": [...]
+        }`
       }],
     });
 

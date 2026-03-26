@@ -565,8 +565,13 @@ function generateNutritionPlan(patient) {
     baseProtein: baseDailyProtein,
     outcomePrediction: outcomePredictionData,
     recipe: buildFormulationOptions({ macroProtein, macroCarbs, macroFat, proteinType, bloodSugar, cachexia, crp }),
-    reportNotes: {
-      basis: 'V5 Multi-System Engine (ESMO/ESPEN/ASCO/KDIGO guidelines).'
+    auditContext: {
+      calorieGap: baseDailyCalories - totalDailyCalories,
+      proteinGap: baseDailyProtein - totalDailyProtein,
+      isEspenEscalationCandidate: actualIntake < 60 && !currentIsEnteral,
+      actualIntakePercent: actualIntake,
+      weightLossStatus: weightLossPercent >= 10 ? 'Severe' : (weightLossPercent >= 5 ? 'Moderate' : 'Stable'),
+      sarcopeniaStatus: sarcopenia ? 'Confirmed' : (patient.smi || patient.handGrip ? 'Suspected' : 'Unknown')
     }
   };
 }

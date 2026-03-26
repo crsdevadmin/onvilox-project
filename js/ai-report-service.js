@@ -79,6 +79,7 @@ const aiReportService = {
             }
 
             const data = await response.json();
+            console.log("AI Auditor Response Received:", data);
             return data;
         } catch (error) {
             console.error("AI Insight Generation Failed:", error);

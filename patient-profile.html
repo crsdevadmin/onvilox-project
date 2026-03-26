@@ -914,7 +914,7 @@
 
         <!-- NUTRITION RX -->
         <div class="rs">
-          <div class="rs-title">Prescription Target</div>
+          <div class="rs-title" id="pPrescriptionTitle">Prescription Target</div>
           <div class="rg">
             <div class="rf full alert-amber" id="cachexiaAlertBox" style="display:none;">
               <div class="rf-lbl" style="color:#b45309;">Cachexia Trigger Detected</div>
@@ -3951,6 +3951,42 @@
               piEl.querySelectorAll('.ai-insight').forEach(el => el.remove());
               const aiHtml = data.instructions.map(t => `<li class="ai-insight" style="color:#6d28d9; font-weight:600; margin-bottom:4px;">✨ ${t}</li>`).join('');
               piEl.innerHTML = aiHtml + piEl.innerHTML;
+            }
+
+            // --- AI AUDITOR: Overpower Logic ---
+            if (data.correctedPrescription && data.correctedPrescription.isOverpowered) {
+                console.log("AI AUDITOR OVERPOWER DETECTED:", data.correctedPrescription);
+                const cp = data.correctedPrescription;
+                // Update the prescribed values in the UI (Formula targets)
+                setVal('dailyCalories', cp.dailyCalories + ' kcal');
+                setVal('dailyProtein', cp.dailyProtein + ' g');
+                
+                // Add a badge to the header
+                const hEl = document.getElementById('pPrescriptionTitle');
+                if (hEl && !document.getElementById('aiOverpowerBadge')) {
+                    const badge = document.createElement('span');
+                    badge.id = 'aiOverpowerBadge';
+                    badge.innerHTML = '⚖️ CLINICAL AUDIT OVERPOWER';
+                    badge.style = 'background:#6d28d9; color:white; font-size:9px; padding:2px 6px; border-radius:4px; margin-left:10px; vertical-align:middle; line-height:1; display:inline-block;';
+                    hEl.appendChild(badge);
+                }
+                
+                // Add to rationale
+                if (crEl) {
+                    const overpowerLi = document.createElement('li');
+                    overpowerLi.className = 'ai-insight';
+                    overpowerLi.style = 'color:#6d28d9; font-weight:800; border-left:3px solid #6d28d9; padding-left:8px; margin-bottom:10px;';
+                    overpowerLi.innerHTML = `⚠️ <b>AI AUDITOR CORRECTION:</b> ${cp.reasoning}`;
+                    crEl.prepend(overpowerLi);
+                }
+            }
+
+            // --- AI AUDITOR: Logic Refinements (Dev Only / Hidden in PDF) ---
+            if (data.logicRefinements && data.logicRefinements.length > 0) {
+                const logs = JSON.parse(localStorage.getItem('onvilox_logic_logs') || '[]');
+                logs.push({ date: new Date().toISOString(), patientId: window.patient?.id, suggestions: data.logicRefinements });
+                localStorage.setItem('onvilox_logic_logs', JSON.stringify(logs.slice(-20))); // Keep last 20
+                console.log("AI Logic Refinements Logged:", data.logicRefinements);
             }
 
             // 3. Clinical Alerts Section
