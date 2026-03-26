@@ -1161,10 +1161,7 @@
             <div>
               <div style="display:flex; justify-content:space-between; align-items:center;">
                 <div class="rs-title" style="font-size:9.5px; margin:0;">Clinical Rationale</div>
-                <button class="btn-primary btn-sm" id="btnClaude" onclick="generateClaudeInsight()"
-                  style="background:#6d28d9; border-color:#5b21b6; font-size:10px; padding:4px 8px; box-shadow: 0 0 15px rgba(109,40,217,0.35); animation: pulse-violet 2s infinite;">
-                  ✨ Refine with Claude Sonnet 4.5
-                </button>
+                <!-- AI Refine button moved to main action row for clarity -->
               </div>
               <ul class="rrat" id="clinicalRationale"></ul>
 
@@ -1734,45 +1731,18 @@
               </div>
 
 
-              <div
-                style="display:flex; gap:12px; flex-wrap:wrap; margin-top:20px; padding-top:20px; border-top:1px solid #e2e8f0;">
-                <button class="btn-warning" type="button" onclick="savePatientEdits()">Save Changes &
-                  Recalculate</button>
-                <button id="approveBtn" class="btn-primary" type="button" onclick="approveFromReport()">Approve
-                  Patient</button>
+                <button class="btn-warning" type="button" onclick="savePatientEditsAndAudit()" style="background:#6d28d9; border-color:#5b21b6; color:white; font-weight:700;">💾 Update Plan & AI Audit</button>
+                <button id="approveBtn" class="btn-primary" type="button" onclick="approveFromReport()">Approve & Finalize</button>
               </div>
             </div> <!-- end .card -->
           </div> <!-- end #editPatientSection -->
 
-          <div id="overrideSection" style="margin-top:28px;display:none;">
-            <h3>Doctor Override (optional)</h3>
-            <div class="form-grid">
-              <div class="form-group">
-                <label>Override Daily Calories (kcal)</label>
-                <input id="ovCalories" type="number" min="0" step="1">
-              </div>
-              <div class="form-group">
-                <label>Override Daily Protein (g)</label>
-                <input id="ovProtein" type="number" min="0" step="1">
-              </div>
-              <div class="form-group">
-                <label>Override Omega-3 text</label>
-                <input id="ovOmega" type="text" placeholder="e.g., 1.5–2 g EPA+DHA">
-              </div>
-              <div class="form-group">
-                <label>Override Note (why changed)</label>
-                <input id="ovNote" type="text" placeholder="Reason for adjustment">
-              </div>
-            </div>
-            <button class="btn-warning" onclick="applyOverride()">Apply Override & Regenerate</button>
-          </div>
+          <!-- Redundant Override section removed as requested -->
         </div> <!-- end .container.page -->
 
-        <div style="text-align: center; margin-top: 20px; display:flex; gap:12px; justify-content:center; align-items:center;"
-          class="no-print">
-          <button class="btn-warning" onclick="enableFollowUpMode()">Log Follow-up</button>
-          <button id="downloadPdfBtn" class="btn-primary" onclick="downloadNutritionPDF()">Download PDF</button>
-          <button class="btn-secondary" style="background:#475569; border-color:#334155; color:white; font-size:11px;" onclick="forceRegenerateAudit()">🔄 Regenerate Audit</button>
+          <button class="btn-warning" onclick="enableFollowUpMode()">🔄 Log Follow-up</button>
+          <button id="btnClaude" class="btn-secondary" style="background:#6d28d9; border-color:#5b21b6; color:white; font-size:11px;" onclick="generateClaudeInsight()">✨ Manual AI Refresh</button>
+          <button id="downloadPdfBtn" class="btn-primary" onclick="downloadNutritionPDF()">📥 Download PDF</button>
         </div>
 
         <script src="js/storage.js"></script>
@@ -2690,6 +2660,13 @@
 
             bind(newPlan);
             alert('Patient details updated and plan recalculated.');
+            return true;
+          }
+
+          async function savePatientEditsAndAudit() {
+            if (savePatientEdits()) {
+               await generateClaudeInsight();
+            }
           }
 
           async function approveFromReport() {
@@ -4024,25 +4001,6 @@
               monTbl.innerHTML = rows;
               monSec.style.display = 'block';
             }
-          }
-
-          async function forceRegenerateAudit() {
-            if (!confirm("This will clear cached AI insights and trigger a fresh STABLE-V3 analysis. Use this to fix truncated reports or apply latest engine rules. Proceed?")) return;
-            const cp = window.currentVersionedPlan;
-            if (cp) {
-              delete cp.claudeInsights;
-              if (typeof updatePlan === 'function') updatePlan(cp);
-            }
-            // Clear UI immediately
-            ['claudeAlertsSection', 'claudeDrugSection', 'claudeMicroSection', 'claudeMonitorSection'].forEach(id => {
-              const el = document.getElementById(id); if (el) el.style.display = 'none';
-            });
-            const cr = document.getElementById('clinicalRationale');
-            if (cr) Array.from(cr.querySelectorAll('.ai-insight')).forEach(el => el.remove());
-            const pi = document.getElementById('patientInstructions');
-            if (pi) Array.from(pi.querySelectorAll('.ai-insight')).forEach(el => el.remove());
-
-            await generateClaudeInsight();
           }
 
           function cleanupOldVersions() {
