@@ -226,7 +226,7 @@ app.post('/api/claude-report', async (req, res) => {
     Return ONLY valid JSON. START with '{' and END with '}'.`;
 
     const msg = await anthropic.messages.create({
-      model: "claude-sonnet-4-6",
+      model: "claude-3-5-sonnet-20241022",
       max_tokens: 4000,
       system: systemInstruction,
       messages: [{
