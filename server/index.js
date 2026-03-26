@@ -104,7 +104,7 @@ app.post('/api/extract', async (req, res) => {
 
   try {
     const msg = await anthropic.messages.create({
-      model: "claude-3-5-sonnet-20241022",
+      model: "claude-sonnet-4-6",
       max_tokens: 1000,
       system: extractionSystemPrompt,
       messages: [{ role: "user", content: `Extract from:\n\n${pdfText}` }],
@@ -135,22 +135,30 @@ app.post('/api/chat', async (req, res) => {
 
   try {
     const contextStr = contextObj ? JSON.stringify(contextObj) : "No context.";
-    const systemPrompt = `You are a clinical oncology nutrition assistant (Onvilox AI Co-pilot).
-    Use ESMO/ASCO guidelines. Keep answers under 3 sentences unless asked for detail.
-    Patient Context: ${contextStr}
-
-    EXTRACTION ROLE:
-    If the user's message contains new clinical values (weight, albumin, cancer type, etc.), you must ALSO extract them into a JSON object.
+    const systemPrompt = `You are a clinical oncology nutrition assistant (Onvilox AI Co-pilot) running on Claude 4.6.
+    Use ESMO/ASCO guidelines.
     
-    Response format:
+    EXTRACTION ROLE:
+    If the user's message contains clinical values (vitals, labs, cancer specs, anthropometry), extract them into a precise JSON object alongside your reply.
+    
+    SCHEMA FOR extractedData:
     {
-      "reply": "Your conversational answer here.",
-      "extractedData": { ... fields from extractionSchema if found, otherwise null ... }
+      "name": "string", "age": number, "sex": "Male/Female", "weight": number, "height": number, "usualWeight": number,
+      "uhic": "string", "cancer": "string", "regimen": "string", "cancerStage": "string", "tumorBurden": "string",
+      "reducedFoodIntake": number, "albumin": number, "crp": number, "creatinine": number, "hemoglobin": number,
+      "bloodSugar": number, "muac": number, "sarcopeniaStatus": "Yes/No", "activityLevel": "string",
+      "comorbidities": [], "sideEffects": [], "existingSupplements": [], "allergies": [], "metastasisSites": [], "genomicMarkers": []
+    }
+
+    Response format (Strict JSON):
+    {
+      "reply": "Conversational reply under 4 sentences.",
+      "extractedData": { ... entire schema above with found values, null otherwise ... }
     }`;
 
     const msg = await anthropic.messages.create({
-      model: "claude-3-5-sonnet-20241022",
-      max_tokens: 800,
+      model: "claude-sonnet-4-6",
+      max_tokens: 1500,
       system: systemPrompt,
       messages: [{ role: "user", content: message }],
     });
@@ -212,7 +220,7 @@ app.post('/api/claude-report', async (req, res) => {
     Return ONLY valid JSON. START with '{' and END with '}'.`;
 
     const msg = await anthropic.messages.create({
-      model: "claude-3-5-sonnet-20241022",
+      model: "claude-sonnet-4-6",
       max_tokens: 1200,
       system: systemInstruction,
       messages: [{

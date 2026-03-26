@@ -890,13 +890,14 @@ async function sendChatMessage() {
     
     const data = await response.json();
     typing.remove();
+    console.log("Onvilox AI Response:", data);
 
     if (data.reply) {
         addMessageHtml(data.reply, 'ai');
     }
 
-    if (data.extractedData) {
-        console.log("AI Detected Clinical Data:", data.extractedData);
+    if (data.extractedData && Object.keys(data.extractedData).length > 0) {
+        console.log("Auto-filling clinical fields from AI extraction...");
         applyExtractionData(data.extractedData);
         addMessage('✨ Clinical data detected! Patient form has been auto-populated.', 'ai');
     }
@@ -969,6 +970,9 @@ function applyExtractionData(data) {
   const setVal = (id, val) => {
     const el = document.getElementById(id);
     if (el && val !== null && val !== undefined) {
+      if (id === 'reducedFoodIntake' && typeof val === 'string') {
+        val = parseInt(val.replace(/[^0-9]/g, '')) || 0;
+      }
       el.value = val;
       highlight(id);
       if (typeof updateLabStatus === 'function') updateLabStatus(id, val);
