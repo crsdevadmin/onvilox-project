@@ -3898,12 +3898,9 @@
             const cp = window.currentVersionedPlan;
             if (!skipPersistence && cp && cp.id) {
               cp.claudeInsights = data;
-              const allPlans = getPlans();
-              const idx = allPlans.findIndex(p => p.id === cp.id);
-              if (idx !== -1) {
-                allPlans[idx] = cp;
-                localStorage.setItem('onvilox_plans', JSON.stringify(allPlans));
-                console.log("Claude insights persisted to plan:", cp.id);
+              if (typeof updatePlan === 'function') {
+                updatePlan(cp);
+                console.log("Claude insights persisted to plan via updatePlan:", cp.id);
               }
             }
 
