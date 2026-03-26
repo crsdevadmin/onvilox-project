@@ -53,13 +53,17 @@ function generateNutritionPlan(patient) {
   var chemFlags = {
     platin: regimen.includes('platin') || regimen.includes('folfox') || regimen.includes('folfirinox'),
     oxaliplatin: regimen.includes('oxaliplatin') || regimen.includes('folfox') || regimen.includes('folfirinox'),
-    bortezomib: (regimen.includes('bortezomib') || regimen.includes('velcade') || regimen.includes('vrd') || regimen.includes('vcd')) || cancer.includes('myeloma')
+    bortezomib: (regimen.includes('bortezomib') || regimen.includes('velcade') || regimen.includes('vrd') || regimen.includes('vcd')) || cancer.includes('myeloma'),
+    pembrolizumab: regimen.includes('pembrolizumab') || regimen.includes('keytruda'),
+    ac: regimen.includes('ac ') || regimen.includes('adriamycin') || (cancer.includes('breast') && regimen.includes('ac'))
   };
   
   var drugs = [];
   if (regimen.includes('cisplatin')) drugs.push("Cisplatin");
   if (chemFlags.bortezomib) drugs.push("Bortezomib");
   if (regimen.includes('lenalidomide') || regimen.includes('revlimid')) drugs.push("Lenalidomide");
+  if (chemFlags.pembrolizumab) drugs.push("Pembrolizumab");
+  if (chemFlags.ac) drugs.push("AC (Adriamycin + Cyclophosphamide)");
   
   const nutritionRiskReasons = [];
   let riskScore = 0;
@@ -191,7 +195,10 @@ function generateNutritionPlan(patient) {
   const totalProteinDelivery = dailyProtein + estimatedDietaryProtein;
 
   const totalDailyCalories = dailyCalories;
-  const totalDailyProtein = totalProteinDelivery; // FIXED: Now reflects TOTAL delivery
+  const totalDailyProtein = totalProteinDelivery; 
+
+  const proteinGap = Math.max(0, baseDailyProtein - totalDailyProtein);
+  const isGapCritical = (proteinGap / baseDailyProtein) > 0.2;
   
   // V3 Safety Engine (Step 6) - Exactly 6 Categories
   const safetyStatus = {
@@ -231,32 +238,38 @@ function generateNutritionPlan(patient) {
   }
 
   // --- Enhanced Drug Detection (Step 6 Safety) ---
-  if (chemFlags.platin || chemFlags.bortezomib) {
-    let msg = `DRUG INTERACTION: ${drugs.join(', ') || (chemFlags.platin ? 'Platinum-based' : 'Bortezomib/Myeloma')} protocol monitored.`;
+  if (chemFlags.platin || chemFlags.bortezomib || chemFlags.pembrolizumab || chemFlags.ac) {
+    let msg = `DRUG INTERACTION: ${drugs.join(', ') || 'High-risk regimen'} protocol monitored.`;
     
     // Check for existing supplements AND system prescriptions
     const existingSupplements = (Array.isArray(patient.existingSupplements) ? patient.existingSupplements : []).map(s => s.toLowerCase());
-    const hasExistingAntioxidants = existingSupplements.some(s => s.includes('vitamin c') || s.includes('alpha lipoic acid') || s.includes('ala'));
+    const hasExistingVitC = existingSupplements.some(s => s.includes('vitamin c') || s.includes('ascorbic'));
+    const hasExistingALA = existingSupplements.some(s => s.includes('alpha lipoic acid') || s.includes('ala'));
     
-    const isPrescribingHighVitC = micronutrients.vitC && parseInt(micronutrients.vitC) > 1000;
-    const isPrescribingALA = micronutrients.ala && micronutrients.ala !== 'None' && micronutrients.ala !== null;
-    const hasActiveAntioxidants = hasExistingAntioxidants || isPrescribingHighVitC || isPrescribingALA;
+    const isPrescribingHighVitC = (micronutrients.vitC && parseInt(micronutrients.vitC) > 500);
+    const isPrescribingALA = (micronutrients.ala && micronutrients.ala !== 'None' && micronutrients.ala !== null);
+
+    if (chemFlags.pembrolizumab) {
+      safetyStatus.drug = { level: 'warning', message: "IMMUNOTHERAPY ALERT: Pembrolizumab detected. [REQUIRED] Monitor for Immune-Related Adverse Events (irAEs) including Thyroiditis and Enterocolitis." };
+      if (tsh === 0 || isNaN(tsh)) {
+         safetyStatus.drug.level = 'danger';
+         safetyStatus.drug.message += " [CRITICAL] TSH missing; mandatory investigation for immunotherapy patients.";
+      }
+    }
+
+    if (chemFlags.ac && (hasExistingVitC || isPrescribingHighVitC)) {
+       safetyStatus.drug = { level: 'warning', message: "AC SAFETY ALERT: Adriamycin detected. High-dose Vit C (>500mg) may attenuate oxidative cytotoxicity. Limit antioxidant intake during infusion cycle." };
+    }
 
     if (chemFlags.bortezomib) {
-      if (hasActiveAntioxidants) {
+      if (hasExistingVitC || hasExistingALA || isPrescribingHighVitC || isPrescribingALA) {
         safetyStatus.drug = { level: 'danger', message: "CRITICAL DRUG CLASH: High-dose antioxidants (Vit C/ALA) found. Neutralizes Bortezomib efficacy. Discontinue immediately." };
       } else {
         safetyStatus.drug = { level: 'warning', message: msg + " Antioxidant cap (Vit C < 500mg, No ALA) enforced." };
       }
-    } else if (chemFlags.platin) {
-      if (hasActiveAntioxidants) {
-        safetyStatus.drug = { level: 'warning', message: `OXALIPLATIN SAFETY: High-dose antioxidants${isPrescribingHighVitC ? ' (Vit C >1000mg)' : ''}${isPrescribingALA ? ' (ALA 600mg)' : ''} detected. Requires Oncologist Clearance.` };
-      } else {
-        safetyStatus.drug = { level: 'info', message: "Drug Safety: Platinum-based chemo screened. No immediate antioxidant clashes." };
-      }
-    }
+    } 
   } else {
-    safetyStatus.drug = { level: 'info', message: 'Drug Interference: Screened for major antioxidant-chemo clashes (Bortezomib/Cisplatin). No flags.' };
+    safetyStatus.drug = { level: 'info', message: 'Drug Interference: Screened for major antioxidant-chemo clashes (Bortezomib/Cisplatin/Immunotherapy). No flags.' };
   }
 
   if (actualIntake <= 30) {
@@ -348,10 +361,13 @@ function generateNutritionPlan(patient) {
   if (regimen.includes('pemetrexed') || regimen.includes('methotrexate')) {
     interactions.push({ drug: "Antifolates (e.g. Pemetrexed)", effect: "Folate Antagonism", advice: "Strict adherence to explicit folate supplementation protocol required." });
   }
+  if (chemFlags.pembrolizumab) {
+    interactions.push({ drug: "Pembrolizumab (Keytruda)", effect: "Immune-Related Enterocolitis/Thyroiditis", advice: "Monitor for diarrhea >3/day or severe fatigue. Measure TSH every cycle." });
+  }
 
   const micronutrients = {
     vitD: hasRenalIssue ? '2000 IU/day (Renal Cap)' : (vitD > 0 && vitD < 20 ? '4000–6000 IU/day' : (vitD < 30 ? '2000–4000 IU/day' : '1000–2000 IU/day')),
-    vitC: chemFlags.bortezomib ? '500 mg/day (Antioxidant Cap for Bortezomib)' : (hasRenalIssue ? '500 mg/day (Renal Cap)' : ((crp > 5 || tumorBurden) && !chemFlags.bortezomib ? '2000 mg/day' : '1000 mg/day')),
+    vitC: (chemFlags.bortezomib || chemFlags.ac) ? '500 mg/day (Antioxidant Cap for Safety)' : (hasRenalIssue ? '500 mg/day (Renal Cap)' : ((crp > 5 || tumorBurden) && !chemFlags.bortezomib ? '2000 mg/day' : '1000 mg/day')),
     zinc: zinc > 0 && zinc < 60 ? '15–25 mg/day (Correction Protocol) + 2mg Copper' : '15 mg/day',
     omega3: (crp > 5 || cachexia || cancer.includes('pancreatic')) ? '3–4 g/day' : '2 g/day',
     epa: (cachexia || tumorBurden || cancer.includes('pancreatic')) ? '2.2 - 3.0 g EPA/day' : 'None',
@@ -512,7 +528,7 @@ function generateNutritionPlan(patient) {
     baseProb -= (ecogNum * 10);
     if (tumorBurden === 'High' || tumorBurden === 'Bulky') baseProb -= 10;
     
-    // 2. Intake Deficit vs. Plan Adequacy
+    // 2. Intake & Lab Deficit Penalties
     const intakeDeficit = 100 - (parseInt(intake) || 100);
     if (intakeDeficit > 20) {
       if (plan && plan.dailyProtein && plan.proteinPerKg && patient && patient.weight) {
@@ -524,6 +540,11 @@ function generateNutritionPlan(patient) {
         baseProb -= (intakeDeficit * 0.4); // Fallback penalty
       }
     }
+    
+    // Lab Integrity Penalties
+    if (chemFlags.pembrolizumab && (tsh === 0 || isNaN(tsh))) baseProb -= 15;
+    if (isDiabetic && (!patient.hba1c || patient.hba1c === 0)) baseProb -= 10;
+    if (proteinGap > 20) baseProb -= 15;
 
     // 3. Therapeutic Boosts
     if (plan && plan.proteinPerKg >= 1.5) baseProb += 8;
