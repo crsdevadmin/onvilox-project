@@ -191,8 +191,8 @@ app.post('/api/chat', async (req, res) => {
           const extracted = { ...data };
           delete extracted.reply;
           
-          // Check if it actually contains clinical keys
-          const hasKeys = commonKeys.some(k => extracted[k] !== undefined);
+          // Check if it actually contains ANY data keys beyond the reply
+          const hasKeys = Object.keys(extracted).length > 0;
           
           data = {
               reply: reply,
