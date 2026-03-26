@@ -214,7 +214,8 @@ app.post('/api/claude-report', async (req, res) => {
     AUDIT PROTOCOL:
     - Compare RAW_PATIENT_DATA vs ENGINE_CALCULATIONS.
     - If the engine under-prescribes, AUTHORIZED to 'Overpower'.
-    - CONCISENESS: Limit 'rationale' to top 5 points. Limit 'instructions' to top 8 actionable steps.
+    - CONCISENESS: Limit 'rationale' to top 5 points. Limit 'instructions' to top 10 actionable steps.
+    - MANDATORY TABLES: You MUST always provide 'drugInteractions', 'micronutrientOrders', and 'monitoringSchedule'. These are not optional. If none apply, return an empty array [].
     - If you overpower, you must include a "CLINICAL OVERPOWER" alert.
     
     CRITICAL SAFETY (NON-NEGOTIABLES):
