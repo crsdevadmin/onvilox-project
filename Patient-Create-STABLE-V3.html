@@ -1022,29 +1022,64 @@ function applyExtractionData(data) {
 
   if (data.cancer) {
     const input = document.getElementById('cancerInput');
-    if (input) {
-      input.value = data.cancer;
-      highlight('cancerInput');
-      if (typeof filterCancerList === 'function') {
-         // Try to find best match in master-data
-         const match = Object.keys(cancerRegimenMap || {}).find(k => k.toLowerCase().includes(data.cancer.toLowerCase()));
-         if (match) {
-            input.value = match;
-            if (typeof selectCancer === 'function') selectCancer(match);
-         }
+    if (input && typeof cancerRegimenMap !== 'undefined') {
+      const allKeys = Object.keys(cancerRegimenMap);
+      const cancerLower = (data.cancer || '').toLowerCase().trim();
+      const normalize = s => s.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+      const cancerNorm = normalize(data.cancer);
+
+      // Score each map key: count matching significant words, prefer longer (more specific) keys on tie
+      let bestMatch = null;
+      let bestScore = -1;
+      allKeys.forEach(k => {
+        const kNorm = normalize(k);
+        if (kNorm === cancerNorm) { bestMatch = k; bestScore = 999; return; }
+        const words = cancerNorm.split(' ').filter(w => w.length > 2);
+        let score = words.reduce((acc, w) => acc + (kNorm.includes(w) ? 1 : 0), 0);
+        // Prefer more specific (longer) keys when word score is tied
+        const tiebreak = kNorm.length / 1000;
+        if (score + tiebreak > bestScore) { bestScore = score + tiebreak; bestMatch = k; }
+      });
+
+      if (bestMatch && bestScore > 0) {
+        if (typeof selectCancer === 'function') {
+          selectCancer(bestMatch);
+        } else {
+          input.value = bestMatch;
+          highlight('cancerInput');
+        }
+      } else {
+        input.value = data.cancer;
+        highlight('cancerInput');
       }
     }
   }
+
   if (data.regimen) {
     const rInput = document.getElementById('regimenInput');
-    if (rInput) {
-       rInput.value = data.regimen;
-       highlight('regimenInput');
-       if (typeof selectRegimen === 'function' && typeof cancerRegimenMap !== 'undefined') {
-          const rList = cancerRegimenMap[document.getElementById('cancerInput').value] || [];
-          const match = rList.find(r => r.toLowerCase().includes(data.regimen.toLowerCase()));
-          if (match) selectRegimen(match);
-       }
+    if (rInput && typeof cancerRegimenMap !== 'undefined') {
+      const cancerKey = document.getElementById('cancerInput').value;
+      const rList = cancerRegimenMap[cancerKey] || [];
+      const normalize = s => s.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+      const regimenNorm = normalize(data.regimen);
+
+      // Score each regimen option by word overlap
+      let bestMatch = null;
+      let bestScore = -1;
+      rList.forEach(r => {
+        const rNorm = normalize(r);
+        if (rNorm === regimenNorm) { bestMatch = r; bestScore = 999; return; }
+        const words = regimenNorm.split(' ').filter(w => w.length > 1);
+        const score = words.reduce((acc, w) => acc + (rNorm.includes(w) ? 1 : 0), 0);
+        if (score > bestScore) { bestScore = score; bestMatch = r; }
+      });
+
+      if (bestMatch && bestScore > 0) {
+        if (typeof selectRegimen === 'function') selectRegimen(bestMatch);
+      } else {
+        rInput.value = data.regimen;
+        highlight('regimenInput');
+      }
     }
   }
 
@@ -1053,7 +1088,36 @@ function applyExtractionData(data) {
   setVal('tumorBurden', data.tumorBurden);
   setVal('sarcopeniaStatus', data.sarcopeniaStatus);
   setVal('activityLevel', data.activityLevel);
-  setVal('feedingMethod', data.feedingMethod);
+
+  // Feeding method: fuzzy-map partial strings to exact <select> option values
+  if (data.feedingMethod) {
+    const fmRaw = (data.feedingMethod || '').toLowerCase().trim();
+    let fmMatch = null;
+    if (typeof feedingMethods !== 'undefined') {
+      // Exact match first
+      fmMatch = feedingMethods.find(f => f.toLowerCase() === fmRaw);
+      if (!fmMatch) {
+        if (fmRaw.includes('parenteral') || fmRaw.includes('tpn')) {
+          fmMatch = fmRaw.includes('enteral') ? 'Combination Feeding (Enteral + Parenteral)' : 'Parenteral Nutrition (TPN)';
+        } else if (fmRaw.includes('combination') || (fmRaw.includes('oral') && (fmRaw.includes('enteral') || fmRaw.includes('tube')))) {
+          fmMatch = 'Combination Feeding (Oral + Enteral)';
+        } else if (fmRaw.includes('peg')) {
+          fmMatch = 'Enteral Feeding – PEG Tube';
+        } else if (fmRaw.includes('jejun') || fmRaw.includes('j-tube') || fmRaw.includes('jtube')) {
+          fmMatch = 'Enteral Feeding – Jejunostomy (J-Tube)';
+        } else if (fmRaw.includes('nasogastric') || fmRaw.includes('ng tube') || fmRaw.includes('ng-tube') || fmRaw.includes(' ng')) {
+          fmMatch = 'Enteral Feeding – Nasogastric Tube (NG)';
+        } else if (fmRaw.includes('enteral') || fmRaw.includes('tube feed') || fmRaw.includes('tube-feed')) {
+          fmMatch = 'Enteral Feeding – Nasogastric Tube (NG)';
+        } else if (fmRaw.includes('supplement') || fmRaw.includes('ons')) {
+          fmMatch = 'Oral Nutrition Supplements (ONS)';
+        } else if (fmRaw.includes('oral')) {
+          fmMatch = 'Oral Feeding (Normal Diet)';
+        }
+      }
+    }
+    setVal('feedingMethod', fmMatch || data.feedingMethod);
+  }
 
   // FUZZY MAPPING & RED FLAG INGESTION
   let extendedNotes = data.notes || "";
