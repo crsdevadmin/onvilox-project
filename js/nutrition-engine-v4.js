@@ -89,7 +89,7 @@ function generateNutritionPlan(patient) {
 
   // --- STEP 4 & 6: LAB INTERPRETATION & SAFETY ---
   if (hemoglobin > 0 && hemoglobin < 10) {
-    safetyAlerts.push({ condition: 'ANEMIA (Hb < 10)', severity: 'Moderate', action: 'Initiate Iron + B12 intensification protocol.' });
+    safetyAlerts.push({ condition: 'ANEMIA (Hb < 10)', severity: 'Moderate', action: 'Iron + B12 protocol indicated — HOLD iron initiation until iron panel confirmed (Ferritin, Serum Iron, TIBC, Transferrin Saturation).' });
   }
   if (patient.potassium > 5.0) {
     safetyAlerts.push({ condition: 'HYPERKALEMIA (>5.0)', severity: 'High', action: 'Restrict potassium sources; adjust formula to K-free matrix.' });
@@ -100,7 +100,7 @@ function generateNutritionPlan(patient) {
     safetyAlerts.push({ condition: 'MILD HYPONATREMIA (<135)', severity: 'Moderate', action: 'Monitor volume status; standard sodium target.' });
   }
   if (vitD > 0 && vitD < 20) {
-    safetyAlerts.push({ condition: 'VITAMIN D DEFICIENCY (<20)', severity: 'Moderate', action: 'High-dose Vit D protocol (4000-6000 IU/day).' });
+    safetyAlerts.push({ condition: 'VITAMIN D DEFICIENCY (<20)', severity: 'Moderate', action: 'Vit D correction: 4000 IU/day standardised. Recheck 25-OH-VitD at 8 weeks.' });
   }
   if (patient.magnesium > 0 && patient.magnesium < 1.7) {
     safetyAlerts.push({ condition: 'HYPOMAGNESEMIA (<1.7)', severity: 'Moderate', action: 'Magnesium correction protocol (200-400mg Mg Oxide/Citrate).' });
@@ -261,7 +261,7 @@ function generateNutritionPlan(patient) {
   }
 
   const micronutrients = {
-    vitD: hasRenalIssue ? '2000 IU/day (Renal Cap)' : (vitD > 0 && vitD < 20 ? '4000–6000 IU/day' : (vitD < 30 ? '2000–4000 IU/day' : '1000–2000 IU/day')),
+    vitD: hasRenalIssue ? '2000 IU/day (Renal Cap)' : (vitD > 0 && vitD < 20 ? '4000 IU/day (Deficiency correction; 25-OH-VitD recheck at 8 weeks required)' : (vitD < 30 ? '2000–4000 IU/day' : '1000–2000 IU/day')),
     vitC: chemFlags.ac ? '500 mg/day — HOLD on AC infusion days; inter-cycle only with oncologist approval' : (chemFlags.bortezomib ? '500 mg/day (Antioxidant Cap for Safety)' : (hasRenalIssue ? '500 mg/day (Renal Cap)' : ((crp > 5 || tumorBurden) && !chemFlags.bortezomib ? '2000 mg/day' : '1000 mg/day'))),
     zinc: zinc > 0 && zinc < 60 ? '15–25 mg/day (Correction Protocol) + 2mg Copper' : '15 mg/day',
     omega3: (crp > 5 || cachexia || cancer.includes('pancreatic')) ? '3–4 g/day' : '2 g/day',
@@ -280,7 +280,7 @@ function generateNutritionPlan(patient) {
     chromium: isDiabetic ? '400 mcg/day (Glycemic monitoring protocol active)' : null,
     ala: (isDiabetic && !chemFlags.bortezomib && !chemFlags.ac) ? '600 mg/day' : null,
     microbiome: (regimen.includes('folfirinox') || hasIBD) ? 'Soluble Fiber + Probiotic' : null,
-    iron: (hemoglobin > 0 && hemoglobin < 10) ? '100 mg elemental iron + B12 support' : null
+    iron: (hemoglobin > 0 && hemoglobin < 10) ? '100 mg elemental iron + B12 support — HOLD pending iron panel (Ferritin, Serum Iron, TIBC, Transferrin Saturation)' : null
   };
 
   if (cancer.includes('myeloma')) {
@@ -386,6 +386,22 @@ function generateNutritionPlan(patient) {
     safetyStatus.escalation = { level: 'danger', message: `LOW INTAKE ALERT: Intaking ${actualIntake}%. Enteral nutrition escalation mandatory — below 50% threshold.` };
   } else if (actualIntake <= 60) {
     safetyStatus.escalation = { level: 'warning', message: `ESCALATION RISK: Intaking ${actualIntake}% — below 60% clinical threshold. Intensive ONS bridging required. Reassess in 3 days; initiate NG tube if no improvement.` };
+  }
+
+  // Compound malnutrition: upgrade warning escalation to danger when ≥3 severe risk factors co-present
+  if (safetyStatus.escalation && safetyStatus.escalation.level === 'warning') {
+    const compoundFactors = [
+      cachexia,
+      sarcopenia,
+      albumin > 0 && albumin < 3.0,
+      prealbumin > 0 && prealbumin < 18,
+      hasMucositis,
+      hasNausea
+    ].filter(Boolean).length;
+    if (compoundFactors >= 3) {
+      safetyStatus.escalation.level = 'danger';
+      safetyStatus.escalation.message = `EN_ESCALATION_MANDATORY [HIGH]: Intake ${actualIntake}% with ${compoundFactors} concurrent high-risk factors (cachexia/sarcopenia/hypoalbuminaemia/GI symptoms). Composite malnutrition severity mandates immediate enteral escalation — do not defer to reassessment window.`;
+    }
   }
 
   if (reducedFoodIntake > 50) {
