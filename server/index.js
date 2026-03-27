@@ -247,62 +247,35 @@ app.post('/api/claude-report', async (req, res) => {
   if (!patient || !plan) return res.status(400).json({ error: 'Context required.' });
 
   try {
-    const rules = [
-      // ── ENTERAL ESCALATION ──
-      "ENTERAL ESCALATION: If reducedFoodIntake > 40 (i.e. actual oral intake < 60% of requirements), you MUST generate a HIGH clinicalAlert with type='EN_ESCALATION_MANDATORY' stating that nasogastric/nasoduodenal tube feeding must be initiated immediately. Do not omit this alert.",
-      // ── PROTEIN SAFETY ──
-      "RENAL CAP BOUNDARY: The 0.8 g/kg renal protein cap applies ONLY when creatinine > 1.3 mg/dL. If creatinine ≤ 1.3, the cap must NOT be applied. If the engine-prescribed protein is < 1.5 g/kg and creatinine ≤ 1.3, flag type='PROTEIN_CRITICAL_UNDERDOSE' as HIGH and set isOverpowered:true with corrected protein = weight × 1.8 (or × 2.0 if cachexia + platinum regimen).",
-      "PROTEIN MINIMUM: If patient has cachexia or sarcopenia AND prescribed totalDailyProtein < weight × 1.6 g/kg AND creatinine ≤ 1.3, flag PROTEIN_CRITICAL_UNDERDOSE as HIGH. State that underdosing accelerates catabolism, worsens sarcopenia, and increases treatment toxicity.",
-      // ── ANTIFOLATE TOXICITY ──
-      "ANTIFOLATE TOXICITY: If the regimen contains Pemetrexed, Methotrexate, or FOLFIRINOX AND patient folate < 5 ng/mL, generate a HIGH clinicalAlert type='FOLATE_DEFICIENCY_ANTIFOLATE'. State that folate deficiency on antifolate therapy significantly increases risk of severe mucositis, myelosuppression, and treatment-limiting neutropenia. Folate repletion must precede next cycle.",
-      // ── VITAMIN D ──
-      "VITAMIN D REPLETION: If vitD < 20 ng/mL flag as DEFICIENT. Prescribe 4000 IU/day repletion (NOT 2000 IU maintenance dose). If vitD < 12 ng/mL, prescribe 50,000 IU/week for 8 weeks then recheck. Always note that 2000 IU is a maintenance dose insufficient for repletion. Include in micronutrientOrders with status=DEFICIENT.",
-      // ── ANAEMIA ──
-      "ANAEMIA + IRON: If hemoglobin < 12 g/dL, generate a MODERATE clinicalAlert. If ferritin or iron studies are absent from the lab panel, flag iron panel as a mandatory investigation. If oral intake < 60%, recommend IV iron consideration over oral supplementation due to impaired absorption.",
-      // ── LIVER MONITORING ──
-      "LFT MONITORING: If ALT > 40 U/L or AST > 40 U/L, generate a MODERATE clinicalAlert requiring fortnightly LFT monitoring. If the patient has liver metastases or a hepatotoxic regimen (platinum, taxane, anthracycline), add hepatology escalation criteria if LFTs exceed 3× ULN.",
-      // ── GLUTAMINE CAUTION ──
-      "GLUTAMINE CAUTION: If glutamine is prescribed AND tumor burden is High or unknown, generate a MODERATE clinicalAlert type='GLUTAMINE_TUMOR_CAUTION'. State that glutamine may fuel tumour metabolism in high-burden settings and that oncologist sign-off is required before initiation.",
-      // ── STEROID HYPERGLYCAEMIA ──
-      "STEROID HYPERGLYCAEMIA: If HbA1c is 5.7–6.4% or fasting blood sugar is 100–125 mg/dL (pre-diabetic range), AND the regimen includes corticosteroids (Dexamethasone) or steroid-containing chemo, generate a MODERATE clinicalAlert for anticipated steroid-induced hyperglycaemia. Recommend glucose monitoring before and 2h after each dexamethasone dose.",
-      // ── IMMUNOTHERAPY ──
-      "IMMUNOTHERAPY: If regimen includes Pembrolizumab, Nivolumab, Atezolizumab, or Durvalumab, TSH monitoring every cycle is MANDATORY. Flag as CRITICAL if TSH is absent from the lab panel.",
-      // ── ANTIOXIDANT SAFETY ──
-      "ANTIOXIDANT SAFETY: If regimen includes Bortezomib, AC (Doxorubicin + Cyclophosphamide), Oxaliplatin, or Cisplatin, flag HIGH-dose Vitamin C (>500 mg) and Alpha-Lipoic Acid as EXCLUDED. Any such supplement in the plan must trigger a HIGH clinicalAlert.",
-      // ── ARITHMETIC ──
-      "ARITHMETIC: Verify onsCalories ÷ servingsPerDay ≈ perServingCalories (±5 kcal). Verify totalDailyProtein×4 + dailyCarbs×4 + dailyFat×9 ≤ totalDailyCalories×1.05.",
-      // ── SCORING ──
-      "SCORE: The maximum achievable score is 9.8 — reserve this for plans that are clinically complete, arithmetically correct, have all mandatory labs present, and require no corrections. Deduct 1.5 for each HIGH/unresolved CRITICAL issue. Deduct 0.5 for each MODERATE gap. Deduct 0.3 for each missing mandatory investigation. Deduct 0.5 for each arithmetic error. A plan with 1 MODERATE gap scores ~9.3; with 1 HIGH issue ~8.3; with 3+ HIGH issues ≤ 5.3. Do NOT round to 10 — 9.8 is the ceiling.",
-      // ── OVERPOWER ──
-      "OVERPOWER: Set isOverpowered:true and supply correctedPrescription if totalDailyProtein is clinically wrong per the protein rules above, or if totalDailyCalories deviates > 15% from weight × appropriate kcal/kg.",
-      // ── DRUG TABLE ──
-      "DRUG TABLE: For EVERY named drug or drug class in the regimen, add a row to drugInteractions. Never return an empty drugInteractions array for a patient on active chemotherapy.",
-      // ── DIETARY ──
-      "DIETARY: If sideEffects include nausea, vomiting, mucositis, or dysgeusia, or if intake < 60%, add specific food-texture modifications and anti-nausea strategies to instructions.",
-      // ── MONITORING ──
-      "MONITORING: Minimum schedule: weekly weight; fortnightly albumin, CRP, LFTs; cycle-specific labs per regimen (TSH for immunotherapy, creatinine + Mg for platinum, LFTs for anthracyclines)."
-    ].join("\n");
-    const system = `You are the Onvilox Clinical AI Auditor (PhD/RD + Clinical Oncology level). Your role is to audit a nutrition plan and generate a complete, untruncated safety report. ALL arrays must be populated — do not omit clinicalAlerts, micronutrientOrders, or monitoringSchedule even if the plan appears adequate.
+    const rules = `
+ENTERAL: reducedFoodIntake>40 (intake<60%) → HIGH alert type=EN_ESCALATION_MANDATORY (NG/NJ tube required immediately).
+PROTEIN_CAP: Renal 0.8g/kg cap ONLY if creatinine>1.3. If creatinine≤1.3 AND totalDailyProtein<weight×1.6 AND (cachexia OR sarcopenia) → HIGH PROTEIN_CRITICAL_UNDERDOSE, isOverpowered:true, correctedProtein=weight×1.8 (×2.0 if cachexia+platinum).
+ANTIFOLATE: (Pemetrexed OR Methotrexate OR FOLFIRINOX) AND folate<5ng/mL → HIGH FOLATE_DEFICIENCY_ANTIFOLATE (mucositis/myelosuppression risk; repletion before next cycle).
+VITD: vitD<20→DEFICIENT→4000IU/day repletion. vitD<12→50,000IU/week×8wks. 2000IU is maintenance only, not repletion.
+ANAEMIA: Hb<12→MODERATE alert. Iron studies absent→mandatory investigation. Intake<60%→prefer IV iron.
+LFT: ALT>40 OR AST>40 → MODERATE, fortnightly LFTs. Liver mets or hepatotoxic regimen (platinum/taxane/anthracycline) → hepatology if >3×ULN.
+GLUTAMINE: Glutamine prescribed AND (tumorBurden=High OR unknown) → MODERATE GLUTAMINE_TUMOR_CAUTION (oncologist approval required).
+STEROID_DM: (HbA1c 5.7–6.4% OR bloodSugar 100–125) AND dexamethasone/steroid in regimen → MODERATE steroid hyperglycaemia alert + glucose monitoring plan.
+IMMUNOTHERAPY: Pembrolizumab/Nivolumab/Atezolizumab/Durvalumab → TSH every cycle mandatory. TSH absent → CRITICAL.
+ANTIOXIDANTS: Bortezomib/AC/Oxaliplatin/Cisplatin → VitC>500mg and ALA are EXCLUDED. Flag HIGH if present in plan.
+MATH: onsCalories÷servingsPerDay≈perServingCalories(±5kcal). protein×4+carbs×4+fat×9≤totalCalories×1.05.
+SCORE: Max=9.8. Deduct 1.5/HIGH, 0.5/MODERATE, 0.3/missing mandatory lab, 0.5/math error. 9.8=complete+correct, ~8.3=1 HIGH issue, ≤5.3=3+ HIGH issues.
+OVERPOWER: isOverpowered:true if protein violates rules above OR calories deviate >15% from weight×kcalPerKg.
+DRUGS: Every drug/class in regimen → drugInteractions entry. Never empty for active chemo.
+DIETARY: Nausea/mucositis/dysgeusia/intake<60% → texture modifications + anti-nausea strategies in instructions.
+MONITORING: Weekly weight; fortnightly albumin+CRP+LFTs; TSH/cycle (immunotherapy); creatinine+Mg (platinum); LFTs (anthracyclines).`.trim();
 
-RULES (apply every rule to every patient):
+    const system = `You are the Onvilox Clinical AI Auditor (Oncology RD/PhD). Audit the nutrition plan strictly. Return ONLY valid compact JSON — no markdown, no prose outside JSON. Keep string values concise (max 25 words each). ALL 9 fields required.
+
+RULES:
 ${rules}
 
-OUTPUT FORMAT (JSON ONLY — no markdown, no preamble). ALL fields are required:
-{
-  "validationScore": number (0–10, honest scoring per deduction rules above),
-  "rationale": [3–5 strings — key clinical reasoning points],
-  "instructions": [patient-facing dietary instructions, 4–6 items],
-  "clinicalAlerts": [{"type": string, "level": "HIGH"|"MODERATE"|"LOW", "message": string}],
-  "correctedPrescription": {"isOverpowered": bool, "dailyCalories": number, "dailyProtein": number, "reasoning": string},
-  "logicRefinements": [strings — arithmetic errors or plan logic gaps],
-  "drugInteractions": [{"drug": string, "interaction": string, "advice": string, "risk": "HIGH"|"MODERATE"|"LOW"}],
-  "micronutrientOrders": [{"nutrient": string, "labValue": string, "dose": string, "rationale": string, "status": "SUPPLEMENT"|"DEFICIENT"|"MONITOR"|"CAPPED"|"EXCLUDED"|"STANDARD"}],
-  "monitoringSchedule": [{"frequency": string, "parameters": string, "threshold": string, "responsible": string}]
-}`;
+OUTPUT (JSON only):
+{"validationScore":number,"rationale":[3-5 strings],"instructions":[4-6 strings],"clinicalAlerts":[{"type":string,"level":"HIGH"|"MODERATE"|"LOW","message":string}],"correctedPrescription":{"isOverpowered":bool,"dailyCalories":number,"dailyProtein":number,"reasoning":string},"logicRefinements":[strings],"drugInteractions":[{"drug":string,"interaction":string,"advice":string,"risk":"HIGH"|"MODERATE"|"LOW"}],"micronutrientOrders":[{"nutrient":string,"labValue":string,"dose":string,"rationale":string,"status":"SUPPLEMENT"|"DEFICIENT"|"MONITOR"|"CAPPED"|"EXCLUDED"|"STANDARD"}],"monitoringSchedule":[{"frequency":string,"parameters":string,"threshold":string,"responsible":string}]}`;
 
     const msg = await anthropic.messages.create({
       model: "claude-sonnet-4-6",
-      max_tokens: 4000,
+      max_tokens: 6000,
       system: system,
       messages: [{
         role: "user",
@@ -313,15 +286,47 @@ OUTPUT FORMAT (JSON ONLY — no markdown, no preamble). ALL fields are required:
     const rawText = msg.content[0].text;
     let data;
     try {
-      const jsonMatch = rawText.match(/{[\s\S]*}/);
+      const jsonMatch = rawText.match(/{[\s\S]*/);
       if (!jsonMatch) throw new Error("No JSON");
       let jsonStr = jsonMatch[0];
-      const open = (jsonStr.match(/{/g) || []).length;
-      const close = (jsonStr.match(/}/g) || []).length;
-      if (open > close) jsonStr += "}".repeat(open - close);
-      data = JSON.parse(jsonStr);
+
+      // Pass 1: close unclosed braces/brackets
+      const opens = (jsonStr.match(/{/g) || []).length;
+      const closes = (jsonStr.match(/}/g) || []).length;
+      if (opens > closes) jsonStr += '}' .repeat(opens - closes);
+
+      // Pass 2: if still invalid, truncate at last cleanly-closed top-level value
+      try {
+        data = JSON.parse(jsonStr);
+      } catch {
+        // Find last position where JSON is likely clean: after a ] or } followed by ,
+        const lastClean = Math.max(jsonStr.lastIndexOf('],'), jsonStr.lastIndexOf('},'));
+        if (lastClean > 10) {
+          let trimmed = jsonStr.substring(0, lastClean + 1);
+          const o2 = (trimmed.match(/{/g) || []).length;
+          const c2 = (trimmed.match(/}/g) || []).length;
+          trimmed += '}'.repeat(Math.max(0, o2 - c2));
+          data = JSON.parse(trimmed);
+        } else {
+          throw new Error('Unrecoverable truncation');
+        }
+      }
     } catch (e) {
-      data = { rationale: ["Analysis too complex/long for current token limit."], instructions: ["Check logs."], clinicalAlerts: [] };
+      console.error("Claude report parse failed, raw length:", rawText?.length, e.message);
+      // Salvage whatever fields are present via regex rather than returning nothing
+      const grabArr = (key) => { try { const m = rawText.match(new RegExp(`"${key}"\\s*:\\s*(\\[[\\s\\S]*?\\])`)); return m ? JSON.parse(m[1]) : []; } catch { return []; } };
+      const grabNum = (key) => { const m = rawText.match(new RegExp(`"${key}"\\s*:\\s*([\\d.]+)`)); return m ? parseFloat(m[1]) : null; };
+      data = {
+        validationScore: grabNum('validationScore'),
+        rationale: grabArr('rationale'),
+        instructions: grabArr('instructions'),
+        clinicalAlerts: grabArr('clinicalAlerts'),
+        correctedPrescription: { isOverpowered: false, dailyCalories: null, dailyProtein: null, reasoning: 'Response truncated — re-run audit.' },
+        logicRefinements: grabArr('logicRefinements'),
+        drugInteractions: grabArr('drugInteractions'),
+        micronutrientOrders: grabArr('micronutrientOrders'),
+        monitoringSchedule: grabArr('monitoringSchedule')
+      };
     }
     res.json(data);
   } catch (error) {
