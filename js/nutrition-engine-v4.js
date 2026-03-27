@@ -24,13 +24,24 @@ function generateNutritionPlan(patient) {
   const cancer = (patient.cancer || '').toLowerCase();
   
   const bmi = height ? (weight / Math.pow(height / 100, 2)) : 0;
+  const isVegetarian = !!patient.vegetarian;
   
   const smi = parseFloat(patient.smi || 0);
   const handGrip = parseFloat(patient.handGrip || 0);
   let sarcopenia = patient.sarcopeniaStatus === 'Sarcopenic';
   
+  // SMI Unit detection (ASMI kg/m2 vs L3-SMI cm2/m2)
+  const isL3SMI = smi > 15; 
+
   if (smi > 0) {
-    const smiLow = (gender === 'male' ? smi < 7.0 : smi < 5.7);
+    let smiLow = false;
+    if (isL3SMI) {
+      // Janssen et al. / Martin et al. thresholds for L3-SMI (cm2/m2)
+      smiLow = (gender === 'male' ? smi < 55 : smi < 38.5); 
+    } else {
+      // EWGSOP2 thresholds for ASMI (kg/m2)
+      smiLow = (gender === 'male' ? smi < 7.0 : smi < 5.7);
+    }
     if (smiLow) sarcopenia = true;
   }
   if (handGrip > 0) {
@@ -274,8 +285,20 @@ function generateNutritionPlan(patient) {
     electrolyte: { level: 'info', message: 'Electrolyte Safety: Standard formula (Na/K normal)' },
     drug: { level: 'info', message: 'Drug Interference: No major antioxidants flagged' },
     escalation: { level: 'info', message: 'Escalation Status: Standard oral intake' },
-    deficit: { level: 'info', message: 'Deficit Monitoring: Gap fully covered by prescription' }
+    deficit: { level: 'info', message: 'Deficit Monitoring: Gap fully covered by prescription' },
+    composition: { level: 'info', message: 'Body Composition: No immediate imaging flags.' }
   };
+
+  // --- SMI / Composition Safety Order ---
+  if (smi > 0 && isL3SMI) {
+     const isAtSarcopeniaBoundary = (gender === 'female' ? (smi >= 38 && smi <= 41) : (smi >= 52 && smi <= 55));
+     if (isAtSarcopeniaBoundary || sarcopenia) {
+         safetyStatus.composition = { 
+             level: 'warning', 
+             message: `SARCOPENIA RISK: SMI ${smi} cm²/m² detected. [MANDATORY] CT L3 imaging order required to confirm algorithmic estimate and baseline muscle mass.` 
+         };
+     }
+  }
 
   if (creatinine > 1.3) {
     safetyStatus.renal = { level: 'danger', message: `CRITICAL RENAL ALERT: Creatinine ${creatinine} is elevated. Protein strictly restricted to 0.8g/kg.` };
@@ -370,7 +393,7 @@ function generateNutritionPlan(patient) {
 
   const reassessmentProtocol = {
     frequency: (nutritionRisk === 'High' || ecog >= 3) ? "Weekly" : "Bi-weekly",
-    markers: "Weight, Serum Albumin, CRP, Hand Grip Strength",
+    markers: (sarcopenia || isL3SMI) ? "Weight, Serum Albumin, CRP, Hand Grip Strength, CT L3 Imaging confirmation" : "Weight, Serum Albumin, CRP, Hand Grip Strength",
     rationale: `High metabolic risk (${nutritionRisk}) requires rapid monitoring window.`
   };
 
@@ -587,6 +610,42 @@ function generateNutritionPlan(patient) {
     organProtection: (hasRenalIssue || alt > 50) ? "Safety Protocols Active" : "Standard"
   };
 
+  // --- Enhanced Dietary Guidance (V3.1) ---
+  const dietaryPlan = {
+    texture: "Standard (Normal solids)",
+    strategies: [],
+    mealExamples: []
+  };
+
+  if (hasMucositis) {
+    dietaryPlan.texture = "Soft / Moist (Grade 1-2 Mucositis Protocol)";
+    dietaryPlan.strategies.push("Avoid acidic (citrus/tomato), spicy, and crunchy foods.", "Use gravy, sauces, or yogurt to moisten foods.", "Cool or room temperature foods are better tolerated.");
+  }
+
+  if (hasNausea) {
+    if (dietaryPlan.texture === "Standard (Normal solids)") {
+        dietaryPlan.texture = "Neutral / Low-Odor (Nausea Management)";
+    }
+    dietaryPlan.strategies.push("Small, frequent snacks instead of large meals.", "Focus on cold or neutral-temperature foods to minimize odors.", "Dry ginger or ginger tea may help alleviate symptoms.");
+  }
+
+  // Culturally Adapted Meal Examples
+  if (isVegetarian) {
+    dietaryPlan.mealExamples = [
+        "Soft Dal (Lentils) with mashed rice and ghee",
+        "Mashed Paneer/Tofu with mild spices",
+        "Greek yogurt with blended fruit puree",
+        "Soft-cooked khichdi (rice and lentil porridge)"
+    ];
+  } else {
+    dietaryPlan.mealExamples = [
+        "Steamed fish (Basa/Tilapia) with mashed potatoes",
+        "Clear chicken soup with shredded soft chicken",
+        "Soft scrambled eggs with a dash of cream",
+        "Mashed tuna with mayonnaise"
+    ];
+  }
+
   return {
     cachexia, sarcopenia, bmi: Math.round(bmi * 10) / 10, kcalPerKg, proteinPerKg,
     servingsPerDay, totalDailyCalories, totalDailyProtein,
@@ -597,6 +656,7 @@ function generateNutritionPlan(patient) {
     nutritionRiskReasons, safetyAlerts,
     patientInstructions, 
     outcomes, interactions,
+    dietaryPlan,
     enteralProtocol, electrolyteStrategy, reassessmentProtocol,
     hasRenalIssue,
     hasHighRiskRegimen: (chemFlags.bortezomib || regimen.includes('cisplatin') || regimen.includes('platin') || regimen.includes('lenalidomide')),

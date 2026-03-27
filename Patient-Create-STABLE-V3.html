@@ -650,6 +650,7 @@ function submitPatient(){
     tumorBurden: document.getElementById('tumorBurden').value,
     ecogStatus: parseInt(document.getElementById('ecogStatus').value || 0),
     cancerStage: document.getElementById('cancerStage').value,
+    vegetarian: (document.getElementById('isVegetarian').value === 'true'),
     culturalPreferences: document.getElementById('culturalPreferences').value,
     notes: document.getElementById('notes').value,
     hospitalName: document.getElementById('hospitalName') ? document.getElementById('hospitalName').value : '',
