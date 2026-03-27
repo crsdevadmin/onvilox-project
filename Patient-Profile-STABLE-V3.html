@@ -997,6 +997,27 @@
           </div>
         </div>
 
+        <!-- MDT REVIEW ACTIONS -->
+        <div id="mdtReviewSection" style="display:none; margin-top:16px;" class="rs">
+          <div class="rs-title" style="color:#1e40af; border-bottom-color:#93c5fd;">&#128203; Pending MDT Reviews — Clinical Decision Required</div>
+          <table style="width:100%; border-collapse:collapse; font-size:11px; margin-top:8px;">
+            <thead>
+              <tr style="background:#eff6ff;">
+                <th style="padding:7px 8px; text-align:left; border:1px solid #93c5fd; font-weight:700; color:#1e40af; width:18%;">Intervention</th>
+                <th style="padding:7px 8px; text-align:left; border:1px solid #93c5fd; font-weight:700; color:#1e40af; width:28%;">Review Rationale</th>
+                <th style="padding:7px 8px; text-align:left; border:1px solid #93c5fd; font-weight:700; color:#1e40af; width:24%;">Monitoring Criteria</th>
+                <th style="padding:7px 8px; text-align:left; border:1px solid #93c5fd; font-weight:700; color:#1e40af; width:12%;">MDT Meeting Date</th>
+                <th style="padding:7px 8px; text-align:left; border:1px solid #93c5fd; font-weight:700; color:#1e40af; width:10%;">Agenda Item Ref</th>
+                <th style="padding:7px 8px; text-align:left; border:1px solid #93c5fd; font-weight:700; color:#1e40af; width:8%;">Lead Clinician</th>
+              </tr>
+            </thead>
+            <tbody id="mdtReviewBody"></tbody>
+          </table>
+          <div style="font-size:9.5px; color:#1e40af; margin-top:8px; font-style:italic; padding-left:8px; border-left:3px solid #93c5fd;">
+            &#9888;&#65039; Interventions listed here are ACTIVE pending MDT review. Do not discontinue without documented MDT consensus. Named lead clinician must be assigned and MDT date confirmed before this record is countersigned.
+          </div>
+        </div>
+
         <!-- MANUFACTURING -->
         <div class="rs">
           <div class="rs-title">Production Specifications</div>
@@ -1061,79 +1082,73 @@
 
         <!-- TRACE & RATIONALE -->
         <div class="rs" style="margin-top:24px;">
-          <div class="rg rg2">
-            <div>
-              <div class="rs-title" style="font-size:9.5px;">Calculation Trace</div>
-              <div class="rtrace" id="calcTrace"></div>
-            </div>
-            <div>
-              <div style="display:flex; justify-content:space-between; align-items:center;">
-                <div class="rs-title" style="font-size:9.5px; margin:0;">Clinical Rationale</div>
-                <!-- AI Refine button moved to main action row for clarity -->
-              </div>
-              <ul class="rrat" id="clinicalRationale"></ul>
+          <div class="rs-title" style="font-size:9.5px;">Calculation Trace</div>
+          <div class="rtrace" id="calcTrace"></div>
+        </div>
 
-              <div class="rs-title" style="font-size:9.5px; margin-top:20px;">Patient Guidance</div>
-              <ul class="rrat" id="patientInstructions" style="font-size:11.5px; color:#475569;"></ul>
+        <div class="rs" style="margin-top:16px;">
+          <div class="rs-title" style="font-size:9.5px;">Clinical Rationale</div>
+          <ul class="rrat" id="clinicalRationale"></ul>
+        </div>
 
-              <div class="rs-title" style="font-size:9.5px; margin-top:20px;">Structured Dietary & Meal Plan</div>
-              <div id="dietaryPlanContainer" style="font-size:11.5px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:12px; margin-top:5px; color:#334155; display:none;">
-                  <div style="margin-bottom:8px;"><strong>Recommended Texture:</strong> <span id="dietTexture" style="color:#0f172a; font-weight:600;"></span></div>
-                  <div style="margin-bottom:8px;"><strong>Clinical Strategies:</strong> <div id="dietStrategies" style="margin-top:2px; line-height:1.4;"></div></div>
-                  <div><strong>Safe Meal Examples:</strong> <ul id="dietMealExamples" style="margin:5px 0 0 15px; padding:0; line-height:1.4;"></ul></div>
-              </div>
+        <div class="rs" style="margin-top:16px;">
+          <div class="rs-title" style="font-size:9.5px;">Patient Guidance</div>
+          <ul class="rrat" id="patientInstructions" style="font-size:11.5px; color:#475569;"></ul>
+        </div>
 
-              <!-- V3 Outcome Probability Engine -->
-              <div id="v3OutcomeModule"
-                style="margin-top:20px; border:2px solid #0ea5e9; border-radius:10px; background:#f0f9ff; padding:15px; display:none;">
-                <div style="display:flex; align-items:center; gap:12px; margin-bottom:10px;">
-                  <div
-                    style="background:#0ea5e9; color:white; font-size:10px; font-weight:900; padding:3px 8px; border-radius:4px; text-transform:uppercase;">
-                    V3 CDSS Logic</div>
-                  <div style="font-weight:700; color:#0369a1; font-size:14px;">Outcome Probability</div>
-                </div>
-                <div style="display:flex; align-items:center; gap:20px;">
-                  <div id="outcomePct" style="font-size:32px; font-weight:800; color:#0ea5e9; min-width:80px;">0%</div>
-                  <div style="border-left:2px solid #e0f2fe; padding-left:15px;">
-                      <div id="aiValidationScore" style="font-size:24px; font-weight:900; color:#6d28d9; line-height:1;">--</div>
-                      <div style="font-size:9px; font-weight:800; color:#6d28d9; text-transform:uppercase; margin-top:2px;">Clinical Validation</div>
-                  </div>
-                  <div style="flex:1;">
-                    <div style="font-weight:600; color:#1e293b; font-size:12.5px;" id="outcomeTitle">Standard Forecast
-                    </div>
-                    <div style="font-size:11px; color:#475569; margin-top:4px;" id="outcomeDesc">Calculating clinical
-                      probability based on risk factors, ECOG, and tumor burden.</div>
-                  </div>
-                </div>
-                <div style="margin-top:12px; height:8px; background:#e0f2fe; border-radius:4px; overflow:hidden;">
-                  <div id="outcomeBar" style="height:100%; width:0%; background:#0ea5e9; transition:width 1s ease;">
-                  </div>
-                </div>
-                <div style="font-size:9px; color:#64748b; margin-top:8px; font-style:italic;">* Quantified prediction
-                  based on 4-week stabilization protocol.</div>
-              </div>
-
-              <div class="rs-title" style="font-size:9.5px; margin-top:20px;">Detailed Clinical Forecasts</div>
-              <ul class="rrat" id="outcomePredictions" style="font-size:11.5px; color:#0369a1;"></ul>
-
-              <div class="rs-title" style="font-size:9.5px; margin-top:20px;">Daily Diet Integration</div>
-              <ul class="rrat" id="dietIntegration" style="font-size:11.5px; color:#1e293b; font-weight:500;"></ul>
-
-              <div class="rs-title" style="font-size:9.5px; margin-top:20px;">Manufacturing Alerts (Store)</div>
-              <ul class="rrat" id="manufacturingAlerts" style="font-size:11.5px; color:#dc2626; font-weight:600;"></ul>
-
-              <div style="font-size:11px; color:#64748b; margin-top:10px; padding-left:14px; font-style:italic;"
-                id="riskMonitor"></div>
-              <div style="font-size:11px; color:#64748b; margin-top:4px; padding-left:14px; font-style:italic;"
-                id="riskNote"></div>
-
-              <!-- MANDATORY INVESTIGATIONS (Engine-Computed) -->
-              <div id="mandatoryInvestigationsContainer" style="display:none; margin-top:16px;">
-                <div class="rs-title" style="font-size:9.5px; margin-bottom:8px; color:#991b1b; border-color:#fca5a5;">🔬 Mandatory Investigations Required Before Approval</div>
-                <div id="mandatoryInvestigationsList"></div>
-              </div>
-
+        <div class="rs" style="margin-top:16px;">
+          <div class="rs-title" style="font-size:9.5px;">Structured Dietary &amp; Meal Plan</div>
+          <div id="dietaryPlanContainer" style="font-size:11.5px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:12px; margin-top:5px; color:#334155; display:none;">
+            <div style="margin-bottom:8px;"><strong>Recommended Texture:</strong> <span id="dietTexture" style="color:#0f172a; font-weight:600;"></span></div>
+            <div style="margin-bottom:8px;"><strong>Clinical Strategies:</strong> <div id="dietStrategies" style="margin-top:2px; line-height:1.4;"></div></div>
+            <div><strong>Safe Meal Examples:</strong> <ul id="dietMealExamples" style="margin:5px 0 0 15px; padding:0; line-height:1.4;"></ul></div>
           </div>
+        </div>
+
+        <!-- V3 Outcome Probability Engine -->
+        <div id="v3OutcomeModule" style="margin-top:16px; border:2px solid #0ea5e9; border-radius:10px; background:#f0f9ff; padding:15px; display:none;">
+          <div style="display:flex; align-items:center; gap:12px; margin-bottom:10px;">
+            <div style="background:#0ea5e9; color:white; font-size:10px; font-weight:900; padding:3px 8px; border-radius:4px; text-transform:uppercase;">V3 CDSS Logic</div>
+            <div style="font-weight:700; color:#0369a1; font-size:14px;">Outcome Probability</div>
+          </div>
+          <div style="display:flex; align-items:center; gap:20px;">
+            <div id="outcomePct" style="font-size:32px; font-weight:800; color:#0ea5e9; min-width:80px;">0%</div>
+            <div style="border-left:2px solid #e0f2fe; padding-left:15px;">
+              <div id="aiValidationScore" style="font-size:24px; font-weight:900; color:#6d28d9; line-height:1;">--</div>
+              <div style="font-size:9px; font-weight:800; color:#6d28d9; text-transform:uppercase; margin-top:2px;">Clinical Validation</div>
+            </div>
+            <div style="flex:1;">
+              <div style="font-weight:600; color:#1e293b; font-size:12.5px;" id="outcomeTitle">Standard Forecast</div>
+              <div style="font-size:11px; color:#475569; margin-top:4px;" id="outcomeDesc">Calculating clinical probability based on risk factors, ECOG, and tumor burden.</div>
+            </div>
+          </div>
+          <div style="margin-top:12px; height:8px; background:#e0f2fe; border-radius:4px; overflow:hidden;">
+            <div id="outcomeBar" style="height:100%; width:0%; background:#0ea5e9; transition:width 1s ease;"></div>
+          </div>
+          <div style="font-size:9px; color:#64748b; margin-top:8px; font-style:italic;">* Quantified prediction based on 4-week stabilization protocol.</div>
+        </div>
+
+        <div class="rs" style="margin-top:16px;">
+          <div class="rs-title" style="font-size:9.5px;">Detailed Clinical Forecasts</div>
+          <ul class="rrat" id="outcomePredictions" style="font-size:11.5px; color:#0369a1;"></ul>
+        </div>
+
+        <div class="rs" style="margin-top:16px;">
+          <div class="rs-title" style="font-size:9.5px;">Daily Diet Integration</div>
+          <ul class="rrat" id="dietIntegration" style="font-size:11.5px; color:#1e293b; font-weight:500;"></ul>
+        </div>
+
+        <div class="rs" style="margin-top:16px;">
+          <div class="rs-title" style="font-size:9.5px;">Manufacturing Alerts (Store)</div>
+          <ul class="rrat" id="manufacturingAlerts" style="font-size:11.5px; color:#dc2626; font-weight:600;"></ul>
+          <div style="font-size:11px; color:#64748b; margin-top:10px; padding-left:14px; font-style:italic;" id="riskMonitor"></div>
+          <div style="font-size:11px; color:#64748b; margin-top:4px; padding-left:14px; font-style:italic;" id="riskNote"></div>
+        </div>
+
+        <!-- MANDATORY INVESTIGATIONS (Engine-Computed) -->
+        <div id="mandatoryInvestigationsContainer" style="display:none; margin-top:16px;" class="rs">
+          <div class="rs-title" style="font-size:9.5px; margin-bottom:8px; color:#991b1b; border-color:#fca5a5;">&#128302; Mandatory Investigations Required Before Approval</div>
+          <div id="mandatoryInvestigationsList"></div>
         </div>
 
         <!-- CLAUDE AI SECTIONS — placed outside CSS Grid for reliable PDF capture -->
@@ -3098,7 +3113,17 @@
             setVal('epa', fp.micronutrients.epa || 'None prescribed');
             setVal('leucine', fp.micronutrients.leucine || 'Not elevated');
             setVal('hmb', fp.micronutrients.hmb || 'None');
-            setVal('glutamine', fp.micronutrients.glutamine || 'None');
+            (function() {
+              const glutVal = fp.micronutrients.glutamine || 'None';
+              if (glutVal.includes('MDT REVIEW REQUIRED')) {
+                document.getElementById('glutamine').innerHTML =
+                  '<span style="background:#eff6ff;border:1px solid #93c5fd;color:#1e40af;font-size:10px;font-weight:800;padding:3px 8px;border-radius:4px;display:inline-block;">&#128203; MDT REVIEW REQUIRED</span>' +
+                  '<span style="color:#475569;font-size:10.5px;margin-left:6px;">' + glutVal.replace(' — MDT REVIEW REQUIRED (High Tumor Burden)', '') + '</span>' +
+                  '<div style="font-size:9.5px;color:#1e40af;margin-top:3px;font-style:italic;">High Tumor Burden: do not discontinue without MDT consensus. See MDT Review table below.</div>';
+              } else {
+                setVal('glutamine', glutVal);
+              }
+            })();
             setVal('selenium', fp.micronutrients.selenium || '50-100 mcg');
             setVal('magnesium', fp.micronutrients.magnesium || 'Standard');
             setVal('bComplex', fp.micronutrients.bComplex || 'Standard');
@@ -3158,6 +3183,15 @@
                   restart: 'Permitted at 500mg cap on confirmed inter-cycle (non-infusion) days only. Any reinstatement on AC infusion days requires oncologist countersignature.',
                   countersig: true
                 });
+                // VitC Taxane-phase dose escalation — additional prescriber order when sequential AC→Taxane
+                if (vitCVal.includes('Taxane phase:') || vitCVal.includes('titration to 1000')) {
+                  holdOrders.push({
+                    supplement: 'Vitamin C — Taxane Phase Escalation (500 \u2192 1000 mg/day)',
+                    reason: 'Sequential AC\u2192Taxane regimen. VitC dose ceiling was 500mg during AC cycle. Escalation to 1000mg/day in Taxane phase requires formal oncologist authorisation \u2014 antioxidant ceiling lifted only after confirmed AC cycle completion and phase transition.',
+                    restart: 'Prescribe 1000 mg/day ONLY after oncologist written sign-off confirms: (1) final AC cycle complete, (2) Taxane phase commenced, (3) no residual doxorubicin activity. Do not dispense increased dose on verbal instruction alone.',
+                    countersig: true
+                  });
+                }
                 // ALA hold — only relevant if patient was diabetic (would otherwise have been prescribed)
                 const pat2 = window.patient || {};
                 const isDiab = parseFloat(pat2.hba1c || 0) >= 6.5 || parseFloat(pat2.bloodSugar || 0) > 180 ||
@@ -3191,6 +3225,45 @@
               }
             })();
 
+            // --- MDT REVIEW SECTION ---
+            (function() {
+              const mdtBody = document.getElementById('mdtReviewBody');
+              const mdtSection = document.getElementById('mdtReviewSection');
+              if (!mdtBody || !mdtSection) return;
+              const mdtItems = [];
+
+              const patMDT = window.patient || {};
+              const isHighBurden = (patMDT.tumorBurden === 'High (Bulky)');
+              const glutValMDT = (fp.micronutrients && fp.micronutrients.glutamine) || '';
+
+              if (isHighBurden && glutValMDT.includes('30 g/day')) {
+                mdtItems.push({
+                  intervention: 'Glutamine 30 g/day',
+                  rationale: 'Prescribed in High Tumor Burden (Bulky) setting. Glutamine supports GI mucosal integrity and enterocyte repair during chemotherapy, but in bulky disease the glutaminolysis pathway may theoretically support tumour proliferation. Periodic MDT review mandated. Current status: ACTIVE \u2014 MONITOR.',
+                  monitoring: 'Do NOT discontinue without MDT consensus. Review at each chemotherapy cycle. Escalate as MDT priority item if: disease progression, worsening GI toxicity, or tumour glutamine-dependency suspected on imaging or biomarkers.'
+                });
+              }
+
+              if (mdtItems.length > 0) {
+                const MDT_DATE = '_____ / _____ / _____';
+                const MDT_REF = '__________';
+                const MDT_CLINICIAN = '_____________________';
+                mdtBody.innerHTML = mdtItems.map(function(m) {
+                  return '<tr>' +
+                    '<td style="padding:8px;border:1px solid #93c5fd;font-weight:700;color:#1e40af;vertical-align:top;">' + m.intervention + '</td>' +
+                    '<td style="padding:8px;border:1px solid #93c5fd;color:#334155;font-size:10.5px;vertical-align:top;">' + m.rationale + '</td>' +
+                    '<td style="padding:8px;border:1px solid #93c5fd;color:#334155;font-size:10.5px;vertical-align:top;">' + m.monitoring + '</td>' +
+                    '<td style="padding:8px;border:1px solid #93c5fd;color:#94a3b8;font-size:10px;vertical-align:top;white-space:nowrap;">' + MDT_DATE + '</td>' +
+                    '<td style="padding:8px;border:1px solid #93c5fd;color:#94a3b8;font-size:10px;vertical-align:top;white-space:nowrap;">' + MDT_REF + '</td>' +
+                    '<td style="padding:8px;border:1px solid #93c5fd;font-size:10px;vertical-align:top;">' + MDT_CLINICIAN + '</td>' +
+                  '</tr>';
+                }).join('');
+                mdtSection.style.display = 'block';
+              } else {
+                mdtSection.style.display = 'none';
+              }
+            })();
+
             // Add Flavor Recommendation to rationale or dedicated section if it exists
             if (fp.flavorProfile) {
               const rationList = document.getElementById('clinicalRationale');
@@ -3200,7 +3273,17 @@
                 rationList.appendChild(li);
               }
             }
-            setVal('glutamine', fp.micronutrients.glutamine);
+            (function() {
+              const glutVal2 = fp.micronutrients.glutamine;
+              if (glutVal2 && glutVal2.includes('MDT REVIEW REQUIRED')) {
+                document.getElementById('glutamine').innerHTML =
+                  '<span style="background:#eff6ff;border:1px solid #93c5fd;color:#1e40af;font-size:10px;font-weight:800;padding:3px 8px;border-radius:4px;display:inline-block;">&#128203; MDT REVIEW REQUIRED</span>' +
+                  '<span style="color:#475569;font-size:10.5px;margin-left:6px;">' + glutVal2.replace(' — MDT REVIEW REQUIRED (High Tumor Burden)', '') + '</span>' +
+                  '<div style="font-size:9.5px;color:#1e40af;margin-top:3px;font-style:italic;">High Tumor Burden: do not discontinue without MDT consensus. See MDT Review table below.</div>';
+              } else {
+                setVal('glutamine', glutVal2);
+              }
+            })();
             setVal('epa', fp.micronutrients.epa);
             setVal('leucine', fp.micronutrients.leucine);
             setVal('hmb', fp.micronutrients.hmb);
@@ -4056,17 +4139,21 @@
                 const cpAudit = data.correctedPrescription;
                 
                 // 1. Update the prescribed values in the UI (Formula targets)
-                setVal('dailyCalories', cpAudit.dailyCalories + ' kcal');
-                setVal('dailyProtein', cpAudit.dailyProtein + ' g');
-                
+                // Only overwrite calorie/protein fields if the audit actually changed them (macro-only corrections keep these unchanged)
+                const currentFP = window.currentVersionedPlan ? (window.currentVersionedPlan.finalPlan || window.currentVersionedPlan) : {};
+                const auditCalories = (cpAudit.dailyCalories != null && cpAudit.dailyCalories > 0) ? cpAudit.dailyCalories : (currentFP.totalDailyCalories || currentFP.dailyCalories);
+                const auditProtein = (cpAudit.dailyProtein != null && cpAudit.dailyProtein > 0) ? cpAudit.dailyProtein : (currentFP.totalDailyProtein || currentFP.dailyProtein);
+                setVal('dailyCalories', auditCalories + ' kcal');
+                setVal('dailyProtein', auditProtein + ' g');
+
                 // 2. TRIGGER RECIPE RECALCULATION (Sychronize Production Specification)
                 if (typeof createOrUpdatePlan === 'function') {
                     const engineOutput = generateNutritionPlan(window.patient);
                     const overrides = {
-                        dailyCalories: Math.round(cpAudit.dailyCalories),
-                        dailyProtein: Math.round(cpAudit.dailyProtein)
+                        dailyCalories: Math.round(auditCalories),
+                        dailyProtein: Math.round(auditProtein)
                     };
-                    
+
                     // Recompute macro breakdown for the recipe
                     const d = recomputeFromDaily(overrides.dailyCalories, overrides.dailyProtein);
                     overrides.perServingCalories = d.perServingCalories;
