@@ -977,6 +977,26 @@
           </table>
         </div>
 
+        <!-- CLINICAL HOLD ORDERS -->
+        <div id="clinicalHoldOrdersSection" style="display:none; margin-top:20px;" class="rs">
+          <div class="rs-title" style="color:#92400e; border-bottom-color:#f59e0b;">⏸ Clinical Hold Orders — Prescriber Action Required</div>
+          <table style="width:100%; border-collapse:collapse; font-size:11px; margin-top:8px;">
+            <thead>
+              <tr style="background:#fef3c7;">
+                <th style="padding:7px 8px; text-align:left; border:1px solid #fbbf24; font-weight:700; color:#92400e; width:18%;">Supplement / Drug</th>
+                <th style="padding:7px 8px; text-align:left; border:1px solid #fbbf24; font-weight:700; color:#92400e; width:28%;">Hold Reason</th>
+                <th style="padding:7px 8px; text-align:left; border:1px solid #fbbf24; font-weight:700; color:#92400e; width:30%;">Release / Restart Criteria</th>
+                <th style="padding:7px 8px; text-align:left; border:1px solid #fbbf24; font-weight:700; color:#92400e; width:10%;">Order Date</th>
+                <th style="padding:7px 8px; text-align:left; border:1px solid #fbbf24; font-weight:700; color:#92400e; width:14%;">Prescriber Signature</th>
+              </tr>
+            </thead>
+            <tbody id="clinicalHoldOrdersBody"></tbody>
+          </table>
+          <div style="font-size:9.5px; color:#92400e; margin-top:8px; font-style:italic; padding-left:2px; border-left:3px solid #f59e0b; padding-left:8px;">
+            ⚠️ Dispensing must not proceed without a signed prescriber order against each hold. Chemotherapy-phase holds require oncologist countersignature before any reinstatement.
+          </div>
+        </div>
+
         <!-- MANUFACTURING -->
         <div class="rs">
           <div class="rs-title">Production Specifications</div>
@@ -3036,12 +3056,32 @@
             setVal('proteinType', fp.proteinType);
 
             setVal('vitD', fp.micronutrients.vitD || '2000 IU');
-            setVal('vitC', fp.micronutrients.vitC || '500-1000 mg');
+
+            // VitC: render HOLD badge when AC phase hold is in effect
+            const vitCVal = fp.micronutrients.vitC || '500-1000 mg';
+            if (vitCVal.includes('HOLD')) {
+              const vcParts = vitCVal.split('—');
+              document.getElementById('vitC').innerHTML =
+                '<span style="background:#fef3c7;border:1px solid #f59e0b;color:#92400e;font-size:10px;font-weight:800;padding:3px 8px;border-radius:4px;display:inline-block;">⏸ CONDITIONAL HOLD (AC Phase)</span>' +
+                '<span style="color:#475569;font-size:10.5px;margin-left:6px;">' + (vcParts[0] || '').trim() + '</span>' +
+                '<div style="font-size:9.5px;color:#92400e;margin-top:3px;font-style:italic;">' + vcParts.slice(1).join('—').trim() + '</div>';
+            } else {
+              setVal('vitC', vitCVal);
+            }
             setVal('pFeedingRoute', fp.prescribedRoute || 'Oral Feeding');
 
             if (fp.micronutrients.iron) {
               document.getElementById('ironRow').style.display = 'table-row';
-              setVal('iron', fp.micronutrients.iron);
+              const ironVal = fp.micronutrients.iron;
+              if (ironVal.includes('HOLD')) {
+                const iParts = ironVal.split('—');
+                document.getElementById('iron').innerHTML =
+                  '<span style="background:#fef3c7;border:1px solid #f59e0b;color:#92400e;font-size:10px;font-weight:800;padding:3px 8px;border-radius:4px;display:inline-block;">⏸ CLINICAL HOLD</span>' +
+                  '<span style="color:#475569;font-size:10.5px;margin-left:6px;">' + (iParts[0] || '').trim() + '</span>' +
+                  '<div style="font-size:9.5px;color:#92400e;margin-top:3px;font-style:italic;">' + iParts.slice(1).join('—').trim() + '</div>';
+              } else {
+                setVal('iron', ironVal);
+              }
             } else {
               document.getElementById('ironRow').style.display = 'none';
             }
@@ -3074,9 +3114,82 @@
             if (fp.micronutrients.ala) {
               setVal('ala', fp.micronutrients.ala);
               document.getElementById('alaRow').style.display = 'table-row';
+            } else if (vitCVal.includes('HOLD on AC')) {
+              // ALA suspended during AC — show row with formal hold notation
+              const pat = window.patient || {};
+              const patDiabetic = parseFloat(pat.hba1c || 0) >= 6.5 || parseFloat(pat.bloodSugar || 0) > 180 ||
+                (Array.isArray(pat.comorbidities) && pat.comorbidities.some(c => typeof c === 'string' && (c.toLowerCase().includes('diabetes') || c.toLowerCase().includes('t2dm'))));
+              if (patDiabetic) {
+                document.getElementById('alaRow').style.display = 'table-row';
+                document.getElementById('ala').innerHTML =
+                  '<span style="background:#fef3c7;border:1px solid #f59e0b;color:#92400e;font-size:10px;font-weight:800;padding:3px 8px;border-radius:4px;display:inline-block;">⏸ SUSPENDED — AC CYCLE HOLD</span>' +
+                  '<div style="font-size:9.5px;color:#92400e;margin-top:3px;font-style:italic;">600 mg/day (glycaemic support) — suspended throughout AC cycle. Restart at Taxane phase commencement only, with oncologist sign-off.</div>';
+              } else {
+                document.getElementById('alaRow').style.display = 'none';
+              }
             } else {
               document.getElementById('alaRow').style.display = 'none';
             }
+
+            // --- CLINICAL HOLD ORDERS SECTION ---
+            (function() {
+              const holdBody = document.getElementById('clinicalHoldOrdersBody');
+              const holdSection = document.getElementById('clinicalHoldOrdersSection');
+              if (!holdBody || !holdSection) return;
+              const holdOrders = [];
+              const SIG_LINE = '_____________________';
+              const DATE_LINE = '_____ / _____ / _____';
+
+              // Iron hold
+              if (fp.micronutrients && fp.micronutrients.iron && fp.micronutrients.iron.includes('HOLD')) {
+                holdOrders.push({
+                  supplement: 'Iron 100mg elemental + B12 support',
+                  reason: 'Iron panel incomplete. Administering iron without confirmed iron-deficiency risks overload in iron-replete or haemolytic states.',
+                  restart: 'Release on receipt of full iron panel (Ferritin, Serum Iron, TIBC, Transferrin Saturation). Initiate only if Transferrin Saturation &lt;20% and Ferritin &lt;30 ng/mL confirm iron-deficiency anaemia.',
+                  countersig: false
+                });
+              }
+
+              // VitC and ALA — AC phase holds
+              if (vitCVal.includes('HOLD on AC')) {
+                holdOrders.push({
+                  supplement: 'Vitamin C 500mg/day',
+                  reason: 'AC regimen (Doxorubicin). High-dose antioxidants attenuate anthracycline oxidative cytotoxicity on infusion days.',
+                  restart: 'Permitted at 500mg cap on confirmed inter-cycle (non-infusion) days only. Any reinstatement on AC infusion days requires oncologist countersignature.',
+                  countersig: true
+                });
+                // ALA hold — only relevant if patient was diabetic (would otherwise have been prescribed)
+                const pat2 = window.patient || {};
+                const isDiab = parseFloat(pat2.hba1c || 0) >= 6.5 || parseFloat(pat2.bloodSugar || 0) > 180 ||
+                  (Array.isArray(pat2.comorbidities) && pat2.comorbidities.some(c => typeof c === 'string' && (c.toLowerCase().includes('diabetes') || c.toLowerCase().includes('t2dm'))));
+                if (isDiab) {
+                  holdOrders.push({
+                    supplement: 'Alpha Lipoic Acid (ALA) 600mg/day',
+                    reason: 'AC regimen (Doxorubicin + Cyclophosphamide). ALA is a potent antioxidant contraindicated throughout AC cycle — may reduce anthracycline efficacy.',
+                    restart: 'Restart permitted ONLY at confirmed Taxane phase commencement. Written oncologist sign-off documenting phase transition required before reinstatement. Do not resume during AC cycle.',
+                    countersig: true
+                  });
+                }
+              }
+
+              if (holdOrders.length > 0) {
+                holdBody.innerHTML = holdOrders.map(function(h) {
+                  return '<tr>' +
+                    '<td style="padding:8px;border:1px solid #fbbf24;font-weight:700;color:#92400e;vertical-align:top;">' + h.supplement + '</td>' +
+                    '<td style="padding:8px;border:1px solid #fbbf24;color:#334155;font-size:10.5px;vertical-align:top;">' + h.reason + '</td>' +
+                    '<td style="padding:8px;border:1px solid #fbbf24;color:#334155;font-size:10.5px;vertical-align:top;">' + h.restart + '</td>' +
+                    '<td style="padding:8px;border:1px solid #fbbf24;color:#94a3b8;font-size:10px;vertical-align:top;white-space:nowrap;">' + DATE_LINE + '</td>' +
+                    '<td style="padding:8px;border:1px solid #fbbf24;font-size:10px;vertical-align:top;">' +
+                      (h.countersig ? '<span style="color:#dc2626;font-weight:800;font-size:9px;display:block;margin-bottom:4px;">ONCOLOGIST COUNTERSIG. REQUIRED</span>' : '') +
+                      SIG_LINE +
+                    '</td>' +
+                  '</tr>';
+                }).join('');
+                holdSection.style.display = 'block';
+              } else {
+                holdSection.style.display = 'none';
+              }
+            })();
 
             // Add Flavor Recommendation to rationale or dedicated section if it exists
             if (fp.flavorProfile) {
