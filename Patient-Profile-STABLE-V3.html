@@ -3737,16 +3737,18 @@
               dlBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Generating Secure PDF...';
             }
 
-            // Step 3: Re-render AI sections from stored insights for PDF export
-            try {
-              const aiPlan = window.currentVersionedPlan;
-              if (aiPlan && aiPlan.claudeInsights) {
-                renderClaudeInsight(aiPlan.claudeInsights, true);
+            // Step 3: Re-render AI sections for PDF export
+            // Use _lastClaudeInsights (always current) — currentVersionedPlan may be replaced by overpower block
+            const pdfInsights = window._lastClaudeInsights
+              || (window.currentVersionedPlan && window.currentVersionedPlan.claudeInsights);
+            if (pdfInsights) {
+              try {
+                renderClaudeInsight(pdfInsights, true);
+              } catch(e) {
+                console.warn("AI re-render for PDF skipped:", e);
               }
-            } catch(e) {
-              console.warn("AI re-render for PDF skipped:", e);
             }
-            // Always ensure all four AI sections are visible regardless
+            // Ensure all four AI sections are visible
             ['claudeAlertsSection','claudeDrugSection','claudeMicroSection','claudeMonitorSection'].forEach(id => {
               const el = document.getElementById(id);
               if (el && el.innerHTML.trim() !== '') el.style.display = 'block';
@@ -3886,6 +3888,8 @@
           function renderClaudeInsight(data, skipPersistence) {
             if (!data) return;
             console.log("renderClaudeInsight received:", JSON.stringify({ score: data.validationScore, alertCount: (data.clinicalAlerts||[]).length, drugCount: (data.drugInteractions||[]).length, microCount: (data.micronutrientOrders||[]).length, monitorCount: (data.monitoringSchedule||[]).length, rationaleCount: (data.rationale||[]).length }));
+            // Always cache the latest insights for PDF export (survives overpower plan replacement)
+            window._lastClaudeInsights = data;
 
             // Persist for future page loads
             const cp = window.currentVersionedPlan;
@@ -3959,6 +3963,7 @@
 
                     const auditNote = `[AI AUDITOR OVERPOWER] ${cpAudit.reasoning}`;
                     const syncedPlan = createOrUpdatePlan(window.patient, engineOutput, overrides, auditNote);
+                    syncedPlan.claudeInsights = data; // preserve insights on the new plan object
                     window.currentVersionedPlan = syncedPlan;
                     bind(syncedPlan); // This updates Production Specs and Serving Admin tables
 
