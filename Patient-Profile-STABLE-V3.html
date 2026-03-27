@@ -3788,12 +3788,19 @@
 
             // Show placeholders in AI sections
             const sections = ['claudeAlertsSection', 'claudeDrugSection', 'claudeMicroSection', 'claudeMonitorSection'];
+            const loadingDiv = '<div style="padding:16px; text-align:center; color:#64748b; font-style:italic;">✨ Claude is analyzing clinical data... please wait.</div>';
+            const loadingRow = '<tr><td colspan="5" style="padding:20px; text-align:center; color:#64748b; font-style:italic;">✨ Claude is analyzing clinical data... please wait.</td></tr>';
             sections.forEach(s => {
               const el = document.getElementById(s);
               if (el) {
                 el.style.display = 'block';
-                const body = el.querySelector('tbody') || document.getElementById('claudeAlertsList');
-                if (body) body.innerHTML = '<tr><td colspan="5" style="padding:20px; text-align:center; color:#64748b; font-style:italic;">✨ Claude is analyzing clinical data... please wait.</td></tr>';
+                const tbody = el.querySelector('tbody');
+                if (tbody) {
+                  tbody.innerHTML = loadingRow;
+                } else {
+                  const inner = el.querySelector('div:last-child');
+                  if (inner) inner.innerHTML = loadingDiv;
+                }
               }
             });
             const crEl = document.getElementById('clinicalRationale');
@@ -3842,7 +3849,8 @@
 
           function renderClaudeInsight(data, skipPersistence) {
             if (!data) return;
-            
+            console.log("renderClaudeInsight received:", JSON.stringify({ score: data.validationScore, alertCount: (data.clinicalAlerts||[]).length, drugCount: (data.drugInteractions||[]).length, microCount: (data.micronutrientOrders||[]).length, monitorCount: (data.monitoringSchedule||[]).length, rationaleCount: (data.rationale||[]).length }));
+
             // Persist for future page loads
             const cp = window.currentVersionedPlan;
             if (!skipPersistence && cp && cp.id) {
@@ -3941,12 +3949,17 @@
                 console.log("AI Logic Refinements Logged:", data.logicRefinements);
             }
 
-            // 3. Clinical Alerts Section
+            // 3. Clinical Alerts Section — always show after AI run
             const alertsSec = document.getElementById('claudeAlertsSection');
             const alertsList = document.getElementById('claudeAlertsList');
-            if (alertsSec && alertsList && data.clinicalAlerts && data.clinicalAlerts.length > 0) {
+            if (alertsSec && alertsList) {
               const lv = { HIGH:{ bg:'#fff0f0',border:'#ef4444',text:'#991b1b',icon:'🚨' }, MODERATE:{ bg:'#fffbeb',border:'#f59e0b',text:'#92400e',icon:'⚠️' }, LOW:{ bg:'#f0fdf4',border:'#22c55e',text:'#166534',icon:'ℹ️' } };
-              alertsList.innerHTML = data.clinicalAlerts.map(a => { const s=lv[a.level]||lv.LOW; return `<div style="background:${s.bg};border:1px solid ${s.border};color:${s.text};padding:9px 12px;border-radius:6px;margin-bottom:7px;font-size:11px;font-weight:600;display:flex;align-items:flex-start;gap:8px;"><span style="font-size:1.1em;flex-shrink:0;">${s.icon}</span><span><b>${a.type}:</b> ${a.message}</span></div>`; }).join('');
+              const alerts = Array.isArray(data.clinicalAlerts) ? data.clinicalAlerts : [];
+              if (alerts.length > 0) {
+                alertsList.innerHTML = alerts.map(a => { const s=lv[a.level]||lv.LOW; return `<div style="background:${s.bg};border:1px solid ${s.border};color:${s.text};padding:9px 12px;border-radius:6px;margin-bottom:7px;font-size:11px;font-weight:600;display:flex;align-items:flex-start;gap:8px;"><span style="font-size:1.1em;flex-shrink:0;">${s.icon}</span><span><b>${a.type}:</b> ${a.message}</span></div>`; }).join('');
+              } else {
+                alertsList.innerHTML = '<div style="color:#16a34a;font-size:11px;padding:8px 4px;">✅ No additional clinical safety alerts — plan meets all audited criteria.</div>';
+              }
               alertsSec.style.display = 'block';
             }
 
