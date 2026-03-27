@@ -347,7 +347,7 @@ OVERPOWER CORRECTION:
 CRITICAL — CLINICAL ALERTS COMPLETENESS:
 Every safety violation you identify — whether mentioned in rationale, logicRefinements, or instructions — MUST also appear as a structured entry in the clinicalAlerts array with the correct type and level. An empty or incomplete clinicalAlerts array while safety issues exist is a critical reporting failure. Do NOT summarise issues only in rationale and leave clinicalAlerts empty or partial.
 
-OUTPUT FORMAT — return ONLY valid JSON, no markdown, no text outside the JSON object:
+OUTPUT FORMAT — return ONLY valid JSON, no markdown, no text outside the JSON object. CRITICAL: never embed literal newline or tab characters inside JSON string values — use \\n and \\t escape sequences if line breaks are needed in text, or omit them entirely. All string values must be valid single-line JSON strings.
 {
   "validationScore": number,
   "rationale": ["string 1", "string 2", "string 3", "string 4", "string 5"],
@@ -362,7 +362,7 @@ OUTPUT FORMAT — return ONLY valid JSON, no markdown, no text outside the JSON 
 
     const msg = await anthropic.messages.create({
       model: "claude-sonnet-4-6",
-      max_tokens: 8000,
+      max_tokens: 16000,
       system: system,
       messages: [{
         role: "user",
@@ -372,30 +372,65 @@ OUTPUT FORMAT — return ONLY valid JSON, no markdown, no text outside the JSON 
 
     const rawText = msg.content[0].text;
     let data;
+
+    // Escape literal control characters that appear inside JSON string values.
+    // Claude occasionally writes real newlines/tabs within long string values which
+    // produces "Expected ',' or ']'" errors even when the rest of the JSON is valid.
+    function escapeControlsInStrings(s) {
+      let out = '', inStr = false;
+      for (let i = 0; i < s.length; i++) {
+        const ch = s[i];
+        if (!inStr) {
+          out += ch;
+          if (ch === '"') inStr = true;
+        } else {
+          if (ch === '\\') { out += ch + (s[++i] || ''); } // skip already-escaped pair
+          else if (ch === '"') { out += ch; inStr = false; }
+          else if (ch === '\n') out += '\\n';
+          else if (ch === '\r') out += '\\r';
+          else if (ch === '\t') out += '\\t';
+          else if (ch.charCodeAt(0) < 32) out += ' ';
+          else out += ch;
+        }
+      }
+      return out;
+    }
+
     try {
-      const jsonMatch = rawText.match(/{[\s\S]*/);
-      if (!jsonMatch) throw new Error("No JSON");
-      let jsonStr = jsonMatch[0];
+      // Strip markdown code fences if Claude wrapped the output
+      let jsonStr = rawText.replace(/^```(?:json)?\s*/m, '').replace(/```\s*$/m, '').trim();
+      const jsonStart = jsonStr.indexOf('{');
+      if (jsonStart < 0) throw new Error("No JSON");
+      jsonStr = jsonStr.slice(jsonStart);
 
-      // Pass 1: close unclosed braces/brackets
-      const opens = (jsonStr.match(/{/g) || []).length;
-      const closes = (jsonStr.match(/}/g) || []).length;
-      if (opens > closes) jsonStr += '}' .repeat(opens - closes);
+      // Pass 0: sanitize literal control chars inside string values
+      jsonStr = escapeControlsInStrings(jsonStr);
 
-      // Pass 2: if still invalid, truncate at last cleanly-closed top-level value
+      // Pass 1: balance unclosed braces AND brackets
+      const openB = (jsonStr.match(/{/g) || []).length;
+      const closeB = (jsonStr.match(/}/g) || []).length;
+      const openArr = (jsonStr.match(/\[/g) || []).length;
+      const closeArr = (jsonStr.match(/\]/g) || []).length;
+      if (openArr > closeArr) jsonStr += ']'.repeat(openArr - closeArr);
+      if (openB > closeB) jsonStr += '}'.repeat(openB - closeB);
+
+      // Pass 2: direct parse
       try {
         data = JSON.parse(jsonStr);
       } catch {
-        // Find last position where JSON is likely clean: after a ] or } followed by ,
+        // Pass 3: truncate at last cleanly-closed boundary
         const lastClean = Math.max(jsonStr.lastIndexOf('],'), jsonStr.lastIndexOf('},'));
         if (lastClean > 10) {
           let trimmed = jsonStr.substring(0, lastClean + 1);
           const o2 = (trimmed.match(/{/g) || []).length;
           const c2 = (trimmed.match(/}/g) || []).length;
+          const oa2 = (trimmed.match(/\[/g) || []).length;
+          const ca2 = (trimmed.match(/\]/g) || []).length;
+          if (oa2 > ca2) trimmed += ']'.repeat(oa2 - ca2);
           trimmed += '}'.repeat(Math.max(0, o2 - c2));
           data = JSON.parse(trimmed);
         } else {
-          throw new Error('Unrecoverable truncation');
+          throw new Error('Unrecoverable parse failure');
         }
       }
     } catch (e) {
