@@ -500,6 +500,21 @@
       margin-bottom: 24px;
     }
 
+    /* MACRO TABLE CELL */
+    .vbig {
+      font-size: 15px;
+      font-weight: 800;
+      color: #0e2247;
+    }
+
+    /* COMPACT LAB TABLE hover */
+    .clt-row:hover { background: #f0f9ff !important; }
+
+    /* PRINT: keep compact lab tables together */
+    @media print {
+      .clinical-report-grid { page-break-inside: avoid !important; }
+    }
+
     .status-badge {
       display: inline-flex;
       align-items: center;
@@ -632,254 +647,117 @@
             <div class="rb rb-i">Clinical Fit: <span id="pFitScore"></span>%</div>
           </div>
 
-          <!-- CLINICAL ASSESSMENT CARDS (REPORT VIEW) -->
-          <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px; margin-top:20px;"
-            class="clinical-report-grid">
+          <!-- CLINICAL ASSESSMENT — COMPACT LAB TABLE -->
+          <div style="margin-top:14px;">
 
-            <!-- CARD 1: METABOLIC & RENAL (Cyan) -->
-            <div class="ai-panel card-cyan" style="margin:0; padding:15px; border-radius:12px; height:100%;">
-              <div
-                style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; border-bottom:1px solid rgba(0,0,0,0.05); padding-bottom:8px;">
-                <div
-                  style="font-size:10px; font-weight:900; color:#0e7490; text-transform:uppercase; letter-spacing:0.05em;">
-                  Metabolic & Renal</div>
-                <div style="font-size:12px; font-weight:700; color:#0e2247;">Organ Function & Labs</div>
+            <!-- ONCOLOGY ROW -->
+            <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-bottom:10px;">
+              <div style="background:#fff8f0; border:1px solid #fed7aa; border-radius:6px; padding:9px 12px;">
+                <div style="font-size:8.5px; font-weight:800; text-transform:uppercase; color:#92400e; letter-spacing:0.08em; margin-bottom:3px;">Cancer / Stage</div>
+                <div style="font-size:12px; font-weight:700; color:#0f172a;"><span id="pCancer_card"></span> · <span id="pStage"></span></div>
               </div>
-              <div class="rg" style="display:grid; grid-template-columns: 1fr; gap:8px;">
-                <div class="rf">
-                  <div class="rf-lbl">Creatinine (mg/dL)</div>
-                  <div class="rf-val" id="pCreatinine"></div>
-                </div>
-                <div class="rf">
-                  <div class="rf-lbl">CRP (mg/L)</div>
-                  <div class="rf-val danger" id="pCRP_val"></div>
-                </div>
-                <div class="rf">
-                  <div class="rf-lbl">ALT / AST (U/L)</div>
-                  <div class="rf-val" id="pLiver"></div>
-                </div>
-                <div class="rf">
-                  <div class="rf-lbl">Bilirubin (mg/dL)</div>
-                  <div class="rf-val" id="pBilirubin"></div>
-                </div>
-                <div class="rf">
-                  <div class="rf-lbl">Blood Sugar (mg/dL)</div>
-                  <div class="rf-val" id="pBloodSugar"></div>
-                </div>
-                <div class="rf">
-                  <div class="rf-lbl">TSH (mIU/L)</div>
-                  <div class="rf-val" id="pTSH"></div>
-                </div>
-                <div class="rf">
-                  <div class="rf-lbl">Sodium (mEq/L)</div>
-                  <div class="rf-val" id="pSodium"></div>
-                </div>
-                <div class="rf">
-                  <div class="rf-lbl">Potassium (mEq/L)</div>
-                  <div class="rf-val" id="pPotassium"></div>
-                </div>
-                <div class="rf">
-                  <div class="rf-lbl">Urea (mg/dL)</div>
-                  <div class="rf-val" id="pUrea"></div>
-                </div>
-                <div class="rf">
-                  <div class="rf-lbl">HbA1c (%)</div>
-                  <div class="rf-val" id="pHbA1c"></div>
-                </div>
+              <div style="background:#fff8f0; border:1px solid #fed7aa; border-radius:6px; padding:9px 12px;">
+                <div style="font-size:8.5px; font-weight:800; text-transform:uppercase; color:#92400e; letter-spacing:0.08em; margin-bottom:3px;">Regimen</div>
+                <div style="font-size:12px; font-weight:700; color:#0f172a;" id="pRegimen_card"></div>
+              </div>
+              <div style="background:#fff8f0; border:1px solid #fed7aa; border-radius:6px; padding:9px 12px;">
+                <div style="font-size:8.5px; font-weight:800; text-transform:uppercase; color:#92400e; letter-spacing:0.08em; margin-bottom:3px;">Tumor Burden · ECOG · Diet</div>
+                <div style="font-size:11.5px; font-weight:700; color:#0f172a;"><span id="pTumorBurden"></span> · ECOG <span id="pECOG"></span> · <span id="pVegetarian"></span></div>
               </div>
             </div>
 
-            <!-- CARD 2: MICRONUTRIENTS (Violet) -->
-            <div class="ai-panel card-violet" style="margin:0; padding:15px; border-radius:12px; height:100%;">
-              <div
-                style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; border-bottom:1px solid rgba(0,0,0,0.05); padding-bottom:8px;">
-                <div
-                  style="font-size:10px; font-weight:900; color:#6d28d9; text-transform:uppercase; letter-spacing:0.05em;">
-                  Micronutrients</div>
-                <div style="font-size:12px; font-weight:700; color:#0e2247;">Nutritional Profile</div>
+            <!-- CLINICAL STATS: 4-col quick strip -->
+            <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:6px; margin-bottom:10px;">
+              <div style="background:#f0f9ff; border:1px solid #bae6fd; border-radius:6px; padding:8px 10px; text-align:center;">
+                <div style="font-size:8px; font-weight:800; text-transform:uppercase; color:#0369a1; margin-bottom:2px;">Weight / Usual</div>
+                <div style="font-size:12.5px; font-weight:800; color:#0e2247;"><span id="pWeight2"></span> / <span id="pUW2"></span> kg</div>
               </div>
-              <div class="rg" style="display:grid; grid-template-columns: 1fr; gap:8px;">
-                <div class="rf">
-                  <div class="rf-lbl">Serum Albumin (g/dL)</div>
-                  <div class="rf-val warn" id="pAlbumin"></div>
-                </div>
-                <div class="rf">
-                  <div class="rf-lbl">Prealbumin (mg/dL)</div>
-                  <div class="rf-val" id="pPrealbumin"></div>
-                </div>
-                <div class="rf">
-                  <div class="rf-lbl">Hemoglobin (g/dL)</div>
-                  <div class="rf-val" id="pHemoglobin"></div>
-                </div>
-                <div class="rf">
-                  <div class="rf-lbl">Vitamin D (ng/mL)</div>
-                  <div class="rf-val" id="pVitD"></div>
-                </div>
-                <div class="rf">
-                  <div class="rf-lbl">Vitamin B12 (pg/mL)</div>
-                  <div class="rf-val" id="pVitB12"></div>
-                </div>
-                <div class="rf">
-                  <div class="rf-lbl">Folate (ng/mL)</div>
-                  <div class="rf-val" id="pFolate"></div>
-                </div>
-                <div class="rf">
-                  <div class="rf-lbl">Zinc (μg/dL)</div>
-                  <div class="rf-val" id="pZinc"></div>
-                </div>
-                <div class="rf">
-                  <div class="rf-lbl">Magnesium (mg/dL)</div>
-                  <div class="rf-val" id="pMagnesium"></div>
-                </div>
-                <div class="rf full">
-                  <div class="rf-lbl">Microbiome Status</div>
-                  <div class="rf-val" id="pMicrobiome"></div>
-                </div>
+              <div style="background:#fef9c3; border:1px solid #fde047; border-radius:6px; padding:8px 10px; text-align:center;">
+                <div style="font-size:8px; font-weight:800; text-transform:uppercase; color:#854d0e; margin-bottom:2px;">Weight Loss</div>
+                <div style="font-size:12.5px; font-weight:800; color:#dc2626;" id="pWL"></div>
+              </div>
+              <div style="background:#f0fdf4; border:1px solid #86efac; border-radius:6px; padding:8px 10px; text-align:center;">
+                <div style="font-size:8px; font-weight:800; text-transform:uppercase; color:#166534; margin-bottom:2px;">Oral Intake</div>
+                <div style="font-size:12.5px; font-weight:800; color:#0f172a;" id="pFoodIntake"></div>
+              </div>
+              <div style="background:#fdf4ff; border:1px solid #e9d5ff; border-radius:6px; padding:8px 10px; text-align:center;">
+                <div style="font-size:8px; font-weight:800; text-transform:uppercase; color:#6b21a8; margin-bottom:2px;">Sarcopenia · MUAC</div>
+                <div style="font-size:11px; font-weight:700; color:#0f172a;"><span id="pSarcopenia"></span> · <span id="pMUAC"></span></div>
               </div>
             </div>
 
-            <!-- CARD 3: ONCOLOGY (Amber) -->
-            <div class="ai-panel card-amber" style="margin:0; padding:15px; border-radius:12px; height:100%;">
-              <div
-                style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; border-bottom:1px solid rgba(0,0,0,0.05); padding-bottom:8px;">
-                <div
-                  style="font-size:10px; font-weight:900; color:#b45309; text-transform:uppercase; letter-spacing:0.05em;">
-                  Oncology</div>
-                <div style="font-size:12px; font-weight:700; color:#0e2247;">Cancer Dynamics & Treatment</div>
+            <!-- COMPACT LAB TABLE: 3 columns side by side -->
+            <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px;">
+
+              <!-- COL A: METABOLIC & ORGAN -->
+              <div style="border:1px solid #e2e8f0; border-radius:6px; overflow:hidden;">
+                <div style="background:#e0f2fe; padding:5px 10px; font-size:8.5px; font-weight:900; text-transform:uppercase; letter-spacing:0.08em; color:#0369a1;">Metabolic &amp; Organ</div>
+                <table style="width:100%; border-collapse:collapse; font-size:11px;">
+                  <tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:4px 8px; color:#64748b;">Creatinine</td><td style="padding:4px 8px; font-weight:700; text-align:right;" id="pCreatinine"></td></tr>
+                  <tr style="border-bottom:1px solid #f1f5f9; background:#fafafa;"><td style="padding:4px 8px; color:#64748b;">CRP</td><td style="padding:4px 8px; font-weight:700; text-align:right; color:#dc2626;" id="pCRP_val"></td></tr>
+                  <tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:4px 8px; color:#64748b;">ALT / AST</td><td style="padding:4px 8px; font-weight:700; text-align:right;" id="pLiver"></td></tr>
+                  <tr style="border-bottom:1px solid #f1f5f9; background:#fafafa;"><td style="padding:4px 8px; color:#64748b;">Bilirubin</td><td style="padding:4px 8px; font-weight:700; text-align:right;" id="pBilirubin"></td></tr>
+                  <tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:4px 8px; color:#64748b;">Blood Sugar</td><td style="padding:4px 8px; font-weight:700; text-align:right;" id="pBloodSugar"></td></tr>
+                  <tr style="border-bottom:1px solid #f1f5f9; background:#fafafa;"><td style="padding:4px 8px; color:#64748b;">TSH</td><td style="padding:4px 8px; font-weight:700; text-align:right;" id="pTSH"></td></tr>
+                  <tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:4px 8px; color:#64748b;">Sodium</td><td style="padding:4px 8px; font-weight:700; text-align:right;" id="pSodium"></td></tr>
+                  <tr style="border-bottom:1px solid #f1f5f9; background:#fafafa;"><td style="padding:4px 8px; color:#64748b;">Potassium</td><td style="padding:4px 8px; font-weight:700; text-align:right;" id="pPotassium"></td></tr>
+                  <tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:4px 8px; color:#64748b;">Urea</td><td style="padding:4px 8px; font-weight:700; text-align:right;" id="pUrea"></td></tr>
+                  <tr><td style="padding:4px 8px; color:#64748b;">HbA1c</td><td style="padding:4px 8px; font-weight:700; text-align:right;" id="pHbA1c"></td></tr>
+                </table>
               </div>
-              <div class="rg" style="display:grid; grid-template-columns: 1fr; gap:8px;">
-                <div class="rf full">
-                  <div class="rf-lbl">Cancer Type</div>
-                  <div class="rf-val" id="pCancer_card"></div>
-                </div>
-                <div class="rf full">
-                  <div class="rf-lbl">Chemo Regimen</div>
-                  <div class="rf-val" id="pRegimen_card"></div>
-                </div>
-                <div class="rf">
-                  <div class="rf-lbl">Cancer Stage</div>
-                  <div class="rf-val" id="pStage"></div>
-                </div>
-                <div class="rf">
-                  <div class="rf-lbl">Tumor Burden</div>
-                  <div class="rf-val" id="pTumorBurden"></div>
-                </div>
-                <div class="rf full">
-                  <div class="rf-lbl">Metastatic Sites</div>
-                  <div class="rf-val" id="pMetastasis"></div>
-                </div>
-                <div class="rf full">
-                  <div class="rf-lbl">Genomic Markers</div>
-                  <div class="rf-val" id="pHxGenomicMarkers"></div>
-                </div>
-                <div class="rf full">
-                  <div class="rf-lbl">Treatments</div>
-                  <div class="rf-val" id="pTreatments"></div>
-                </div>
+
+              <!-- COL B: NUTRITIONAL LABS -->
+              <div style="border:1px solid #e2e8f0; border-radius:6px; overflow:hidden;">
+                <div style="background:#ede9fe; padding:5px 10px; font-size:8.5px; font-weight:900; text-transform:uppercase; letter-spacing:0.08em; color:#5b21b6;">Nutritional Labs</div>
+                <table style="width:100%; border-collapse:collapse; font-size:11px;">
+                  <tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:4px 8px; color:#64748b;">Albumin</td><td style="padding:4px 8px; font-weight:700; text-align:right; color:#d97706;" id="pAlbumin"></td></tr>
+                  <tr style="border-bottom:1px solid #f1f5f9; background:#fafafa;"><td style="padding:4px 8px; color:#64748b;">Prealbumin</td><td style="padding:4px 8px; font-weight:700; text-align:right;" id="pPrealbumin"></td></tr>
+                  <tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:4px 8px; color:#64748b;">Hemoglobin</td><td style="padding:4px 8px; font-weight:700; text-align:right;" id="pHemoglobin"></td></tr>
+                  <tr style="border-bottom:1px solid #f1f5f9; background:#fafafa;"><td style="padding:4px 8px; color:#64748b;">Vitamin D</td><td style="padding:4px 8px; font-weight:700; text-align:right;" id="pVitD"></td></tr>
+                  <tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:4px 8px; color:#64748b;">Vitamin B12</td><td style="padding:4px 8px; font-weight:700; text-align:right;" id="pVitB12"></td></tr>
+                  <tr style="border-bottom:1px solid #f1f5f9; background:#fafafa;"><td style="padding:4px 8px; color:#64748b;">Folate</td><td style="padding:4px 8px; font-weight:700; text-align:right;" id="pFolate"></td></tr>
+                  <tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:4px 8px; color:#64748b;">Zinc</td><td style="padding:4px 8px; font-weight:700; text-align:right;" id="pZinc"></td></tr>
+                  <tr><td style="padding:4px 8px; color:#64748b;">Magnesium</td><td style="padding:4px 8px; font-weight:700; text-align:right;" id="pMagnesium"></td></tr>
+                </table>
+              </div>
+
+              <!-- COL C: BODY COMPOSITION & FUNCTIONAL -->
+              <div style="border:1px solid #e2e8f0; border-radius:6px; overflow:hidden;">
+                <div style="background:#dcfce7; padding:5px 10px; font-size:8.5px; font-weight:900; text-transform:uppercase; letter-spacing:0.08em; color:#166534;">Body Composition</div>
+                <table style="width:100%; border-collapse:collapse; font-size:11px;">
+                  <tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:4px 8px; color:#64748b;">SMI (cm²/m²)</td><td style="padding:4px 8px; font-weight:700; text-align:right;" id="pSMI"></td></tr>
+                  <tr style="border-bottom:1px solid #f1f5f9; background:#fafafa;"><td style="padding:4px 8px; color:#64748b;">Hand Grip (kg)</td><td style="padding:4px 8px; font-weight:700; text-align:right;" id="pHandGrip"></td></tr>
+                  <tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:4px 8px; color:#64748b;">Lean Body Mass</td><td style="padding:4px 8px; font-weight:700; text-align:right;" id="pLBM"></td></tr>
+                  <tr style="border-bottom:1px solid #f1f5f9; background:#fafafa;"><td style="padding:4px 8px; color:#64748b;">Fat %</td><td style="padding:4px 8px; font-weight:700; text-align:right;" id="pFat"></td></tr>
+                  <tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:4px 8px; color:#64748b;">BSA (m²)</td><td style="padding:4px 8px; font-weight:700; text-align:right;" id="pBSA"></td></tr>
+                  <tr style="border-bottom:1px solid #f1f5f9; background:#fafafa;"><td style="padding:4px 8px; color:#64748b;">Activity</td><td style="padding:4px 8px; font-weight:700; text-align:right;" id="pActivity"></td></tr>
+                  <tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:4px 8px; color:#64748b;">Feeding Route</td><td style="padding:4px 8px; font-weight:700; text-align:right;" id="pFeeding"></td></tr>
+                  <tr style="border-bottom:1px solid #f1f5f9; background:#fafafa;"><td style="padding:4px 8px; color:#64748b;">Metastasis</td><td style="padding:4px 8px; font-weight:700; text-align:right; font-size:10px;" id="pMetastasis"></td></tr>
+                  <tr><td style="padding:4px 8px; color:#64748b;">Genomics</td><td style="padding:4px 8px; font-weight:700; text-align:right; font-size:10px;" id="pHxGenomicMarkers"></td></tr>
+                </table>
+              </div>
+
+            </div>
+
+            <!-- COMORBIDITIES / SIDE EFFECTS / ALLERGIES STRIP -->
+            <div style="margin-top:8px; display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px;">
+              <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:5px; padding:7px 10px;">
+                <div style="font-size:8px; font-weight:800; text-transform:uppercase; color:#94a3b8; margin-bottom:3px;">Comorbidities</div>
+                <div style="font-size:11px; font-weight:600; color:#334155;" id="pHxComorbidities"></div>
+              </div>
+              <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:5px; padding:7px 10px;">
+                <div style="font-size:8px; font-weight:800; text-transform:uppercase; color:#94a3b8; margin-bottom:3px;">Side Effects (Current)</div>
+                <div style="font-size:11px; font-weight:600; color:#334155;" id="pHxSideEffects"></div>
+              </div>
+              <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:5px; padding:7px 10px;">
+                <div style="font-size:8px; font-weight:800; text-transform:uppercase; color:#94a3b8; margin-bottom:3px;">Allergies · Cultural</div>
+                <div style="font-size:11px; font-weight:600; color:#334155;"><span id="pHxAllergies"></span> | <span id="pCultural"></span></div>
               </div>
             </div>
 
-            <!-- CARD 4: FUNCTIONAL (Green) -->
-            <div class="ai-panel card-green" style="margin:0; padding:15px; border-radius:12px; height:100%;">
-              <div
-                style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; border-bottom:1px solid rgba(0,0,0,0.05); padding-bottom:8px;">
-                <div
-                  style="font-size:10px; font-weight:900; color:#15803d; text-transform:uppercase; letter-spacing:0.05em;">
-                  Functional</div>
-                <div style="font-size:12px; font-weight:700; color:#0e2247;">Physical Status & Composition</div>
-              </div>
-              <div class="rg" style="display:grid; grid-template-columns: 1fr; gap:8px;">
-                <div class="rf">
-                  <div class="rf-lbl">Feeding Method</div>
-                  <div class="rf-val" id="pFeeding"></div>
-                </div>
-                <div class="rf">
-                  <div class="rf-lbl">ECOG Status</div>
-                  <div class="rf-val" id="pECOG"></div>
-                </div>
-                <div class="rf">
-                  <div class="rf-lbl">Activity Level</div>
-                  <div class="rf-val" id="pActivity"></div>
-                </div>
-                <div class="rf">
-                  <div class="rf-lbl">Sarcopenia Status</div>
-                  <div class="rf-val" id="pSarcopenia"></div>
-                </div>
-                <div class="rf">
-                  <div class="rf-lbl">MUAC (cm)</div>
-                  <div class="rf-val" id="pMUAC"></div>
-                </div>
-                <div class="rf">
-                  <div class="rf-lbl">Lean Body Mass (kg)</div>
-                  <div class="rf-val" id="pLBM"></div>
-                </div>
-                <div class="rf">
-                  <div class="rf-lbl">Fat Percentage (%)</div>
-                  <div class="rf-val" id="pFat"></div>
-                </div>
-                <div class="rf">
-                  <div class="rf-lbl">Skeletal Muscle Index (cm²/m²)</div>
-                  <div class="rf-val" id="pSMI"></div>
-                </div>
-                <div class="rf">
-                  <div class="rf-lbl">Hand Grip Strength (kg)</div>
-                  <div class="rf-val" id="pHandGrip"></div>
-                </div>
-                <div class="rf full">
-                  <div class="rf-lbl">BSA (m²) - Auto</div>
-                  <div class="rf-val" id="pBSA"></div>
-                </div>
-              </div>
-            </div>
-
-            <!-- CARD 5: LIFESTYLE (Slate - Full Width) -->
-            <div class="ai-panel card-slate" style="margin:0; padding:15px; border-radius:12px; grid-column: 1 / -1;">
-              <div
-                style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; border-bottom:1px solid rgba(0,0,0,0.05); padding-bottom:8px;">
-                <div
-                  style="font-size:10px; font-weight:900; color:#475569; text-transform:uppercase; letter-spacing:0.05em;">
-                  Lifestyle</div>
-                <div style="font-size:12px; font-weight:700; color:#0e2247;">Dietary & Metadata</div>
-              </div>
-              <div class="rg" style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
-                <div class="rf">
-                  <div class="rf-lbl">Dietary preference</div>
-                  <div class="rf-val" id="pVegetarian"></div>
-                </div>
-                <div class="rf">
-                  <div class="rf-lbl">Actual Food Intake</div>
-                  <div class="rf-val" id="pFoodIntake"></div>
-                </div>
-                <div class="rf">
-                  <div class="rf-lbl">Usual Weight (kg)</div>
-                  <div class="rf-val" id="pUW"></div>
-                </div>
-                <div class="rf">
-                  <div class="rf-lbl">Weight Loss (%)</div>
-                  <div class="rf-val danger" id="pWL"></div>
-                </div>
-                <div class="rf">
-                  <div class="rf-lbl">Cultural Preferences</div>
-                  <div class="rf-val" id="pCultural"></div>
-                </div>
-                <div class="rf full">
-                  <div class="rf-lbl">Allergies</div>
-                  <div class="rf-val" id="pHxAllergies"></div>
-                </div>
-                <div class="rf full">
-                  <div class="rf-lbl">Side Effects (Current Therapy)</div>
-                  <div class="rf-val" id="pHxSideEffects"></div>
-                </div>
-                <div class="rf full">
-                  <div class="rf-lbl">Comorbidities</div>
-                  <div class="rf-val" id="pHxComorbidities"></div>
-                </div>
-                <div class="rf full">
-                  <div class="rf-lbl">Additional Notes</div>
-                  <div class="rf-val" id="pHxNotes"></div>
-                </div>
-              </div>
-            </div>
+            <!-- HIDDEN fields kept for DOM compatibility -->
+            <span id="pTreatments" style="display:none;"></span>
+            <span id="pMicrobiome" style="display:none;"></span>
 
           </div>
         </div>
@@ -915,31 +793,41 @@
         <!-- NUTRITION RX -->
         <div class="rs">
           <div class="rs-title" id="pPrescriptionTitle">Prescription Target</div>
-          <div class="rg">
-            <div class="rf full alert-amber" id="cachexiaAlertBox" style="display:none;">
-              <div class="rf-lbl" style="color:#b45309;">Cachexia Trigger Detected</div>
-              <div class="rf-val" style="font-size:12px; font-weight:600;" id="riskCachexia"></div>
-            </div>
 
-            <div class="rf full" style="margin-bottom:8px;">
-              <div class="rf-lbl">Total Base Target</div>
-              <div class="rf-val big" id="totalDailyTarget"></div>
+          <!-- CACHEXIA ALERT -->
+          <div class="rf full alert-amber" id="cachexiaAlertBox" style="display:none; margin-bottom:10px;">
+            <div class="rf-lbl" style="color:#b45309;">Cachexia Trigger Detected</div>
+            <div class="rf-val" style="font-size:12px; font-weight:600;" id="riskCachexia"></div>
+          </div>
+
+          <!-- PRESCRIPTION HERO BLOCK -->
+          <div style="background:linear-gradient(135deg,#0e2247 0%,#1e3a6e 100%); border-radius:10px; padding:16px 20px; margin-bottom:12px; color:#fff;">
+            <div style="font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:0.12em; color:rgba(255,255,255,0.55); margin-bottom:10px;">Daily Therapeutic Target</div>
+            <div style="display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:12px;">
+              <div>
+                <div style="font-size:9px; color:rgba(255,255,255,0.5); margin-bottom:2px;">Energy</div>
+                <div style="font-size:22px; font-weight:900; font-family:'Outfit',sans-serif; color:#22d3ee;" id="dailyCalories"></div>
+              </div>
+              <div>
+                <div style="font-size:9px; color:rgba(255,255,255,0.5); margin-bottom:2px;">Protein</div>
+                <div style="font-size:22px; font-weight:900; font-family:'Outfit',sans-serif; color:#a5f3fc;" id="dailyProtein"></div>
+              </div>
+              <div>
+                <div style="font-size:9px; color:rgba(255,255,255,0.5); margin-bottom:2px;">Servings/Day</div>
+                <div style="font-size:22px; font-weight:900; font-family:'Outfit',sans-serif; color:#fde68a;" id="servingsPerDay"></div>
+              </div>
+              <div>
+                <div style="font-size:9px; color:rgba(255,255,255,0.5); margin-bottom:2px;">Route</div>
+                <div style="font-size:13px; font-weight:800; color:#86efac; margin-top:4px; line-height:1.3;" id="pFeedingRoute"></div>
+              </div>
             </div>
-            <div class="rf">
-              <div class="rf-lbl">Formula Intake Target</div>
-              <div class="rf-val big accent" id="dailyCalories"></div>
-            </div>
-            <div class="rf">
-              <div class="rf-lbl">Formula Protein Target</div>
-              <div class="rf-val big" id="dailyProtein"></div>
-            </div>
+            <div style="margin-top:10px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.1); font-size:10.5px; color:rgba(255,255,255,0.7);" id="totalDailyTarget"></div>
+          </div>
+
+          <div class="rg">
             <div class="rf">
               <div class="rf-lbl">Protein Formulation Type</div>
               <div class="rf-val" id="proteinType"></div>
-            </div>
-            <div class="rf">
-              <div class="rf-lbl">Prescribed Nutrition Route</div>
-              <div class="rf-val accent" style="font-weight:800;" id="pFeedingRoute"></div>
             </div>
 
             <div class="rf full" style="margin-top:4px;">
@@ -974,7 +862,7 @@
           <div class="rg">
             <div class="rf">
               <div class="rf-lbl">Frequency</div>
-              <div class="rf-val big accent" id="servingsPerDay"></div>
+              <div class="rf-val big accent" id="servingsPerDay2"></div>
             </div>
             <div class="rf">
               <div class="rf-lbl">Per Serving Energy</div>
@@ -2930,6 +2818,7 @@
             setVal('pAge', patient.age + ' years');
             setVal('pSex', patient.sex);
             setVal('pWeight', patient.weight + ' kg');
+            setVal('pWeight2', patient.weight + ' kg');
             setVal('pHeight', patient.height + ' cm');
             setVal('pMUAC', (patient.muac ? patient.muac + ' cm' : '-'));
             setVal('pCreatinine', (patient.creatinine ? patient.creatinine + ' mg/dL' : '-'));
@@ -3014,6 +2903,7 @@
 
             setVal('pIBW', computeHamwiIBW() + ' kg');
             setVal('pUW', (patient.usualWeight ? patient.usualWeight + ' kg' : '-'));
+            setVal('pUW2', (patient.usualWeight ? patient.usualWeight + ' kg' : '-'));
             setVal('pWL', (patient.weightLossPercent ?? '-') + ' %');
             setVal('pCancer_header', patient.cancer);
             setVal('pRegimen_header', patient.regimen);
@@ -3313,6 +3203,7 @@
 
             setVal('servingHeader', `Per Serving (${fp.servingsPerDay || 2}x Daily)`);
             setVal('servingsPerDay', (fp.servingsPerDay || 2) + ' servings/day');
+            setVal('servingsPerDay2', (fp.servingsPerDay || 2) + ' servings/day');
             setVal('servingCalories', fp.perServingCalories + ' kcal');
             setVal('servingProtein', fp.perServingProtein + ' g');
             setVal('servingTolerance', (fp.servingsPerDay || 2) >= 4 ? 'Smaller, more frequent feeds selected to improve tolerance during treatment.' : 'Moderate serving volume selected based on current intake pattern.');

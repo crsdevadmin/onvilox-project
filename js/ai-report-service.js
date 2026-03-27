@@ -14,15 +14,34 @@ const aiReportService = {
             return Math.round((parseFloat(patient.weight) / (h * h)) * 10) / 10;
         })();
 
+        // Only send non-null lab values to reduce token count
+        function compactLabs(src, keys) {
+            const out = {};
+            keys.forEach(k => { if (src[k] != null && src[k] !== 0 && src[k] !== '') out[k] = src[k]; });
+            return out;
+        }
+
+        // Slim micronutrients: only send keys that are non-standard (i.e. have a clinical decision)
+        const microSlim = {};
+        const mu = fp.micronutrients || {};
+        Object.keys(mu).forEach(k => {
+            const v = mu[k];
+            if (v && v !== 'Standard' && v !== 'None' && v !== null) microSlim[k] = v;
+        });
+
+        // Safety alerts: send only condition + severity, not full message text
+        const alertsSlim = (fp.safetyAlerts || [])
+            .filter(a => a.level === 'danger' || a.level === 'warning')
+            .map(a => ({ level: a.level, condition: (a.condition || a.message || '').substring(0, 60) }));
+
         return {
-            patient: {
-                name: patient.name, age: patient.age, sex: patient.sex,
+            patient: compactLabs({
+                age: patient.age, sex: patient.sex,
                 weight: patient.weight, height: patient.height,
                 usualWeight: patient.usualWeight,
                 weightLossPercent: patient.weightLossPercent || 0,
-                uhic: patient.uhic, cancer: patient.cancer,
-                cancerStage: patient.cancerStage, regimen: patient.regimen,
-                ecogStatus: patient.ecogStatus, treatmentTypes: patient.treatmentTypes,
+                cancer: patient.cancer, cancerStage: patient.cancerStage,
+                regimen: patient.regimen, ecogStatus: patient.ecogStatus,
                 feedingMethod: patient.feedingMethod,
                 reducedFoodIntake: patient.reducedFoodIntake || 0,
                 albumin: patient.albumin, prealbumin: patient.prealbumin,
@@ -31,36 +50,33 @@ const aiReportService = {
                 sodium: patient.sodium, potassium: patient.potassium,
                 magnesium: patient.magnesium, creatinine: patient.creatinine,
                 alt: patient.alt, ast: patient.ast, bilirubin: patient.bilirubin,
-                vitD: patient.vitD, vitB12: patient.vitB12,
-                folate: patient.folate, zinc: patient.zinc,
+                vitD: patient.vitD, tsh: patient.tsh, zinc: patient.zinc,
                 smi: patient.smi, handGrip: patient.handGrip,
-                muac: patient.muac, lvef: patient.lvef || null,
                 comorbidities: patient.comorbidities || [],
-                allergies: patient.allergies || [],
                 sideEffects: patient.sideEffects || [],
-                culturalPreferences: patient.culturalPreferences,
                 genomicMarkers: patient.genomicMarkers || [],
                 tumorBurden: patient.tumorBurden,
-                sarcopeniaStatus: patient.sarcopeniaStatus
-            },
+                sarcopeniaStatus: patient.sarcopeniaStatus,
+                vegetarian: patient.vegetarian,
+                culturalPreferences: patient.culturalPreferences
+            }, ['age','sex','weight','height','usualWeight','weightLossPercent','cancer','cancerStage','regimen','ecogStatus','feedingMethod','reducedFoodIntake','albumin','prealbumin','crp','hemoglobin','bloodSugar','hba1c','sodium','potassium','magnesium','creatinine','alt','ast','bilirubin','vitD','tsh','zinc','smi','handGrip','tumorBurden','sarcopeniaStatus','vegetarian','culturalPreferences','comorbidities','sideEffects','genomicMarkers']),
             plan: {
-                bmi: bmi, dailyCalories: fp.dailyCalories, kcalPerKg: fp.kcalPerKg,
+                bmi: bmi,
+                dailyCalories: fp.dailyCalories, kcalPerKg: fp.kcalPerKg,
                 dailyProtein: fp.dailyProtein, proteinPerKg: fp.proteinPerKg,
                 servingsPerDay: fp.servingsPerDay,
                 perServingCalories: fp.perServingCalories,
                 perServingProtein: fp.perServingProtein,
-                dailyCarbs: fp.dailyCarbs,
-                dailyFat: fp.dailyFat,
-                macroCarbs: fp.macroCarbs,
-                macroFat: fp.macroFat,
-                prescribedRoute: fp.prescribedRoute, cachexia: fp.cachexia,
-                proteinType: fp.proteinType, safetyAlerts: fp.safetyAlerts || [],
-                interactions: fp.interactions || [],
-                micronutrients: fp.micronutrients || {},
-                outcomes: fp.outcomes || {},
+                dailyCarbs: fp.dailyCarbs, dailyFat: fp.dailyFat,
+                macroCarbs: fp.macroCarbs, macroFat: fp.macroFat,
+                prescribedRoute: fp.prescribedRoute,
+                cachexia: fp.cachexia, sarcopenia: fp.sarcopenia,
+                proteinType: fp.proteinType,
+                safetyFlags: alertsSlim,
+                drugInteractions: (fp.interactions || []).map(i => ({ drug: i.drug, effect: i.effect })),
+                micronutrientsActive: microSlim,
                 feasibilityScore: fp.feasibilityScore,
-                mandatoryInvestigations: fp.mandatoryInvestigations || [],
-                recipe: fp.recipe || {}
+                mandatoryInvestigations: fp.mandatoryInvestigations || []
             }
         };
     },
