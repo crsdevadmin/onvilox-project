@@ -1219,6 +1219,12 @@
               <div style="font-size:11px; color:#64748b; margin-top:4px; padding-left:14px; font-style:italic;"
                 id="riskNote"></div>
 
+              <!-- MANDATORY INVESTIGATIONS (Engine-Computed) -->
+              <div id="mandatoryInvestigationsContainer" style="display:none; margin-top:16px;">
+                <div class="rs-title" style="font-size:9.5px; margin-bottom:8px; color:#991b1b; border-color:#fca5a5;">🔬 Mandatory Investigations Required Before Approval</div>
+                <div id="mandatoryInvestigationsList"></div>
+              </div>
+
               <!-- CLAUDE AI: Clinical Alerts Section -->
               <div id="claudeAlertsSection" style="display:none; margin-top:20px;">
                 <div class="rs-title" style="font-size:9.5px; margin-bottom:8px;">⚡ Clinical Safety Alerts (AI)</div>
@@ -2806,19 +2812,26 @@
 
           function recomputeFromDaily(dailyCalories, dailyProtein) {
             const p = window.patient || {};
-            const servingsPerDay = (p.giIssues || dailyCalories >= 1600) ? 4 : 3;
+            const sideEffects = (Array.isArray(p.sideEffects) ? p.sideEffects : []).map(s => (s || '').toLowerCase());
+            const hasAppetiteLoss = sideEffects.some(s => s.includes('appetite') || s.includes('satiety'));
+            const hasNausea = sideEffects.some(s => s.includes('nausea') || s.includes('vomit'));
+            let servingsPerDay = 3;
+            if (dailyCalories >= 1800 || hasAppetiteLoss || hasNausea || p.giIssues) servingsPerDay = 4;
+            if (dailyCalories >= 2400) servingsPerDay = 5;
+
             const perServingCalories = Math.round(dailyCalories / servingsPerDay);
             const perServingProtein = Math.round(dailyProtein / servingsPerDay);
             const proteinCaloriesDaily = dailyProtein * 4;
             const remainingCalories = Math.max(dailyCalories - proteinCaloriesDaily, 0);
 
-            // Synchronize with nutrition-engine-v4.js logic (carbRatio)
-            const lowerComorbidities = (Array.isArray(p.comorbidities) ? p.comorbidities : []).map(c => c.toLowerCase());
+            const lowerComorbidities = (Array.isArray(p.comorbidities) ? p.comorbidities : []).map(c => (c || '').toLowerCase());
             const isDiabetic = (lowerComorbidities.some(c => c.includes('diabetes') || c.includes('t2dm')) || (p.bloodSugar || 0) > 180);
             const carbRatio = ((p.crp || 0) > 5 || isDiabetic) ? 0.35 : 0.45;
 
-            const dailyCarbs = Math.round((remainingCalories * carbRatio) / 4);
-            const dailyFat = Math.round((remainingCalories * (1 - carbRatio)) / 9);
+            const dailyCarbs = Math.floor((remainingCalories * carbRatio) / 4);
+            const carbCalories = dailyCarbs * 4;
+            const fatCalories = Math.max(remainingCalories - carbCalories, 0);
+            const dailyFat = Math.round((fatCalories / 9) * 10) / 10;
             const macroCarbs = Math.round((dailyCarbs / servingsPerDay) * 10) / 10;
             const macroFat = Math.round((dailyFat / servingsPerDay) * 10) / 10;
             return { servingsPerDay, perServingCalories, perServingProtein, macroCarbs, macroFat, dailyCarbs, dailyFat };
@@ -3093,12 +3106,16 @@
             const fPct = Math.round((fp.dailyFat * 9 / totalSupplKcal) * 100) || 0;
             setVal('macroRatio', `${pPct}% / ${cPct}% / ${fPct}%`);
 
-            // carbs/fat show daily totals derived from per-serving
-            setVal('dailyCarbs', ((fp.dailyCarbs != null ? fp.dailyCarbs : fp.macroCarbs * (fp.servingsPerDay || 2))) + ' g');
-            setVal('perServingCarbs', fp.macroCarbs + ' g');
-            const dailyFatVal = (fp.dailyFat != null ? fp.dailyFat : (fp.macroFat * (fp.servingsPerDay || 2)));
-            setVal('dailyFat', (typeof dailyFatVal === 'number' ? dailyFatVal.toFixed(1) : dailyFatVal) + ' g');
-            setVal('perServingFat', fp.macroFat + ' g');
+            // Macro rendering: always derive per-serving from daily totals to guarantee arithmetic consistency
+            const bindServings = fp.servingsPerDay || 4;
+            const bindDailyCarbs = fp.dailyCarbs != null ? fp.dailyCarbs : 0;
+            const bindDailyFat = fp.dailyFat != null ? fp.dailyFat : 0;
+            const bindPerServingCarbs = Math.round((bindDailyCarbs / bindServings) * 10) / 10;
+            const bindPerServingFat = Math.round((bindDailyFat / bindServings) * 10) / 10;
+            setVal('dailyCarbs', bindDailyCarbs + ' g');
+            setVal('perServingCarbs', bindPerServingCarbs + ' g');
+            setVal('dailyFat', (typeof bindDailyFat === 'number' ? bindDailyFat.toFixed(1) : bindDailyFat) + ' g');
+            setVal('perServingFat', bindPerServingFat + ' g');
 
             setVal('proteinType', fp.proteinType);
 
@@ -3168,8 +3185,8 @@
 
             setVal('mCalories', fp.perServingCalories + ' kcal');
             setVal('mProtein', fp.perServingProtein + ' g');
-            setVal('mCarbs', fp.macroCarbs + ' g');
-            setVal('mFat', fp.macroFat + ' g');
+            setVal('mCarbs', bindPerServingCarbs + ' g');
+            setVal('mFat', bindPerServingFat + ' g');
 
             // Mandatory Switch: Format follows the Prescribed Route (Safety Escalation) not the current profile method
             const isEscalation = (fp.prescribedRoute || '').includes('Enteral');
@@ -3271,6 +3288,24 @@
             const bmiVal = fp.bmi != null ? fp.bmi : computeBMI();
             setVal('riskBmi', bmiVal < 18.5 ? `Low BMI (${bmiVal})` : `Within range (${bmiVal})`);
             setVal('pFitScore', fp.feasibilityScore != null ? fp.feasibilityScore : '100');
+
+            // Mandatory Investigations Banner
+            const miContainer = document.getElementById('mandatoryInvestigationsContainer');
+            if (miContainer) {
+              const items = fp.mandatoryInvestigations || [];
+              if (items.length > 0) {
+                miContainer.style.display = 'block';
+                document.getElementById('mandatoryInvestigationsList').innerHTML = items.map(inv => {
+                  const isCritical = inv.urgency === 'CRITICAL';
+                  return `<div style="display:flex;align-items:flex-start;gap:8px;padding:7px 10px;margin-bottom:5px;border-radius:5px;background:${isCritical ? '#fff0f0' : '#fffbeb'};border:1px solid ${isCritical ? '#fca5a5' : '#fcd34d'};font-size:11px;font-weight:600;color:${isCritical ? '#991b1b' : '#92400e'};">
+                    <span style="flex-shrink:0;">${isCritical ? '🚨' : '⚠️'}</span>
+                    <span><b>[${inv.urgency}]</b> ${inv.item}</span>
+                  </div>`;
+                }).join('');
+              } else {
+                miContainer.style.display = 'none';
+              }
+            }
             setVal('riskNutrition', fp.cachexia ? 'High nutrition risk' : 'Moderate nutrition risk');
             setVal('riskCachexia', fp.cachexia ? 'Yes - intensified support used' : 'No major trigger');
             setVal('riskNote', fp.cachexia ? 'Weight loss / albumin / BMI pattern suggests need for calorie-dense, high-protein support.' : 'Support plan built to maintain intake during treatment.');
@@ -4014,12 +4049,20 @@
             const drugSec = document.getElementById('claudeDrugSection');
             const drugTbl = document.getElementById('claudeDrugTable');
             if (drugSec && drugTbl) {
-              const rows = data.drugInteractions && data.drugInteractions.length > 0
-                ? data.drugInteractions.map(d => {
-                    const rc = { HIGH:'#dc2626', MODERATE:'#d97706', LOW:'#16a34a' };
-                    return `<tr><td style="padding:7px 8px;border:1px solid #e2e8f0;font-weight:700;color:#0e2247;">${d.drug}</td><td style="padding:7px 8px;border:1px solid #e2e8f0;">${d.interaction}</td><td style="padding:7px 8px;border:1px solid #e2e8f0;font-style:italic;color:#1e40af;">${d.advice}</td><td style="padding:7px 8px;border:1px solid #e2e8f0;text-align:center;"><span style="background:${rc[d.risk]||'#64748b'}22;color:${rc[d.risk]||'#64748b'};font-size:9.5px;font-weight:800;padding:2px 8px;border-radius:999px;text-transform:uppercase;">${d.risk||'N/A'}</span></td></tr>`;
-                  }).join('')
-                : `<tr><td colspan="4" style="padding:15px;text-align:center;color:#64748b;font-style:italic;">No significant clinical drug-nutrient interactions identified.</td></tr>`;
+              const rc = { HIGH:'#dc2626', MODERATE:'#d97706', LOW:'#16a34a' };
+              let drugRows = [];
+              if (data.drugInteractions && data.drugInteractions.length > 0) {
+                drugRows = data.drugInteractions;
+              } else {
+                // Fallback: use engine-computed interactions if Claude returned empty
+                const fp = window.currentVersionedPlan ? (window.currentVersionedPlan.finalPlan || window.currentVersionedPlan) : {};
+                if (fp.interactions && fp.interactions.length > 0) {
+                  drugRows = fp.interactions.map(i => ({ drug: i.drug, interaction: i.effect, advice: i.advice, risk: 'MODERATE' }));
+                }
+              }
+              const rows = drugRows.length > 0
+                ? drugRows.map(d => `<tr><td style="padding:7px 8px;border:1px solid #e2e8f0;font-weight:700;color:#0e2247;">${d.drug}</td><td style="padding:7px 8px;border:1px solid #e2e8f0;">${d.interaction}</td><td style="padding:7px 8px;border:1px solid #e2e8f0;font-style:italic;color:#1e40af;">${d.advice}</td><td style="padding:7px 8px;border:1px solid #e2e8f0;text-align:center;"><span style="background:${rc[d.risk]||'#64748b'}22;color:${rc[d.risk]||'#64748b'};font-size:9.5px;font-weight:800;padding:2px 8px;border-radius:999px;text-transform:uppercase;">${d.risk||'N/A'}</span></td></tr>`).join('')
+                : `<tr><td colspan="4" style="padding:15px;text-align:center;color:#64748b;font-style:italic;">No active drug-nutrient interactions detected for this regimen.</td></tr>`;
               drugTbl.innerHTML = rows;
               drugSec.style.display = 'block';
             }

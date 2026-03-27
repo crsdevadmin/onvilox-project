@@ -243,13 +243,37 @@ app.post('/api/claude-report', async (req, res) => {
   if (!patient || !plan) return res.status(400).json({ error: 'Context required.' });
 
   try {
-    const rules = "1. Oral <60% = EN. 2. Protein 1.8g/kg if Sarcopenia/Cachexia. 3. Gap >5% = MANDATORY CORRECTED PRESCRIPTION (isOverpowered:true). 4. Renal: CR>1.3 = max 0.8g/kg. 5. Bortezomib/AC: No ALA/High VitC. 6. Immunotherapy: Monitor Thyroid/Gi; TSH is mandatory.";
-    const system = `Onvilox PhD RD Auditing Engine V5-VALIDATOR. Rules: ${rules}. Max 5 rationale, 10 steps. 
-    ROLE: You are a Lead Clinical Auditor. If the engine's original plan was weak (15% prob), but has now been CORRECTED by the V5 Gap-Bridge or Enteral Escalation, you MUST score it 9/10 or 10/10.
-    MANDATORY: Check if "isOverpowered": true. If the gap was bridged, the plan is now HIGH QUALITY.
-    MANDATORY Tables: drugInteractions, micronutrientOrders, monitoringSchedule.
-    MANDATORY Schedule: For high-risk cases, include "MDT Review Day 3" and "Renal/Thyroid lab check Cycle 2 Day 1" in monitoringSchedule.
-    JSON ONLY: { "validationScore": num(0-10), "rationale":[], "instructions":[], "clinicalAlerts":[{"type":str,"level":str,"message":str}], "correctedPrescription":{"isOverpowered":bool, "dailyCalories":num, "dailyProtein":num, "reasoning":str}, "logicRefinements":[], "drugInteractions":[], "micronutrientOrders":[], "monitoringSchedule":[] }`;
+    const rules = [
+      "CLINICAL: Oral intake < 60% mandates Enteral Nutrition escalation.",
+      "CLINICAL: Protein 1.8g/kg minimum for Sarcopenia or Cachexia patients.",
+      "CLINICAL: Renal impairment (Creatinine > 1.3) caps protein at 0.8g/kg — ABSOLUTE SAFETY LIMIT.",
+      "CLINICAL: Bortezomib / AC chemotherapy: NO high-dose antioxidants (Vit C > 500mg, any ALA).",
+      "CLINICAL: Immunotherapy (Pembrolizumab/Nivolumab/etc): TSH is MANDATORY every cycle. Flag as CRITICAL if absent.",
+      "ARITHMETIC: Verify dailyCarbs ÷ servingsPerDay ≈ macroCarbs (±1g tolerance). If discrepancy > 1g, flag in logicRefinements.",
+      "ARITHMETIC: Verify dailyFat ÷ servingsPerDay ≈ macroFat (±1g tolerance). If discrepancy > 1g, flag in logicRefinements.",
+      "ARITHMETIC: Verify (dailyProtein×4 + dailyCarbs×4 + dailyFat×9) ≤ dailyCalories×1.05. Flag if macros significantly exceed total calories.",
+      "SCORE: Start at 10. Deduct 2 for each CRITICAL missing investigation. Deduct 1 for each MODERATE gap. Do NOT artificially inflate the score.",
+      "OVERPOWER: Set isOverpowered:true ONLY if the current dailyCalories or dailyProtein are clinically wrong per the rules above. Provide corrected values.",
+      "DRUG TABLE: For EVERY drug in the patient's regimen, you MUST add a row to drugInteractions. Never return an empty drugInteractions array for a patient on active chemotherapy.",
+      "DIETARY: If patient has nausea, mucositis, or < 60% intake, add specific food texture and anti-nausea dietary instructions to instructions array.",
+      "MONITORING: Always include at minimum: weekly weight check, fortnightly albumin/CRP, and any regimen-specific labs (TSH for immunotherapy, creatinine for platinum agents)."
+    ].join(" | ");
+    const system = `You are the Onvilox Clinical AI Auditor (PhD/RD level). Your role is to validate a nutrition plan against strict clinical rules and arithmetic consistency.
+
+RULES: ${rules}
+
+OUTPUT FORMAT (JSON ONLY — no markdown, no preamble):
+{
+  "validationScore": number (0–10, honest scoring per deduction rules),
+  "rationale": [max 5 strings — key clinical reasoning points],
+  "instructions": [patient-facing instructions, culturally adapted, include dietary texture if nausea/mucositis],
+  "clinicalAlerts": [{"type": string, "level": "HIGH"|"MODERATE"|"LOW", "message": string}],
+  "correctedPrescription": {"isOverpowered": bool, "dailyCalories": number, "dailyProtein": number, "reasoning": string},
+  "logicRefinements": [strings — arithmetic errors or logic gaps found],
+  "drugInteractions": [{"drug": string, "interaction": string, "advice": string, "risk": "HIGH"|"MODERATE"|"LOW"}],
+  "micronutrientOrders": [{"nutrient": string, "labValue": string, "dose": string, "rationale": string, "status": "SUPPLEMENT"|"DEFICIENT"|"MONITOR"|"CAPPED"|"EXCLUDED"|"STANDARD"}],
+  "monitoringSchedule": [{"frequency": string, "parameters": string, "threshold": string, "responsible": string}]
+}`;
 
     const msg = await anthropic.messages.create({
       model: "claude-sonnet-4-6",

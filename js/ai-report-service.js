@@ -46,11 +46,20 @@ const aiReportService = {
             plan: {
                 bmi: bmi, dailyCalories: fp.dailyCalories, kcalPerKg: fp.kcalPerKg,
                 dailyProtein: fp.dailyProtein, proteinPerKg: fp.proteinPerKg,
+                servingsPerDay: fp.servingsPerDay,
+                perServingCalories: fp.perServingCalories,
+                perServingProtein: fp.perServingProtein,
+                dailyCarbs: fp.dailyCarbs,
+                dailyFat: fp.dailyFat,
+                macroCarbs: fp.macroCarbs,
+                macroFat: fp.macroFat,
                 prescribedRoute: fp.prescribedRoute, cachexia: fp.cachexia,
                 proteinType: fp.proteinType, safetyAlerts: fp.safetyAlerts || [],
                 interactions: fp.interactions || [],
                 micronutrients: fp.micronutrients || {},
                 outcomes: fp.outcomes || {},
+                feasibilityScore: fp.feasibilityScore,
+                mandatoryInvestigations: fp.mandatoryInvestigations || [],
                 recipe: fp.recipe || {}
             }
         };

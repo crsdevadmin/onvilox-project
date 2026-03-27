@@ -646,8 +646,46 @@ function generateNutritionPlan(patient) {
     ];
   }
 
+  // --- FEASIBILITY SCORE: Data Completeness Index ---
+  let feasibilityScore = 100;
+  const missingItems = [];
+  if (chemFlags.pembrolizumab && (tsh === 0 || isNaN(tsh))) {
+    feasibilityScore -= 20;
+    missingItems.push('TSH (CRITICAL for Immunotherapy — Pembrolizumab Thyroiditis risk)');
+  }
+  if (isDiabetic && (!patient.hba1c || patient.hba1c === 0)) {
+    feasibilityScore -= 10;
+    missingItems.push('HbA1c (Required: Diabetic patient / Hyperglycemia detected)');
+  }
+  if (smi > 0 && sarcopenia && isL3SMI) {
+    feasibilityScore -= 15;
+    missingItems.push('CT L3 Imaging (Required: SMI at sarcopenic threshold — algorithmic estimate must be confirmed)');
+  }
+  if (albumin === 0 && cachexia) {
+    feasibilityScore -= 10;
+    missingItems.push('Serum Albumin (Required: Cachexia protocol active)');
+  }
+  if (hemoglobin === 0 && riskScore >= 4) {
+    feasibilityScore -= 5;
+    missingItems.push('Hemoglobin (Recommended: High-risk nutrition patient)');
+  }
+  feasibilityScore = Math.max(0, Math.min(100, feasibilityScore));
+
+  // --- MANDATORY INVESTIGATIONS ---
+  const mandatoryInvestigations = [];
+  if (missingItems.length > 0) {
+    missingItems.forEach(item => mandatoryInvestigations.push({ item, urgency: item.startsWith('CT') ? 'MODERATE' : 'CRITICAL' }));
+  }
+  if (sarcopenia && isL3SMI) {
+    const alreadyHasCT = mandatoryInvestigations.some(i => i.item.includes('CT L3'));
+    if (!alreadyHasCT) {
+      mandatoryInvestigations.push({ item: 'CT L3 Imaging — Confirm Skeletal Muscle Index', urgency: 'MODERATE' });
+    }
+  }
+
   return {
     cachexia, sarcopenia, bmi: Math.round(bmi * 10) / 10, kcalPerKg, proteinPerKg,
+    feasibilityScore, mandatoryInvestigations,
     servingsPerDay, totalDailyCalories, totalDailyProtein,
     estimatedDietaryProtein, totalProteinDelivery,
     dailyCalories, dailyProtein, perServingCalories, perServingProtein,
