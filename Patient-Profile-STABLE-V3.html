@@ -1113,62 +1113,63 @@
                 <div id="mandatoryInvestigationsList"></div>
               </div>
 
-              <!-- CLAUDE AI: Clinical Alerts Section -->
-              <div id="claudeAlertsSection" style="display:none; margin-top:20px;">
-                <div class="rs-title" style="font-size:9.5px; margin-bottom:8px;">⚡ Clinical Safety Alerts (AI)</div>
-                <div id="claudeAlertsList"></div>
-              </div>
-
-              <!-- CLAUDE AI: Drug-Nutrient Interactions Table -->
-              <div id="claudeDrugSection" style="display:none; margin-top:20px;">
-                <div class="rs-title" style="font-size:9.5px; margin-bottom:8px;">💊 Drug-Nutrient Interaction Guidance (AI)</div>
-                <table style="width:100%; border-collapse:collapse; font-size:10.5px;">
-                  <thead>
-                    <tr style="background:#f1f5f9;">
-                      <th style="padding:6px 8px; text-align:left; border:1px solid #e2e8f0; font-weight:700;">Drug</th>
-                      <th style="padding:6px 8px; text-align:left; border:1px solid #e2e8f0; font-weight:700;">Interaction</th>
-                      <th style="padding:6px 8px; text-align:left; border:1px solid #e2e8f0; font-weight:700;">Clinical Advice</th>
-                      <th style="padding:6px 8px; text-align:center; border:1px solid #e2e8f0; font-weight:700;">Risk</th>
-                    </tr>
-                  </thead>
-                  <tbody id="claudeDrugTable"></tbody>
-                </table>
-              </div>
-
-              <!-- CLAUDE AI: Micronutrient Orders Table -->
-              <div id="claudeMicroSection" style="display:none; margin-top:20px;">
-                <div class="rs-title" style="font-size:9.5px; margin-bottom:8px;">🧬 Micronutrient & Functional Support Orders (AI)</div>
-                <table style="width:100%; border-collapse:collapse; font-size:10.5px;">
-                  <thead>
-                    <tr style="background:#f1f5f9;">
-                      <th style="padding:6px 8px; text-align:left; border:1px solid #e2e8f0; font-weight:700;">Nutrient</th>
-                      <th style="padding:6px 8px; text-align:left; border:1px solid #e2e8f0; font-weight:700;">Lab Value</th>
-                      <th style="padding:6px 8px; text-align:left; border:1px solid #e2e8f0; font-weight:700;">Dose</th>
-                      <th style="padding:6px 8px; text-align:left; border:1px solid #e2e8f0; font-weight:700;">Rationale</th>
-                      <th style="padding:6px 8px; text-align:center; border:1px solid #e2e8f0; font-weight:700;">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody id="claudeMicroTable"></tbody>
-                </table>
-              </div>
-
-              <!-- CLAUDE AI: Monitoring Schedule Table -->
-              <div id="claudeMonitorSection" style="display:none; margin-top:20px;">
-                <div class="rs-title" style="font-size:9.5px; margin-bottom:8px;">📅 Monitoring & Reassessment Schedule (AI)</div>
-                <table style="width:100%; border-collapse:collapse; font-size:10.5px;">
-                  <thead>
-                    <tr style="background:#f1f5f9;">
-                      <th style="padding:6px 8px; text-align:left; border:1px solid #e2e8f0; font-weight:700;">Frequency</th>
-                      <th style="padding:6px 8px; text-align:left; border:1px solid #e2e8f0; font-weight:700;">Parameters</th>
-                      <th style="padding:6px 8px; text-align:left; border:1px solid #e2e8f0; font-weight:700;">Action Threshold</th>
-                      <th style="padding:6px 8px; text-align:left; border:1px solid #e2e8f0; font-weight:700;">Responsible</th>
-                    </tr>
-                  </thead>
-                  <tbody id="claudeMonitorTable"></tbody>
-                </table>
-              </div>
-
           </div>
+        </div>
+
+        <!-- CLAUDE AI SECTIONS — placed outside CSS Grid for reliable PDF capture -->
+        <!-- CLAUDE AI: Clinical Alerts Section -->
+        <div id="claudeAlertsSection" style="display:none; margin-top:20px;">
+          <div class="rs-title" style="font-size:9.5px; margin-bottom:8px;">⚡ Clinical Safety Alerts (AI)</div>
+          <div id="claudeAlertsList"></div>
+        </div>
+
+        <!-- CLAUDE AI: Drug-Nutrient Interactions Table -->
+        <div id="claudeDrugSection" style="display:none; margin-top:20px;">
+          <div class="rs-title" style="font-size:9.5px; margin-bottom:8px;">💊 Drug-Nutrient Interaction Guidance (AI)</div>
+          <table style="width:100%; border-collapse:collapse; font-size:10.5px;">
+            <thead>
+              <tr style="background:#f1f5f9;">
+                <th style="padding:6px 8px; text-align:left; border:1px solid #e2e8f0; font-weight:700;">Drug</th>
+                <th style="padding:6px 8px; text-align:left; border:1px solid #e2e8f0; font-weight:700;">Interaction</th>
+                <th style="padding:6px 8px; text-align:left; border:1px solid #e2e8f0; font-weight:700;">Clinical Advice</th>
+                <th style="padding:6px 8px; text-align:center; border:1px solid #e2e8f0; font-weight:700;">Risk</th>
+              </tr>
+            </thead>
+            <tbody id="claudeDrugTable"></tbody>
+          </table>
+        </div>
+
+        <!-- CLAUDE AI: Micronutrient Orders Table -->
+        <div id="claudeMicroSection" style="display:none; margin-top:20px;">
+          <div class="rs-title" style="font-size:9.5px; margin-bottom:8px;">🧬 Micronutrient & Functional Support Orders (AI)</div>
+          <table style="width:100%; border-collapse:collapse; font-size:10.5px;">
+            <thead>
+              <tr style="background:#f1f5f9;">
+                <th style="padding:6px 8px; text-align:left; border:1px solid #e2e8f0; font-weight:700;">Nutrient</th>
+                <th style="padding:6px 8px; text-align:left; border:1px solid #e2e8f0; font-weight:700;">Lab Value</th>
+                <th style="padding:6px 8px; text-align:left; border:1px solid #e2e8f0; font-weight:700;">Dose</th>
+                <th style="padding:6px 8px; text-align:left; border:1px solid #e2e8f0; font-weight:700;">Rationale</th>
+                <th style="padding:6px 8px; text-align:center; border:1px solid #e2e8f0; font-weight:700;">Status</th>
+              </tr>
+            </thead>
+            <tbody id="claudeMicroTable"></tbody>
+          </table>
+        </div>
+
+        <!-- CLAUDE AI: Monitoring Schedule Table -->
+        <div id="claudeMonitorSection" style="display:none; margin-top:20px;">
+          <div class="rs-title" style="font-size:9.5px; margin-bottom:8px;">📅 Monitoring & Reassessment Schedule (AI)</div>
+          <table style="width:100%; border-collapse:collapse; font-size:10.5px;">
+            <thead>
+              <tr style="background:#f1f5f9;">
+                <th style="padding:6px 8px; text-align:left; border:1px solid #e2e8f0; font-weight:700;">Frequency</th>
+                <th style="padding:6px 8px; text-align:left; border:1px solid #e2e8f0; font-weight:700;">Parameters</th>
+                <th style="padding:6px 8px; text-align:left; border:1px solid #e2e8f0; font-weight:700;">Action Threshold</th>
+                <th style="padding:6px 8px; text-align:left; border:1px solid #e2e8f0; font-weight:700;">Responsible</th>
+              </tr>
+            </thead>
+            <tbody id="claudeMonitorTable"></tbody>
+          </table>
         </div>
 
             </div>
