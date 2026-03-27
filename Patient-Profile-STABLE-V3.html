@@ -3915,7 +3915,16 @@
                     const syncedPlan = createOrUpdatePlan(window.patient, engineOutput, overrides, auditNote);
                     window.currentVersionedPlan = syncedPlan;
                     bind(syncedPlan); // This updates Production Specs and Serving Admin tables
-                    
+
+                    // Append AI correction note to Calculation Trace
+                    const ctEl = document.getElementById('calcTrace');
+                    if (ctEl) {
+                        const aiNote = document.createElement('div');
+                        aiNote.style = 'background:#f3e8ff;border-left:3px solid #6d28d9;padding:8px 10px;margin-top:10px;font-size:11px;color:#6d28d9;font-weight:600;border-radius:4px;';
+                        aiNote.innerHTML = `⚖️ <b>AI AUDITOR CORRECTION APPLIED:</b> ${cpAudit.reasoning}`;
+                        ctEl.appendChild(aiNote);
+                    }
+
                     // SAVE BACK TO STORAGE IMMEDIATELY
                     updatePlan(syncedPlan);
                     console.log("AI AUDITOR: Clinical correction persisted immediately.");
@@ -3971,6 +3980,19 @@
                 alertsList.innerHTML = '<div style="color:#16a34a;font-size:11px;padding:8px 4px;">✅ No additional clinical safety alerts — plan meets all audited criteria.</div>';
               }
               alertsSec.style.display = 'block';
+
+              // --- AI AUTHORITATIVE: Update feeding route display if EN escalation mandated ---
+              const enAlert = (Array.isArray(data.clinicalAlerts) ? data.clinicalAlerts : [])
+                .find(a => a.type === 'EN_ESCALATION_MANDATORY' && a.level === 'HIGH');
+              if (enAlert) {
+                const routeEl = document.getElementById('pFeedingRoute');
+                if (routeEl) {
+                  routeEl.innerHTML = '⚡ Enteral Tube Feeding (AI Mandatory Escalation)';
+                  routeEl.style.color = '#fca5a5';
+                }
+                const mFormEl = document.getElementById('mForm');
+                if (mFormEl) mFormEl.innerText = 'Liquid (Emergency Enteral Format — AI Mandated)';
+              }
             }
 
             const drugSec = document.getElementById('claudeDrugSection');
@@ -4006,6 +4028,44 @@
                 : `<tr><td colspan="5" style="padding:15px;text-align:center;color:#64748b;font-style:italic;">No therapeutic micronutrient interventions required beyond standard protocols.</td></tr>`;
               microTbl.innerHTML = rows;
               microSec.style.display = 'block';
+
+              // --- AI AUTHORITATIVE: Apply Claude micro orders to engine micro table cells ---
+              const nutrientIdMap = {
+                'vitamin c': 'vitC', 'ascorbic acid': 'vitC',
+                'alpha lipoic acid': 'ala', 'lipoic acid': 'ala',
+                'glutamine': 'glutamine',
+                'bcaa': 'bcaa', 'branched-chain': 'bcaa',
+                'vitamin d': 'vitD', 'vit d': 'vitD',
+                'zinc': 'zinc',
+                'omega-3': 'omega3', 'omega3': 'omega3', 'dha': 'omega3',
+                'epa': 'epa',
+                'leucine': 'leucine',
+                'hmb': 'hmb',
+                'iron': 'iron',
+                'selenium': 'selenium',
+                'magnesium': 'magnesium'
+              };
+              (data.micronutrientOrders || []).forEach(function(m) {
+                const key = (m.nutrient || '').toLowerCase();
+                let elId = null;
+                for (const term in nutrientIdMap) {
+                  if (key.includes(term)) { elId = nutrientIdMap[term]; break; }
+                }
+                if (!elId) return;
+                const el = document.getElementById(elId);
+                if (!el) return;
+                if (m.status === 'EXCLUDED') {
+                  el.innerHTML = '<span style="color:#dc2626;font-weight:800;">&#9940; EXCLUDED (AI Audit) — ' + (m.dose || 'Contraindicated') + '</span>';
+                  const row = el.closest('tr');
+                  if (row) row.style.display = 'table-row';
+                } else if (m.status === 'DEFICIENT') {
+                  el.innerHTML = '<span style="color:#dc2626;font-weight:700;">&#128308; ' + m.dose + '</span>';
+                } else if (m.status === 'CAPPED') {
+                  el.innerHTML = '<span style="color:#9333ea;font-weight:700;">&#128998; ' + m.dose + ' (Capped)</span>';
+                } else if (m.dose && m.dose !== '—') {
+                  el.innerHTML = '<span style="color:#0284c7;font-weight:600;">&#10024; ' + m.dose + '</span>';
+                }
+              });
             }
 
             const monSec = document.getElementById('claudeMonitorSection');

@@ -55,7 +55,13 @@ function generateNutritionPlan(patient) {
   
   var isDiabetic = (lowerComorbidities.some(c => c.includes('diabetes') || c.includes('t2dm')) || bloodSugar > 180);
   var hasIBD = lowerComorbidities.some(c => c.includes('ibd') || c.includes('crohn') || c.includes('colitis'));
-  var hasRenalIssue = lowerComorbidities.some(c => c.includes('renal') || c.includes('kidney') || c.includes('ckd') || c.includes('nephro')) || creatinine > 1.3 || urea >= 40;
+  // Only match specific renal DISEASE terms — not generic mentions like "normal renal function"
+  var hasRenalDisease = lowerComorbidities.some(c =>
+    c.includes('ckd') || c.includes('chronic kidney') || c.includes('renal failure') ||
+    c.includes('renal disease') || c.includes('renal impairment') || c.includes('renal insufficiency') ||
+    c.includes('nephropathy') || c.includes('dialysis') || c.includes('aki') || c.includes('acute kidney')
+  );
+  var hasRenalIssue = hasRenalDisease || creatinine > 1.3 || urea >= 50;
   
   var hasNausea = sideEffects.some(s => s.includes('nausea') || s.includes('vomit'));
   var hasAppetiteLoss = sideEffects.some(s => s.includes('appetite') || s.includes('satiety'));
