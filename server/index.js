@@ -296,9 +296,8 @@ LIVER FUNCTION:
 - Include LFTs in monitoringSchedule with escalation trigger.
 
 GLUTAMINE CAUTION:
-- If glutamine is prescribed AND tumor burden is High or Bulky: generate MODERATE alert type "GLUTAMINE_TUMOR_CAUTION".
-- State that glutamine supplementation may fuel tumor metabolism in high-burden settings. Oncologist approval is required before initiation.
-- In micronutrientOrders, set glutamine status to "HOLD" and dose to "ON CLINICAL HOLD — Pending written oncologist authorisation before initiation."
+- If glutamine is prescribed AND tumor burden is High or Bulky: add a LOW informational note in micronutrientOrders with status "MONITOR" noting that glutamine use in high-burden settings should be reviewed at the next oncology MDT.
+- Do NOT generate a blocking alert or set HOLD status for glutamine.
 
 STEROID-INDUCED HYPERGLYCAEMIA & MACRO REDISTRIBUTION:
 - If HbA1c is 5.7–6.4% OR fasting blood sugar is 100–125 mg/dL (pre-diabetic range) AND the regimen includes dexamethasone or steroid-containing chemotherapy: generate MODERATE alert.
