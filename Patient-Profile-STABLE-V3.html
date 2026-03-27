@@ -2977,16 +2977,29 @@
 
 
 
-            const totalKcal = fp.totalDailyCalories || fp.dailyCalories;
+            // totalDailyCalories = full 24h target (e.g. 1890 kcal)
+            // onsCalories / dailyCalories = formula contribution only (e.g. 851 kcal)
+            const totalKcal = fp.totalDailyCalories || fp.baseEnergy || fp.dailyCalories;
             const totalPro = fp.totalDailyProtein || fp.dailyProtein;
-            const proteinText = (fp.estimatedDietaryProtein > 0)
-              ? `${totalPro}g Total (Diet: ${fp.estimatedDietaryProtein}g + ONS: ${fp.dailyProtein}g)`
-              : `${totalPro}g Total (Full Replacement)`;
-            setVal('totalDailyTarget', totalKcal + ' kcal / ' + proteinText);
+            const onsKcal = fp.onsCalories != null ? fp.onsCalories : fp.dailyCalories;
+            const onsPro = fp.prescribedProtein != null
+              ? fp.prescribedProtein
+              : (fp.estimatedDietaryProtein > 0 ? totalPro - fp.estimatedDietaryProtein : totalPro);
+            const dietPro = fp.estimatedDietaryProtein || 0;
 
-            setVal('dailyCalories', fp.dailyCalories + ' kcal');
+            const proteinText = dietPro > 0
+              ? `${totalPro}g Total (Diet: ${dietPro}g + Formula: ${onsPro}g)`
+              : `${totalPro}g (Full Replacement Formula)`;
+            const kcalBreakText = dietPro > 0
+              ? `${totalKcal} kcal / ${proteinText} — Formula: ${onsKcal} kcal`
+              : `${totalKcal} kcal / ${proteinText}`;
+            setVal('totalDailyTarget', kcalBreakText);
+
+            // Hero block shows TOTAL 24h target, not formula-only portion
+            setVal('dailyCalories', totalKcal + ' kcal');
+            setVal('dailyProtein', totalPro + ' g');
+            // Per-serving values are based on formula portion (what the patient administers per feed)
             setVal('perServingCalories', fp.perServingCalories + ' kcal');
-            setVal('dailyProtein', fp.dailyProtein + ' g');
             setVal('perServingProtein', fp.perServingProtein + ' g');
 
             // Fix macro ratio

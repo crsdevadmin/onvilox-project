@@ -215,8 +215,12 @@ function generateNutritionPlan(patient) {
 
   const totalProteinDelivery = prescribedProtein + estimatedDietaryProtein;
 
-  const totalDailyCalories = dailyCalories;
-  const totalDailyProtein = totalProteinDelivery; 
+  // totalDailyCalories = the true 24h calorie TARGET (base prescription).
+  // dailyCalories = the formula/ONS contribution only (the deficit to be filled).
+  const totalDailyCalories = baseDailyCalories;
+  const totalDailyProtein = totalProteinDelivery;
+  // onsCalories = calorie contribution from formula/ONS (may equal totalDailyCalories for full replacement)
+  const onsCalories = dailyCalories;
 
   const proteinGap = Math.max(0, baseDailyProtein - totalDailyProtein);
   const isGapCritical = (proteinGap / baseDailyProtein) > 0.2;
@@ -688,6 +692,7 @@ function generateNutritionPlan(patient) {
     feasibilityScore, mandatoryInvestigations,
     servingsPerDay, totalDailyCalories, totalDailyProtein,
     estimatedDietaryProtein, totalProteinDelivery,
+    onsCalories, prescribedProtein,
     dailyCalories, dailyProtein, perServingCalories, perServingProtein,
     proteinType, dailyCarbs, dailyFat, macroProtein, macroCarbs, macroFat,
     micronutrients, rationale, nutritionRisk, nutritionRiskScore: riskScore,
