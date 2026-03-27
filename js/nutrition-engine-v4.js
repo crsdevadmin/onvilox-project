@@ -196,7 +196,8 @@ function generateNutritionPlan(patient) {
   const actualIntake = 100 - (reducedFoodIntake || 0);
   
   // CRITICAL FIX: If the patient is Renal, Enteral, or Escalated, we always target 100% 
-  const isFullReplacement = (patient.feedingMethod || '').toLowerCase().includes('enteral') || (actualIntake <= 50) || hasRenalIssue;
+  // ESPEN guideline: intake ≤60% triggers full replacement prescription
+  const isFullReplacement = (patient.feedingMethod || '').toLowerCase().includes('enteral') || (actualIntake <= 60) || hasRenalIssue;
   
   const dailyCalories = isFullReplacement ? baseDailyCalories : Math.round(baseDailyCalories * (reducedFoodIntake / 100));
   const dailyProtein = isFullReplacement ? baseDailyProtein : Math.round(baseDailyProtein * (reducedFoodIntake / 100));
@@ -367,9 +368,11 @@ function generateNutritionPlan(patient) {
   }
 
   if (actualIntake <= 30) {
-    safetyStatus.escalation = { level: 'danger', message: `CRITICAL INTAKE REQ: Intaking only ${actualIntake}%. Immediate Enteral Tube Escalation required.` };
+    safetyStatus.escalation = { level: 'danger', message: `CRITICAL INTAKE REQ: Intaking only ${actualIntake}%. Immediate Enteral Tube Escalation required per ESPEN guidelines.` };
   } else if (actualIntake <= 50) {
-    safetyStatus.escalation = { level: 'warning', message: `LOW INTAKE ALERT: Intaking ${actualIntake}%. Intensive ONS required.` };
+    safetyStatus.escalation = { level: 'danger', message: `LOW INTAKE ALERT: Intaking ${actualIntake}%. Enteral nutrition escalation mandatory — below 50% threshold.` };
+  } else if (actualIntake <= 60) {
+    safetyStatus.escalation = { level: 'warning', message: `ESCALATION RISK: Intaking ${actualIntake}% — below 60% clinical threshold. Intensive ONS bridging required. Reassess in 3 days; initiate NG tube if no improvement.` };
   }
 
   if (reducedFoodIntake > 50) {
@@ -382,11 +385,11 @@ function generateNutritionPlan(patient) {
   }
 
   // --- NEW: CLINICAL PROTOCOLS (TRANSITION & FOLLOW-UP) ---
-  const enteralProtocol = (actualIntake <= 50) ? {
+  const enteralProtocol = (actualIntake <= 60) ? {
     type: "Isocaloric / High-Protein Enteral Formula",
     dosage: `Initial: 20-25 ml/hr continuously; Target: ${Math.round(dailyCalories/24)} ml/hr`,
     transition: "Day 1-2: Trophic feeding. Day 3: Achieve 100% target volume. If tolerated, transition ONS to meal-replacement only.",
-    rationale: "Intake < 50% mandates clinical escalation to prevent further catabolism."
+    rationale: `Intake ${actualIntake}% — below 60% ESPEN threshold. Escalation to enteral nutrition initiated.`
   } : null;
 
   const electrolyteStrategy = {
@@ -605,7 +608,7 @@ function generateNutritionPlan(patient) {
   }
 
   const outcomePredictionData = calculateOutcomePrediction(riskScore, patient.ecogStatus, reducedFoodIntake, patient.tumorBurden, {
-    dailyProtein, proteinPerKg, prescribedRoute: (actualIntake <= 50) ? "Enteral" : "Oral", micronutrients
+    dailyProtein, proteinPerKg, prescribedRoute: (actualIntake <= 60) ? "Enteral" : "Oral", micronutrients
   });
 
   const outcomes = {
@@ -703,7 +706,7 @@ function generateNutritionPlan(patient) {
     enteralProtocol, electrolyteStrategy, reassessmentProtocol,
     hasRenalIssue,
     hasHighRiskRegimen: (chemFlags.bortezomib || regimen.includes('cisplatin') || regimen.includes('platin') || regimen.includes('lenalidomide')),
-    prescribedRoute: (actualIntake <= 50) ? "Enteral Tube Feeding (Escalation)" : (actualIntake <= 75 ? "Oral Nutrition Supplements (ONS)" : "Oral Feeding (Maintenance)"),
+    prescribedRoute: (actualIntake <= 60) ? "Enteral Tube Feeding (Escalation)" : (actualIntake <= 75 ? "Oral Nutrition Supplements (ONS)" : "Oral Feeding (Maintenance)"),
     baseEnergy: baseDailyCalories,
     baseProtein: baseDailyProtein,
     outcomePrediction: outcomePredictionData,

@@ -309,9 +309,10 @@ IMMUNOTHERAPY MONITORING:
 - Include thyroid function in monitoringSchedule with per-cycle frequency.
 
 ANTIOXIDANT SAFETY:
-- If regimen includes Bortezomib, AC (Doxorubicin + Cyclophosphamide), Oxaliplatin, or Cisplatin: Vitamin C > 500 mg/day and Alpha-Lipoic Acid are CONTRAINDICATED as they may reduce chemotherapy efficacy via free radical scavenging.
-- If any such supplement is present in the plan: generate HIGH clinicalAlert.
+- If regimen includes Bortezomib, AC (Doxorubicin + Cyclophosphamide), Oxaliplatin, or Cisplatin: Vitamin C > 500 mg/day and Alpha-Lipoic Acid are CONTRAINDICATED during those specific cycles as they may reduce chemotherapy efficacy via ROS-dependent cytotoxic mechanisms.
+- If any such supplement is present in the plan without phase-specific suspension guidance: generate HIGH clinicalAlert.
 - Mark these as EXCLUDED in micronutrientOrders.
+- PHASE-SPECIFIC ALA RULE (sequential regimens): If the regimen is AC → Taxane (or any anthracycline-first sequential protocol), ALA may be prescribed therapeutically during the Taxane phase for peripheral neuropathy prevention, BUT must be explicitly SUSPENDED during all AC/anthracycline cycles. If the plan prescribes ALA without this phase-specific suspension instruction documented, generate a MODERATE alert type "ALA_PHASE_SUSPENSION_MISSING" stating: "ALA must be held during AC cycles and resumed only at Taxane phase commencement. Continuous ALA administration through AC cycles risks attenuating doxorubicin cytotoxicity."
 
 BCAA & LEUCINE OVERLAP:
 - If BCAA ≥ 15g/day AND Leucine is also prescribed separately: flag MODERATE alert for potential leucine excess (>13–15g/day total may exceed anabolic threshold and cause metabolic stress).
