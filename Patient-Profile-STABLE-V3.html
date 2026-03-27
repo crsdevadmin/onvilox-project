@@ -3865,7 +3865,7 @@
             const vsEl = document.getElementById('aiValidationScore');
             if (vsEl && data.validationScore !== undefined) {
                 vsEl.innerText = `${data.validationScore}/10`;
-                vsEl.style.color = data.validationScore >= 9 ? '#16a34a' : (data.validationScore >= 7 ? '#d97706' : '#dc2626');
+                vsEl.style.color = data.validationScore >= 8.5 ? '#16a34a' : (data.validationScore >= 6.5 ? '#d97706' : '#dc2626');
             }
 
             // 1. Rationale (Prepend with cleanup)
@@ -3941,12 +3941,22 @@
                 }
             }
 
-            // --- AI AUDITOR: Logic Refinements (Dev Only / Hidden in PDF) ---
+            // --- AI AUDITOR: Logic Refinements — visible in report + persisted ---
             if (data.logicRefinements && data.logicRefinements.length > 0) {
-                const logs = JSON.parse(localStorage.getItem('onvilox_logic_logs') || '[]');
-                logs.push({ date: new Date().toISOString(), patientId: window.patient?.id, suggestions: data.logicRefinements });
-                localStorage.setItem('onvilox_logic_logs', JSON.stringify(logs.slice(-20))); // Keep last 20
-                console.log("AI Logic Refinements Logged:", data.logicRefinements);
+                const logHistory = JSON.parse(localStorage.getItem('onvilox_logic_logs') || '[]');
+                logHistory.push({ date: new Date().toISOString(), patientId: window.patient?.id, suggestions: data.logicRefinements });
+                localStorage.setItem('onvilox_logic_logs', JSON.stringify(logHistory.slice(-20)));
+                console.log("AI Logic Refinements:", data.logicRefinements);
+                // Show in rationale block so clinician sees arithmetic/logic corrections
+                if (crEl) {
+                    data.logicRefinements.forEach(r => {
+                        const li = document.createElement('li');
+                        li.className = 'ai-insight';
+                        li.style = 'color:#b45309; font-weight:600; border-left:3px solid #f59e0b; padding-left:8px; margin-bottom:6px;';
+                        li.innerHTML = `🔧 <b>Plan Logic:</b> ${r}`;
+                        crEl.appendChild(li);
+                    });
+                }
             }
 
             // 3. Clinical Alerts Section — always show after AI run

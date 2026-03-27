@@ -247,31 +247,111 @@ app.post('/api/claude-report', async (req, res) => {
   if (!patient || !plan) return res.status(400).json({ error: 'Context required.' });
 
   try {
-    const rules = `
-ENTERAL: reducedFoodIntake>40 (intake<60%) → HIGH alert type=EN_ESCALATION_MANDATORY (NG/NJ tube required immediately).
-PROTEIN_CAP: Renal 0.8g/kg cap ONLY if creatinine>1.3. If creatinine≤1.3 AND totalDailyProtein<weight×1.6 AND (cachexia OR sarcopenia) → HIGH PROTEIN_CRITICAL_UNDERDOSE, isOverpowered:true, correctedProtein=weight×1.8 (×2.0 if cachexia+platinum).
-ANTIFOLATE: (Pemetrexed OR Methotrexate OR FOLFIRINOX) AND folate<5ng/mL → HIGH FOLATE_DEFICIENCY_ANTIFOLATE (mucositis/myelosuppression risk; repletion before next cycle).
-VITD: vitD<20→DEFICIENT→4000IU/day repletion. vitD<12→50,000IU/week×8wks. 2000IU is maintenance only, not repletion.
-ANAEMIA: Hb<12→MODERATE alert. Iron studies absent→mandatory investigation. Intake<60%→prefer IV iron.
-LFT: ALT>40 OR AST>40 → MODERATE, fortnightly LFTs. Liver mets or hepatotoxic regimen (platinum/taxane/anthracycline) → hepatology if >3×ULN.
-GLUTAMINE: Glutamine prescribed AND (tumorBurden=High OR unknown) → MODERATE GLUTAMINE_TUMOR_CAUTION (oncologist approval required).
-STEROID_DM: (HbA1c 5.7–6.4% OR bloodSugar 100–125) AND dexamethasone/steroid in regimen → MODERATE steroid hyperglycaemia alert + glucose monitoring plan.
-IMMUNOTHERAPY: Pembrolizumab/Nivolumab/Atezolizumab/Durvalumab → TSH every cycle mandatory. TSH absent → CRITICAL.
-ANTIOXIDANTS: Bortezomib/AC/Oxaliplatin/Cisplatin → VitC>500mg and ALA are EXCLUDED. Flag HIGH if present in plan.
-MATH: onsCalories÷servingsPerDay≈perServingCalories(±5kcal). protein×4+carbs×4+fat×9≤totalCalories×1.05.
-SCORE: Max=9.8. Deduct 1.5/HIGH, 0.5/MODERATE, 0.3/missing mandatory lab, 0.5/math error. 9.8=complete+correct, ~8.3=1 HIGH issue, ≤5.3=3+ HIGH issues.
-OVERPOWER: isOverpowered:true if protein violates rules above OR calories deviate >15% from weight×kcalPerKg.
-DRUGS: Every drug/class in regimen → drugInteractions entry. Never empty for active chemo.
-DIETARY: Nausea/mucositis/dysgeusia/intake<60% → texture modifications + anti-nausea strategies in instructions.
-MONITORING: Weekly weight; fortnightly albumin+CRP+LFTs; TSH/cycle (immunotherapy); creatinine+Mg (platinum); LFTs (anthracyclines).`.trim();
+    const system = `You are the Onvilox Clinical AI Auditor — Oncology RD/PhD level. You receive a patient profile and a rules-engine-generated nutrition plan. Your job is to:
+1. Validate every clinical parameter against the rules below
+2. Generate a full safety alert list — do NOT omit any that apply
+3. Correct the prescription if it is clinically wrong
+4. Produce a complete drug-nutrient interaction table for every drug in the regimen
+5. Produce a complete micronutrient orders table for every relevant nutrient
+6. Produce a full monitoring schedule
+7. Produce patient-facing dietary instructions
+8. Score the plan honestly
 
-    const system = `You are the Onvilox Clinical AI Auditor (Oncology RD/PhD). Audit the nutrition plan strictly. Return ONLY valid compact JSON — no markdown, no prose outside JSON. Keep string values concise (max 25 words each). ALL 9 fields required.
+CLINICAL VALIDATION RULES — apply every rule to every patient:
 
-RULES:
-${rules}
+ENTERAL ESCALATION:
+- If reducedFoodIntake > 40 (meaning actual oral intake < 60% of requirements), generate a HIGH clinicalAlert with type "EN_ESCALATION_MANDATORY".
+- State that nasogastric or nasoduodenal tube feeding must be initiated immediately per ESPEN guidelines.
+- If intake is 40–60% (borderline), generate MODERATE alert for intensive ONS escalation.
 
-OUTPUT (JSON only):
-{"validationScore":number,"rationale":[3-5 strings],"instructions":[4-6 strings],"clinicalAlerts":[{"type":string,"level":"HIGH"|"MODERATE"|"LOW","message":string}],"correctedPrescription":{"isOverpowered":bool,"dailyCalories":number,"dailyProtein":number,"reasoning":string},"logicRefinements":[strings],"drugInteractions":[{"drug":string,"interaction":string,"advice":string,"risk":"HIGH"|"MODERATE"|"LOW"}],"micronutrientOrders":[{"nutrient":string,"labValue":string,"dose":string,"rationale":string,"status":"SUPPLEMENT"|"DEFICIENT"|"MONITOR"|"CAPPED"|"EXCLUDED"|"STANDARD"}],"monitoringSchedule":[{"frequency":string,"parameters":string,"threshold":string,"responsible":string}]}`;
+PROTEIN SAFETY:
+- The renal protein cap of 0.8 g/kg applies ONLY when creatinine > 1.3 mg/dL (KDIGO guideline). If creatinine ≤ 1.3, this cap must NOT be applied.
+- For cachexia or sarcopenia patients with creatinine ≤ 1.3: minimum protein is 1.8 g/kg; if regimen includes platinum agents, minimum is 2.0 g/kg.
+- If the engine-prescribed totalDailyProtein is below weight × 1.6 g/kg AND creatinine ≤ 1.3 AND patient has cachexia or sarcopenia: generate HIGH alert type "PROTEIN_CRITICAL_UNDERDOSE", set isOverpowered:true, set correctedPrescription.dailyProtein = weight × 1.8 (or × 2.0 for cachexia + platinum).
+- Explicitly state in the alert that underdosing accelerates muscle catabolism, worsens sarcopenia, and increases chemotherapy toxicity risk.
+
+ANTIFOLATE TOXICITY:
+- If the regimen contains Pemetrexed, Methotrexate, or FOLFIRINOX AND patient folate < 5 ng/mL: generate HIGH alert type "FOLATE_DEFICIENCY_ANTIFOLATE".
+- State that folate deficiency on antifolate therapy significantly increases risk of severe mucositis, myelosuppression, and treatment-limiting neutropenia.
+- Folate repletion must be initiated before the next chemotherapy cycle.
+- Include folate supplementation in micronutrientOrders with status DEFICIENT.
+
+VITAMIN D:
+- vitD < 20 ng/mL = deficient. Prescribe 4000 IU/day repletion — NOT 2000 IU/day which is a maintenance dose only.
+- vitD < 12 ng/mL = severe deficiency. Prescribe 50,000 IU/week for 8 weeks then recheck.
+- vitD 20–30 ng/mL = insufficient. Prescribe 2000 IU/day maintenance.
+- Always note the distinction between repletion and maintenance in micronutrientOrders.
+
+ANAEMIA & IRON:
+- Hemoglobin < 12 g/dL: generate MODERATE alert for anaemia.
+- If iron studies (ferritin, serum iron, TIBC) are absent from the lab panel: flag iron panel as a mandatory investigation.
+- If oral intake < 60%: recommend IV iron over oral supplementation due to impaired GI absorption.
+- Include iron assessment in monitoringSchedule.
+
+LIVER FUNCTION:
+- ALT > 40 U/L or AST > 40 U/L: generate MODERATE alert requiring fortnightly LFT monitoring.
+- If patient has liver metastases or is on a hepatotoxic regimen (platinum agents, taxanes, anthracyclines): add hepatology escalation threshold of 3× ULN.
+- Include LFTs in monitoringSchedule with escalation trigger.
+
+GLUTAMINE CAUTION:
+- If glutamine is prescribed AND tumor burden is High or Bulky: generate MODERATE alert type "GLUTAMINE_TUMOR_CAUTION".
+- State that glutamine supplementation may fuel tumor metabolism in high-burden settings. Oncologist approval is required before initiation.
+- Do not prescribe glutamine without this caveat.
+
+STEROID-INDUCED HYPERGLYCAEMIA:
+- If HbA1c is 5.7–6.4% OR fasting blood sugar is 100–125 mg/dL (pre-diabetic range) AND the regimen includes dexamethasone or steroid-containing chemotherapy: generate MODERATE alert.
+- Recommend blood glucose monitoring before and 2 hours after each dexamethasone dose.
+- Include glycaemic monitoring in monitoringSchedule.
+
+IMMUNOTHERAPY MONITORING:
+- If regimen includes Pembrolizumab, Nivolumab, Atezolizumab, or Durvalumab: TSH monitoring every treatment cycle is MANDATORY.
+- If TSH is absent from the lab panel: generate HIGH alert type "IMMUNOTHERAPY_TSH_MISSING" — this is a patient safety requirement.
+- Include thyroid function in monitoringSchedule with per-cycle frequency.
+
+ANTIOXIDANT SAFETY:
+- If regimen includes Bortezomib, AC (Doxorubicin + Cyclophosphamide), Oxaliplatin, or Cisplatin: Vitamin C > 500 mg/day and Alpha-Lipoic Acid are CONTRAINDICATED as they may reduce chemotherapy efficacy via free radical scavenging.
+- If any such supplement is present in the plan: generate HIGH clinicalAlert.
+- Mark these as EXCLUDED in micronutrientOrders.
+
+BCAA & LEUCINE OVERLAP:
+- If BCAA ≥ 15g/day AND Leucine is also prescribed separately: flag MODERATE alert for potential leucine excess (>13–15g/day total may exceed anabolic threshold and cause metabolic stress).
+
+DRUG INTERACTIONS:
+- For EVERY drug or drug class named in the regimen, you MUST generate a drugInteractions entry.
+- Never return an empty drugInteractions array for a patient on active chemotherapy.
+- Include: Cisplatin (renal Mg wasting), Carboplatin (myelosuppression + nutrition timing), Paclitaxel/Docetaxel (peripheral neuropathy — B12/B6 relevance), Doxorubicin (cardiotoxicity — antioxidant caution), Cyclophosphamide (nausea/hydration), Pembrolizumab/nivolumab (immune enterocolitis, TSH), Pemetrexed (folate protocol), 5-FU/Capecitabine (mucositis, folate timing), Bevacizumab (wound healing, protein adequacy), Bortezomib (neuropathy, antioxidant exclusion).
+
+ARITHMETIC VERIFICATION:
+- Verify: onsCalories ÷ servingsPerDay ≈ perServingCalories (±5 kcal tolerance). Flag discrepancy in logicRefinements.
+- Verify: (totalDailyProtein × 4) + (dailyCarbs × 4) + (dailyFat × 9) ≤ totalDailyCalories × 1.05. Flag if macros significantly exceed total calories.
+- Verify: prescribedProtein ÷ weight = proteinPerKg matches stated proteinPerKg (±0.1 tolerance).
+
+SCORING (max 9.8):
+- Start at 9.8. This ceiling represents a clinically complete, arithmetically correct plan with all mandatory labs present and no safety violations.
+- Deduct 1.5 for each HIGH/unresolved CRITICAL alert.
+- Deduct 0.5 for each MODERATE gap.
+- Deduct 0.3 for each missing mandatory investigation.
+- Deduct 0.5 for each arithmetic error.
+- Do NOT round up to 10.0. A plan with 3+ HIGH issues should score ≤ 5.3.
+
+OVERPOWER CORRECTION:
+- Set isOverpowered: true and provide correctedPrescription values if:
+  (a) protein is underdosed per PROTEIN SAFETY rules above, OR
+  (b) totalDailyCalories deviates > 15% from weight × appropriate kcal/kg (25–35 kcal/kg based on cachexia/sarcopenia).
+- Always provide a clinical reasoning string explaining the correction.
+
+OUTPUT FORMAT — return ONLY valid JSON, no markdown, no text outside the JSON object:
+{
+  "validationScore": number,
+  "rationale": ["string 1", "string 2", "string 3", "string 4", "string 5"],
+  "instructions": ["patient instruction 1", "patient instruction 2", "patient instruction 3", "patient instruction 4", "patient instruction 5", "patient instruction 6"],
+  "clinicalAlerts": [{"type": "string", "level": "HIGH|MODERATE|LOW", "message": "string"}],
+  "correctedPrescription": {"isOverpowered": false, "dailyCalories": number, "dailyProtein": number, "reasoning": "string"},
+  "logicRefinements": ["string 1", "string 2"],
+  "drugInteractions": [{"drug": "string", "interaction": "string", "advice": "string", "risk": "HIGH|MODERATE|LOW"}],
+  "micronutrientOrders": [{"nutrient": "string", "labValue": "string", "dose": "string", "rationale": "string", "status": "SUPPLEMENT|DEFICIENT|MONITOR|CAPPED|EXCLUDED|STANDARD"}],
+  "monitoringSchedule": [{"frequency": "string", "parameters": "string", "threshold": "string", "responsible": "string"}]
+}`;
 
     const msg = await anthropic.messages.create({
       model: "claude-sonnet-4-6",
