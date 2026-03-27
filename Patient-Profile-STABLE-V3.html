@@ -3737,8 +3737,17 @@
               dlBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Generating Secure PDF...';
             }
 
-            // Step 3: Ensure AI sections are visible for PDF export (show only, no re-render)
-            ['claudeAlertsSection','claudeDrugSection','claudeMicroSection'].forEach(id => {
+            // Step 3: Re-render AI sections from stored insights for PDF export
+            try {
+              const aiPlan = window.currentVersionedPlan;
+              if (aiPlan && aiPlan.claudeInsights) {
+                renderClaudeInsight(aiPlan.claudeInsights, true);
+              }
+            } catch(e) {
+              console.warn("AI re-render for PDF skipped:", e);
+            }
+            // Always ensure all four AI sections are visible regardless
+            ['claudeAlertsSection','claudeDrugSection','claudeMicroSection','claudeMonitorSection'].forEach(id => {
               const el = document.getElementById(id);
               if (el && el.innerHTML.trim() !== '') el.style.display = 'block';
             });
@@ -3911,8 +3920,8 @@
               piEl.innerHTML = aiHtml + piEl.innerHTML;
             }
 
-            // --- AI AUDITOR: Overpower Logic ---
-            if (data.correctedPrescription && data.correctedPrescription.isOverpowered) {
+            // --- AI AUDITOR: Overpower Logic (skip when called from PDF export context) ---
+            if (!skipPersistence && data.correctedPrescription && data.correctedPrescription.isOverpowered) {
                 console.log("AI AUDITOR OVERPOWER DETECTED:", data.correctedPrescription);
                 const cpAudit = data.correctedPrescription;
                 
