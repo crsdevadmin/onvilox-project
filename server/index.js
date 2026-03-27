@@ -266,9 +266,10 @@ ENTERAL ESCALATION:
 
 PROTEIN SAFETY:
 - The renal protein cap of 0.8 g/kg applies ONLY when creatinine > 1.3 mg/dL (KDIGO guideline). If creatinine ≤ 1.3, this cap must NOT be applied.
-- For cachexia or sarcopenia patients with creatinine ≤ 1.3: minimum protein is 1.8 g/kg; if regimen includes platinum agents, minimum is 2.0 g/kg.
-- If the engine-prescribed totalDailyProtein is below weight × 1.6 g/kg AND creatinine ≤ 1.3 AND patient has cachexia or sarcopenia: generate HIGH alert type "PROTEIN_CRITICAL_UNDERDOSE", set isOverpowered:true, set correctedPrescription.dailyProtein = weight × 1.8 (or × 2.0 for cachexia + platinum).
-- Explicitly state in the alert that underdosing accelerates muscle catabolism, worsens sarcopenia, and increases chemotherapy toxicity risk.
+- For cachexia OR sarcopenia patients with creatinine ≤ 1.3: minimum protein is 1.8 g/kg.
+- For patients with BOTH (cachexia OR sarcopenia) AND (immunotherapy checkpoint inhibitor — pembrolizumab, nivolumab, atezolizumab, durvalumab — OR platinum agents): minimum protein is 2.0 g/kg due to combined immunometabolic and anti-catabolic demand.
+- If totalDailyProtein is below weight × 1.6 g/kg AND creatinine ≤ 1.3 AND cachexia or sarcopenia present: generate HIGH alert "PROTEIN_CRITICAL_UNDERDOSE", set isOverpowered:true, correctedPrescription.dailyProtein = weight × 1.8 (or × 2.0 if immunotherapy or platinum also present).
+- If totalDailyProtein is below weight × 1.9 g/kg AND patient has BOTH (cachexia or sarcopenia) AND (immunotherapy or platinum): generate HIGH alert "PROTEIN_UNDERDOSE_IMMUNOTHERAPY", set isOverpowered:true, correctedPrescription.dailyProtein = weight × 2.0. State that 2.0 g/kg is the minimum for this immunometabolic profile and that underdosing accelerates muscle catabolism, worsens sarcopenia, and increases chemotherapy toxicity risk.
 
 ANTIFOLATE TOXICITY:
 - If the regimen contains Pemetrexed, Methotrexate, or FOLFIRINOX AND patient folate < 5 ng/mL: generate HIGH alert type "FOLATE_DEFICIENCY_ANTIFOLATE".
@@ -302,7 +303,7 @@ GLUTAMINE CAUTION:
 STEROID-INDUCED HYPERGLYCAEMIA & MACRO REDISTRIBUTION:
 - If HbA1c is 5.7–6.4% OR fasting blood sugar is 100–125 mg/dL (pre-diabetic range) AND the regimen includes dexamethasone or steroid-containing chemotherapy: generate MODERATE alert.
 - Recommend blood glucose monitoring before and 2 hours after each dexamethasone dose.
-- If HbA1c ≥ 6.5% (diabetic range) OR blood sugar > 140 mg/dL: the macro distribution MUST be corrected. Set isOverpowered: true and set correctedPrescription.dailyCarbs = weight × 2.5 (max 40% of total calories from carbs), recalculate dailyFat from remaining calories after protein and carb allocation. Provide the corrected gram values for dailyCarbs and dailyFat in correctedPrescription.
+- If HbA1c ≥ 6.5% (diabetic range) OR blood sugar > 140 mg/dL OR patient comorbidities include Fatty Liver Disease (NAFLD/MAFLD/NASH/steatohepatitis): the macro distribution MUST be corrected. Set isOverpowered: true. Fat must not exceed 30% of totalDailyCalories: set dailyFat = totalDailyCalories × 0.30 / 9, then set dailyCarbs = (totalDailyCalories − dailyProtein×4 − dailyFat×9) / 4. Distribute carbs across 5–6 small meals for glycaemic control. Provide the corrected gram values for dailyCarbs and dailyFat in correctedPrescription.
 - Include glycaemic monitoring in monitoringSchedule.
 
 IMMUNOTHERAPY MONITORING:
@@ -344,6 +345,9 @@ OVERPOWER CORRECTION:
   (b) totalDailyCalories deviates > 15% from weight × appropriate kcal/kg (25–35 kcal/kg based on cachexia/sarcopenia).
 - Always provide a clinical reasoning string explaining the correction.
 
+CRITICAL — CLINICAL ALERTS COMPLETENESS:
+Every safety violation you identify — whether mentioned in rationale, logicRefinements, or instructions — MUST also appear as a structured entry in the clinicalAlerts array with the correct type and level. An empty or incomplete clinicalAlerts array while safety issues exist is a critical reporting failure. Do NOT summarise issues only in rationale and leave clinicalAlerts empty or partial.
+
 OUTPUT FORMAT — return ONLY valid JSON, no markdown, no text outside the JSON object:
 {
   "validationScore": number,
@@ -359,7 +363,7 @@ OUTPUT FORMAT — return ONLY valid JSON, no markdown, no text outside the JSON 
 
     const msg = await anthropic.messages.create({
       model: "claude-sonnet-4-6",
-      max_tokens: 6000,
+      max_tokens: 8000,
       system: system,
       messages: [{
         role: "user",

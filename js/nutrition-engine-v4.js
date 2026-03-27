@@ -189,7 +189,8 @@ function generateNutritionPlan(patient) {
     if (age >= 70 && proteinPerKg < 1.5) {
       proteinPerKg = 1.5;
     }
-    if ((regimen.includes('folfirinox') || regimen.includes('platin')) && cachexia && proteinPerKg < 2.0) {
+    // 2.0 g/kg for: platinum or FOLFIRINOX (high catabolism), or immunotherapy + cachexia/sarcopenia combined
+    if ((regimen.includes('folfirinox') || regimen.includes('platin') || chemFlags.pembrolizumab || regimen.includes('nivolumab') || regimen.includes('atezolizumab') || regimen.includes('durvalumab')) && (cachexia || sarcopenia) && proteinPerKg < 2.0) {
       proteinPerKg = 2.0;
     }
   }
