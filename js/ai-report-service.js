@@ -29,10 +29,10 @@ const aiReportService = {
             if (v && v !== 'Standard' && v !== 'None' && v !== null) microSlim[k] = v;
         });
 
-        // Safety alerts: send only condition + severity, not full message text
+        // Safety alerts: send condition + full message (not truncated) so Claude has full engine context
         const alertsSlim = (fp.safetyAlerts || [])
             .filter(a => a.level === 'danger' || a.level === 'warning')
-            .map(a => ({ level: a.level, condition: (a.condition || a.message || '').substring(0, 60) }));
+            .map(a => ({ level: a.level, condition: a.condition || a.message || '' }));
 
         return {
             patient: compactLabs({
@@ -47,6 +47,7 @@ const aiReportService = {
                 albumin: patient.albumin, prealbumin: patient.prealbumin,
                 crp: patient.crp, hemoglobin: patient.hemoglobin,
                 bloodSugar: patient.bloodSugar, hba1c: patient.hba1c,
+                folate: patient.folate,
                 sodium: patient.sodium, potassium: patient.potassium,
                 magnesium: patient.magnesium, creatinine: patient.creatinine,
                 alt: patient.alt, ast: patient.ast, bilirubin: patient.bilirubin,
@@ -59,10 +60,16 @@ const aiReportService = {
                 sarcopeniaStatus: patient.sarcopeniaStatus,
                 vegetarian: patient.vegetarian,
                 culturalPreferences: patient.culturalPreferences
-            }, ['age','sex','weight','height','usualWeight','weightLossPercent','cancer','cancerStage','regimen','ecogStatus','feedingMethod','reducedFoodIntake','albumin','prealbumin','crp','hemoglobin','bloodSugar','hba1c','sodium','potassium','magnesium','creatinine','alt','ast','bilirubin','vitD','tsh','zinc','smi','handGrip','tumorBurden','sarcopeniaStatus','vegetarian','culturalPreferences','comorbidities','sideEffects','genomicMarkers']),
+            }, ['age','sex','weight','height','usualWeight','weightLossPercent','cancer','cancerStage','regimen','ecogStatus','feedingMethod','reducedFoodIntake','albumin','prealbumin','crp','hemoglobin','bloodSugar','hba1c','folate','sodium','potassium','magnesium','creatinine','alt','ast','bilirubin','vitD','tsh','zinc','smi','handGrip','tumorBurden','sarcopeniaStatus','vegetarian','culturalPreferences','comorbidities','sideEffects','genomicMarkers']),
             plan: {
                 bmi: bmi,
-                dailyCalories: fp.dailyCalories, kcalPerKg: fp.kcalPerKg,
+                // totalDailyCalories = full 24h target; onsCalories = formula contribution only
+                totalDailyCalories: fp.totalDailyCalories || fp.baseEnergy || fp.dailyCalories,
+                onsCalories: fp.onsCalories || fp.dailyCalories,
+                totalDailyProtein: fp.totalDailyProtein || fp.dailyProtein,
+                prescribedProtein: fp.prescribedProtein,
+                estimatedDietaryProtein: fp.estimatedDietaryProtein || 0,
+                kcalPerKg: fp.kcalPerKg,
                 dailyProtein: fp.dailyProtein, proteinPerKg: fp.proteinPerKg,
                 servingsPerDay: fp.servingsPerDay,
                 perServingCalories: fp.perServingCalories,

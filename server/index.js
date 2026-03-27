@@ -248,32 +248,53 @@ app.post('/api/claude-report', async (req, res) => {
 
   try {
     const rules = [
-      "CLINICAL: Oral intake < 60% mandates Enteral Nutrition escalation.",
-      "CLINICAL: Protein 1.8g/kg minimum for Sarcopenia or Cachexia patients.",
-      "CLINICAL: Renal impairment (Creatinine > 1.3) caps protein at 0.8g/kg — ABSOLUTE SAFETY LIMIT.",
-      "CLINICAL: Bortezomib / AC chemotherapy: NO high-dose antioxidants (Vit C > 500mg, any ALA).",
-      "CLINICAL: Immunotherapy (Pembrolizumab/Nivolumab/etc): TSH is MANDATORY every cycle. Flag as CRITICAL if absent.",
-      "ARITHMETIC: Verify dailyCarbs ÷ servingsPerDay ≈ macroCarbs (±1g tolerance). If discrepancy > 1g, flag in logicRefinements.",
-      "ARITHMETIC: Verify dailyFat ÷ servingsPerDay ≈ macroFat (±1g tolerance). If discrepancy > 1g, flag in logicRefinements.",
-      "ARITHMETIC: Verify (dailyProtein×4 + dailyCarbs×4 + dailyFat×9) ≤ dailyCalories×1.05. Flag if macros significantly exceed total calories.",
-      "SCORE: Start at 10. Deduct 2 for each CRITICAL missing investigation. Deduct 1 for each MODERATE gap. Do NOT artificially inflate the score.",
-      "OVERPOWER: Set isOverpowered:true ONLY if the current dailyCalories or dailyProtein are clinically wrong per the rules above. Provide corrected values.",
-      "DRUG TABLE: For EVERY drug in the patient's regimen, you MUST add a row to drugInteractions. Never return an empty drugInteractions array for a patient on active chemotherapy.",
-      "DIETARY: If patient has nausea, mucositis, or < 60% intake, add specific food texture and anti-nausea dietary instructions to instructions array.",
-      "MONITORING: Always include at minimum: weekly weight check, fortnightly albumin/CRP, and any regimen-specific labs (TSH for immunotherapy, creatinine for platinum agents)."
-    ].join(" | ");
-    const system = `You are the Onvilox Clinical AI Auditor (PhD/RD level). Your role is to validate a nutrition plan against strict clinical rules and arithmetic consistency.
+      // ── ENTERAL ESCALATION ──
+      "ENTERAL ESCALATION: If reducedFoodIntake > 40 (i.e. actual oral intake < 60% of requirements), you MUST generate a HIGH clinicalAlert with type='EN_ESCALATION_MANDATORY' stating that nasogastric/nasoduodenal tube feeding must be initiated immediately. Do not omit this alert.",
+      // ── PROTEIN SAFETY ──
+      "RENAL CAP BOUNDARY: The 0.8 g/kg renal protein cap applies ONLY when creatinine > 1.3 mg/dL. If creatinine ≤ 1.3, the cap must NOT be applied. If the engine-prescribed protein is < 1.5 g/kg and creatinine ≤ 1.3, flag type='PROTEIN_CRITICAL_UNDERDOSE' as HIGH and set isOverpowered:true with corrected protein = weight × 1.8 (or × 2.0 if cachexia + platinum regimen).",
+      "PROTEIN MINIMUM: If patient has cachexia or sarcopenia AND prescribed totalDailyProtein < weight × 1.6 g/kg AND creatinine ≤ 1.3, flag PROTEIN_CRITICAL_UNDERDOSE as HIGH. State that underdosing accelerates catabolism, worsens sarcopenia, and increases treatment toxicity.",
+      // ── ANTIFOLATE TOXICITY ──
+      "ANTIFOLATE TOXICITY: If the regimen contains Pemetrexed, Methotrexate, or FOLFIRINOX AND patient folate < 5 ng/mL, generate a HIGH clinicalAlert type='FOLATE_DEFICIENCY_ANTIFOLATE'. State that folate deficiency on antifolate therapy significantly increases risk of severe mucositis, myelosuppression, and treatment-limiting neutropenia. Folate repletion must precede next cycle.",
+      // ── VITAMIN D ──
+      "VITAMIN D REPLETION: If vitD < 20 ng/mL flag as DEFICIENT. Prescribe 4000 IU/day repletion (NOT 2000 IU maintenance dose). If vitD < 12 ng/mL, prescribe 50,000 IU/week for 8 weeks then recheck. Always note that 2000 IU is a maintenance dose insufficient for repletion. Include in micronutrientOrders with status=DEFICIENT.",
+      // ── ANAEMIA ──
+      "ANAEMIA + IRON: If hemoglobin < 12 g/dL, generate a MODERATE clinicalAlert. If ferritin or iron studies are absent from the lab panel, flag iron panel as a mandatory investigation. If oral intake < 60%, recommend IV iron consideration over oral supplementation due to impaired absorption.",
+      // ── LIVER MONITORING ──
+      "LFT MONITORING: If ALT > 40 U/L or AST > 40 U/L, generate a MODERATE clinicalAlert requiring fortnightly LFT monitoring. If the patient has liver metastases or a hepatotoxic regimen (platinum, taxane, anthracycline), add hepatology escalation criteria if LFTs exceed 3× ULN.",
+      // ── GLUTAMINE CAUTION ──
+      "GLUTAMINE CAUTION: If glutamine is prescribed AND tumor burden is High or unknown, generate a MODERATE clinicalAlert type='GLUTAMINE_TUMOR_CAUTION'. State that glutamine may fuel tumour metabolism in high-burden settings and that oncologist sign-off is required before initiation.",
+      // ── STEROID HYPERGLYCAEMIA ──
+      "STEROID HYPERGLYCAEMIA: If HbA1c is 5.7–6.4% or fasting blood sugar is 100–125 mg/dL (pre-diabetic range), AND the regimen includes corticosteroids (Dexamethasone) or steroid-containing chemo, generate a MODERATE clinicalAlert for anticipated steroid-induced hyperglycaemia. Recommend glucose monitoring before and 2h after each dexamethasone dose.",
+      // ── IMMUNOTHERAPY ──
+      "IMMUNOTHERAPY: If regimen includes Pembrolizumab, Nivolumab, Atezolizumab, or Durvalumab, TSH monitoring every cycle is MANDATORY. Flag as CRITICAL if TSH is absent from the lab panel.",
+      // ── ANTIOXIDANT SAFETY ──
+      "ANTIOXIDANT SAFETY: If regimen includes Bortezomib, AC (Doxorubicin + Cyclophosphamide), Oxaliplatin, or Cisplatin, flag HIGH-dose Vitamin C (>500 mg) and Alpha-Lipoic Acid as EXCLUDED. Any such supplement in the plan must trigger a HIGH clinicalAlert.",
+      // ── ARITHMETIC ──
+      "ARITHMETIC: Verify onsCalories ÷ servingsPerDay ≈ perServingCalories (±5 kcal). Verify totalDailyProtein×4 + dailyCarbs×4 + dailyFat×9 ≤ totalDailyCalories×1.05.",
+      // ── SCORING ──
+      "SCORE: Start at 10. Deduct 2 for each HIGH/CRITICAL alert not already corrected. Deduct 1 for each MODERATE gap. Deduct 1 for each missing mandatory investigation. Do NOT inflate the score — a plan with 3 CRITICAL issues should score ≤ 4.",
+      // ── OVERPOWER ──
+      "OVERPOWER: Set isOverpowered:true and supply correctedPrescription if totalDailyProtein is clinically wrong per the protein rules above, or if totalDailyCalories deviates > 15% from weight × appropriate kcal/kg.",
+      // ── DRUG TABLE ──
+      "DRUG TABLE: For EVERY named drug or drug class in the regimen, add a row to drugInteractions. Never return an empty drugInteractions array for a patient on active chemotherapy.",
+      // ── DIETARY ──
+      "DIETARY: If sideEffects include nausea, vomiting, mucositis, or dysgeusia, or if intake < 60%, add specific food-texture modifications and anti-nausea strategies to instructions.",
+      // ── MONITORING ──
+      "MONITORING: Minimum schedule: weekly weight; fortnightly albumin, CRP, LFTs; cycle-specific labs per regimen (TSH for immunotherapy, creatinine + Mg for platinum, LFTs for anthracyclines)."
+    ].join("\n");
+    const system = `You are the Onvilox Clinical AI Auditor (PhD/RD + Clinical Oncology level). Your role is to audit a nutrition plan and generate a complete, untruncated safety report. ALL arrays must be populated — do not omit clinicalAlerts, micronutrientOrders, or monitoringSchedule even if the plan appears adequate.
 
-RULES: ${rules}
+RULES (apply every rule to every patient):
+${rules}
 
-OUTPUT FORMAT (JSON ONLY — no markdown, no preamble):
+OUTPUT FORMAT (JSON ONLY — no markdown, no preamble). ALL fields are required:
 {
-  "validationScore": number (0–10, honest scoring per deduction rules),
-  "rationale": [max 5 strings — key clinical reasoning points],
-  "instructions": [patient-facing instructions, culturally adapted, include dietary texture if nausea/mucositis],
+  "validationScore": number (0–10, honest scoring per deduction rules above),
+  "rationale": [3–5 strings — key clinical reasoning points],
+  "instructions": [patient-facing dietary instructions, 4–6 items],
   "clinicalAlerts": [{"type": string, "level": "HIGH"|"MODERATE"|"LOW", "message": string}],
   "correctedPrescription": {"isOverpowered": bool, "dailyCalories": number, "dailyProtein": number, "reasoning": string},
-  "logicRefinements": [strings — arithmetic errors or logic gaps found],
+  "logicRefinements": [strings — arithmetic errors or plan logic gaps],
   "drugInteractions": [{"drug": string, "interaction": string, "advice": string, "risk": "HIGH"|"MODERATE"|"LOW"}],
   "micronutrientOrders": [{"nutrient": string, "labValue": string, "dose": string, "rationale": string, "status": "SUPPLEMENT"|"DEFICIENT"|"MONITOR"|"CAPPED"|"EXCLUDED"|"STANDARD"}],
   "monitoringSchedule": [{"frequency": string, "parameters": string, "threshold": string, "responsible": string}]
@@ -281,7 +302,7 @@ OUTPUT FORMAT (JSON ONLY — no markdown, no preamble):
 
     const msg = await anthropic.messages.create({
       model: "claude-sonnet-4-6",
-      max_tokens: 1800,
+      max_tokens: 3000,
       system: system,
       messages: [{
         role: "user",
