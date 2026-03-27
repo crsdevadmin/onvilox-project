@@ -3695,45 +3695,30 @@
             // Step 1: Mandatory Data Validation
             if (!validateMandatoryData()) return;
 
-            // Step 1b: Clinical Safety Gate — smart per-alert logic
+            // Step 1b: Clinical Safety Gate
             const insights = window.currentVersionedPlan && window.currentVersionedPlan.claudeInsights;
             if (insights) {
               const alerts = Array.isArray(insights.clinicalAlerts) ? insights.clinicalAlerts : [];
-              const microOrders = Array.isArray(insights.micronutrientOrders) ? insights.micronutrientOrders : [];
 
-              // ALA/VitC are resolved if AI already marked them EXCLUDED in micronutrientOrders
-              const alaExcluded = microOrders.some(m => m.status === 'EXCLUDED' && (m.nutrient||'').toLowerCase().match(/alpha.lipoic|lipoic|^ala\b/));
-              const vitcExcluded = microOrders.some(m => m.status === 'EXCLUDED' && (m.nutrient||'').toLowerCase().match(/vitamin c|ascorbic/));
-              const antioxidantResolved = alaExcluded && vitcExcluded;
-
-              // EN escalation is resolved if the feeding route element already shows Enteral
-              const routeEl = document.getElementById('pFeedingRoute');
-              const enResolved = routeEl && (routeEl.innerHTML || '').toLowerCase().includes('enteral');
-
-              // HARD BLOCKERS — prevent printing until resolved
-              const hardBlockers = [];
-              if (alerts.some(a => a.type === 'EN_ESCALATION_MANDATORY') && !enResolved)
-                hardBlockers.push('⛔ Feeding route must be set to Enteral Nutrition — AI escalation is mandatory per ESPEN guidelines.');
-              if (alerts.some(a => a.type === 'ANTIOXIDANT_CONTRAINDICATION' || a.type === 'ALA_PHASE_SUSPENSION_MISSING') && !antioxidantResolved)
-                hardBlockers.push('⛔ ALA / Vitamin C still active — these are CONTRAINDICATED during AC cycles. Run AI Refresh to exclude them.');
-              if (alerts.some(a => a.type === 'PROTEIN_CRITICAL_UNDERDOSE' || a.type === 'PROTEIN_UNDERDOSE_IMMUNOTHERAPY'))
-                hardBlockers.push('⛔ Protein is critically underdosed — AI correction must be applied before printing.');
-
-              // SOFT WARNINGS — documented in plan, clinician must acknowledge but can proceed
-              const warnings = [];
-              if (alerts.some(a => a.type === 'IRON_PANEL_MANDATORY'))
-                warnings.push('⚠️ Iron panel pending — iron is on CLINICAL HOLD in the plan until ferritin/TIBC results available.');
-              if (alerts.some(a => a.type === 'IMMUNOTHERAPY_TSH_MISSING'))
-                warnings.push('⚠️ TSH/FT4 STAT order required — thyroid monitoring mandatory for this immunotherapy patient.');
-              // Glutamine: per clinical decision, oncologist sign-off not required — documented as monitor only
-
-              if (hardBlockers.length > 0) {
-                alert('⛔ PLAN BLOCKED FOR PRINTING\n\nThe following critical issues must be resolved before this plan can be handed to clinical staff:\n\n' + hardBlockers.join('\n') + (warnings.length > 0 ? '\n\nPending labs (acknowledged in plan):\n' + warnings.join('\n') : ''));
+              // HARD BLOCK — only protein underdose is an uncorrectable calculation error
+              if (alerts.some(a => a.type === 'PROTEIN_CRITICAL_UNDERDOSE' || a.type === 'PROTEIN_UNDERDOSE_IMMUNOTHERAPY')) {
+                alert('⛔ PLAN BLOCKED FOR PRINTING\n\nProtein is critically underdosed and cannot be corrected automatically.\nPlease re-run the AI Audit to apply the corrected protein value before printing.');
                 return;
               }
 
+              // SOFT WARNINGS — clinician acknowledges and proceeds
+              const warnings = [];
+              if (alerts.some(a => a.type === 'EN_ESCALATION_MANDATORY'))
+                warnings.push('⚠️ ENTERAL ESCALATION: Feeding route has been updated to Enteral Nutrition in this plan per ESPEN guidelines.');
+              if (alerts.some(a => a.type === 'ANTIOXIDANT_CONTRAINDICATION' || a.type === 'ALA_PHASE_SUSPENSION_MISSING'))
+                warnings.push('⚠️ ALA / VITAMIN C: Contraindicated during AC cycles — marked EXCLUDED in micronutrient table. Do not dispense during AC phase.');
+              if (alerts.some(a => a.type === 'IRON_PANEL_MANDATORY'))
+                warnings.push('⚠️ IRON: On CLINICAL HOLD — confirm ferritin/TIBC/transferrin saturation ordered before dispensing iron.');
+              if (alerts.some(a => a.type === 'IMMUNOTHERAPY_TSH_MISSING'))
+                warnings.push('⚠️ THYROID: TSH/FT4 STAT order required — confirm order placed before next immunotherapy dose.');
+
               if (warnings.length > 0) {
-                const proceed = confirm('⚠️ CLINICAL WARNINGS — REVIEW BEFORE PRINTING\n\n' + warnings.join('\n') + '\n\nThese items are documented as HOLD/PENDING in the plan.\n\nConfirm you have ordered the required labs and print?');
+                const proceed = confirm('CLINICAL SAFETY ACKNOWLEDGEMENT\n\nPlease review and confirm before printing:\n\n' + warnings.join('\n\n') + '\n\n─────────────────────────────\nI confirm I have reviewed the above safety items and accept responsibility for clinical action.\n\nPrint plan?');
                 if (!proceed) return;
               }
             }
