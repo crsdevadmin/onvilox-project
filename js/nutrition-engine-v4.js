@@ -53,7 +53,7 @@ function generateNutritionPlan(patient) {
   const lowerComorbidities = comorbidities.map(c => c.toLowerCase());
   const sideEffects = (Array.isArray(patient.sideEffects) ? patient.sideEffects : []).map(s => s.toLowerCase());
   
-  var isDiabetic = (lowerComorbidities.some(c => c.includes('diabetes') || c.includes('t2dm')) || bloodSugar > 180);
+  var isDiabetic = (lowerComorbidities.some(c => c.includes('diabetes') || c.includes('t2dm')) || bloodSugar > 180 || parseFloat(patient.hba1c || 0) >= 6.5);
   var hasIBD = lowerComorbidities.some(c => c.includes('ibd') || c.includes('crohn') || c.includes('colitis'));
   // Only match specific renal DISEASE terms — not generic mentions like "normal renal function"
   var hasRenalDisease = lowerComorbidities.some(c =>
@@ -262,7 +262,7 @@ function generateNutritionPlan(patient) {
 
   const micronutrients = {
     vitD: hasRenalIssue ? '2000 IU/day (Renal Cap)' : (vitD > 0 && vitD < 20 ? '4000–6000 IU/day' : (vitD < 30 ? '2000–4000 IU/day' : '1000–2000 IU/day')),
-    vitC: (chemFlags.bortezomib || chemFlags.ac) ? '500 mg/day (Antioxidant Cap for Safety)' : (hasRenalIssue ? '500 mg/day (Renal Cap)' : ((crp > 5 || tumorBurden) && !chemFlags.bortezomib ? '2000 mg/day' : '1000 mg/day')),
+    vitC: chemFlags.ac ? '500 mg/day — HOLD on AC infusion days; inter-cycle only with oncologist approval' : (chemFlags.bortezomib ? '500 mg/day (Antioxidant Cap for Safety)' : (hasRenalIssue ? '500 mg/day (Renal Cap)' : ((crp > 5 || tumorBurden) && !chemFlags.bortezomib ? '2000 mg/day' : '1000 mg/day'))),
     zinc: zinc > 0 && zinc < 60 ? '15–25 mg/day (Correction Protocol) + 2mg Copper' : '15 mg/day',
     omega3: (crp > 5 || cachexia || cancer.includes('pancreatic')) ? '3–4 g/day' : '2 g/day',
     epa: (cachexia || tumorBurden || cancer.includes('pancreatic')) ? '2.2 - 3.0 g EPA/day' : 'None',
@@ -278,7 +278,7 @@ function generateNutritionPlan(patient) {
       return (patient.folate > 0 && patient.folate < 3 || hemoglobin < 10) ? '5 mg/day' : (regimen.includes('pemetrexed') || regimen.includes('methotrexate') ? '1 mg/day (per oncology protocol)' : '1.0 mg/day');
     })(),
     chromium: isDiabetic ? '400 mcg/day (Glycemic monitoring protocol active)' : null,
-    ala: (isDiabetic && !chemFlags.bortezomib) ? '600 mg/day' : null,
+    ala: (isDiabetic && !chemFlags.bortezomib && !chemFlags.ac) ? '600 mg/day' : null,
     microbiome: (regimen.includes('folfirinox') || hasIBD) ? 'Soluble Fiber + Probiotic' : null,
     iron: (hemoglobin > 0 && hemoglobin < 10) ? '100 mg elemental iron + B12 support' : null
   };
@@ -359,8 +359,14 @@ function generateNutritionPlan(patient) {
       }
     }
 
-    if (chemFlags.ac && (hasExistingVitC || isPrescribingHighVitC)) {
-       safetyStatus.drug = { level: 'warning', message: "AC SAFETY ALERT: Adriamycin detected. High-dose Vit C (>500mg) may attenuate oxidative cytotoxicity. Limit antioxidant intake during infusion cycle." };
+    if (chemFlags.ac) {
+      let acMsg = "AC SAFETY ALERT: Adriamycin (Doxorubicin) detected. Antioxidants attenuate oxidative cytotoxicity. ALA suspended for AC cycle. VitC capped at 500mg — HOLD on infusion days; resume inter-cycle only with oncologist sign-off.";
+      if (hasExistingVitC || hasExistingALA) {
+        acMsg += " [ACTION REQUIRED] Patient carries existing antioxidant supplements — instruct suspension on infusion days.";
+        safetyStatus.drug = { level: 'danger', message: acMsg };
+      } else {
+        safetyStatus.drug = { level: 'warning', message: acMsg };
+      }
     }
 
     if (chemFlags.bortezomib) {
@@ -426,11 +432,22 @@ function generateNutritionPlan(patient) {
   const remainingCalories = Math.max(0, dailyCalories - proteinCalories);
   
   const carbRatio = (crp > 5 || isDiabetic) ? 0.35 : 0.45;
-  const dailyCarbs = Math.floor((remainingCalories * carbRatio) / 4);
+  let dailyCarbs = Math.floor((remainingCalories * carbRatio) / 4);
   const carbCalories = dailyCarbs * 4;
-  
+
   const fatCalories = remainingCalories - carbCalories;
-  const dailyFat = Math.round((fatCalories / 9) * 10) / 10;
+  let dailyFat = Math.round((fatCalories / 9) * 10) / 10;
+
+  // NAFLD/Fatty Liver Disease: enforce fat ceiling at 30% of total daily calories
+  const hasNAFLD = lowerComorbidities.some(c => c.includes('fatty liver') || c.includes('nafld') || c.includes('nash'));
+  if (hasNAFLD) {
+    const maxFatKcal = dailyCalories * 0.30;
+    if (dailyFat * 9 > maxFatKcal) {
+      const excessFatKcal = (dailyFat * 9) - maxFatKcal;
+      dailyFat = Math.round((maxFatKcal / 9) * 10) / 10;
+      dailyCarbs = Math.round(dailyCarbs + excessFatKcal / 4);
+    }
+  }
 
   const macroProtein = Math.round((dailyProtein / servingsPerDay) * 10) / 10;
   const macroCarbs = Math.round((dailyCarbs / servingsPerDay) * 10) / 10;
