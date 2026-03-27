@@ -3737,12 +3737,11 @@
               dlBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Generating Secure PDF...';
             }
 
-            // Step 3: Explicitly ensure AI sections are visible (if they have data)
-            const aiPlan = window.currentVersionedPlan;
-            if (aiPlan && aiPlan.claudeInsights) {
-               console.log("Forcing AI visibility for PDF export...");
-               renderClaudeInsight(aiPlan.claudeInsights, true); // Force re-render to DOM
-            }
+            // Step 3: Ensure AI sections are visible for PDF export (show only, no re-render)
+            ['claudeAlertsSection','claudeDrugSection','claudeMicroSection'].forEach(id => {
+              const el = document.getElementById(id);
+              if (el && el.innerHTML.trim() !== '') el.style.display = 'block';
+            });
 
             // Give the browser 1 second to "settle" and render all dynamic styles/content
             await new Promise(resolve => setTimeout(resolve, 1000));
