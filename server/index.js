@@ -273,8 +273,8 @@ PROTEIN SAFETY:
 ANTIFOLATE TOXICITY:
 - If the regimen contains Pemetrexed, Methotrexate, or FOLFIRINOX AND patient folate < 5 ng/mL: generate HIGH alert type "FOLATE_DEFICIENCY_ANTIFOLATE".
 - State that folate deficiency on antifolate therapy significantly increases risk of severe mucositis, myelosuppression, and treatment-limiting neutropenia.
-- Folate repletion must be initiated before the next chemotherapy cycle.
-- Include folate supplementation in micronutrientOrders with status DEFICIENT.
+- Folate repletion must be initiated before the next chemotherapy cycle. Specify the repletion dose (5 mg/day folic acid), the timing of the follow-up serum folate test (Day 7 after commencing supplementation), and the cycle-day checkpoint (serum folate must be confirmed ≥ 5 ng/mL before Cycle N+1 Day 1).
+- Include folate supplementation in micronutrientOrders with status DEFICIENT and dose "5 mg/day folic acid — recheck serum folate Day 7; confirm ≥5 ng/mL before next cycle."
 
 VITAMIN D:
 - vitD < 20 ng/mL = deficient. Prescribe 4000 IU/day repletion — NOT 2000 IU/day which is a maintenance dose only.
@@ -284,8 +284,9 @@ VITAMIN D:
 
 ANAEMIA & IRON:
 - Hemoglobin < 12 g/dL: generate MODERATE alert for anaemia.
-- If iron studies (ferritin, serum iron, TIBC) are absent from the lab panel: flag iron panel as a mandatory investigation.
+- If iron studies (ferritin, serum iron, TIBC) are absent from the lab panel: generate HIGH alert type "IRON_PANEL_MANDATORY" and flag iron panel as a mandatory investigation.
 - If oral intake < 60%: recommend IV iron over oral supplementation due to impaired GI absorption.
+- In micronutrientOrders, set iron status to "HOLD" and dose to "ON CLINICAL HOLD — Pending iron panel (ferritin, serum iron, TIBC, transferrin saturation) before empirical dosing."
 - Include iron assessment in monitoringSchedule.
 
 LIVER FUNCTION:
@@ -296,17 +297,19 @@ LIVER FUNCTION:
 GLUTAMINE CAUTION:
 - If glutamine is prescribed AND tumor burden is High or Bulky: generate MODERATE alert type "GLUTAMINE_TUMOR_CAUTION".
 - State that glutamine supplementation may fuel tumor metabolism in high-burden settings. Oncologist approval is required before initiation.
-- Do not prescribe glutamine without this caveat.
+- In micronutrientOrders, set glutamine status to "HOLD" and dose to "ON CLINICAL HOLD — Pending written oncologist authorisation before initiation."
 
-STEROID-INDUCED HYPERGLYCAEMIA:
+STEROID-INDUCED HYPERGLYCAEMIA & MACRO REDISTRIBUTION:
 - If HbA1c is 5.7–6.4% OR fasting blood sugar is 100–125 mg/dL (pre-diabetic range) AND the regimen includes dexamethasone or steroid-containing chemotherapy: generate MODERATE alert.
 - Recommend blood glucose monitoring before and 2 hours after each dexamethasone dose.
+- If HbA1c ≥ 6.5% (diabetic range) OR blood sugar > 140 mg/dL: the macro distribution MUST be corrected. Set isOverpowered: true and set correctedPrescription.dailyCarbs = weight × 2.5 (max 40% of total calories from carbs), recalculate dailyFat from remaining calories after protein and carb allocation. Provide the corrected gram values for dailyCarbs and dailyFat in correctedPrescription.
 - Include glycaemic monitoring in monitoringSchedule.
 
 IMMUNOTHERAPY MONITORING:
 - If regimen includes Pembrolizumab, Nivolumab, Atezolizumab, or Durvalumab: TSH monitoring every treatment cycle is MANDATORY.
 - If TSH is absent from the lab panel: generate HIGH alert type "IMMUNOTHERAPY_TSH_MISSING" — this is a patient safety requirement.
-- Include thyroid function in monitoringSchedule with per-cycle frequency.
+- If TSH is absent AND patient sideEffects include fatigue, tiredness, or weakness: add an additional note in the alert that current fatigue symptoms must be assessed as a possible immune-related adverse event (irAE — immune thyroiditis) while TSH is pending. Do not attribute fatigue solely to chemotherapy until thyroid function is confirmed.
+- Include thyroid function in monitoringSchedule with per-cycle frequency and TSH thresholds (<0.5 or >4.5 mIU/L → endocrinology referral).
 
 ANTIOXIDANT SAFETY:
 - If regimen includes Bortezomib, AC (Doxorubicin + Cyclophosphamide), Oxaliplatin, or Cisplatin: Vitamin C > 500 mg/day and Alpha-Lipoic Acid are CONTRAINDICATED during those specific cycles as they may reduce chemotherapy efficacy via ROS-dependent cytotoxic mechanisms.
@@ -347,10 +350,10 @@ OUTPUT FORMAT — return ONLY valid JSON, no markdown, no text outside the JSON 
   "rationale": ["string 1", "string 2", "string 3", "string 4", "string 5"],
   "instructions": ["patient instruction 1", "patient instruction 2", "patient instruction 3", "patient instruction 4", "patient instruction 5", "patient instruction 6"],
   "clinicalAlerts": [{"type": "string", "level": "HIGH|MODERATE|LOW", "message": "string"}],
-  "correctedPrescription": {"isOverpowered": false, "dailyCalories": number, "dailyProtein": number, "reasoning": "string"},
+  "correctedPrescription": {"isOverpowered": false, "dailyCalories": number, "dailyProtein": number, "dailyCarbs": number, "dailyFat": number, "reasoning": "string"},
   "logicRefinements": ["string 1", "string 2"],
   "drugInteractions": [{"drug": "string", "interaction": "string", "advice": "string", "risk": "HIGH|MODERATE|LOW"}],
-  "micronutrientOrders": [{"nutrient": "string", "labValue": "string", "dose": "string", "rationale": "string", "status": "SUPPLEMENT|DEFICIENT|MONITOR|CAPPED|EXCLUDED|STANDARD"}],
+  "micronutrientOrders": [{"nutrient": "string", "labValue": "string", "dose": "string", "rationale": "string", "status": "SUPPLEMENT|DEFICIENT|MONITOR|CAPPED|EXCLUDED|HOLD|STANDARD"}],
   "monitoringSchedule": [{"frequency": "string", "parameters": "string", "threshold": "string", "responsible": "string"}]
 }`;
 

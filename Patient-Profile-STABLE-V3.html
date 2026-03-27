@@ -3695,6 +3695,25 @@
             // Step 1: Mandatory Data Validation
             if (!validateMandatoryData()) return;
 
+            // Step 1b: Clinical Validation Score Gate (minimum 5.0 to print)
+            const insights = window.currentVersionedPlan && window.currentVersionedPlan.claudeInsights;
+            if (insights && insights.validationScore !== undefined) {
+              const score = parseFloat(insights.validationScore);
+              if (score < 5) {
+                const alerts = Array.isArray(insights.clinicalAlerts) ? insights.clinicalAlerts : [];
+                const blockers = [];
+                if (alerts.some(a => a.type === 'EN_ESCALATION_MANDATORY')) blockers.push('[BLOCK] Feeding route must be updated to Enteral Nutrition before printing.');
+                if (alerts.some(a => a.type === 'ANTIOXIDANT_CONTRAINDICATION' || a.type === 'ALA_PHASE_SUSPENSION_MISSING')) blockers.push('[BLOCK] Contraindicated supplements (ALA/VitC) must be removed from active prescription.');
+                if (alerts.some(a => a.type === 'PROTEIN_CRITICAL_UNDERDOSE')) blockers.push('[BLOCK] Protein prescription is critically underdosed — resolve before printing.');
+                if (alerts.some(a => a.type === 'IRON_PANEL_MANDATORY')) blockers.push('[HIGH] Iron panel results required before empirical iron dosing.');
+                if (alerts.some(a => a.type === 'GLUTAMINE_TUMOR_CAUTION')) blockers.push('[HIGH] Glutamine requires written oncologist authorisation — obtain before printing.');
+                if (alerts.some(a => a.type === 'IMMUNOTHERAPY_TSH_MISSING')) blockers.push('[HIGH] TSH/FT4 STAT order required for immunotherapy patient.');
+                const blockerText = blockers.length > 0 ? '\n\nUnresolved blockers:\n' + blockers.join('\n') : '\n\nReview all HIGH alerts and resolve before clinical use.';
+                alert('⛔ PLAN BLOCKED FOR PRINTING\n\nClinical Validation Score: ' + score + '/10 — below minimum threshold of 5.0.\nThis plan cannot be handed to clinical staff in its current state.' + blockerText);
+                return;
+              }
+            }
+
             // If html2pdf isn't available (offline), fall back to Print.
             if (typeof html2pdf === 'undefined') {
               window.print();
@@ -3905,11 +3924,21 @@
                     const d = recomputeFromDaily(overrides.dailyCalories, overrides.dailyProtein);
                     overrides.perServingCalories = d.perServingCalories;
                     overrides.perServingProtein = d.perServingProtein;
-                    overrides.macroCarbs = d.macroCarbs;
-                    overrides.macroFat = d.macroFat;
-                    overrides.dailyCarbs = d.dailyCarbs;
-                    overrides.dailyFat = d.dailyFat;
                     overrides.servingsPerDay = d.servingsPerDay;
+
+                    // If AI explicitly corrected macro distribution (e.g. diabetic carb restriction), use those values
+                    if (cpAudit.dailyCarbs && cpAudit.dailyFat) {
+                        overrides.dailyCarbs = Math.round(cpAudit.dailyCarbs);
+                        overrides.dailyFat = Math.round(cpAudit.dailyFat);
+                        const totalCal = overrides.dailyCalories || d.dailyCalories;
+                        overrides.macroCarbs = Math.round((overrides.dailyCarbs * 4 / totalCal) * 100);
+                        overrides.macroFat = Math.round((overrides.dailyFat * 9 / totalCal) * 100);
+                    } else {
+                        overrides.macroCarbs = d.macroCarbs;
+                        overrides.macroFat = d.macroFat;
+                        overrides.dailyCarbs = d.dailyCarbs;
+                        overrides.dailyFat = d.dailyFat;
+                    }
 
                     const auditNote = `[AI AUDITOR OVERPOWER] ${cpAudit.reasoning}`;
                     const syncedPlan = createOrUpdatePlan(window.patient, engineOutput, overrides, auditNote);
@@ -4021,7 +4050,7 @@
             if (microSec && microTbl) {
               const rows = data.micronutrientOrders && data.micronutrientOrders.length > 0
                 ? data.micronutrientOrders.map(m => {
-                    const sc = { SUPPLEMENT:'#0284c7', DEFICIENT:'#dc2626', MONITOR:'#d97706', CAPPED:'#9333ea', EXCLUDED:'#ef4444', STANDARD:'#64748b', 'CARDIAC Rx':'#0e2247', 'GLYCEMIC Rx':'#b45309' };
+                    const sc = { SUPPLEMENT:'#0284c7', DEFICIENT:'#dc2626', MONITOR:'#d97706', CAPPED:'#9333ea', EXCLUDED:'#ef4444', HOLD:'#b45309', STANDARD:'#64748b', 'CARDIAC Rx':'#0e2247', 'GLYCEMIC Rx':'#b45309' };
                     const col = sc[m.status]||'#64748b';
                     return `<tr><td style="padding:7px 8px;border:1px solid #e2e8f0;font-weight:700;color:#0e2247;">${m.nutrient}</td><td style="padding:7px 8px;border:1px solid #e2e8f0;color:#475569;">${m.labValue||'—'}</td><td style="padding:7px 8px;border:1px solid #e2e8f0;font-weight:600;">${m.dose}</td><td style="padding:7px 8px;border:1px solid #e2e8f0;font-size:10.5px;color:#334155;">${m.rationale}</td><td style="padding:7px 8px;border:1px solid #e2e8f0;text-align:center;"><span style="background:${col}22;color:${col};font-size:9px;font-weight:800;padding:2px 7px;border-radius:999px;text-transform:uppercase;white-space:nowrap;">${m.status}</span></td></tr>`;
                   }).join('')
@@ -4062,6 +4091,10 @@
                   el.innerHTML = '<span style="color:#dc2626;font-weight:700;">&#128308; ' + m.dose + '</span>';
                 } else if (m.status === 'CAPPED') {
                   el.innerHTML = '<span style="color:#9333ea;font-weight:700;">&#128998; ' + m.dose + ' (Capped)</span>';
+                } else if (m.status === 'HOLD') {
+                  el.innerHTML = '<span style="background:#fef3c7;border:1px solid #f59e0b;color:#92400e;font-size:10px;font-weight:800;padding:3px 8px;border-radius:4px;display:inline-block;">&#9208; CLINICAL HOLD — ' + m.dose + '</span>';
+                  const row = el.closest('tr');
+                  if (row) row.style.display = 'table-row';
                 } else if (m.dose && m.dose !== '—') {
                   el.innerHTML = '<span style="color:#0284c7;font-weight:600;">&#10024; ' + m.dose + '</span>';
                 }
