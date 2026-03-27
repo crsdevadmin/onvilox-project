@@ -75,7 +75,12 @@ const aiReportService = {
                 perServingCalories: fp.perServingCalories,
                 perServingProtein: fp.perServingProtein,
                 dailyCarbs: fp.dailyCarbs, dailyFat: fp.dailyFat,
-                macroCarbs: fp.macroCarbs, macroFat: fp.macroFat,
+                // Per-serving grams (explicit units to prevent % misinterpretation)
+                perServingCarbsG: fp.dailyCarbs && fp.servingsPerDay ? Math.round(fp.dailyCarbs / fp.servingsPerDay * 10) / 10 : null,
+                perServingFatG: fp.dailyFat && fp.servingsPerDay ? Math.round(fp.dailyFat / fp.servingsPerDay * 10) / 10 : null,
+                // Macro percentages of total daily formula calories (computed, unambiguous)
+                fatPct: fp.dailyFat && fp.dailyCalories ? Math.round(fp.dailyFat * 9 / fp.dailyCalories * 100) : null,
+                carbsPct: fp.dailyCarbs && fp.dailyCalories ? Math.round(fp.dailyCarbs * 4 / fp.dailyCalories * 100) : null,
                 prescribedRoute: fp.prescribedRoute,
                 cachexia: fp.cachexia, sarcopenia: fp.sarcopenia,
                 proteinType: fp.proteinType,

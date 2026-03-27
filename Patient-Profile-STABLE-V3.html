@@ -3964,9 +3964,10 @@
                     if (cpAudit.dailyCarbs && cpAudit.dailyFat) {
                         overrides.dailyCarbs = Math.round(cpAudit.dailyCarbs);
                         overrides.dailyFat = Math.round(cpAudit.dailyFat);
-                        const totalCal = overrides.dailyCalories || d.dailyCalories;
-                        overrides.macroCarbs = Math.round((overrides.dailyCarbs * 4 / totalCal) * 100);
-                        overrides.macroFat = Math.round((overrides.dailyFat * 9 / totalCal) * 100);
+                        // Store per-serving grams consistently — macroFat/macroCarbs always = g/serving
+                        const svgs = overrides.servingsPerDay || d.servingsPerDay;
+                        overrides.macroCarbs = Math.round((overrides.dailyCarbs / svgs) * 10) / 10;
+                        overrides.macroFat = Math.round((overrides.dailyFat / svgs) * 10) / 10;
                     } else {
                         overrides.macroCarbs = d.macroCarbs;
                         overrides.macroFat = d.macroFat;
