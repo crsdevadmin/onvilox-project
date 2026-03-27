@@ -106,7 +106,7 @@ app.post('/api/extract', async (req, res) => {
   try {
     const msg = await anthropic.messages.create({
       model: "claude-haiku-4-5-20251001",
-      max_tokens: 1200,
+      max_tokens: 1600,
       system: extractionSystemPrompt,
       messages: [{ role: "user", content: `Extract from:\n\n${pdfText}` }],
     });
@@ -147,7 +147,7 @@ app.post('/api/chat', async (req, res) => {
 
     const msg = await anthropic.messages.create({
       model: "claude-haiku-4-5-20251001",
-      max_tokens: 1500,
+      max_tokens: 2000,
       system: systemPrompt,
       messages: [{ role: "user", content: message }],
     });
@@ -272,7 +272,7 @@ app.post('/api/claude-report', async (req, res) => {
       // ── ARITHMETIC ──
       "ARITHMETIC: Verify onsCalories ÷ servingsPerDay ≈ perServingCalories (±5 kcal). Verify totalDailyProtein×4 + dailyCarbs×4 + dailyFat×9 ≤ totalDailyCalories×1.05.",
       // ── SCORING ──
-      "SCORE: Start at 10. Deduct 2 for each HIGH/CRITICAL alert not already corrected. Deduct 1 for each MODERATE gap. Deduct 1 for each missing mandatory investigation. Do NOT inflate the score — a plan with 3 CRITICAL issues should score ≤ 4.",
+      "SCORE: The maximum achievable score is 9.8 — reserve this for plans that are clinically complete, arithmetically correct, have all mandatory labs present, and require no corrections. Deduct 1.5 for each HIGH/unresolved CRITICAL issue. Deduct 0.5 for each MODERATE gap. Deduct 0.3 for each missing mandatory investigation. Deduct 0.5 for each arithmetic error. A plan with 1 MODERATE gap scores ~9.3; with 1 HIGH issue ~8.3; with 3+ HIGH issues ≤ 5.3. Do NOT round to 10 — 9.8 is the ceiling.",
       // ── OVERPOWER ──
       "OVERPOWER: Set isOverpowered:true and supply correctedPrescription if totalDailyProtein is clinically wrong per the protein rules above, or if totalDailyCalories deviates > 15% from weight × appropriate kcal/kg.",
       // ── DRUG TABLE ──
@@ -302,7 +302,7 @@ OUTPUT FORMAT (JSON ONLY — no markdown, no preamble). ALL fields are required:
 
     const msg = await anthropic.messages.create({
       model: "claude-sonnet-4-6",
-      max_tokens: 3000,
+      max_tokens: 4000,
       system: system,
       messages: [{
         role: "user",
