@@ -118,6 +118,11 @@ function generateNutritionPlan(patient) {
     nutritionRiskReasons.push('Renal Function Impairment (Creatinine: ' + creatinine + ')');
     safetyAlerts.push({ condition: 'RENAL SAFETY PROTOCOL', severity: 'High', action: 'Protein capped to prevent nitrogen overload.' });
   }
+  if (hasPelvicRadiation) {
+    riskScore += 2;
+    nutritionRiskReasons.push('Pelvic/Abdominal Radiation — Enteritis Risk');
+    safetyAlerts.push({ condition: 'RADIATION ENTERITIS PROTOCOL', severity: 'High', action: 'Pelvic/abdominal radiation detected. Formula switched to peptide-based (pre-digested). Low-residue carbohydrate source required. Avoid intact disaccharides (e.g. Palatinose). Reassess formula at each radiation milestone (10 Gy, 20 Gy, completion). If brachytherapy planned: consider elemental formula peri-procedure.' });
+  }
   if (hasIBD) {
     riskScore += 1;
     nutritionRiskReasons.push('IBD / Malabsorption Risk');
@@ -237,7 +242,10 @@ function generateNutritionPlan(patient) {
   // --- STEP 5: MICRONUTRIENTS & DRUG INTERACTIONS ---
   const interactions = [];
   if (regimen.includes('cisplatin')) {
-    interactions.push({ drug: "Cisplatin", effect: "Renal Magnesium Wasting", advice: "Mandatory Magnesium protocol; monitor creatinine closely." });
+    interactions.push({ drug: "Cisplatin", effect: "Renal Magnesium Wasting + Nephrotoxicity", advice: "Mandatory Magnesium protocol; weekly creatinine monitoring. Escalation trigger: Creatinine >1.5 mg/dL = hold Cisplatin." });
+    if (isDiabetic) {
+      interactions.push({ drug: "Cisplatin + ALA (Diabetic Patient)", effect: "ALA Excluded — Antioxidant Interference", advice: "ALA is contraindicated during Cisplatin cycles. Platinum cytotoxicity relies partly on oxidative stress; ALA antioxidant activity may attenuate efficacy. For peripheral neuropathy management on Cisplatin: use High-potency B-Complex only. Resume ALA consideration after Cisplatin completion with oncology sign-off." });
+    }
   }
   if (regimen.includes('taxane') || regimen.includes('paclitaxel') || regimen.includes('docetaxel')) {
     interactions.push({ drug: "Taxanes", effect: "Peripheral Neuropathy focus", advice: "ALA and B-Complex optimized." });
@@ -260,6 +268,9 @@ function generateNutritionPlan(patient) {
   if (chemFlags.pembrolizumab) {
     interactions.push({ drug: "Pembrolizumab (Keytruda)", effect: "Immune-Related Enterocolitis/Thyroiditis", advice: "Monitor for diarrhea >3/day or severe fatigue. Measure TSH every cycle." });
   }
+  if (hasPelvicRadiation) {
+    interactions.push({ drug: "Pelvic / Abdominal Radiation", effect: "Radiation Enteritis — Mucosal Barrier Disruption", advice: "Small bowel mucosa compromised. Formula MUST be peptide-based or hydrolysed whey (pre-digested) to bypass impaired enzymatic digestion. Low-residue carbohydrate source required — avoid Palatinose / intact disaccharides. If brachytherapy planned: elemental formula may be required peri-procedure. Reassess formula type at each radiation fraction milestone (10 Gy, 20 Gy, completion)." });
+  }
 
   const micronutrients = {
     vitD: hasRenalIssue ? '2000 IU/day (Renal Cap)' : (vitD > 0 && vitD < 20 ? '4000 IU/day (Deficiency correction; 25-OH-VitD recheck at 8 weeks required)' : (vitD < 30 ? '2000–4000 IU/day' : '1000–2000 IU/day')),
@@ -268,7 +279,7 @@ function generateNutritionPlan(patient) {
     omega3: (crp > 5 || cachexia || cancer.includes('pancreatic')) ? '3–4 g/day' : '2 g/day',
     epa: (cachexia || tumorBurden || cancer.includes('pancreatic')) ? '2.2 - 3.0 g EPA/day' : 'None',
     leucine: (sarcopenia || tumorBurden || ecog >= 2) ? '5 g/day' : '3 g/day',
-    glutamine: (patient.giIssues || hasMucositis || hasNausea || regimen.includes('folfirinox') || hasIBD) ? (tumorBurden ? '30 g/day — MDT REVIEW REQUIRED (High Tumor Burden)' : '30 g/day') : 'Consider if GI toxicity persists',
+    glutamine: (patient.giIssues || hasMucositis || hasNausea || regimen.includes('folfirinox') || hasIBD || hasPelvicRadiation) ? (tumorBurden ? '30 g/day — MDT REVIEW REQUIRED (High Tumor Burden)' : '30 g/day') : 'Consider if GI toxicity persists',
     bcaa: (alt > 50 || ast > 50 || bilirubin > 1.2) ? '20 g/day for Hepatic Protection' : (sarcopenia ? '10 g/day' : null),
     magnesium: (patient.magnesium < 1.7 || regimen.includes('cisplatin')) ? '400 mg (Correction Protocol)' : 'Standard',
     bComplex: (regimen.includes('taxane') || regimen.includes('folfirinox')) ? 'High-potency B-Complex' : 'Standard dose',
@@ -279,7 +290,7 @@ function generateNutritionPlan(patient) {
       return (patient.folate > 0 && patient.folate < 3 || hemoglobin < 10) ? '5 mg/day' : (regimen.includes('pemetrexed') || regimen.includes('methotrexate') ? '1 mg/day (per oncology protocol)' : '1.0 mg/day');
     })(),
     chromium: isDiabetic ? '400 mcg/day (Glycemic monitoring protocol active)' : null,
-    ala: (isDiabetic && !chemFlags.bortezomib && !chemFlags.ac) ? '600 mg/day' : null,
+    ala: (isDiabetic && !chemFlags.bortezomib && !chemFlags.ac && !regimen.includes('cisplatin')) ? '600 mg/day' : null,
     microbiome: (regimen.includes('folfirinox') || hasIBD) ? 'Soluble Fiber + Probiotic' : null,
     iron: (hemoglobin > 0 && hemoglobin < 10) ? '100 mg elemental iron + B12 support — HOLD pending iron panel (Ferritin, Serum Iron, TIBC, Transferrin Saturation)' : null
   };
@@ -315,6 +326,8 @@ function generateNutritionPlan(patient) {
 
   if (creatinine > 1.3) {
     safetyStatus.renal = { level: 'danger', message: `CRITICAL RENAL ALERT: Creatinine ${creatinine} is elevated. Protein strictly restricted to 0.8g/kg.` };
+  } else if (creatinine >= 1.2 && regimen.includes('cisplatin')) {
+    safetyStatus.renal = { level: 'warning', message: `RENAL BORDERLINE (Cisplatin): Creatinine ${creatinine} mg/dL — at/near upper safety threshold on a nephrotoxic platinum agent. Weekly creatinine monitoring mandatory each cycle. Escalation trigger: Creatinine >1.5 mg/dL = hold Cisplatin and escalate to nephrology. Do not dose-reduce protein without confirmed GFR decline.` };
   } else if (creatinine < 0.6) {
     safetyStatus.renal = { level: 'warning', message: 'LOW CREATININE ALERT: Potential muscle wasting; verify SMI/Grip.' };
   }
@@ -473,7 +486,14 @@ function generateNutritionPlan(patient) {
   let proteinType = 'Whey isolate';
   const tolerance = (patient.proteinTolerance || '').toLowerCase();
 
-  if (tolerance === 'gi' || cancer.includes('pancreatic') || hasIBD || hasNausea) proteinType = 'Hydrolyzed whey';
+  // Detect pelvic/abdominal radiation — drives mucosal-adapted formula requirement
+  const treatmentTypes = (Array.isArray(patient.treatmentTypes) ? patient.treatmentTypes : []).map(t => (t || '').toLowerCase());
+  const hasPelvicRadiation = treatmentTypes.some(t => t.includes('pelvic') || t.includes('abdominal') || t.includes('radiation') || t.includes('radiotherapy') || t.includes('ebrt') || t.includes('brachytherapy'))
+    || lowerComorbidities.some(c => c.includes('radiation enteritis') || c.includes('enteritis'))
+    || sideEffects.some(s => s.includes('radiation') || s.includes('enteritis'));
+
+  if (hasPelvicRadiation) proteinType = 'Peptide formulas';
+  else if (tolerance === 'gi' || cancer.includes('pancreatic') || hasIBD || hasNausea) proteinType = 'Hydrolyzed whey';
   else if (tolerance === 'mucositis' || hasMucositis || (patient.feedingMethod || '').toLowerCase().includes('enteral')) proteinType = 'Peptide formulas';
   else if (tolerance === 'lactose') proteinType = 'Plant proteins (pea / rice)';
 

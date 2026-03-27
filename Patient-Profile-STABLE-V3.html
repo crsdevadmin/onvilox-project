@@ -3050,17 +3050,35 @@
             setVal('perServingCalories', fp.perServingCalories + ' kcal');
             setVal('perServingProtein', fp.perServingProtein + ' g');
 
-            // Fix macro ratio
+            // Fix macro ratio — computed after NAFLD ceiling is applied below, so use fp values here
+            // (bindDailyCarbs/bindDailyFat are declared in the block below; ratio uses fp directly but
+            //  will be recomputed after bind variables are set — defer to avoid forward-reference)
             const totalSupplKcal = fp.dailyCalories;
-            const pPct = Math.round((fp.dailyProtein * 4 / totalSupplKcal) * 100) || 0;
-            const cPct = Math.round((fp.dailyCarbs * 4 / totalSupplKcal) * 100) || 0;
-            const fPct = Math.round((fp.dailyFat * 9 / totalSupplKcal) * 100) || 0;
-            setVal('macroRatio', `${pPct}% / ${cPct}% / ${fPct}%`);
 
             // Macro rendering: always derive per-serving from daily totals to guarantee arithmetic consistency
             const bindServings = fp.servingsPerDay || 4;
-            const bindDailyCarbs = fp.dailyCarbs != null ? fp.dailyCarbs : 0;
-            const bindDailyFat = fp.dailyFat != null ? fp.dailyFat : 0;
+            let bindDailyCarbs = fp.dailyCarbs != null ? fp.dailyCarbs : 0;
+            let bindDailyFat = fp.dailyFat != null ? fp.dailyFat : 0;
+            const bindDailyCalories = fp.dailyCalories || fp.onsCalories || 0;
+
+            // NAFLD/Fatty Liver: enforce fat ceiling at 30% of total daily calories at render time.
+            // This is deterministic — stored plans created before the engine fix was applied will always
+            // display corrected values. Dispensing staff never see a protocol-violating macro table.
+            const bindComorbidities = (Array.isArray(patient.comorbidities) ? patient.comorbidities : []).map(c => (c || '').toLowerCase());
+            const bindHasNAFLD = bindComorbidities.some(c => c.includes('fatty liver') || c.includes('nafld') || c.includes('nash'));
+            if (bindHasNAFLD && bindDailyCalories > 0 && bindDailyFat * 9 > bindDailyCalories * 0.30) {
+                const maxFatKcal = bindDailyCalories * 0.30;
+                const excessFatKcal = (bindDailyFat * 9) - maxFatKcal;
+                bindDailyFat = Math.round((maxFatKcal / 9) * 10) / 10;
+                bindDailyCarbs = Math.round(bindDailyCarbs + excessFatKcal / 4);
+            }
+
+            // Macro ratio — computed from corrected values so percentage reflects the enforced ceiling
+            const pPct = Math.round((fp.dailyProtein * 4 / totalSupplKcal) * 100) || 0;
+            const cPct = Math.round((bindDailyCarbs * 4 / totalSupplKcal) * 100) || 0;
+            const fPct = Math.round((bindDailyFat * 9 / totalSupplKcal) * 100) || 0;
+            setVal('macroRatio', `${pPct}% / ${cPct}% / ${fPct}%`);
+
             const bindPerServingCarbs = Math.round((bindDailyCarbs / bindServings) * 10) / 10;
             const bindPerServingFat = Math.round((bindDailyFat / bindServings) * 10) / 10;
             setVal('dailyCarbs', bindDailyCarbs + ' g');

@@ -320,10 +320,21 @@ ANTIOXIDANT SAFETY:
 BCAA & LEUCINE OVERLAP:
 - If BCAA ≥ 15g/day AND Leucine is also prescribed separately: flag MODERATE alert for potential leucine excess (>13–15g/day total may exceed anabolic threshold and cause metabolic stress).
 
+ALA EXCLUSION ON CISPLATIN:
+- ALA is contraindicated during Cisplatin cycles (same rationale as oxaliplatin — platinum cytotoxicity relies on oxidative stress; ALA antioxidant activity may attenuate efficacy).
+- If ALA is prescribed AND the regimen includes Cisplatin: generate HIGH alert type "ALA_CISPLATIN_CONTRAINDICATION" and set status EXCLUDED in micronutrientOrders for ALA.
+- For peripheral neuropathy management on Cisplatin in a diabetic patient: recommend High-potency B-Complex only. Do NOT recommend ALA as a substitute during active Cisplatin cycles.
+
+CISPLATIN RENAL BORDERLINE:
+- If creatinine is between 1.2–1.3 mg/dL AND regimen includes Cisplatin: generate MODERATE alert type "RENAL_BORDERLINE_CISPLATIN" noting creatinine is at the nephrotoxicity threshold, weekly monitoring is mandatory, and the escalation trigger is >1.5 mg/dL (hold Cisplatin, escalate to nephrology). Do NOT classify this as "Normal."
+
+RADIATION ENTERITIS FORMULA ADAPTATION:
+- If treatmentTypes includes any form of radiation (pelvic, abdominal, EBRT, brachytherapy) OR comorbidities/sideEffects include radiation enteritis: the formula protein source MUST be peptide-based or hydrolysed whey. Flag in micronutrientOrders and rationale that intact disaccharides (e.g. Palatinose) are contraindicated — low-residue carbohydrate only. If brachytherapy is planned, note elemental formula may be required peri-procedure. Generate MODERATE alert type "RADIATION_ENTERITIS_FORMULA" if the prescribed formula uses non-adapted protein or high-residue carbohydrates.
+
 DRUG INTERACTIONS:
 - For EVERY drug or drug class named in the regimen, you MUST generate a drugInteractions entry.
 - Never return an empty drugInteractions array for a patient on active chemotherapy.
-- Include: Cisplatin (renal Mg wasting), Carboplatin (myelosuppression + nutrition timing), Paclitaxel/Docetaxel (peripheral neuropathy — B12/B6 relevance), Doxorubicin (cardiotoxicity — antioxidant caution), Cyclophosphamide (nausea/hydration), Pembrolizumab/nivolumab (immune enterocolitis, TSH), Pemetrexed (folate protocol), 5-FU/Capecitabine (mucositis, folate timing), Bevacizumab (wound healing, protein adequacy), Bortezomib (neuropathy, antioxidant exclusion).
+- Include: Cisplatin (renal Mg wasting + nephrotoxicity threshold monitoring), Carboplatin (myelosuppression + nutrition timing), Paclitaxel/Docetaxel (peripheral neuropathy — B12/B6 relevance), Doxorubicin (cardiotoxicity — antioxidant caution), Cyclophosphamide (nausea/hydration), Pembrolizumab/nivolumab (immune enterocolitis, TSH), Pemetrexed (folate protocol), 5-FU/Capecitabine (mucositis, folate timing), Bevacizumab (wound healing, protein adequacy), Bortezomib (neuropathy, antioxidant exclusion).
 
 ARITHMETIC VERIFICATION:
 - Verify: onsCalories ÷ servingsPerDay ≈ perServingCalories (±5 kcal tolerance). Flag discrepancy in logicRefinements.
