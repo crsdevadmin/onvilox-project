@@ -4064,14 +4064,34 @@
                 console.warn("AI re-render for PDF skipped:", e);
               }
             }
-            // Ensure all four AI sections are visible
+            // Ensure all four AI sections are visible (only if they have content)
             ['claudeAlertsSection','claudeDrugSection','claudeMicroSection','claudeMonitorSection'].forEach(id => {
               const el = document.getElementById(id);
               if (el && el.innerHTML.trim() !== '') el.style.display = 'block';
             });
 
-            // Give the browser 1 second to "settle" and render all dynamic styles/content
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            // Ensure all dynamically-populated report sections that bind() showed are still visible
+            // (html2canvas clones the DOM — sections hidden by overflow or display:none will be missing)
+            const pdfVisibleSections = [
+              'safetyAlertsBlock', 'drugSection', 'clinicalHoldOrdersSection',
+              'mdtReviewSection', 'refeedingSection', 'v3OutcomeModule',
+              'clinicalProtocolsContainer', 'mandatoryInvestigationsContainer',
+              'dietaryPlanContainer', 'progressSection'
+            ];
+            const sectionPrevDisplays = {};
+            pdfVisibleSections.forEach(id => {
+              const el = document.getElementById(id);
+              if (el) {
+                sectionPrevDisplays[id] = el.style.display;
+                // Only show if it has actual content (avoid empty placeholder boxes)
+                if (el.style.display === 'none' && el.innerHTML.trim().length > 20) {
+                  el.style.display = 'block';
+                }
+              }
+            });
+
+            // Give the browser 1.5 seconds to settle all dynamic styles/content
+            await new Promise(resolve => setTimeout(resolve, 1500));
 
             // Step 4: Setup Export Source
             const source = document.getElementById('pdfExportRoot');
@@ -4085,14 +4105,23 @@
               margin: [10, 10, 10, 10],
               filename: filename,
               image: { type: 'jpeg', quality: 1.0 },
-              html2canvas: { 
-                scale: 2, 
-                useCORS: true, 
-                logging: false, 
+              html2canvas: {
+                scale: 2,
+                useCORS: true,
+                logging: false,
                 letterRendering: true,
-                allowTaint: true
+                allowTaint: true,
+                // Fix scroll-position clipping — html2canvas must start from top of element,
+                // not from the current browser scroll position
+                scrollX: 0,
+                scrollY: 0,
+                // Force full-document width so content doesn't wrap or clip
+                windowWidth: Math.max(source.scrollWidth, 1200),
+                windowHeight: source.scrollHeight
               },
-              jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+              jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+              // Prevent content being sliced mid-sentence or mid-table across page boundaries
+              pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
             };
 
             // Hide the download button(s) and other UI junk inside the exported PDF
@@ -4109,6 +4138,11 @@
             } finally {
               // Restore UI
               buttons.forEach((b, i) => b.style.display = prevDisplays[i]);
+              // Restore section display states
+              pdfVisibleSections.forEach(id => {
+                const el = document.getElementById(id);
+                if (el && sectionPrevDisplays[id] !== undefined) el.style.display = sectionPrevDisplays[id];
+              });
               if (dlBtn) {
                 dlBtn.disabled = false;
                 dlBtn.innerHTML = originalBtnHtml;
