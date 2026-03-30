@@ -4111,8 +4111,11 @@
                 logging: false,
                 letterRendering: true,
                 allowTaint: true,
-                // windowWidth prevents responsive layout shifts during capture
-                windowWidth: source.scrollWidth
+                // Explicit dimensions ensure full element is captured, not just viewport
+                width: source.scrollWidth,
+                height: source.scrollHeight,
+                windowWidth: source.scrollWidth,
+                windowHeight: source.scrollHeight
               },
               jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
             };
