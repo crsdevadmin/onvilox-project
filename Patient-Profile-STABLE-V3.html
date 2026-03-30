@@ -4016,14 +4016,10 @@
             if (insights) {
               const alerts = Array.isArray(insights.clinicalAlerts) ? insights.clinicalAlerts : [];
 
-              // HARD BLOCK — only protein underdose is an uncorrectable calculation error
-              if (alerts.some(a => a.type === 'PROTEIN_CRITICAL_UNDERDOSE' || a.type === 'PROTEIN_UNDERDOSE_IMMUNOTHERAPY')) {
-                alert('⛔ PLAN BLOCKED FOR PRINTING\n\nProtein is critically underdosed and cannot be corrected automatically.\nPlease re-run the AI Audit to apply the corrected protein value before printing.');
-                return;
-              }
-
               // SOFT WARNINGS — clinician acknowledges and proceeds
               const warnings = [];
+              if (alerts.some(a => a.type === 'PROTEIN_CRITICAL_UNDERDOSE' || a.type === 'PROTEIN_UNDERDOSE_IMMUNOTHERAPY'))
+                warnings.push('⚠️ PROTEIN: AI audit detected a protein underdose and has applied the correction. Confirm the protein value in the prescription before dispensing.');
               if (alerts.some(a => a.type === 'EN_ESCALATION_MANDATORY'))
                 warnings.push('⚠️ ENTERAL ESCALATION: Feeding route has been updated to Enteral Nutrition in this plan per ESPEN guidelines.');
               if (alerts.some(a => a.type === 'ANTIOXIDANT_CONTRAINDICATION' || a.type === 'ALA_PHASE_SUSPENSION_MISSING'))
