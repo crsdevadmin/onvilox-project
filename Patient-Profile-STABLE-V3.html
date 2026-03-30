@@ -4064,10 +4064,18 @@
                 console.warn("AI re-render for PDF skipped:", e);
               }
             }
-            // Ensure all four AI sections are visible (only if they have content)
-            ['claudeAlertsSection','claudeDrugSection','claudeMicroSection','claudeMonitorSection'].forEach(id => {
-              const el = document.getElementById(id);
-              if (el && el.innerHTML.trim() !== '') el.style.display = 'block';
+            // Ensure all four AI sections are visible (only if their content list has data)
+            [
+              ['claudeAlertsSection',  'claudeAlertsList'],
+              ['claudeDrugSection',    'claudeDrugTable'],
+              ['claudeMicroSection',   'claudeMicroTable'],
+              ['claudeMonitorSection', 'claudeMonitorTable']
+            ].forEach(([sectionId, listId]) => {
+              const section = document.getElementById(sectionId);
+              const list = document.getElementById(listId);
+              if (section && list && list.innerHTML.trim().length > 10) {
+                section.style.display = 'block';
+              }
             });
 
             // Ensure all dynamically-populated report sections that bind() showed are still visible
@@ -4090,6 +4098,9 @@
               }
             });
 
+            // Scroll to top so html2canvas sees the full element from position 0
+            window.scrollTo(0, 0);
+
             // Give the browser 1.5 seconds to settle all dynamic styles/content
             await new Promise(resolve => setTimeout(resolve, 1500));
 
@@ -4110,12 +4121,7 @@
                 useCORS: true,
                 logging: false,
                 letterRendering: true,
-                allowTaint: true,
-                // Explicit dimensions ensure full element is captured, not just viewport
-                width: source.scrollWidth,
-                height: source.scrollHeight,
-                windowWidth: source.scrollWidth,
-                windowHeight: source.scrollHeight
+                allowTaint: true
               },
               jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
             };
