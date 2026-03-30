@@ -105,8 +105,8 @@ function generateNutritionPlan(patient) {
 
   // Detect pelvic/abdominal radiation — drives mucosal-adapted formula requirement
   // Declared here (before use at nutritionRisk block) to avoid temporal dead zone
-  const treatmentTypes = (Array.isArray(patient.treatmentTypes) ? patient.treatmentTypes : []).map(t => (t || '').toLowerCase());
-  const hasPelvicRadiation = treatmentTypes.some(t => t.includes('pelvic') || t.includes('abdominal') || t.includes('radiation') || t.includes('radiotherapy') || t.includes('ebrt') || t.includes('brachytherapy'))
+  var treatmentTypes = (Array.isArray(patient.treatmentTypes) ? patient.treatmentTypes : []).map(t => (t || '').toLowerCase());
+  var hasPelvicRadiation = treatmentTypes.some(t => t.includes('pelvic') || t.includes('abdominal') || t.includes('radiation') || t.includes('radiotherapy') || t.includes('ebrt') || t.includes('brachytherapy'))
     || lowerComorbidities.some(c => c.includes('radiation enteritis') || c.includes('enteritis'))
     || sideEffects.some(s => s.includes('radiation') || s.includes('enteritis'));
 
