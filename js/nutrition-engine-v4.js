@@ -17,6 +17,7 @@ function generateNutritionPlan(patient) {
   const vitD = parseFloat(patient.vitD || 0);
   const zinc = parseFloat(patient.zinc || 0);
   const prealbumin = parseFloat(patient.prealbumin || 0);
+  const wbc = parseFloat(patient.wbc || 0);
   const age = parseInt(patient.age || 0);
   const ecog = parseInt(patient.ecogStatus || 0);
   const gender = (patient.sex || '').toLowerCase();
@@ -92,16 +93,22 @@ function generateNutritionPlan(patient) {
     oxaliplatin: regimen.includes('oxaliplatin') || regimen.includes('folfox') || regimen.includes('folfirinox'),
     bortezomib: (regimen.includes('bortezomib') || regimen.includes('velcade') || regimen.includes('vrd') || regimen.includes('vcd')) || cancer.includes('myeloma'),
     pembrolizumab: regimen.includes('pembrolizumab') || regimen.includes('keytruda'),
-    ac: regimen.includes('ac ') || regimen.includes('adriamycin') || (cancer.includes('breast') && regimen.includes('ac')),
-    taxane: regimen.includes('taxane') || regimen.includes('paclitaxel') || regimen.includes('docetaxel')
+    // ac: includes R-CHOP/CHOP (Doxorubicin present) — antioxidant contraindication applies to all
+    ac: regimen.includes('ac ') || regimen.includes('adriamycin') || regimen.includes('doxorubicin') || (cancer.includes('breast') && regimen.includes('ac')) || regimen.includes('r-chop') || regimen.includes('rchop') || regimen.includes('chop'),
+    taxane: regimen.includes('taxane') || regimen.includes('paclitaxel') || regimen.includes('docetaxel'),
+    rchop: regimen.includes('r-chop') || regimen.includes('rchop') || regimen.includes('chop'),
+    vincristine: regimen.includes('vincristine') || regimen.includes('r-chop') || regimen.includes('rchop') || regimen.includes('chop'),
+    steroid: regimen.includes('prednisolone') || regimen.includes('prednisone') || regimen.includes('r-chop') || regimen.includes('rchop') || regimen.includes('chop') || regimen.includes('dexamethasone') || regimen.includes('dexa')
   };
-  
+
   var drugs = [];
   if (regimen.includes('cisplatin')) drugs.push("Cisplatin");
   if (chemFlags.bortezomib) drugs.push("Bortezomib");
   if (regimen.includes('lenalidomide') || regimen.includes('revlimid')) drugs.push("Lenalidomide");
   if (chemFlags.pembrolizumab) drugs.push("Pembrolizumab");
-  if (chemFlags.ac) drugs.push("AC (Adriamycin + Cyclophosphamide)");
+  if (chemFlags.rchop) drugs.push("R-CHOP (Rituximab + Cyclophosphamide + Doxorubicin + Vincristine + Prednisolone)");
+  else if (chemFlags.ac) drugs.push("AC (Adriamycin + Cyclophosphamide)");
+  if (chemFlags.vincristine && !chemFlags.rchop) drugs.push("Vincristine");
 
   // Detect pelvic/abdominal radiation — drives mucosal-adapted formula requirement
   // Declared here (before use at nutritionRisk block) to avoid temporal dead zone
@@ -114,6 +121,12 @@ function generateNutritionPlan(patient) {
   let riskScore = 0;
   // V3 Safety Engine (Step 6) - Initialized later in function
   let safetyAlerts = [];
+
+  // Neutropenia detection — affects formula sterility, probiotics, food safety
+  const hasNeutropenia = wbc > 0 && wbc < 3500;
+  const hasSevereNeutropenia = wbc > 0 && wbc < 2000;
+  // Steroid-induced hyperglycaemia triple trigger
+  const hasTripleTrigger = chemFlags.steroid && isDiabetic && bloodSugar >= 180;
 
   // --- STEP 4 & 6: LAB INTERPRETATION & SAFETY ---
   if (hemoglobin > 0 && hemoglobin < 10) {
@@ -354,10 +367,15 @@ function generateNutritionPlan(patient) {
   if (hasPelvicRadiation) {
     interactions.push({ drug: "Pelvic / Abdominal Radiation", effect: "Radiation Enteritis — Mucosal Barrier Disruption", advice: "Small bowel mucosa compromised. Formula MUST be peptide-based or hydrolysed whey (pre-digested) to bypass impaired enzymatic digestion. Low-residue carbohydrate source required — avoid Palatinose / intact disaccharides. If brachytherapy planned: elemental formula may be required peri-procedure. Reassess formula type at each radiation fraction milestone (10 Gy, 20 Gy, completion)." });
   }
+  if (chemFlags.rchop) {
+    interactions.push({ drug: "Doxorubicin — R-CHOP Anthracycline", effect: "Antioxidant Contraindication (All Cycles)", advice: "Doxorubicin cytotoxicity depends on reactive oxygen species generation. ALA and Vitamin C >500 mg/day are CONTRAINDICATED for the entire R-CHOP course. Unlike AC→Taxane sequential regimens, R-CHOP is a single combined infusion — no agent can be phase-separated. This prohibition applies from Cycle 1 through completion." });
+    interactions.push({ drug: "Vincristine — R-CHOP", effect: "Peripheral Neuropathy + B6 Toxicity Risk", advice: "B6 STRICTLY CAPPED at <100 mg/day in any B-Complex prescribed — high-dose B6 paradoxically worsens Vincristine-induced peripheral neuropathy. ALA (alpha-lipoic acid) CANNOT be prescribed for neuropathy prevention as Doxorubicin co-administration in R-CHOP (combined single infusion) makes phase-separation impossible throughout the entire treatment course." });
+    interactions.push({ drug: "Prednisolone — R-CHOP Corticosteroid", effect: "Steroid-Induced Hyperglycaemia", advice: "Prednisolone drives post-prandial insulin resistance — most severe 4–8 hours after dose. Blood glucose monitoring MANDATORY before and 2h after each Prednisolone dose. Fat restricted to <30% of total calories when T2DM + BS ≥180 mg/dL co-present. Endocrinology referral MANDATORY in confirmed T2DM or HbA1c ≥6.5%." });
+  }
 
   const micronutrients = {
     vitD: hasRenalIssue ? '2000 IU/day (Renal Cap)' : (vitD > 0 && vitD < 20 ? '4000 IU/day (Deficiency correction; 25-OH-VitD recheck at 8 weeks required)' : (vitD < 30 ? '2000–4000 IU/day' : '1000–2000 IU/day')),
-    vitC: chemFlags.ac ? (chemFlags.taxane ? '500 mg/day — HOLD on AC infusion days; Taxane phase: titration to 1000 mg/day requires oncologist sign-off (prescriber order required before dispensing)' : '500 mg/day — HOLD on AC infusion days; inter-cycle only with oncologist approval') : (chemFlags.bortezomib ? '500 mg/day (Antioxidant Cap for Safety)' : (hasRenalIssue ? '500 mg/day (Renal Cap)' : ((crp > 5 || tumorBurden) && !chemFlags.bortezomib ? '2000 mg/day' : '1000 mg/day'))),
+    vitC: chemFlags.rchop ? '500 mg/day MAX — HOLD on ALL R-CHOP infusion days (Doxorubicin antioxidant contraindication; combined single infusion — no phase-separation possible)' : chemFlags.ac ? (chemFlags.taxane ? '500 mg/day — HOLD on AC infusion days; Taxane phase: titration to 1000 mg/day requires oncologist sign-off (prescriber order required before dispensing)' : '500 mg/day — HOLD on AC infusion days; inter-cycle only with oncologist approval') : (chemFlags.bortezomib ? '500 mg/day (Antioxidant Cap for Safety)' : (hasRenalIssue ? '500 mg/day (Renal Cap)' : ((crp > 5 || tumorBurden) && !chemFlags.bortezomib ? '2000 mg/day' : '1000 mg/day'))),
     zinc: zinc > 0 && zinc < 60 ? '15–25 mg/day (Correction Protocol) + 2mg Copper' : '15 mg/day',
     omega3: (crp > 5 || cachexia || cancer.includes('pancreatic')) ? '3–4 g/day' : '2 g/day',
     epa: (cachexia || tumorBurden || cancer.includes('pancreatic')) ? '2.2 - 3.0 g EPA/day' : 'None',
@@ -365,7 +383,7 @@ function generateNutritionPlan(patient) {
     glutamine: (patient.giIssues || hasMucositis || hasNausea || regimen.includes('folfirinox') || hasIBD || hasPelvicRadiation) ? (tumorBurden ? '30 g/day — MDT REVIEW REQUIRED (High Tumor Burden)' : '30 g/day') : 'Consider if GI toxicity persists',
     bcaa: (alt > 50 || ast > 50 || bilirubin > 1.2) ? '20 g/day for Hepatic Protection' : (sarcopenia ? '10 g/day' : null),
     magnesium: (patient.magnesium < 1.7 || regimen.includes('cisplatin')) ? '400 mg (Correction Protocol)' : 'Standard',
-    bComplex: (regimen.includes('taxane') || regimen.includes('folfirinox')) ? 'High-potency B-Complex' : 'Standard dose',
+    bComplex: chemFlags.vincristine ? 'B-Complex — B6 STRICTLY CAPPED at <100 mg/day (Vincristine neuropathy protocol: high-dose B6 paradoxically worsens peripheral neuropathy)' : (regimen.includes('taxane') || regimen.includes('folfirinox')) ? 'High-potency B-Complex' : 'Standard dose',
     folate: (() => {
       const markers = (patient.genomicMarkers || []);
       const hasMthfr = markers.some(m => m.includes('MTHFR'));
@@ -374,7 +392,7 @@ function generateNutritionPlan(patient) {
     })(),
     chromium: isDiabetic ? '400 mcg/day (Glycemic monitoring protocol active)' : null,
     ala: (isDiabetic && !chemFlags.bortezomib && !chemFlags.ac && !regimen.includes('cisplatin')) ? '600 mg/day' : null,
-    microbiome: (regimen.includes('folfirinox') || hasIBD) ? 'Soluble Fiber + Probiotic' : null,
+    microbiome: hasNeutropenia ? 'Soluble Fiber ONLY — PROBIOTICS STRICTLY CONTRAINDICATED (active neutropenia/WBC <3500)' : ((regimen.includes('folfirinox') || hasIBD) ? 'Soluble Fiber + Probiotic' : null),
     iron: (hemoglobin > 0 && hemoglobin < 10) ? '100 mg elemental iron + B12 support — HOLD pending iron panel (Ferritin, Serum Iron, TIBC, Transferrin Saturation)' : null
   };
 
@@ -393,7 +411,9 @@ function generateNutritionPlan(patient) {
     drug: { level: 'info', message: 'Drug Interference: No major antioxidants flagged' },
     escalation: { level: 'info', message: 'Escalation Status: Standard oral intake' },
     deficit: { level: 'info', message: 'Deficit Monitoring: Gap fully covered by prescription' },
-    composition: { level: 'info', message: 'Body Composition: No immediate imaging flags.' }
+    composition: { level: 'info', message: 'Body Composition: No immediate imaging flags.' },
+    neutropenia: { level: 'info', message: 'Neutropenia: WBC within acceptable range' },
+    steroidGlycemic: { level: 'info', message: 'Steroid Glycaemia: Not applicable' }
   };
 
   // --- SMI / Composition Safety Order ---
@@ -405,6 +425,20 @@ function generateNutritionPlan(patient) {
              message: `SARCOPENIA RISK: SMI ${smi} cm²/m² detected. [MANDATORY] CT L3 imaging order required to confirm algorithmic estimate and baseline muscle mass.` 
          };
      }
+  }
+
+  // Neutropenia safety
+  if (hasSevereNeutropenia) {
+    safetyStatus.neutropenia = { level: 'danger', message: `SEVERE NEUTROPENIA (WBC ${wbc}/µL): Raw foods, unpasteurised products, and live cultures CONTRAINDICATED. Formula must be commercially sterile. PROBIOTICS STRICTLY CONTRAINDICATED. Immediate G-CSF eligibility assessment by oncology. Fever ≥38°C = emergency protocol — do not defer.` };
+  } else if (hasNeutropenia) {
+    safetyStatus.neutropenia = { level: 'warning', message: `NEUTROPENIA RISK (WBC ${wbc}/µL): Strict food safety protocol — no raw foods or live cultures. Formula must be commercially sterile. PROBIOTICS CONTRAINDICATED. G-CSF eligibility review recommended. Monitor temperature daily.` };
+  }
+
+  // Steroid-induced hyperglycaemia
+  if (hasTripleTrigger) {
+    safetyStatus.steroidGlycemic = { level: 'danger', message: `STEROID-INDUCED HYPERGLYCAEMIA — TRIPLE TRIGGER: Prednisolone + T2DM + Blood Sugar ${bloodSugar} mg/dL + HbA1c ${patient.hba1c || '?'}%. Fat CAPPED at 30% of total calories. Blood glucose monitoring MANDATORY before and 2h after every Prednisolone dose. ENDOCRINOLOGY REFERRAL MANDATORY.` };
+  } else if (chemFlags.steroid && isDiabetic) {
+    safetyStatus.steroidGlycemic = { level: 'warning', message: `STEROID GLYCAEMIA WATCH: Prednisolone + confirmed T2DM. Monitor blood glucose before each Prednisolone dose. Endocrinology review recommended.` };
   }
 
   if (creatinine > 1.3) {
@@ -456,7 +490,16 @@ function generateNutritionPlan(patient) {
       }
     }
 
-    if (chemFlags.ac) {
+    if (chemFlags.rchop) {
+      // R-CHOP: single combined infusion — no phase-separation possible between Doxorubicin and other agents
+      let rcMsg = "R-CHOP ANTIOXIDANT CONTRAINDICATION: Doxorubicin (anthracycline) is co-administered with all R-CHOP agents in a single combined infusion — phase-separation is NOT possible. ALA EXCLUDED for ALL R-CHOP cycles (Doxorubicin oxidative mechanism). VitC CAPPED at 500 mg/day, HOLD on every infusion day. Vincristine neuropathy must be managed with B6-capped B-Complex only — ALA cannot be substituted due to Doxorubicin co-administration.";
+      if (hasExistingVitC || hasExistingALA) {
+        rcMsg += " [ACTION REQUIRED] Existing antioxidant supplements detected — must be fully suspended before and during all R-CHOP cycles.";
+        safetyStatus.drug = { level: 'danger', message: rcMsg };
+      } else {
+        safetyStatus.drug = { level: 'warning', message: rcMsg };
+      }
+    } else if (chemFlags.ac) {
       let acMsg = "AC SAFETY ALERT: Adriamycin (Doxorubicin) detected. Antioxidants attenuate oxidative cytotoxicity. ALA suspended for AC cycle. VitC capped at 500mg — HOLD on infusion days; resume inter-cycle only with oncologist sign-off.";
       if (hasExistingVitC || hasExistingALA) {
         acMsg += " [ACTION REQUIRED] Patient carries existing antioxidant supplements — instruct suspension on infusion days.";
@@ -493,11 +536,13 @@ function generateNutritionPlan(patient) {
       albumin > 0 && albumin < 3.0,
       prealbumin > 0 && prealbumin < 18,
       hasMucositis,
-      hasNausea
+      hasNausea,
+      ecog >= 2,
+      sideEffects.some(s => s.includes('swallow') || s.includes('dysphagia') || s.includes('fatigue'))
     ].filter(Boolean).length;
     if (compoundFactors >= 3) {
       safetyStatus.escalation.level = 'danger';
-      safetyStatus.escalation.message = `EN_ESCALATION_MANDATORY [HIGH]: Intake ${actualIntake}% with ${compoundFactors} concurrent high-risk factors (cachexia/sarcopenia/hypoalbuminaemia/GI symptoms). Composite malnutrition severity mandates immediate enteral escalation — do not defer to reassessment window.`;
+      safetyStatus.escalation.message = `EN_ESCALATION_MANDATORY [HIGH]: Intake ${actualIntake}% with ${compoundFactors} concurrent high-risk factors (cachexia/sarcopenia/hypoalbuminaemia/GI toxicity/ECOG≥2/dysphagia). Immediate nasogastric (NG) or nasoduodenal (ND) tube feeding required. 3-day reassessment window is a bridge only — not a deferral of enteral initiation.`;
     }
   }
 
@@ -559,6 +604,17 @@ function generateNutritionPlan(patient) {
       const excessFatKcal = (dailyFat * 9) - maxFatKcal;
       dailyFat = Math.round((maxFatKcal / 9) * 10) / 10;
       dailyCarbs = Math.round(dailyCarbs + excessFatKcal / 4);
+    }
+  }
+
+  // Steroid-induced hyperglycaemia (triple trigger): fat capped at 30% of total calories
+  // Prednisolone + T2DM + BS ≥180 → mandatory macro redistribution per ESPEN/endocrine protocol
+  if (hasTripleTrigger) {
+    const maxFatKcalSteroid = dailyCalories * 0.30;
+    if (dailyFat * 9 > maxFatKcalSteroid) {
+      const excessKcal = (dailyFat * 9) - maxFatKcalSteroid;
+      dailyFat = Math.round((maxFatKcalSteroid / 9) * 10) / 10;
+      dailyCarbs = Math.round(dailyCarbs + excessKcal / 4);
     }
   }
 
