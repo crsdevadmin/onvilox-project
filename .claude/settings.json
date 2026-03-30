@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -rn \"hasPelvis\\\\|PelvicRad\\\\|pelvicRad\" c:/Users/mjaff/Downloads/onvilox-corrected-pdf-qr-pdf-fixed --include=*.js --include=*.html)",
+      "Bash(node -e \":*)"
+    ]
+  }
+}
