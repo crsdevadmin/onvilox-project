@@ -1086,6 +1086,12 @@
           <div class="rtrace" id="calcTrace"></div>
         </div>
 
+        <!-- REFEEDING SYNDROME PROTOCOL (shown only when risk detected) -->
+        <div class="rs" id="refeedingSection" style="margin-top:16px; display:none;">
+          <div class="rs-title" style="font-size:9.5px;">Refeeding Syndrome Protocol (NICE CG32)</div>
+          <div id="refeedingBody"></div>
+        </div>
+
         <div class="rs" style="margin-top:16px;">
           <div class="rs-title" style="font-size:9.5px;">Clinical Rationale</div>
           <ul class="rrat" id="clinicalRationale"></ul>
@@ -1710,6 +1716,26 @@
           function setVal(id, val) {
             const el = document.getElementById(id);
             if (el) el.innerText = val ?? '-';
+          }
+          function setHTML(id, html) {
+            const el = document.getElementById(id);
+            if (el) el.innerHTML = html ?? '-';
+          }
+          // Returns value + coloured dot badge based on reference ranges
+          // ranges: { lo, hi, critLo, critHi } — all optional
+          function labBadge(v, unit, ranges) {
+            if (!v && v !== 0) return '-';
+            const vf = parseFloat(v);
+            if (isNaN(vf) || vf === 0) return '-';
+            const { lo, hi, critLo, critHi } = ranges || {};
+            let color = '#22c55e'; let title = 'Normal';
+            if ((critLo !== undefined && vf < critLo) || (critHi !== undefined && vf > critHi)) {
+              color = '#ef4444'; title = 'Critical';
+            } else if ((lo !== undefined && vf < lo) || (hi !== undefined && vf > hi)) {
+              color = '#f59e0b'; title = 'Borderline';
+            }
+            const dot = `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;margin-left:5px;vertical-align:middle;background:${color};" title="${title}"></span>`;
+            return `${vf}${unit ? ' ' + unit : ''}${dot}`;
           }
           // INTAKE CALCULATOR LOGIC
           function addIntakeRow() {
@@ -2869,22 +2895,29 @@
             setVal('pWeight2', patient.weight + ' kg');
             setVal('pHeight', patient.height + ' cm');
             setVal('pMUAC', (patient.muac ? patient.muac + ' cm' : '-'));
-            setVal('pCreatinine', (patient.creatinine ? patient.creatinine + ' mg/dL' : '-'));
-            setVal('pLiver', (patient.alt || patient.ast) ? `${patient.alt || '-'}/${patient.ast || '-'} U/L` : '-');
-            setVal('pBilirubin', (patient.bilirubin ? patient.bilirubin + ' mg/dL' : '-'));
-            setVal('pBloodSugar', (patient.bloodSugar ? patient.bloodSugar + ' mg/dL' : '-'));
-            setVal('pSodium', (patient.sodium ? patient.sodium + ' mEq/L' : '-'));
-            setVal('pPotassium', (patient.potassium ? patient.potassium + ' mEq/L' : '-'));
-            setVal('pUrea', (patient.urea ? patient.urea + ' mg/dL' : '-'));
-            setVal('pHbA1c', (patient.hba1c ? patient.hba1c + '%' : '-'));
-            setVal('pTSH', (patient.tsh ? patient.tsh + ' mIU/L' : '-'));
-            setVal('pPrealbumin', (patient.prealbumin ? patient.prealbumin + ' mg/dL' : '-'));
-            setVal('pHemoglobin', (patient.hemoglobin ? patient.hemoglobin + ' g/dL' : '-'));
-            setVal('pVitD', (patient.vitD ? patient.vitD + ' ng/mL' : '-'));
-            setVal('pVitB12', (patient.vitB12 ? patient.vitB12 + ' pg/mL' : '-'));
-            setVal('pFolate', (patient.folate ? patient.folate + ' ng/mL' : '-'));
-            setVal('pZinc', (patient.zinc ? patient.zinc + ' μg/dL' : '-'));
-            setVal('pMagnesium', (patient.magnesium ? patient.magnesium + ' mg/dL' : '-'));
+            const sex = (patient.sex || '').toLowerCase();
+            const hbLo = sex === 'male' ? 13 : 12;
+            setHTML('pCreatinine', labBadge(patient.creatinine, 'mg/dL', {lo:0.7, hi:1.3, critHi:1.5}));
+            setHTML('pLiver', (() => {
+              if (!patient.alt && !patient.ast) return '-';
+              const altB = labBadge(patient.alt, '', {lo:7, hi:56, critHi:200});
+              const astB = labBadge(patient.ast, 'U/L', {lo:5, hi:40, critHi:200});
+              return `${patient.alt ? altB : '-'} / ${patient.ast ? astB : '-'}`;
+            })());
+            setHTML('pBilirubin', labBadge(patient.bilirubin, 'mg/dL', {lo:0.1, hi:1.2, critHi:2.0}));
+            setHTML('pBloodSugar', labBadge(patient.bloodSugar, 'mg/dL', {lo:70, hi:99, critHi:180}));
+            setHTML('pSodium', labBadge(patient.sodium, 'mEq/L', {lo:136, hi:145, critLo:130, critHi:150}));
+            setHTML('pPotassium', labBadge(patient.potassium, 'mEq/L', {lo:3.5, hi:5.0, critLo:3.0, critHi:5.5}));
+            setHTML('pUrea', labBadge(patient.urea, 'mg/dL', {lo:7, hi:20, critHi:50}));
+            setHTML('pHbA1c', labBadge(patient.hba1c, '%', {lo:0.1, hi:5.6, critHi:8.0}));
+            setHTML('pTSH', labBadge(patient.tsh, 'mIU/L', {lo:0.4, hi:4.0, critLo:0.1, critHi:10}));
+            setHTML('pPrealbumin', labBadge(patient.prealbumin, 'mg/dL', {lo:20, hi:40, critLo:10}));
+            setHTML('pHemoglobin', labBadge(patient.hemoglobin, 'g/dL', {lo:hbLo, hi:18, critLo:8}));
+            setHTML('pVitD', labBadge(patient.vitD, 'ng/mL', {lo:30, hi:100, critLo:20}));
+            setHTML('pVitB12', labBadge(patient.vitB12, 'pg/mL', {lo:200, hi:900, critLo:100}));
+            setHTML('pFolate', labBadge(patient.folate, 'ng/mL', {lo:3.1, hi:17.5, critLo:2.0}));
+            setHTML('pZinc', labBadge(patient.zinc, 'μg/dL', {lo:60, hi:120, critLo:40}));
+            setHTML('pMagnesium', labBadge(patient.magnesium, 'mg/dL', {lo:1.7, hi:2.2, critLo:1.5}));
             setVal('pMicrobiome', fp.micronutrients.microbiome || '-');
             setVal('pFat', (patient.fatPercent ? patient.fatPercent + ' %' : '-'));
             setVal('pSMI', (patient.smi ? patient.smi + ' cm²/m²' : '-'));
@@ -2956,8 +2989,8 @@
             setVal('pCancer_header', patient.cancer);
             setVal('pRegimen_header', patient.regimen);
             setVal('pFeeding', fp.prescribedRoute);
-            setVal('pAlbumin', patient.albumin + ' g/dL');
-            setVal('pCRP_val', (patient.crp || 0) + ' mg/L');
+            setHTML('pAlbumin', labBadge(patient.albumin, 'g/dL', {lo:3.5, hi:5.5, critLo:2.8}));
+            setHTML('pCRP_val', labBadge(patient.crp, 'mg/L', {lo:0.1, hi:5, critHi:10}));
 
             // New Clinical History fields
             const actualIntakePct = 100 - (patient.reducedFoodIntake || 0);
@@ -3470,13 +3503,22 @@
             const crpStr = patient.crp ? `, CRP ${patient.crp} mg/L` : '';
             const sarcStr = (patient.smi || patient.handGrip) ? `, SMI ${patient.smi}, Grip ${patient.handGrip}kg` : '';
 
+            const calcWt = fp.calcWeight || patient.weight;
+            const wbStr = fp.weightBasis ? ` — <em style="color:#6b7280;">${fp.weightBasis}</em>` : '';
             trace.push(`<b>Inputs used:</b> Age ${age}, Current Weight ${patient.weight} kg${uwStr}, IBW ${ibwVal} kg, Albumin ${patient.albumin} g/dL, Weight loss ${patient.weightLossPercent}%${crpStr}${sarcStr}`);
+            trace.push(`<b>Calorie weight basis:</b> ${calcWt} kg${wbStr}`);
 
             const sarcRisk = (fp.nutritionRiskReasons || []).some(r => r.includes('Sarcopenia')) ? 'YES (SMI/Grip triggered)' : 'NO';
             trace.push(`<b>Risk triggers:</b> Cachexia = ${cachexia ? 'YES' : 'NO'}; Sarcopenia = ${sarcRisk}.`);
 
-            const baseCal = fp.baseEnergy || Math.round(patient.weight * kcalPerKg);
-            trace.push(`<b>Base Energy Required:</b> ${kcalPerKg} kcal/kg/day → ${patient.weight} (Weight) × ${kcalPerKg} = <b>${baseCal} kcal/day</b>.`);
+            // MUST score
+            if (fp.mustTotal !== undefined) {
+              const mustColor = fp.mustTotal === 0 ? '#166534' : fp.mustTotal === 1 ? '#92400e' : '#991b1b';
+              trace.push(`<b>MUST Score:</b> <span style="color:${mustColor}; font-weight:800;">${fp.mustTotal} — ${fp.mustRisk || ''}</span> (BMI score + weight-loss score + acute disease effect)`);
+            }
+
+            const baseCal = fp.baseEnergy || Math.round(calcWt * kcalPerKg);
+            trace.push(`<b>Base Energy Required:</b> ${kcalPerKg} kcal/kg/day → ${calcWt} kg (calc weight) × ${kcalPerKg} = <b>${baseCal} kcal/day</b>.`);
 
             const reducedIntake = patient.reducedFoodIntake || 0;
             if (reducedIntake > 0) {
@@ -3488,9 +3530,9 @@
               }
             }
 
-            const baseProt = fp.baseProtein || Math.round(patient.weight * proteinPerKg);
+            const baseProt = fp.baseProtein || Math.round(calcWt * proteinPerKg);
             const protNote = (age >= 70 && proteinPerKg < 1.5 && !fp.hasRenalIssue) ? ' (Adjusted to 1.5 min for elderly)' : (fp.hasRenalIssue ? ' (Renal Restricted)' : '');
-            trace.push(`<b>Protein rule applied:</b> ${proteinPerKg} g/kg/day${protNote} → ${patient.weight} (Weight) × ${proteinPerKg} = ${baseProt} g/day. <b>Final Prescription: ${fp.dailyProtein} g/day</b>.`);
+            trace.push(`<b>Protein rule applied:</b> ${proteinPerKg} g/kg/day${protNote} → ${calcWt} kg (calc weight) × ${proteinPerKg} = ${baseProt} g/day. <b>Final Prescription: ${fp.dailyProtein} g/day</b>.`);
             trace.push(`<b>Serving pattern:</b> daily target ÷ ${fp.servingsPerDay || 2} servings/day for better tolerance.`);
 
             const carbSource = (fp.recipe && fp.recipe.carb) ? fp.recipe.carb.name : 'Standard';
@@ -3518,10 +3560,32 @@
               trace.push(`${overrideHeader}${changes.join(', ') || 'Modifications accepted.'}${plan.overrideNotes ? `<br><b>Justification:</b> ${plan.overrideNotes}` : ''}`);
             }
 
-            trace.push(`<div style="margin-top:10px;color:#6b7280;font-size:13px;">Guideline notes: uses weight-loss/albumin to stratify nutritional risk and cachexia-related wasting states.</div>`);
+            trace.push(`<div style="margin-top:10px;color:#6b7280;font-size:13px;">Guideline notes: ESPEN Oncology 2021 + NICE CG32 refeeding screening applied. Weight basis per ASPEN/ESPEN (AdjBW used when BMI ≥ 30 and weight >120% IBW). MUST screening per BAPEN.</div>`);
 
             const ctEl = document.getElementById('calcTrace');
             if (ctEl) ctEl.innerHTML = trace.map(x => `<div>${x}</div>`).join('');
+
+            // Refeeding Protocol Panel
+            const rfSec = document.getElementById('refeedingSection');
+            const rfBody = document.getElementById('refeedingBody');
+            if (fp.refeedingProtocol && rfSec && rfBody) {
+              rfSec.style.display = 'block';
+              const rf = fp.refeedingProtocol;
+              const rfColor = rf.risk === 'HIGH' ? '#dc2626' : '#d97706';
+              const rfBg = rf.risk === 'HIGH' ? '#fef2f2' : '#fffbeb';
+              const rfBorder = rf.risk === 'HIGH' ? '#fca5a5' : '#fde68a';
+              rfBody.innerHTML = `
+                <div style="background:${rfBg}; border:2px solid ${rfBorder}; border-radius:8px; padding:14px;">
+                  <div style="font-size:10px; font-weight:900; text-transform:uppercase; color:${rfColor}; letter-spacing:0.08em; margin-bottom:6px;">
+                    Refeeding Syndrome — ${rf.risk} RISK
+                  </div>
+                  <div style="font-size:11.5px; color:#1e293b; margin-bottom:4px;"><b>Criteria:</b> ${rf.criteria}</div>
+                  <div style="font-size:11.5px; color:#1e293b; margin-bottom:4px;"><b>Protocol:</b> ${rf.protocol}</div>
+                  <div style="font-size:11.5px; color:${rfColor}; font-weight:700;"><b>Thiamine:</b> ${rf.thiamine}</div>
+                </div>`;
+            } else if (rfSec) {
+              rfSec.style.display = 'none';
+            }
 
             // Protocols Section (NEW: Enteral, Electrolyte, Follow-up)
             const protocols = [];

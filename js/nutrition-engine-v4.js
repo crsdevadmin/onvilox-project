@@ -24,6 +24,26 @@ function generateNutritionPlan(patient) {
   const cancer = (patient.cancer || '').toLowerCase();
   
   const bmi = height ? (weight / Math.pow(height / 100, 2)) : 0;
+
+  // IBW (Devine formula) and AdjBW for obese patients — ESPEN/ASPEN calorie basis
+  let ibw = 0;
+  if (height > 0) {
+    const heightInches = height / 2.54;
+    ibw = gender === 'male'
+      ? Math.max(0, 50 + 2.3 * (heightInches - 60))
+      : Math.max(0, 45.5 + 2.3 * (heightInches - 60));
+    ibw = Math.round(ibw * 10) / 10;
+  }
+  let calcWeight = weight;
+  let weightBasis = `Actual Body Weight (${weight} kg)`;
+  if (bmi >= 30 && ibw > 0 && weight > ibw * 1.2) {
+    const adjBW = Math.round((ibw + 0.25 * (weight - ibw)) * 10) / 10;
+    calcWeight = adjBW;
+    weightBasis = `Adjusted Body Weight (AdjBW) = IBW ${ibw} kg + 25% × (Actual ${weight} kg − IBW) = ${adjBW} kg`;
+  } else if (ibw > 0) {
+    weightBasis = `Actual Body Weight (${weight} kg); BMI ${Math.round(bmi * 10) / 10} — IBW adjustment not required`;
+  }
+
   const isVegetarian = !!patient.vegetarian;
   
   const smi = parseFloat(patient.smi || 0);
@@ -82,7 +102,14 @@ function generateNutritionPlan(patient) {
   if (regimen.includes('lenalidomide') || regimen.includes('revlimid')) drugs.push("Lenalidomide");
   if (chemFlags.pembrolizumab) drugs.push("Pembrolizumab");
   if (chemFlags.ac) drugs.push("AC (Adriamycin + Cyclophosphamide)");
-  
+
+  // Detect pelvic/abdominal radiation — drives mucosal-adapted formula requirement
+  // Declared here (before use at nutritionRisk block) to avoid temporal dead zone
+  const treatmentTypes = (Array.isArray(patient.treatmentTypes) ? patient.treatmentTypes : []).map(t => (t || '').toLowerCase());
+  const hasPelvicRadiation = treatmentTypes.some(t => t.includes('pelvic') || t.includes('abdominal') || t.includes('radiation') || t.includes('radiotherapy') || t.includes('ebrt') || t.includes('brachytherapy'))
+    || lowerComorbidities.some(c => c.includes('radiation enteritis') || c.includes('enteritis'))
+    || sideEffects.some(s => s.includes('radiation') || s.includes('enteritis'));
+
   const nutritionRiskReasons = [];
   let riskScore = 0;
   // V3 Safety Engine (Step 6) - Initialized later in function
@@ -184,7 +211,63 @@ function generateNutritionPlan(patient) {
     kcalPerKg = 30; // Tier 2: Moderate Risk
   }
   
-  if (hasAppetiteLoss) kcalPerKg = Math.max(kcalPerKg, 32); 
+  if (hasAppetiteLoss) kcalPerKg = Math.max(kcalPerKg, 32);
+
+  // ESPEN Oncology 2021 — minimum 28 kcal/kg for active chemo, stable (not cachexia/moderateRisk)
+  const activeChemo = regimen && regimen.trim().length > 0;
+  if (activeChemo && !cachexia && !moderateRisk) {
+    kcalPerKg = Math.max(kcalPerKg, 28);
+  }
+
+  // --- REFEEDING SYNDROME RISK SCREENING (NICE CG32) ---
+  const rfHighRiskCriteria = [
+    (bmi > 0 && bmi < 16),
+    (weightLossPercent > 15),
+    (patient.potassium > 0 && patient.potassium < 3.5),
+    (patient.phosphate > 0 && patient.phosphate < 0.8),
+    (patient.magnesium > 0 && patient.magnesium < 0.75)
+  ];
+  const rfAtRiskCriteria = [
+    (bmi > 0 && bmi < 18.5),
+    (weightLossPercent >= 10),
+    (reducedFoodIntake >= 60),
+    activeChemo
+  ];
+  const rfHighRisk = rfHighRiskCriteria.some(Boolean);
+  const rfAtRiskCount = rfAtRiskCriteria.filter(Boolean).length;
+  const rfAtRisk = !rfHighRisk && rfAtRiskCount >= 2;
+
+  let refeedingProtocol = null;
+  if (rfHighRisk) {
+    refeedingProtocol = {
+      risk: 'HIGH',
+      criteria: 'NICE CG32 High Risk (≥1 criterion: BMI <16, WL >15%, or critically low pre-feed electrolytes)',
+      protocol: 'Start at 5 kcal/kg/day; increase slowly over 4–7 days to target. Thiamine MANDATORY before refeeding. Monitor K⁺, Mg²⁺, PO₄³⁻ every 12h for first 72h.',
+      thiamine: 'MANDATORY: Thiamine 200–300 mg/day IV/oral before refeeding commences'
+    };
+    kcalPerKg = Math.min(kcalPerKg, 5);
+    safetyAlerts.push({ condition: 'REFEEDING SYNDROME — HIGH RISK (NICE CG32)', severity: 'Critical', action: 'Cap calories at 5 kcal/kg/day. Thiamine BEFORE refeeding starts. Monitor K⁺/Mg²⁺/PO₄³⁻ every 12h for 72h.' });
+  } else if (rfAtRisk) {
+    refeedingProtocol = {
+      risk: 'AT RISK',
+      criteria: `NICE CG32 At Risk (${rfAtRiskCount} of 4 criteria met)`,
+      protocol: 'Start at 10 kcal/kg/day; increase to target over 2–3 days. Thiamine prophylaxis. Monitor K⁺, Mg²⁺, PO₄³⁻ daily for 48h.',
+      thiamine: 'Prophylactic: Thiamine 100 mg/day'
+    };
+    safetyAlerts.push({ condition: 'REFEEDING SYNDROME — AT RISK (NICE CG32)', severity: 'High', action: 'Start 10 kcal/kg/day; titrate over 2–3 days. Thiamine 100 mg/day prophylaxis. Monitor electrolytes daily x48h.' });
+  }
+
+  // --- MUST SCORE (Malnutrition Universal Screening Tool) ---
+  let mustBMIScore = 0;
+  if (bmi > 0 && bmi < 18.5) mustBMIScore = 2;
+  else if (bmi > 0 && bmi <= 20) mustBMIScore = 1;
+  let mustWLScore = 0;
+  if (weightLossPercent > 10) mustWLScore = 2;
+  else if (weightLossPercent >= 5) mustWLScore = 1;
+  const mustAcuteScore = (reducedFoodIntake >= 70 || (activeChemo && cachexia)) ? 2 : 0;
+  const mustTotal = mustBMIScore + mustWLScore + mustAcuteScore;
+  const mustRisk = mustTotal === 0 ? 'Low Risk' : mustTotal === 1 ? 'Medium Risk' : 'High Risk';
+
   var proteinPerKg = (cachexia || moderateRisk) ? 1.8 : 1.4;
 
   // --- STEP 6: SAFETY LAYER (PROTEIN CAP) ---
@@ -201,8 +284,8 @@ function generateNutritionPlan(patient) {
     }
   }
 
-  const baseDailyCalories = Math.round(weight * kcalPerKg);
-  const baseDailyProtein = Math.round(weight * proteinPerKg);
+  const baseDailyCalories = Math.round(calcWeight * kcalPerKg);
+  const baseDailyProtein = Math.round(calcWeight * proteinPerKg);
 
   // --- DEFICIT LOGIC (Pure arithmetic without force-total override) ---
   // --- DEFICIT LOGIC (Optimized for Escalation) ---
@@ -486,12 +569,6 @@ function generateNutritionPlan(patient) {
   let proteinType = 'Whey isolate';
   const tolerance = (patient.proteinTolerance || '').toLowerCase();
 
-  // Detect pelvic/abdominal radiation — drives mucosal-adapted formula requirement
-  const treatmentTypes = (Array.isArray(patient.treatmentTypes) ? patient.treatmentTypes : []).map(t => (t || '').toLowerCase());
-  const hasPelvicRadiation = treatmentTypes.some(t => t.includes('pelvic') || t.includes('abdominal') || t.includes('radiation') || t.includes('radiotherapy') || t.includes('ebrt') || t.includes('brachytherapy'))
-    || lowerComorbidities.some(c => c.includes('radiation enteritis') || c.includes('enteritis'))
-    || sideEffects.some(s => s.includes('radiation') || s.includes('enteritis'));
-
   if (hasPelvicRadiation) proteinType = 'Peptide formulas';
   else if (tolerance === 'gi' || cancer.includes('pancreatic') || hasIBD || hasNausea) proteinType = 'Hydrolyzed whey';
   else if (tolerance === 'mucositis' || hasMucositis || (patient.feedingMethod || '').toLowerCase().includes('enteral')) proteinType = 'Peptide formulas';
@@ -767,7 +844,15 @@ function generateNutritionPlan(patient) {
     enteralProtocol, electrolyteStrategy, reassessmentProtocol,
     hasRenalIssue,
     hasHighRiskRegimen: (chemFlags.bortezomib || regimen.includes('cisplatin') || regimen.includes('platin') || regimen.includes('lenalidomide')),
-    prescribedRoute: (actualIntake <= 60) ? "Enteral Tube Feeding (Escalation)" : (actualIntake <= 75 ? "Oral Nutrition Supplements (ONS)" : "Oral Feeding (Maintenance)"),
+    weightBasis, ibw, calcWeight,
+    refeedingProtocol, mustTotal, mustRisk,
+    prescribedRoute: (() => {
+      const alreadyEnteral = (patient.feedingMethod || '').toLowerCase().includes('enteral');
+      if (alreadyEnteral || actualIntake <= 50) return "Enteral Tube Feeding (Escalation)";
+      if (actualIntake <= 60) return "ONS (Oral Nutrition Supplements) — Escalate to Enteral if intake target not met within 48h";
+      if (actualIntake <= 75) return "Oral Nutrition Supplements (ONS)";
+      return "Oral Feeding (Maintenance)";
+    })(),
     baseEnergy: baseDailyCalories,
     baseProtein: baseDailyProtein,
     outcomePrediction: outcomePredictionData,
