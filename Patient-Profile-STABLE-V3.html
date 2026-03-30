@@ -4104,24 +4104,18 @@
             const opts = {
               margin: [10, 10, 10, 10],
               filename: filename,
-              image: { type: 'jpeg', quality: 1.0 },
+              image: { type: 'jpeg', quality: 0.98 },
               html2canvas: {
                 scale: 2,
                 useCORS: true,
                 logging: false,
                 letterRendering: true,
                 allowTaint: true,
-                // Fix scroll-position clipping — html2canvas must start from top of element,
-                // not from the current browser scroll position
-                scrollX: 0,
-                scrollY: 0,
-                // Force full-document width so content doesn't wrap or clip
-                windowWidth: Math.max(source.scrollWidth, 1200),
-                windowHeight: source.scrollHeight
+                // Compensate for browser scroll position so capture starts at element top
+                scrollX: -window.scrollX,
+                scrollY: -window.scrollY
               },
-              jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-              // Prevent content being sliced mid-sentence or mid-table across page boundaries
-              pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+              jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
             };
 
             // Hide the download button(s) and other UI junk inside the exported PDF
