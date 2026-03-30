@@ -3574,14 +3574,39 @@
               const rfColor = rf.risk === 'HIGH' ? '#dc2626' : '#d97706';
               const rfBg = rf.risk === 'HIGH' ? '#fef2f2' : '#fffbeb';
               const rfBorder = rf.risk === 'HIGH' ? '#fca5a5' : '#fde68a';
+              // Build escalation table rows
+              const schedRows = (rf.escalationSchedule || []).map((s, i) => {
+                const isTarget = i === (rf.escalationSchedule.length - 1);
+                const rowBg = isTarget ? '#f0fdf4' : (i === 0 ? '#fff7ed' : '#ffffff');
+                const phaseColor = isTarget ? '#16a34a' : (i === 0 ? rfColor : '#374151');
+                return `<tr style="background:${rowBg};">
+                  <td style="padding:5px 8px; font-weight:700; color:${phaseColor}; font-size:11px; white-space:nowrap;">${s.phase}</td>
+                  <td style="padding:5px 8px; font-weight:900; color:${phaseColor}; font-size:12px; text-align:right; white-space:nowrap;">${s.kcal} kcal</td>
+                  <td style="padding:5px 8px; font-size:10.5px; color:#6b7280;">${s.note}</td>
+                </tr>`;
+              }).join('');
               rfBody.innerHTML = `
                 <div style="background:${rfBg}; border:2px solid ${rfBorder}; border-radius:8px; padding:14px;">
                   <div style="font-size:10px; font-weight:900; text-transform:uppercase; color:${rfColor}; letter-spacing:0.08em; margin-bottom:6px;">
-                    Refeeding Syndrome — ${rf.risk} RISK
+                    Refeeding Syndrome — ${rf.risk} RISK (NICE CG32)
                   </div>
                   <div style="font-size:11.5px; color:#1e293b; margin-bottom:4px;"><b>Criteria:</b> ${rf.criteria}</div>
-                  <div style="font-size:11.5px; color:#1e293b; margin-bottom:4px;"><b>Protocol:</b> ${rf.protocol}</div>
-                  <div style="font-size:11.5px; color:${rfColor}; font-weight:700;"><b>Thiamine:</b> ${rf.thiamine}</div>
+                  <div style="font-size:11.5px; color:${rfColor}; font-weight:700; margin-bottom:8px;"><b>Thiamine:</b> ${rf.thiamine}</div>
+                  <div style="font-size:10px; font-weight:800; text-transform:uppercase; color:#374151; margin-bottom:4px; letter-spacing:0.05em;">Calorie Escalation Schedule</div>
+                  <table style="width:100%; border-collapse:collapse; border:1px solid ${rfBorder}; border-radius:6px; overflow:hidden;">
+                    <thead>
+                      <tr style="background:${rfBorder};">
+                        <th style="padding:5px 8px; font-size:10px; text-align:left; color:#374151;">Phase</th>
+                        <th style="padding:5px 8px; font-size:10px; text-align:right; color:#374151;">Target</th>
+                        <th style="padding:5px 8px; font-size:10px; text-align:left; color:#374151;">Clinical Note</th>
+                      </tr>
+                    </thead>
+                    <tbody>${schedRows}</tbody>
+                  </table>
+                  <div style="margin-top:8px; font-size:10px; color:#6b7280; font-style:italic;">
+                    ⚠ The operative prescription above reflects the <b>full therapeutic target</b> (Day 7+).
+                    Initiate at Days 1–3 dose and escalate per schedule. Do not dispense full-target formula volume on Day 1.
+                  </div>
                 </div>`;
             } else if (rfSec) {
               rfSec.style.display = 'none';

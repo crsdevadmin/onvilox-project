@@ -250,24 +250,46 @@ function generateNutritionPlan(patient) {
   const rfAtRiskCount = rfAtRiskCriteria.filter(Boolean).length;
   const rfAtRisk = !rfHighRisk && rfAtRiskCount >= 2;
 
+  // rfTargetKcal = full therapeutic target at current kcalPerKg (before any refeeding override)
+  // CRITICAL: kcalPerKg must NOT be overridden by refeeding start dose — the refeeding start
+  // dose is a 3-day initiation phase only; the operative prescription uses the full target.
+  const rfTargetKcal = Math.round(calcWeight * kcalPerKg);
+
   let refeedingProtocol = null;
   if (rfHighRisk) {
+    const rfStart = Math.round(calcWeight * 5);
+    const rfMid1 = Math.round(calcWeight * 10);
+    const rfMid2 = Math.round(calcWeight * 20);
     refeedingProtocol = {
       risk: 'HIGH',
       criteria: 'NICE CG32 High Risk (≥1 criterion: BMI <16, WL >15%, or critically low pre-feed electrolytes)',
-      protocol: 'Start at 5 kcal/kg/day; increase slowly over 4–7 days to target. Thiamine MANDATORY before refeeding. Monitor K⁺, Mg²⁺, PO₄³⁻ every 12h for first 72h.',
-      thiamine: 'MANDATORY: Thiamine 200–300 mg/day IV/oral before refeeding commences'
+      protocol: 'Initiate at 5 kcal/kg/day (Days 1–3). Escalate stepwise to full therapeutic target by Day 7. Thiamine MANDATORY before refeeding commences. Monitor K⁺, Mg²⁺, PO₄³⁻ every 12h for first 72h.',
+      thiamine: 'MANDATORY: Thiamine 200–300 mg/day IV/oral before refeeding commences',
+      startKcal: rfStart,
+      targetKcal: rfTargetKcal,
+      escalationSchedule: [
+        { phase: 'Days 1–3',  kcal: rfStart,       note: 'Refeeding initiation. Thiamine before Day 1. K⁺/Mg²⁺/PO₄³⁻ every 12h.' },
+        { phase: 'Day 4',     kcal: rfMid1,         note: 'Step-up only if electrolytes stable. Recheck Mg²⁺/PO₄³⁻.' },
+        { phase: 'Day 5–6',   kcal: rfMid2,         note: 'Continue escalation. Daily electrolyte check.' },
+        { phase: 'Day 7+',    kcal: rfTargetKcal,   note: 'Full therapeutic target. Maintain electrolyte monitoring weekly.' }
+      ]
     };
-    kcalPerKg = Math.min(kcalPerKg, 5);
-    safetyAlerts.push({ condition: 'REFEEDING SYNDROME — HIGH RISK (NICE CG32)', severity: 'Critical', action: 'Cap calories at 5 kcal/kg/day. Thiamine BEFORE refeeding starts. Monitor K⁺/Mg²⁺/PO₄³⁻ every 12h for 72h.' });
+    // kcalPerKg deliberately NOT overridden — full prescription uses therapeutic target
   } else if (rfAtRisk) {
+    const rfStart = Math.round(calcWeight * 10);
     refeedingProtocol = {
       risk: 'AT RISK',
       criteria: `NICE CG32 At Risk (${rfAtRiskCount} of 4 criteria met)`,
-      protocol: 'Start at 10 kcal/kg/day; increase to target over 2–3 days. Thiamine prophylaxis. Monitor K⁺, Mg²⁺, PO₄³⁻ daily for 48h.',
-      thiamine: 'Prophylactic: Thiamine 100 mg/day'
+      protocol: 'Initiate at 10 kcal/kg/day (Days 1–2). Escalate to full therapeutic target by Day 3. Thiamine prophylaxis. Monitor K⁺, Mg²⁺, PO₄³⁻ daily for 48h.',
+      thiamine: 'Prophylactic: Thiamine 100 mg/day',
+      startKcal: rfStart,
+      targetKcal: rfTargetKcal,
+      escalationSchedule: [
+        { phase: 'Days 1–2',  kcal: rfStart,       note: 'Cautious start. Thiamine prophylaxis. Electrolytes daily.' },
+        { phase: 'Day 3+',    kcal: rfTargetKcal,   note: 'Full therapeutic target if electrolytes stable.' }
+      ]
     };
-    safetyAlerts.push({ condition: 'REFEEDING SYNDROME — AT RISK (NICE CG32)', severity: 'High', action: 'Start 10 kcal/kg/day; titrate over 2–3 days. Thiamine 100 mg/day prophylaxis. Monitor electrolytes daily x48h.' });
+    // kcalPerKg deliberately NOT overridden — full prescription uses therapeutic target
   }
 
   // --- MUST SCORE (Malnutrition Universal Screening Tool) ---
