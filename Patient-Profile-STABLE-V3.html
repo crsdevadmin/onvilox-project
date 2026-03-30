@@ -4076,7 +4076,7 @@
               'safetyAlertsBlock', 'drugSection', 'clinicalHoldOrdersSection',
               'mdtReviewSection', 'refeedingSection', 'v3OutcomeModule',
               'clinicalProtocolsContainer', 'mandatoryInvestigationsContainer',
-              'dietaryPlanContainer', 'progressSection'
+              'dietaryPlanContainer', 'progressSection', 'specsHistory'
             ];
             const sectionPrevDisplays = {};
             pdfVisibleSections.forEach(id => {
@@ -4104,16 +4104,15 @@
             const opts = {
               margin: [10, 10, 10, 10],
               filename: filename,
-              image: { type: 'jpeg', quality: 0.98 },
+              image: { type: 'jpeg', quality: 0.95 },
               html2canvas: {
-                scale: 2,
+                scale: 1.5,
                 useCORS: true,
                 logging: false,
                 letterRendering: true,
                 allowTaint: true,
-                // Compensate for browser scroll position so capture starts at element top
-                scrollX: -window.scrollX,
-                scrollY: -window.scrollY
+                // windowWidth prevents responsive layout shifts during capture
+                windowWidth: source.scrollWidth
               },
               jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
             };
