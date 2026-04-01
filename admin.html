@@ -81,10 +81,12 @@
 <script>
 auth.requireRole(['SUPER_ADMIN']);
 
-const doctors = userService.getUsersByRole('DOCTOR');
-const stores = storeService.getStores();
+// Load DB data first, then populate dashboard
+initStore().then(() => {
+const doctors = (typeof userService !== 'undefined') ? userService.getUsersByRole('DOCTOR') : [];
+const stores = (typeof storeService !== 'undefined') ? storeService.getStores() : [];
 const patients = getPatients();
-const jobs = manufacturingService.getJobs();
+const jobs = (typeof manufacturingService !== 'undefined') ? manufacturingService.getJobs() : [];
 
 function countJobs(status){
   return jobs.filter(j => j.status === status).length;
@@ -101,6 +103,7 @@ document.getElementById('tProcessing').innerText = countJobs('PROCESSING');
 document.getElementById('tReady').innerText = countJobs('READY');
 document.getElementById('tDispatched').innerText = countJobs('DISPATCHED');
 document.getElementById('tDelivered').innerText = countJobs('DELIVERED');
+}); // end initStore().then
 </script>
 
 <script src="js/theme.js"></script>

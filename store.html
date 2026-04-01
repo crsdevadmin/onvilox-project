@@ -186,7 +186,7 @@ function openPdf(patientId){
   window.open(url, '_blank', 'noopener');
 }
 
-render();
+initStore().then(() => render());
 
 let __qrCurrentLink = '';
 

@@ -1806,13 +1806,20 @@
           const me = auth.getCurrentUser();
           const params = new URLSearchParams(window.location.search);
           const patientId = params.get('id');
-          const patient = getPatientById(patientId);
-          window.patient = patient;
 
-          if (!patient) {
-            alert('Patient not found');
-            window.location.href = 'doctor.html';
-          }
+          // Load DB data before rendering patient profile
+          initStore().then(() => {
+            const patient = getPatientById(patientId);
+            window.patient = patient;
+            if (!patient) {
+              alert('Patient not found');
+              window.location.href = 'doctor.html';
+              return;
+            }
+            _initPatientProfile(patient);
+          });
+
+          function _initPatientProfile(patient) {
 
           const printMode = params.get('print') === '1';
           const reviewMode = params.get('review') === '1';
@@ -4498,6 +4505,7 @@
              }
           }
           setTimeout(cleanupOldVersions, 3000);
+          } // end _initPatientProfile
         </script>
 </body>
 

@@ -104,15 +104,24 @@
 <script src="js/auth.js"></script>
 
 <script>
-function handleLogin(){
+async function handleLogin(){
   const u = document.getElementById('username').value;
   const p = document.getElementById('password').value;
-  const res = auth.login(u,p);
-  if(!res.ok){
-    document.getElementById('errorBox').innerText = res.error;
-    return;
+  const btn = document.querySelector('button[onclick="handleLogin()"]') || document.querySelector('.login-btn');
+  if (btn) btn.disabled = true;
+  document.getElementById('errorBox').innerText = 'Signing in...';
+  try {
+    const res = await auth.login(u, p);
+    if(!res.ok){
+      document.getElementById('errorBox').innerText = res.error;
+      if (btn) btn.disabled = false;
+      return;
+    }
+    window.location.href = res.route;
+  } catch(e) {
+    document.getElementById('errorBox').innerText = 'Login error: ' + e.message;
+    if (btn) btn.disabled = false;
   }
-  window.location.href = res.route;
 }
 
 // enter key

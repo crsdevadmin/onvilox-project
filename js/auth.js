@@ -14,26 +14,46 @@
     window.location.href = 'index.html';
   }
 
-  function login(username, password){
-    const users = db.getTable('users', []);
-    const user = users.find(u => (u.username||'').toLowerCase() === (username||'').toLowerCase() && u.password === password);
-    if(!user) return { ok:false, error:'Invalid username or password' };
+  // async: calls server API, returns { ok, route } or { ok:false, error }
+  async function login(username, password){
+    const apiBase = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : '';
+    try {
+      const res = await fetch(apiBase + '/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: username, password })
+      });
 
-    // Minimal session payload
-    setCurrentUser({
-      id: user.id,
-      role: user.role,
-      username: user.username,
-      name: user.name,
-      storeId: user.storeId || null
-    });
+      if (res.ok) {
+        const data = await res.json();
+        // Store session with JWT token for subsequent API calls
+        setCurrentUser({
+          id: data.user.id,
+          role: data.user.role,
+          name: data.user.name,
+          hospital_name: data.user.hospital_name,
+          username: username,
+          token: data.token
+        });
+        return { ok: true, route: routeForRole(data.user.role) };
+      }
 
-    const route = routeForRole(user.role);
-    return { ok:true, route };
+      const errData = await res.json().catch(() => ({}));
+      return { ok: false, error: errData.error || 'Invalid credentials' };
+
+    } catch (e) {
+      // Network error — fall back to localStorage users for offline/dev mode
+      console.warn('Server login failed, trying localStorage fallback:', e.message);
+      const users = db.getTable('users', []);
+      const user = users.find(u => (u.username || u.email || '').toLowerCase() === (username || '').toLowerCase() && u.password === password);
+      if (!user) return { ok: false, error: 'Server unavailable and no local user found' };
+      setCurrentUser({ id: user.id, role: user.role, username: user.username || user.email, name: user.name, storeId: user.storeId || null, token: null });
+      return { ok: true, route: routeForRole(user.role) };
+    }
   }
 
   function routeForRole(role){
-    if(role === 'SUPER_ADMIN') return 'admin.html';
+    if(role === 'SUPER_ADMIN' || role === 'ADMIN') return 'admin.html';
     if(role === 'DOCTOR' || role === 'ASSISTANT') return 'doctor.html';
     if(role === 'STORE') return 'store.html';
     return 'index.html';
@@ -44,7 +64,6 @@
     if(!u){ window.location.href='index.html'; return; }
     if(Array.isArray(allowedRoles) && allowedRoles.length){
       if(!allowedRoles.includes(u.role)){
-        // redirect to their home
         window.location.href = routeForRole(u.role);
         return;
       }

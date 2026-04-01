@@ -55,7 +55,9 @@ app.post('/api/auth/login', async (req, res) => {
 app.get('/api/patients', authenticateToken, async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM patients ORDER BY created_at DESC');
-    res.json(result.rows);
+    // Return full_data if available (complete client-side object), otherwise the DB row
+    const patients = result.rows.map(r => r.full_data || r);
+    res.json(patients);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -65,10 +67,290 @@ app.get('/api/patients', authenticateToken, async (req, res) => {
 app.post('/api/patients', authenticateToken, async (req, res) => {
   const p = req.body;
   try {
+    await pool.query(
+      `INSERT INTO patients (
+        id, uhic, name, age, sex, height, weight, usual_weight, albumin, crp, muac,
+        feeding_method, gi_issues, assigned_doctor_id, created_by_id, status,
+        cancer, regimen, sodium, potassium, urea, hba1c, weight_loss_percent,
+        reduced_food_intake, hand_grip, smi, allergies, side_effects, comorbidities,
+        genomic_markers, created_date, created_by_user_id, full_data,
+        creatinine, egfr, alt, ast, bilirubin, blood_sugar, tsh, hemoglobin,
+        prealbumin, vit_d, vit_b12, folate, zinc, magnesium, ecog_status,
+        cancer_stage, tumor_burden, metastasis_sites, treatment_types, activity_level,
+        bsa, lean_body_mass, sarcopenia_status, fat_percent, is_vegetarian,
+        cultural_preferences, existing_supplements, store_id, palliative_stage
+      ) VALUES (
+        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,
+        $17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,
+        $34,$35,$36,$37,$38,$39,$40,$41,$42,$43,$44,$45,$46,$47,$48,$49,$50,
+        $51,$52,$53,$54,$55,$56,$57,$58,$59,$60,$61
+      )
+      ON CONFLICT (id) DO UPDATE SET full_data = EXCLUDED.full_data`,
+      [
+        p.id, p.uhic, p.name, p.age, p.sex, p.height, p.weight,
+        p.usualWeight || p.usual_weight, p.albumin, p.crp, p.muac,
+        p.feedingMethod || p.feeding_method, !!(p.giIssues || p.gi_issues),
+        p.assignedDoctorId || p.assigned_doctor_id, req.user.id,
+        p.status || 'CREATED',
+        p.cancer, p.regimen, p.sodium, p.potassium, p.urea, p.hba1c,
+        p.weightLossPercent || p.weight_loss_percent,
+        p.reducedFoodIntake || p.reduced_food_intake,
+        p.handGrip || p.hand_grip, p.smi,
+        Array.isArray(p.allergies) ? JSON.stringify(p.allergies) : p.allergies,
+        Array.isArray(p.sideEffects) ? JSON.stringify(p.sideEffects) : (Array.isArray(p.side_effects) ? JSON.stringify(p.side_effects) : p.side_effects),
+        Array.isArray(p.comorbidities) ? JSON.stringify(p.comorbidities) : p.comorbidities,
+        Array.isArray(p.genomicMarkers) ? JSON.stringify(p.genomicMarkers) : (Array.isArray(p.genomic_markers) ? JSON.stringify(p.genomic_markers) : p.genomic_markers),
+        p.createdDate || p.created_date, p.createdByUserId || req.user.id,
+        JSON.stringify(p),
+        p.creatinine, p.egfr, p.alt, p.ast, p.bilirubin,
+        p.bloodSugar || p.blood_sugar, p.tsh, p.hemoglobin, p.prealbumin,
+        p.vitD || p.vit_d, p.vitB12 || p.vit_b12, p.folate, p.zinc, p.magnesium,
+        p.ecogStatus || p.ecog_status, p.cancerStage || p.cancer_stage,
+        p.tumorBurden || p.tumor_burden,
+        Array.isArray(p.metastasisSites) ? JSON.stringify(p.metastasisSites) : p.metastasis_sites,
+        Array.isArray(p.treatmentTypes) ? JSON.stringify(p.treatmentTypes) : p.treatment_types,
+        p.activityLevel || p.activity_level, p.bsa,
+        p.leanBodyMass || p.lean_body_mass,
+        p.sarcopeniaStatus || p.sarcopenia_status,
+        p.fatPercent || p.fat_percent,
+        !!(p.vegetarian || p.is_vegetarian),
+        p.culturalPreferences || p.cultural_preferences,
+        Array.isArray(p.existingSupplements) ? JSON.stringify(p.existingSupplements) : p.existing_supplements,
+        p.storeId || p.store_id, p.palliativeStage || p.palliative_stage
+      ]
+    );
+    res.status(201).json(p);
+  } catch (err) {
+    console.error('Patient create error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Patients: Get by ID
+app.get('/api/patients/:id', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM patients WHERE id = $1', [req.params.id]);
+    if (!result.rows[0]) return res.status(404).json({ error: 'Not found' });
+    const row = result.rows[0];
+    res.json(row.full_data || row);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Patients: Update
+app.put('/api/patients/:id', authenticateToken, async (req, res) => {
+  const p = req.body;
+  try {
+    await pool.query(
+      `UPDATE patients SET
+        name=$1, age=$2, sex=$3, height=$4, weight=$5, usual_weight=$6,
+        albumin=$7, crp=$8, muac=$9, feeding_method=$10, gi_issues=$11,
+        status=$12, cancer=$13, regimen=$14, sodium=$15, potassium=$16,
+        urea=$17, hba1c=$18, weight_loss_percent=$19, reduced_food_intake=$20,
+        hand_grip=$21, smi=$22, allergies=$23, side_effects=$24, comorbidities=$25,
+        genomic_markers=$26, full_data=$27, creatinine=$28, alt=$29, ast=$30,
+        bilirubin=$31, blood_sugar=$32, tsh=$33, hemoglobin=$34, prealbumin=$35,
+        vit_d=$36, vit_b12=$37, folate=$38, zinc=$39, magnesium=$40,
+        ecog_status=$41, cancer_stage=$42, tumor_burden=$43,
+        metastasis_sites=$44, treatment_types=$45, activity_level=$46,
+        bsa=$47, lean_body_mass=$48, sarcopenia_status=$49, fat_percent=$50,
+        is_vegetarian=$51, cultural_preferences=$52, existing_supplements=$53,
+        store_id=$54, assigned_doctor_id=$55
+      WHERE id=$56`,
+      [
+        p.name, p.age, p.sex, p.height, p.weight,
+        p.usualWeight || p.usual_weight, p.albumin, p.crp, p.muac,
+        p.feedingMethod || p.feeding_method, !!(p.giIssues || p.gi_issues),
+        p.status || 'CREATED', p.cancer, p.regimen, p.sodium, p.potassium,
+        p.urea, p.hba1c, p.weightLossPercent || p.weight_loss_percent,
+        p.reducedFoodIntake || p.reduced_food_intake,
+        p.handGrip || p.hand_grip, p.smi,
+        Array.isArray(p.allergies) ? JSON.stringify(p.allergies) : p.allergies,
+        Array.isArray(p.sideEffects) ? JSON.stringify(p.sideEffects) : (Array.isArray(p.side_effects) ? JSON.stringify(p.side_effects) : p.side_effects),
+        Array.isArray(p.comorbidities) ? JSON.stringify(p.comorbidities) : p.comorbidities,
+        Array.isArray(p.genomicMarkers) ? JSON.stringify(p.genomicMarkers) : (Array.isArray(p.genomic_markers) ? JSON.stringify(p.genomic_markers) : p.genomic_markers),
+        JSON.stringify(p), p.creatinine, p.alt, p.ast, p.bilirubin,
+        p.bloodSugar || p.blood_sugar, p.tsh, p.hemoglobin, p.prealbumin,
+        p.vitD || p.vit_d, p.vitB12 || p.vit_b12, p.folate, p.zinc, p.magnesium,
+        p.ecogStatus || p.ecog_status, p.cancerStage || p.cancer_stage,
+        p.tumorBurden || p.tumor_burden,
+        Array.isArray(p.metastasisSites) ? JSON.stringify(p.metastasisSites) : p.metastasis_sites,
+        Array.isArray(p.treatmentTypes) ? JSON.stringify(p.treatmentTypes) : p.treatment_types,
+        p.activityLevel || p.activity_level, p.bsa,
+        p.leanBodyMass || p.lean_body_mass,
+        p.sarcopeniaStatus || p.sarcopenia_status,
+        p.fatPercent || p.fat_percent,
+        !!(p.vegetarian || p.is_vegetarian),
+        p.culturalPreferences || p.cultural_preferences,
+        Array.isArray(p.existingSupplements) ? JSON.stringify(p.existingSupplements) : p.existing_supplements,
+        p.storeId || p.store_id,
+        p.assignedDoctorId || p.assigned_doctor_id,
+        req.params.id
+      ]
+    );
+    res.json(p);
+  } catch (err) {
+    console.error('Patient update error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Patients: Delete
+app.delete('/api/patients/:id', authenticateToken, async (req, res) => {
+  try {
+    await pool.query('DELETE FROM patients WHERE id = $1', [req.params.id]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Assessments: Add to patient
+app.post('/api/patients/:id/assessments', authenticateToken, async (req, res) => {
+  const a = req.body;
+  try {
     const result = await pool.query(
-      `INSERT INTO patients (id, uhic, name, age, sex, height, weight, usual_weight, albumin, crp, muac, feeding_method, gi_issues, assigned_doctor_id, created_by_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) RETURNING *`,
-      [p.id, p.uhic, p.name, p.age, p.sex, p.height, p.weight, p.usual_weight, p.albumin, p.crp, p.muac, p.feeding_method, p.gi_issues, p.assigned_doctor_id, req.user.id]
+      `INSERT INTO assessments (
+        id, patient_id, assessment_date, weight, albumin, crp, muac, creatinine,
+        alt, ast, bilirubin, blood_sugar, tsh, hemoglobin, prealbumin, vit_d,
+        vit_b12, folate, zinc, magnesium, bsa, lean_body_mass, fat_percent,
+        gi_issues, reduced_food_intake, notes
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26)
+      RETURNING *`,
+      [
+        a.id, req.params.id, a.date || new Date().toISOString().split('T')[0],
+        a.weight, a.albumin, a.crp, a.muac, a.creatinine,
+        a.alt, a.ast, a.bilirubin, a.bloodSugar || a.blood_sugar,
+        a.tsh, a.hemoglobin, a.prealbumin, a.vitD || a.vit_d,
+        a.vitB12 || a.vit_b12, a.folate, a.zinc, a.magnesium,
+        a.bsa, a.leanBodyMass || a.lean_body_mass, a.fatPercent || a.fat_percent,
+        !!(a.giIssues || a.gi_issues), a.reducedFoodIntake || a.reduced_food_intake,
+        a.notes || ''
+      ]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Nutrition Plans: Get all (optionally filtered by patient)
+app.get('/api/nutrition-plans', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT * FROM nutrition_plans ORDER BY generated_at DESC'
+    );
+    const plans = result.rows.map(r => r.full_data || {
+      id: r.id,
+      patientId: r.patient_id,
+      version: r.version,
+      generatedAt: r.generated_at,
+      generatedBy: r.generated_by,
+      inputsSnapshot: r.inputs_snapshot,
+      engineOutput: r.engine_output,
+      overrides: r.overrides,
+      finalPlan: r.final_plan,
+      rationale: r.rationale,
+      overrideNotes: r.override_notes,
+      claudeInsights: r.claude_insights
+    });
+    res.json(plans);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Nutrition Plans: Get for a patient
+app.get('/api/nutrition-plans/patient/:patientId', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT * FROM nutrition_plans WHERE patient_id = $1 ORDER BY version DESC',
+      [req.params.patientId]
+    );
+    const plans = result.rows.map(r => r.full_data || {
+      id: r.id, patientId: r.patient_id, version: r.version,
+      generatedAt: r.generated_at, generatedBy: r.generated_by,
+      inputsSnapshot: r.inputs_snapshot, engineOutput: r.engine_output,
+      overrides: r.overrides, finalPlan: r.final_plan,
+      rationale: r.rationale, overrideNotes: r.override_notes,
+      claudeInsights: r.claude_insights
+    });
+    res.json(plans);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Nutrition Plans: Create
+app.post('/api/nutrition-plans', authenticateToken, async (req, res) => {
+  const pl = req.body;
+  try {
+    await pool.query(
+      `INSERT INTO nutrition_plans (id, patient_id, version, inputs_snapshot, engine_output, overrides, final_plan, rationale, override_notes, generated_by, claude_insights, full_data)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+       ON CONFLICT (id) DO UPDATE SET full_data = EXCLUDED.full_data, final_plan = EXCLUDED.final_plan, overrides = EXCLUDED.overrides, override_notes = EXCLUDED.override_notes`,
+      [
+        pl.id, pl.patientId || pl.patient_id, pl.version,
+        pl.inputsSnapshot ? JSON.stringify(pl.inputsSnapshot) : null,
+        pl.engineOutput ? JSON.stringify(pl.engineOutput) : null,
+        pl.overrides ? JSON.stringify(pl.overrides) : null,
+        pl.finalPlan ? JSON.stringify(pl.finalPlan) : null,
+        pl.rationale || [],
+        pl.overrideNotes || '',
+        pl.generatedBy || 'ENGINE',
+        pl.claudeInsights ? JSON.stringify(pl.claudeInsights) : null,
+        JSON.stringify(pl)
+      ]
+    );
+    res.status(201).json(pl);
+  } catch (err) {
+    console.error('Plan create error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Nutrition Plans: Update
+app.put('/api/nutrition-plans/:id', authenticateToken, async (req, res) => {
+  const pl = req.body;
+  try {
+    await pool.query(
+      `UPDATE nutrition_plans SET
+        overrides=$1, final_plan=$2, override_notes=$3, claude_insights=$4, full_data=$5
+       WHERE id=$6`,
+      [
+        pl.overrides ? JSON.stringify(pl.overrides) : null,
+        pl.finalPlan ? JSON.stringify(pl.finalPlan) : null,
+        pl.overrideNotes || '',
+        pl.claudeInsights ? JSON.stringify(pl.claudeInsights) : null,
+        JSON.stringify(pl),
+        req.params.id
+      ]
+    );
+    res.json(pl);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Users: Get All (admin)
+app.get('/api/users', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query('SELECT id, name, email, role, hospital_name, created_at FROM users ORDER BY created_at DESC');
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Users: Create (admin)
+app.post('/api/users', authenticateToken, async (req, res) => {
+  const { id, name, email, password, role, hospital_name } = req.body;
+  try {
+    const hash = await bcrypt.hash(password, 10);
+    const result = await pool.query(
+      'INSERT INTO users (id, name, email, password_hash, role, hospital_name) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id, name, email, role, hospital_name',
+      [id || `user_${Date.now()}`, name, email, hash, role, hospital_name]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {

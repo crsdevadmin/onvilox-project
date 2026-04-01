@@ -82,23 +82,27 @@ const me = auth.getCurrentUser();
 const params = new URLSearchParams(window.location.search);
 const jobId = params.get('job');
 
-const jobs = manufacturingService.getJobs();
+initStore().then(() => {
+const jobs = (typeof manufacturingService !== 'undefined') ? manufacturingService.getJobs() : [];
 const job = jobs.find(j => j.id === jobId);
 
 if(!job){
   alert('Job not found');
   window.location.href='store.html';
+  return;
 }
 
 if(me.storeId && job.storeId !== me.storeId){
   alert('This job does not belong to your store.');
   window.location.href='store.html';
+  return;
 }
 
 const patient = getPatientById(job.patientId);
 if(!patient){
   alert('Patient not found');
   window.location.href='store.html';
+  return;
 }
 
 function getUserName(id){
@@ -166,7 +170,7 @@ document.getElementById('nProteinType').innerText = plan.proteinType;
 document.getElementById('viewReportBtn').onclick = function(){
   location.href = 'patient-profile.html?id=' + encodeURIComponent(patient.id) + '&view=store';
 };
-
+}); // end initStore().then
 </script>
 
 <script src="js/theme.js"></script>

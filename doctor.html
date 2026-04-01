@@ -328,7 +328,8 @@
     }
 
 
-    render();
+    // Load data from server DB before first render
+    initStore().then(() => render());
 
 
     let __qrCurrentLink = '';

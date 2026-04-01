@@ -169,6 +169,7 @@
     return u.searchParams.get(name);
   }
   const id = qp('id');
+  initStore().then(function() {
   const p = id ? getPatientById(id) : null;
 
   const setText = (id, val) => {
@@ -274,6 +275,7 @@
       });
     }
   }
+  }); // end initStore().then
 })();
 </script>
 

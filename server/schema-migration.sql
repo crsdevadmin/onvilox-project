@@ -1,0 +1,24 @@
+-- Migration: Add full_data JSONB column to patients for complete object storage
+ALTER TABLE patients ADD COLUMN IF NOT EXISTS full_data JSONB;
+
+-- Migration: Add missing clinical columns to patients
+ALTER TABLE patients ADD COLUMN IF NOT EXISTS cancer VARCHAR(255);
+ALTER TABLE patients ADD COLUMN IF NOT EXISTS regimen VARCHAR(255);
+ALTER TABLE patients ADD COLUMN IF NOT EXISTS sodium DOUBLE PRECISION;
+ALTER TABLE patients ADD COLUMN IF NOT EXISTS potassium DOUBLE PRECISION;
+ALTER TABLE patients ADD COLUMN IF NOT EXISTS urea DOUBLE PRECISION;
+ALTER TABLE patients ADD COLUMN IF NOT EXISTS hba1c DOUBLE PRECISION;
+ALTER TABLE patients ADD COLUMN IF NOT EXISTS weight_loss_percent DOUBLE PRECISION;
+ALTER TABLE patients ADD COLUMN IF NOT EXISTS reduced_food_intake DOUBLE PRECISION;
+ALTER TABLE patients ADD COLUMN IF NOT EXISTS hand_grip DOUBLE PRECISION;
+ALTER TABLE patients ADD COLUMN IF NOT EXISTS smi DOUBLE PRECISION;
+ALTER TABLE patients ADD COLUMN IF NOT EXISTS allergies TEXT;
+ALTER TABLE patients ADD COLUMN IF NOT EXISTS side_effects TEXT;
+ALTER TABLE patients ADD COLUMN IF NOT EXISTS comorbidities TEXT;
+ALTER TABLE patients ADD COLUMN IF NOT EXISTS genomic_markers TEXT;
+ALTER TABLE patients ADD COLUMN IF NOT EXISTS created_date VARCHAR(50);
+ALTER TABLE patients ADD COLUMN IF NOT EXISTS created_by_user_id VARCHAR(50);
+
+-- Migration: Add claude_insights to nutrition_plans
+ALTER TABLE nutrition_plans ADD COLUMN IF NOT EXISTS claude_insights JSONB;
+ALTER TABLE nutrition_plans ADD COLUMN IF NOT EXISTS full_data JSONB;

@@ -46,12 +46,14 @@
 
 <script>
 auth.requireRole(['SUPER_ADMIN']);
-const patients = getPatients();
-const jobs = manufacturingService.getJobs();
-document.getElementById('rpPatients').innerText = patients.length;
-document.getElementById('rpPending').innerText = patients.filter(p => p.status === 'CREATED').length;
-document.getElementById('rpProcessing').innerText = jobs.filter(j => j.status === 'PROCESSING').length;
-document.getElementById('rpDelivered').innerText = jobs.filter(j => j.status === 'DELIVERED').length;
+initStore().then(() => {
+  const patients = getPatients();
+  const jobs = (typeof manufacturingService !== 'undefined') ? manufacturingService.getJobs() : [];
+  document.getElementById('rpPatients').innerText = patients.length;
+  document.getElementById('rpPending').innerText = patients.filter(p => p.status === 'CREATED').length;
+  document.getElementById('rpProcessing').innerText = jobs.filter(j => j.status === 'PROCESSING').length;
+  document.getElementById('rpDelivered').innerText = jobs.filter(j => j.status === 'DELIVERED').length;
+});
 </script>
 
 <script src="js/theme.js"></script>
