@@ -4,7 +4,7 @@
 //   AWS EC2:               "https://your-ec2-public-ip" (or domain)
 //   AWS App Runner:        "https://xxxx.region.awsapprunner.com"
 const CONFIG = {
-  API_BASE_URL: "https://onvilox-production.eba-mxtq8wua.us-east-1.elasticbeanstalk.com"
+  API_BASE_URL: "http://onvilox-production.eba-mxtq8wua.us-east-1.elasticbeanstalk.com"
 };
 
 console.log("ONVILOX_CONFIG_LOADED", CONFIG.API_BASE_URL);
