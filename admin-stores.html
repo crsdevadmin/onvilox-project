@@ -175,7 +175,11 @@ async function deleteStoreUI(id){
   renderStores();
 }
 
-renderStores();
+(async () => {
+  await storeService.initStores();
+  await userService.initUsers();
+  renderStores();
+})();
 </script>
 
 <script src="js/theme.js"></script>

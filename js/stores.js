@@ -56,6 +56,7 @@
 
     // Update cache immediately
     if (_cache.stores) _cache.stores.push(store);
+    else _cache.stores = [store];
     db.setTable('stores', getStores());
 
     // Save to server
