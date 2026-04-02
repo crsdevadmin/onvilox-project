@@ -79,7 +79,7 @@
 <script src="js/patient-store.js"></script>
 
 <script>
-auth.requireRole(['SUPER_ADMIN']);
+auth.requireRole(['SUPER_ADMIN', 'ADMIN']);
 
 // Load DB data first, then populate dashboard
 initStore().then(() => {
