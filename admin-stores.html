@@ -132,13 +132,13 @@ function renderStores(){
   }
 }
 
-function createStoreUI(){
+async function createStoreUI(){
   if(!validateStoreName()) return;
   const name = document.getElementById('storeName').value;
   const hospital = document.getElementById('storeHospital').value;
   const location = document.getElementById('storeLocation').value;
 
-  const res = storeService.createStore({name, hospital, location});
+  const res = await storeService.createStore({name, hospital, location});
   if(!res.ok){
     document.getElementById('storeError').innerText = res.error;
     return;
@@ -158,15 +158,15 @@ function createStoreUI(){
   renderStores();
 }
 
-function resetStorePassword(userId){
-  const res = userService.resetUserPassword(userId);
+async function resetStorePassword(userId){
+  const res = await userService.resetUserPassword(userId);
   if(!res.ok){ alert(res.error || 'Unable to reset password'); return; }
   alert('New Store Login Password\n\nUsername: ' + res.user.username + '\nPassword: ' + res.password + '\n\nPlease share securely.');
   renderStores();
 }
 
-function deleteStoreUI(id){
-  const res = storeService.deleteStore(id);
+async function deleteStoreUI(id){
+  const res = await storeService.deleteStore(id);
   if(res && res.ok === false){
     document.getElementById('storeError').innerText = res.error;
     return;
