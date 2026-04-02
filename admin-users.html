@@ -145,7 +145,7 @@
 <script src="js/users.js"></script>
 
 <script>
-auth.requireRole(['SUPER_ADMIN']);
+auth.requireRole(['SUPER_ADMIN', 'ADMIN']);
 
 function setFieldState(field, ok, msg){
   const msgBox = document.getElementById(field.id + '_msg');

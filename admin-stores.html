@@ -75,7 +75,7 @@
 <script src="js/users.js"></script>
 
 <script>
-auth.requireRole(['SUPER_ADMIN']);
+auth.requireRole(['SUPER_ADMIN', 'ADMIN']);
 
 function validateStoreName(){
   const el = document.getElementById('storeName');

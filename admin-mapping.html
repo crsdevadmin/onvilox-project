@@ -61,7 +61,7 @@
 <script src="js/stores.js"></script>
 
 <script>
-auth.requireRole(['SUPER_ADMIN']);
+auth.requireRole(['SUPER_ADMIN', 'ADMIN']);
 
 function getUsers(){ return db.getTable('users', []); }
 function saveUsers(u){ db.setTable('users', u); }

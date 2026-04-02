@@ -46,7 +46,7 @@
 <script src="js/manufacturing.js"></script>
 
 <script>
-auth.requireRole(['SUPER_ADMIN']);
+auth.requireRole(['SUPER_ADMIN', 'ADMIN']);
 initStore().then(() => {
   const patients = getPatients();
   const jobs = (typeof manufacturingService !== 'undefined') ? manufacturingService.getJobs() : [];
