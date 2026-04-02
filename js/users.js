@@ -103,8 +103,10 @@
 
     const password = generatePassword();
     const id = db.uid('user');
+    const username = mail || ph;
     const user = {
       id, role, name: fullName,
+      username,
       email: mail, phone: ph,
       address: address || '',
       storeId: storeId || null,
