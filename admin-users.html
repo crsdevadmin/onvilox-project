@@ -143,6 +143,7 @@
 <script src="js/auth.js"></script>
 <script src="js/stores.js"></script>
 <script src="js/users.js"></script>
+<script src="js/mappings.js"></script>
 
 <script>
 auth.requireRole(['SUPER_ADMIN', 'ADMIN']);
@@ -348,7 +349,7 @@ function onRoleChange(){
   }
 }
 
-function createUserUI(){
+async function createUserUI(){
   if(!validateUserForm()) return;
   const role = document.getElementById('role').value;
   const name = document.getElementById('fullName').value;
@@ -386,7 +387,7 @@ function createUserUI(){
   const storeId = document.getElementById('storeSelect').value;
   const mappedDoctorId = document.getElementById('doctorSelect').value;
 
-  const res = userService.createUser({ role, name, email, phone, address, storeId, mappedDoctorId, hospitalName });
+  const res = await userService.createUser({ role, name, email, phone, address, storeId, mappedDoctorId, hospitalName });
   if(!res.ok){
     document.getElementById('errorBox').innerText = res.error;
     return;
@@ -457,8 +458,8 @@ function renderUsersTable(){
   });
 }
 
-function resetPasswordUI(userId){
-  const res = userService.resetUserPassword(userId);
+async function resetPasswordUI(userId){
+  const res = await userService.resetUserPassword(userId);
   if(!res.ok){
     alert(res.error || 'Unable to reset password');
     return;
@@ -470,9 +471,9 @@ function resetPasswordUI(userId){
   renderUsersTable();
 }
 
-function deleteUserUI(userId, username){
+async function deleteUserUI(userId, username){
   if(confirm(`Are you sure you want to delete the user: ${username}?\nThis action cannot be undone.`)){
-    const res = userService.deleteUser(userId);
+    const res = await userService.deleteUser(userId);
     if(!res.ok){
       alert(res.error || 'Unable to delete user');
       return;
@@ -482,8 +483,12 @@ function deleteUserUI(userId, username){
 }
 
 
-onRoleChange();
-renderUsersTable();
+(async () => {
+  await userService.initUsers();
+  await storeService.initStores();
+  onRoleChange();
+  renderUsersTable();
+})();
 </script>
 
 <script src="js/theme.js"></script>
