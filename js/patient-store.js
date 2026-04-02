@@ -17,7 +17,7 @@
     return h;
   }
 
-  // Load all patients + plans from server into memory cache.
+  // Load all data from server into memory cache.
   // Call this once on page load before reading any data.
   async function initStore() {
     try {
@@ -32,6 +32,13 @@
       _cache.patients = db.getTable('patients', []);
       _cache.plans = db.getTable('nutrition_plans', []);
     }
+    // Also init users, stores, jobs, mappings
+    const inits = [];
+    if (typeof userService !== 'undefined' && userService.initUsers) inits.push(userService.initUsers());
+    if (typeof storeService !== 'undefined' && storeService.initStores) inits.push(storeService.initStores());
+    if (typeof manufacturingService !== 'undefined' && manufacturingService.initJobs) inits.push(manufacturingService.initJobs());
+    if (typeof mappingService !== 'undefined' && mappingService.initMappings) inits.push(mappingService.initMappings());
+    await Promise.all(inits);
   }
 
   // ── Synchronous getters (use cache) ──────────────────────────────

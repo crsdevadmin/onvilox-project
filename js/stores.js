@@ -1,64 +1,93 @@
-(function(global){
-  function getStores(){ return db.getTable('stores', []); }
-  function saveStores(stores){ db.setTable('stores', stores); }
+// stores.js — API-backed store service with localStorage fallback cache
 
-  function createStore({name, hospital, location}){
-    const stores = getStores();
-    const n = (name||'').trim();
-    if(!n) return { ok:false, error:'Store name is required' };
-    if(stores.some(s => (s.name||'').toLowerCase() === n.toLowerCase())){
-      return { ok:false, error:'Store already exists' };
+(function(global){
+
+  const _cache = { stores: null };
+
+  function _apiBase() {
+    return (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : '';
+  }
+
+  function _headers() {
+    const u = (typeof auth !== 'undefined') ? auth.getCurrentUser() : null;
+    const h = { 'Content-Type': 'application/json' };
+    if (u && u.token) h['Authorization'] = 'Bearer ' + u.token;
+    return h;
+  }
+
+  async function initStores() {
+    try {
+      const res = await fetch(_apiBase() + '/api/stores', { headers: _headers() });
+      if (res.ok) {
+        _cache.stores = await res.json();
+        db.setTable('stores', _cache.stores);
+      }
+    } catch(e) {
+      console.warn('initStores: server unreachable, using localStorage');
+      _cache.stores = db.getTable('stores', []);
     }
+  }
+
+  function getStores() {
+    return _cache.stores || db.getTable('stores', []);
+  }
+
+  function getStoreById(id) {
+    return getStores().find(s => s.id === id) || null;
+  }
+
+  async function createStore({name, hospital, location}) {
+    const n = (name || '').trim();
+    if (!n) return { ok: false, error: 'Store name is required' };
+
+    const stores = getStores();
+    if (stores.some(s => (s.name || '').toLowerCase() === n.toLowerCase())) {
+      return { ok: false, error: 'Store already exists' };
+    }
+
+    const id = db.uid('store');
     const store = {
-      id: db.uid('store'),
-      name: n,
-      hospital: (hospital||'').trim(),
-      location: (location||'').trim(),
+      id, name: n,
+      hospital: (hospital || '').trim(),
+      location: (location || '').trim(),
       createdAt: new Date().toISOString(),
       active: true
     };
-    stores.push(store);
-    saveStores(stores);
 
-    // Auto-create Store login (one per store) for MVP convenience
-    // Username is derived from store name, guaranteed unique.
-    try{
-      const existing = db.getTable('users', []).some(u => u.role === 'STORE' && u.storeId === store.id);
-      if(!existing && global.userService){
-        const base = n.toLowerCase().replace(/[^a-z0-9]+/g,'').slice(0,10) || 'store';
-        let uname = base + '_store';
-        let i = 1;
-        const users = db.getTable('users', []);
-        while(users.some(u => (u.username||'').toLowerCase() === uname.toLowerCase())){
-          uname = base + '_store' + i;
-          i++;
-        }
-        const res = global.userService.createUser({ role:'STORE', name: n + ' Store', username: uname, storeId: store.id });
-        if(res && res.ok){
-          return { ok:true, store, storeLogin: { username: uname, password: res.password } };
-        }
+    // Update cache immediately
+    if (_cache.stores) _cache.stores.push(store);
+    db.setTable('stores', getStores());
+
+    // Save to server
+    try {
+      const res = await fetch(_apiBase() + '/api/stores', {
+        method: 'POST', headers: _headers(), body: JSON.stringify(store)
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        return { ok: false, error: err.error || 'Server error creating store' };
       }
-    }catch(e){ /* ignore auto-login creation errors */ }
-
-    return { ok:true, store };
-  }
-
-  function deleteStore(id){
-    // MVP safety: don't allow deleting a store that has a Store login
-    const users = db.getTable('users', []);
-    const hasManager = users.some(u => u.role === 'STORE' && u.storeId === id);
-    if(hasManager){
-      return { ok:false, error:'Cannot delete this store because it already has a Store login.' };
+    } catch(e) {
+      console.warn('createStore: server unreachable, saved to localStorage only');
     }
-    let stores = getStores();
-    stores = stores.filter(s => s.id !== id);
-    saveStores(stores);
-    return { ok:true };
+
+    return { ok: true, store };
   }
 
-  function getStoreById(id){
-    return getStores().find(s => s.id === id);
+  async function deleteStore(id) {
+    const users = (typeof userService !== 'undefined') ? userService.getUsers() : db.getTable('users', []);
+    const hasManager = users.some(u => u.role === 'STORE' && (u.storeId === id || u.store_id === id));
+    if (hasManager) return { ok: false, error: 'Cannot delete this store because it has a Store login.' };
+
+    if (_cache.stores) _cache.stores = _cache.stores.filter(s => s.id !== id);
+    db.setTable('stores', getStores());
+
+    try {
+      await fetch(_apiBase() + '/api/stores/' + id, { method: 'DELETE', headers: _headers() });
+    } catch(e) { console.warn('deleteStore: server unreachable'); }
+
+    return { ok: true };
   }
 
-  global.storeService = { getStores, createStore, deleteStore, getStoreById };
+  global.storeService = { initStores, getStores, getStoreById, createStore, deleteStore };
 })(window);
