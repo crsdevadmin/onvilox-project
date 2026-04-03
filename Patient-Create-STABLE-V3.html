@@ -548,6 +548,7 @@
 
 <script>
 auth.requireRole(['DOCTOR','ASSISTANT']);
+loadEngineConfig(); // Part 3: load formula constants + active rules from DB
 
 function tagsToArray(containerId){
   const c = document.getElementById(containerId);
@@ -1200,6 +1201,7 @@ window.onload = function() {
   </div>
   
   <script src="js/nutrition-engine-v4.js"></script>
+  <script src="js/engine-config.js"></script>
   <script src="js/ai-report-service.js"></script>
   <script src="js/theme.js"></script>
 </body>

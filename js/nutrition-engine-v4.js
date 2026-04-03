@@ -1,4 +1,11 @@
-function generateNutritionPlan(patient) {
+function generateNutritionPlan(patient, engineConfig) {
+  // Use passed config, or fall back to globally loaded window.engineConfig, or empty defaults
+  engineConfig = engineConfig || window.engineConfig || { formulas: {}, rules: [] };
+  // fv(name, default) — reads a formula constant from DB config, falls back to hardcoded default
+  const fv = (name, def) => {
+    const v = engineConfig.formulas && engineConfig.formulas[name];
+    return (v !== undefined && v !== null && v !== '') ? parseFloat(v) : def;
+  };
 
   const weight = parseFloat(patient.weight || 0);
   const height = parseFloat(patient.height || 0);
@@ -31,14 +38,14 @@ function generateNutritionPlan(patient) {
   if (height > 0) {
     const heightInches = height / 2.54;
     ibw = gender === 'male'
-      ? Math.max(0, 50 + 2.3 * (heightInches - 60))
-      : Math.max(0, 45.5 + 2.3 * (heightInches - 60));
+      ? Math.max(0, fv('ibw_base_male', 50) + fv('ibw_per_inch', 2.3) * (heightInches - 60))
+      : Math.max(0, fv('ibw_base_female', 45.5) + fv('ibw_per_inch', 2.3) * (heightInches - 60));
     ibw = Math.round(ibw * 10) / 10;
   }
   let calcWeight = weight;
   let weightBasis = `Actual Body Weight (${weight} kg)`;
-  if (bmi >= 30 && ibw > 0 && weight > ibw * 1.2) {
-    const adjBW = Math.round((ibw + 0.25 * (weight - ibw)) * 10) / 10;
+  if (bmi >= fv('bmi_obesity_threshold', 30) && ibw > 0 && weight > ibw * 1.2) {
+    const adjBW = Math.round((ibw + fv('adjbw_factor', 0.25) * (weight - ibw)) * 10) / 10;
     calcWeight = adjBW;
     weightBasis = `Adjusted Body Weight (AdjBW) = IBW ${ibw} kg + 25% × (Actual ${weight} kg − IBW) = ${adjBW} kg`;
   } else if (ibw > 0) {
@@ -58,15 +65,15 @@ function generateNutritionPlan(patient) {
     let smiLow = false;
     if (isL3SMI) {
       // Janssen et al. / Martin et al. thresholds for L3-SMI (cm2/m2)
-      smiLow = (gender === 'male' ? smi < 55 : smi < 38.5); 
+      smiLow = (gender === 'male' ? smi < fv('smi_l3_male', 55) : smi < fv('smi_l3_female', 38.5));
     } else {
       // EWGSOP2 thresholds for ASMI (kg/m2)
-      smiLow = (gender === 'male' ? smi < 7.0 : smi < 5.7);
+      smiLow = (gender === 'male' ? smi < fv('asmi_male', 7.0) : smi < fv('asmi_female', 5.7));
     }
     if (smiLow) sarcopenia = true;
   }
   if (handGrip > 0) {
-    const gripLow = (gender === 'male' ? handGrip < 26 : handGrip < 18);
+    const gripLow = (gender === 'male' ? handGrip < fv('grip_male', 26) : handGrip < fv('grip_female', 18));
     if (gripLow) sarcopenia = true;
   }
 
@@ -74,7 +81,7 @@ function generateNutritionPlan(patient) {
   const lowerComorbidities = comorbidities.map(c => c.toLowerCase());
   const sideEffects = (Array.isArray(patient.sideEffects) ? patient.sideEffects : []).map(s => s.toLowerCase());
   
-  var isDiabetic = (lowerComorbidities.some(c => c.includes('diabetes') || c.includes('t2dm')) || bloodSugar > 180 || parseFloat(patient.hba1c || 0) >= 6.5);
+  var isDiabetic = (lowerComorbidities.some(c => c.includes('diabetes') || c.includes('t2dm')) || bloodSugar > fv('blood_sugar_danger', 180) || parseFloat(patient.hba1c || 0) >= 6.5);
   var hasIBD = lowerComorbidities.some(c => c.includes('ibd') || c.includes('crohn') || c.includes('colitis'));
   // Only match specific renal DISEASE terms — not generic mentions like "normal renal function"
   var hasRenalDisease = lowerComorbidities.some(c =>
@@ -82,7 +89,7 @@ function generateNutritionPlan(patient) {
     c.includes('renal disease') || c.includes('renal impairment') || c.includes('renal insufficiency') ||
     c.includes('nephropathy') || c.includes('dialysis') || c.includes('aki') || c.includes('acute kidney')
   );
-  var hasRenalIssue = hasRenalDisease || creatinine > 1.3 || urea >= 50;
+  var hasRenalIssue = hasRenalDisease || creatinine > fv('creatinine_renal_danger', 1.3) || urea >= fv('urea_high', 50);
   
   var hasNausea = sideEffects.some(s => s.includes('nausea') || s.includes('vomit'));
   var hasAppetiteLoss = sideEffects.some(s => s.includes('appetite') || s.includes('satiety'));
@@ -135,30 +142,30 @@ function generateNutritionPlan(patient) {
   let safetyAlerts = [];
 
   // Neutropenia detection — affects formula sterility, probiotics, food safety
-  const hasNeutropenia = wbc > 0 && wbc < 3500;
-  const hasSevereNeutropenia = wbc > 0 && wbc < 2000;
+  const hasNeutropenia = wbc > 0 && wbc < fv('wbc_neutropenia', 3500);
+  const hasSevereNeutropenia = wbc > 0 && wbc < fv('wbc_severe_neutropenia', 2000);
   // Steroid-induced hyperglycaemia triple trigger
   const hasTripleTrigger = chemFlags.steroid && isDiabetic && bloodSugar >= 180;
 
   // --- STEP 4 & 6: LAB INTERPRETATION & SAFETY ---
-  if (hemoglobin > 0 && hemoglobin < 10) {
+  if (hemoglobin > 0 && hemoglobin < fv('hemoglobin_anemia', 10)) {
     safetyAlerts.push({ condition: 'ANEMIA (Hb < 10)', severity: 'Moderate', action: 'Iron + B12 protocol indicated — HOLD iron initiation until iron panel confirmed (Ferritin, Serum Iron, TIBC, Transferrin Saturation).' });
   }
-  if (patient.potassium > 5.0) {
+  if (patient.potassium > fv('potassium_high', 5.0)) {
     safetyAlerts.push({ condition: 'HYPERKALEMIA (>5.0)', severity: 'High', action: 'Restrict potassium sources; adjust formula to K-free matrix.' });
   }
-  if (patient.sodium > 0 && patient.sodium < 130) {
+  if (patient.sodium > 0 && patient.sodium < fv('sodium_danger', 130)) {
     safetyAlerts.push({ condition: 'HYPONATREMIA (<130)', severity: 'High', action: 'Fluid balance correction protocol; target 1-2g NaCl.' });
-  } else if (patient.sodium > 0 && patient.sodium < 135) {
+  } else if (patient.sodium > 0 && patient.sodium < fv('sodium_warning', 135)) {
     safetyAlerts.push({ condition: 'MILD HYPONATREMIA (<135)', severity: 'Moderate', action: 'Monitor volume status; standard sodium target.' });
   }
-  if (vitD > 0 && vitD < 20) {
+  if (vitD > 0 && vitD < fv('vitd_deficiency', 20)) {
     safetyAlerts.push({ condition: 'VITAMIN D DEFICIENCY (<20)', severity: 'Moderate', action: 'Vit D correction: 4000 IU/day standardised. Recheck 25-OH-VitD at 8 weeks.' });
   }
-  if (patient.magnesium > 0 && patient.magnesium < 1.7) {
+  if (patient.magnesium > 0 && patient.magnesium < fv('magnesium_low', 1.7)) {
     safetyAlerts.push({ condition: 'HYPOMAGNESEMIA (<1.7)', severity: 'Moderate', action: 'Magnesium correction protocol (200-400mg Mg Oxide/Citrate).' });
   }
-  if (tsh > 5.0) {
+  if (tsh > fv('tsh_high', 5.0)) {
     safetyAlerts.push({ condition: 'METABOLIC RATE FLAG', severity: 'Low', action: 'Elevated TSH detected; monitor metabolic rate.' });
   }
 
@@ -180,18 +187,18 @@ function generateNutritionPlan(patient) {
     nutritionRiskReasons.push('IBD / Malabsorption Risk');
   }
 
-  if (albumin > 0 && albumin < 3.5) {
+  if (albumin > 0 && albumin < fv('albumin_low_threshold', 3.5)) {
     riskScore += 2;
     nutritionRiskReasons.push('Low albumin');
   }
-  if (weightLossPercent >= 10) {
+  if (weightLossPercent >= fv('weight_loss_high', 10)) {
     riskScore += 2;
     nutritionRiskReasons.push('Weight loss ≥ 10%');
-  } else if (weightLossPercent >= 5) {
+  } else if (weightLossPercent >= fv('weight_loss_moderate', 5)) {
     riskScore += 1;
     nutritionRiskReasons.push('Weight loss 5–9.9%');
   }
-  if (bmi > 0 && bmi < 18.5) {
+  if (bmi > 0 && bmi < fv('bmi_low_threshold', 18.5)) {
     riskScore += 2;
     nutritionRiskReasons.push('Low BMI');
   }
@@ -199,11 +206,11 @@ function generateNutritionPlan(patient) {
     riskScore += 1;
     nutritionRiskReasons.push('GI issues');
   }
-  if (alt > 50 || ast > 50 || bilirubin > 1.2) {
+  if (alt > fv('alt_liver_threshold', 50) || ast > fv('ast_liver_threshold', 50) || bilirubin > fv('bilirubin_liver_threshold', 1.2)) {
     riskScore += 2;
     nutritionRiskReasons.push('Liver function compromised');
   }
-  if (ecog >= 2) {
+  if (ecog >= fv('ecog_moderate_threshold', 2)) {
     riskScore += 1;
     nutritionRiskReasons.push('Reduced physical performance (ECOG ≥ 2)');
   }
@@ -211,7 +218,7 @@ function generateNutritionPlan(patient) {
     riskScore += 1;
     nutritionRiskReasons.push('Diabetes / Hyperglycemia');
   }
-  if (hemoglobin > 0 && hemoglobin < 12) {
+  if (hemoglobin > 0 && hemoglobin < fv('hemoglobin_low', 12)) {
     riskScore += 1;
     nutritionRiskReasons.push('Anemia (Low Hemoglobin)');
   }
@@ -221,8 +228,8 @@ function generateNutritionPlan(patient) {
   }
 
   let nutritionRisk = 'Low';
-  if (riskScore >= 4) nutritionRisk = 'High';
-  else if (riskScore >= 2) nutritionRisk = 'Moderate';
+  if (riskScore >= fv('risk_score_high', 4)) nutritionRisk = 'High';
+  else if (riskScore >= fv('risk_score_moderate', 2)) nutritionRisk = 'Moderate';
 
   const tumorBurden = patient.tumorBurden === 'High (Bulky)';
   // Advanced/metastatic cancer is a cachexia-equivalent regardless of tumorBurden string
@@ -231,41 +238,41 @@ function generateNutritionPlan(patient) {
     (patient.cancerStage || '').toLowerCase().includes('stage 4') ||
     (patient.palliativeStage || '').toLowerCase().includes('palliative');
 
-  const cachexia = albumin < 3.5 || weightLossPercent >= 10 || bmi < 18.5 || crp > 10 || sarcopenia || tumorBurden || isAdvancedMetastatic;
-  const moderateRisk = weightLossPercent >= 5 || ecog >= 2 || age >= 70;
+  const cachexia = albumin < fv('albumin_low_threshold', 3.5) || weightLossPercent >= fv('weight_loss_high', 10) || bmi < fv('bmi_low_threshold', 18.5) || crp > 10 || sarcopenia || tumorBurden || isAdvancedMetastatic;
+  const moderateRisk = weightLossPercent >= fv('weight_loss_moderate', 5) || ecog >= fv('ecog_moderate_threshold', 2) || age >= fv('age_elderly_threshold', 70);
 
-  let kcalPerKg = 25; // Tier 1: Baseline Stable
+  let kcalPerKg = fv('kcal_stable', 25); // Tier 1: Baseline Stable
   if (cachexia) {
-    kcalPerKg = 35; // Tier 3: Severe / Cachectic
+    kcalPerKg = fv('kcal_cachexia', 35); // Tier 3: Severe / Cachectic
   } else if (moderateRisk) {
-    kcalPerKg = 30; // Tier 2: Moderate Risk
+    kcalPerKg = fv('kcal_moderate_risk', 30); // Tier 2: Moderate Risk
   }
-  
-  if (hasAppetiteLoss) kcalPerKg = Math.max(kcalPerKg, 32);
+
+  if (hasAppetiteLoss) kcalPerKg = Math.max(kcalPerKg, fv('kcal_appetite_loss_floor', 32));
 
   // ESPEN Oncology 2021 — minimum 28 kcal/kg for active chemo, stable (not cachexia/moderateRisk)
   const activeChemo = regimen && regimen.trim().length > 0;
   if (activeChemo && !cachexia && !moderateRisk) {
-    kcalPerKg = Math.max(kcalPerKg, 28);
+    kcalPerKg = Math.max(kcalPerKg, fv('kcal_active_chemo_min', 28));
   }
 
   // --- REFEEDING SYNDROME RISK SCREENING (NICE CG32) ---
   const rfHighRiskCriteria = [
-    (bmi > 0 && bmi < 16),
-    (weightLossPercent > 15),
-    (patient.potassium > 0 && patient.potassium < 3.5),
-    (patient.phosphate > 0 && patient.phosphate < 0.8),
-    (patient.magnesium > 0 && patient.magnesium < 0.75)
+    (bmi > 0 && bmi < fv('rf_high_bmi', 16)),
+    (weightLossPercent > fv('rf_high_weight_loss', 15)),
+    (patient.potassium > 0 && patient.potassium < fv('rf_high_potassium', 3.5)),
+    (patient.phosphate > 0 && patient.phosphate < fv('rf_high_phosphate', 0.8)),
+    (patient.magnesium > 0 && patient.magnesium < fv('rf_high_magnesium', 0.75))
   ];
   const rfAtRiskCriteria = [
-    (bmi > 0 && bmi < 18.5),
-    (weightLossPercent >= 10),
-    (reducedFoodIntake >= 60),
+    (bmi > 0 && bmi < fv('bmi_low_threshold', 18.5)),
+    (weightLossPercent >= fv('weight_loss_high', 10)),
+    (reducedFoodIntake >= fv('intake_full_replacement', 60)),
     activeChemo
   ];
   const rfHighRisk = rfHighRiskCriteria.some(Boolean);
   const rfAtRiskCount = rfAtRiskCriteria.filter(Boolean).length;
-  const rfAtRisk = !rfHighRisk && rfAtRiskCount >= 2;
+  const rfAtRisk = !rfHighRisk && rfAtRiskCount >= fv('rf_at_risk_criteria_min', 2);
 
   // rfTargetKcal = full therapeutic target at current kcalPerKg (before any refeeding override)
   // CRITICAL: kcalPerKg must NOT be overridden by refeeding start dose — the refeeding start
@@ -274,7 +281,7 @@ function generateNutritionPlan(patient) {
 
   let refeedingProtocol = null;
   if (rfHighRisk) {
-    const rfStart = Math.round(calcWeight * 5);
+    const rfStart = Math.round(calcWeight * fv('rf_high_start_kcal', 5));
     const rfMid1 = Math.round(calcWeight * 10);
     const rfMid2 = Math.round(calcWeight * 20);
     refeedingProtocol = {
@@ -293,7 +300,7 @@ function generateNutritionPlan(patient) {
     };
     // kcalPerKg deliberately NOT overridden — full prescription uses therapeutic target
   } else if (rfAtRisk) {
-    const rfStart = Math.round(calcWeight * 10);
+    const rfStart = Math.round(calcWeight * fv('rf_at_risk_start_kcal', 10));
     refeedingProtocol = {
       risk: 'AT RISK',
       criteria: `NICE CG32 At Risk (${rfAtRiskCount} of 4 criteria met)`,
@@ -320,19 +327,19 @@ function generateNutritionPlan(patient) {
   const mustTotal = mustBMIScore + mustWLScore + mustAcuteScore;
   const mustRisk = mustTotal === 0 ? 'Low Risk' : mustTotal === 1 ? 'Medium Risk' : 'High Risk';
 
-  var proteinPerKg = (cachexia || moderateRisk) ? 1.8 : 1.4;
+  var proteinPerKg = (cachexia || moderateRisk) ? fv('protein_cachexia', 1.8) : fv('protein_baseline', 1.4);
 
   // --- STEP 6: SAFETY LAYER (PROTEIN CAP) ---
   if (hasRenalIssue) {
-    // KDIGO: 0.8g/kg strict limit is the highest priority safety rule.
-    proteinPerKg = 0.8;
+    // KDIGO: strict limit is the highest priority safety rule.
+    proteinPerKg = fv('protein_renal', 0.8);
   } else {
-    if (age >= 70 && proteinPerKg < 1.5) {
-      proteinPerKg = 1.5;
+    if (age >= fv('age_elderly_threshold', 70) && proteinPerKg < fv('protein_elderly_min', 1.5)) {
+      proteinPerKg = fv('protein_elderly_min', 1.5);
     }
-    // 2.0 g/kg for: platinum or FOLFIRINOX (high catabolism), or immunotherapy + cachexia/sarcopenia combined
-    if ((regimen.includes('folfirinox') || regimen.includes('platin') || chemFlags.pembrolizumab || regimen.includes('nivolumab') || regimen.includes('atezolizumab') || regimen.includes('durvalumab')) && (cachexia || sarcopenia) && proteinPerKg < 2.0) {
-      proteinPerKg = 2.0;
+    // High catabolism: platinum or FOLFIRINOX or immunotherapy + cachexia/sarcopenia
+    if ((regimen.includes('folfirinox') || regimen.includes('platin') || chemFlags.pembrolizumab || regimen.includes('nivolumab') || regimen.includes('atezolizumab') || regimen.includes('durvalumab')) && (cachexia || sarcopenia) && proteinPerKg < fv('protein_high_catabolism', 2.0)) {
+      proteinPerKg = fv('protein_high_catabolism', 2.0);
     }
   }
 
@@ -345,7 +352,7 @@ function generateNutritionPlan(patient) {
   
   // CRITICAL FIX: If the patient is Renal, Enteral, or Escalated, we always target 100% 
   // ESPEN guideline: intake ≤60% triggers full replacement prescription
-  const isFullReplacement = (patient.feedingMethod || '').toLowerCase().includes('enteral') || (actualIntake <= 60) || hasRenalIssue;
+  const isFullReplacement = (patient.feedingMethod || '').toLowerCase().includes('enteral') || (actualIntake <= fv('intake_full_replacement', 60)) || hasRenalIssue;
   
   const dailyCalories = isFullReplacement ? baseDailyCalories : Math.round(baseDailyCalories * (reducedFoodIntake / 100));
   const dailyProtein = isFullReplacement ? baseDailyProtein : Math.round(baseDailyProtein * (reducedFoodIntake / 100));
@@ -618,7 +625,7 @@ function generateNutritionPlan(patient) {
   const electrolyteStrategy = {
     potassium: (patient.potassium > 5.0) ? "STRICT LIMIT: < 40 mEq/day" : "Maintenance: 60-80 mEq/day",
     sodium: (patient.sodium > 0 && patient.sodium < 135) ? "CORRECTION: NaCl 1-2g target; Target Na 135-140" : "Maintenance: 100-150 mEq/day",
-    fluids: `Daily target: ${Math.round(weight * 30)} - ${Math.round(weight * 35)} ml/day (inclusive of formula)`
+    fluids: `Daily target: ${Math.round(weight * fv('fluid_min_per_kg', 30))} - ${Math.round(weight * fv('fluid_max_per_kg', 35))} ml/day (inclusive of formula)`
   };
 
   const reassessmentProtocol = {
@@ -631,9 +638,9 @@ function generateNutritionPlan(patient) {
   safetyAlerts = Object.values(safetyStatus);
   
   // Adaptive Servings: Increase frequency for high calorie/low appetite to decrease per-serving volume
-  let servingsPerDay = 3;
-  if (dailyCalories >= 1800 || hasAppetiteLoss || hasNausea) servingsPerDay = 4;
-  if (dailyCalories >= 2400) servingsPerDay = 5;
+  let servingsPerDay = Math.round(fv('servings_base', 3));
+  if (dailyCalories >= fv('servings_high_threshold', 1800) || hasAppetiteLoss || hasNausea) servingsPerDay = Math.round(fv('servings_high_count', 4));
+  if (dailyCalories >= fv('servings_very_high_threshold', 2400)) servingsPerDay = Math.round(fv('servings_very_high_count', 5));
 
   // Integer division so perServingCalories * servingsPerDay === onsCalories exactly (no rounding drift)
   const perServingCalories = Math.round(dailyCalories / servingsPerDay);
@@ -642,7 +649,7 @@ function generateNutritionPlan(patient) {
   const proteinCalories = dailyProtein * 4;
   const remainingCalories = Math.max(0, dailyCalories - proteinCalories);
   
-  const carbRatio = (crp > 5 || isDiabetic) ? 0.35 : 0.45;
+  const carbRatio = (crp > 5 || isDiabetic) ? fv('carb_ratio_diabetic', 0.35) : fv('carb_ratio_standard', 0.45);
   let dailyCarbs = Math.floor((remainingCalories * carbRatio) / 4);
   const carbCalories = dailyCarbs * 4;
 
@@ -972,7 +979,7 @@ function generateNutritionPlan(patient) {
     }
   }
 
-  return {
+  const plan = {
     cachexia, sarcopenia, bmi: Math.round(bmi * 10) / 10, kcalPerKg, proteinPerKg,
     feasibilityScore, mandatoryInvestigations,
     servingsPerDay, totalDailyCalories, totalDailyProtein,
@@ -982,7 +989,7 @@ function generateNutritionPlan(patient) {
     proteinType, dailyCarbs, dailyFat, macroProtein, macroCarbs, macroFat,
     micronutrients, rationale, nutritionRisk, nutritionRiskScore: riskScore,
     nutritionRiskReasons, safetyAlerts,
-    patientInstructions, 
+    patientInstructions,
     outcomes, interactions,
     dietaryPlan,
     enteralProtocol, electrolyteStrategy, reassessmentProtocol,
@@ -992,8 +999,8 @@ function generateNutritionPlan(patient) {
     refeedingProtocol, mustTotal, mustRisk,
     prescribedRoute: (() => {
       const alreadyEnteral = (patient.feedingMethod || '').toLowerCase().includes('enteral');
-      if (alreadyEnteral || actualIntake <= 50) return "Enteral Tube Feeding (Escalation)";
-      if (actualIntake <= 60) return "ONS (Oral Nutrition Supplements) — Escalate to Enteral if intake target not met within 48h";
+      if (alreadyEnteral || actualIntake <= fv('intake_mandatory_en', 50)) return "Enteral Tube Feeding (Escalation)";
+      if (actualIntake <= fv('intake_full_replacement', 60)) return "ONS (Oral Nutrition Supplements) — Escalate to Enteral if intake target not met within 48h";
       if (actualIntake <= 75) return "Oral Nutrition Supplements (ONS)";
       return "Oral Feeding (Maintenance)";
     })(),
@@ -1004,10 +1011,32 @@ function generateNutritionPlan(patient) {
     auditContext: {
       calorieGap: baseDailyCalories - totalDailyCalories,
       proteinGap: baseDailyProtein - totalDailyProtein,
-      isEspenEscalationCandidate: actualIntake < 60 && !currentIsEnteral,
+      isEspenEscalationCandidate: actualIntake < fv('intake_full_replacement', 60) && !currentIsEnteral,
       actualIntakePercent: actualIntake,
-      weightLossStatus: weightLossPercent >= 10 ? 'Severe' : (weightLossPercent >= 5 ? 'Moderate' : 'Stable'),
+      weightLossStatus: weightLossPercent >= fv('weight_loss_high', 10) ? 'Severe' : (weightLossPercent >= fv('weight_loss_moderate', 5) ? 'Moderate' : 'Stable'),
       sarcopeniaStatus: sarcopenia ? 'Confirmed' : (patient.smi || patient.handGrip ? 'Suspected' : 'Unknown')
     }
   };
+
+  // --- Apply admin-promoted engine rules from DB (active rules) ---
+  // Operators: max (cap), min (floor), set (override), exclude (remove field)
+  if (engineConfig && Array.isArray(engineConfig.rules)) {
+    const appliedRules = [];
+    for (const rule of engineConfig.rules) {
+      const tf = rule.target_field;
+      const rv = parseFloat(rule.value);
+      if (tf in plan && !isNaN(rv)) {
+        if (rule.operator === 'max' && plan[tf] > rv)  { plan[tf] = rv; appliedRules.push(`${tf} capped to ${rv} [${rule.rule_name}]`); }
+        else if (rule.operator === 'min' && plan[tf] < rv) { plan[tf] = rv; appliedRules.push(`${tf} floored to ${rv} [${rule.rule_name}]`); }
+        else if (rule.operator === 'set') { plan[tf] = rv; appliedRules.push(`${tf} set to ${rv} [${rule.rule_name}]`); }
+        else if (rule.operator === 'exclude') { delete plan[tf]; appliedRules.push(`${tf} excluded [${rule.rule_name}]`); }
+      }
+    }
+    if (appliedRules.length > 0) {
+      console.log('[EngineConfig] Applied rules:', appliedRules);
+      plan.appliedRules = appliedRules;
+    }
+  }
+
+  return plan;
 }

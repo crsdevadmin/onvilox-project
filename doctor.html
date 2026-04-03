@@ -131,6 +131,7 @@
   <script src="js/mappings.js?v=3.1"></script>
   <script src="js/patient-store.js?v=3.1"></script>
   <script src="js/nutrition-engine-v4.js?v=3.1"></script>
+  <script src="js/engine-config.js"></script>
   <script src="js/manufacturing.js?v=3.1"></script>
   <script src="js/ai-report-service.js?v=3.1"></script>
 
@@ -140,6 +141,7 @@
     console.log("ONVILOX_STABLE_V4_FIXED_LOADED");
     // INTAKE CALCULATOR LOGIC
     auth.requireRole(['DOCTOR', 'ASSISTANT']);
+    loadEngineConfig(); // Part 3: load formula constants + active rules from DB
     const me = auth.getCurrentUser();
 
     // Top-right role pill
