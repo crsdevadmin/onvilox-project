@@ -555,11 +555,11 @@
       <h4><svg style="width:16px; height:16px; fill:currentColor;" viewBox="0 0 24 24">
           <path
             d="M12,2A10,10 0 0,1 22,12A10,10 0 0,1 12,22A10,10 0 0,1 2,12A10,10 0 0,1 12,2M12,4A8,8 0 0,0 4,12C4,14.39 5,16.5 6.74,18L7,17.27C7.3,16.27 8.23,15.5 9.35,15.5H10.5V14.5A0.5,0.5 0 0,1 11,14H13A0.5,0.5 0 0,1 13.5,14.5V15.5H14.65C15.77,15.5 16.7,16.27 17,17.27L17.26,18C19,16.5 20,14.39 20,12A8,8 0 0,0 12,4M12.5,7A1.5,1.5 0 0,1 14,8.5A1.5,1.5 0 0,1 12.5,10A1.5,1.5 0 0,1 11,8.5A1.5,1.5 0 0,1 12.5,7M11,14.5A0.5,0.5 0 0,0 10.5,14H9A0.5,0.5 0 0,1 8.5,14.5V15.5H9.35C10.1,15.5 10.74,15.04 11,14.41V14.5M15.5,14.5A0.5,0.5 0 0,0 15,14H13.5A0.5,0.5 0 0,1 13,14.5V15.5H14.65C15,15.5 15.29,15.4 15.5,15.24V14.5Z" />
-        </svg> ✨ Claude AI Assistant</h4>
+        </svg> ✨ AI Assistance</h4>
       <div class="close-chat" onclick="toggleChat()">✕</div>
     </div>
     <div class="ai-chat-messages" id="chatMsgs">
-      <div class="msg msg-ai">👋 Hi! I'm your <b>Claude AI Assistant</b>.<br><br>
+      <div class="msg msg-ai">👋 Hi! I'm your <b>AI Assistance</b>. What can I do for you?<br><br>
         📋 <b>Paste clinical notes</b> and I'll fill the form automatically.<br>
         📎 <b>Upload a PDF report</b> using the 📎 button.<br>
         💬 <b>Ask me anything</b> about this patient's nutrition plan!
@@ -894,19 +894,72 @@
           </div>
         </div>
 
-        <!-- DRUG NUTRIENT INTERACTIONS -->
-        <div class="rs" id="drugSection" style="display:none; margin-top:20px;">
-          <div class="rs-title">Drug-Nutrient Interaction Guidance</div>
-          <table class="clinical-history-table">
-            <thead>
-              <tr>
-                <th style="width:150px;">Target Drug</th>
-                <th>Potential Interaction / Effect</th>
-                <th>Clinical Advice / Adaptation</th>
-              </tr>
-            </thead>
-            <tbody id="drugInteractionsBody"></tbody>
-          </table>
+        <!-- MANUFACTURING -->
+        <div class="rs">
+          <div class="rs-title">Production Specifications</div>
+          <div class="rg rg4">
+            <div class="rf">
+              <div class="rf-lbl">Format</div>
+              <div class="rf-val" id="mForm"></div>
+            </div>
+            <div class="rf">
+              <div class="rf-lbl">Per Serving Energy</div>
+              <div class="rf-val" id="mCalories"></div>
+            </div>
+            <div class="rf">
+              <div class="rf-lbl">Per Serving Protein</div>
+              <div class="rf-val" id="mProtein"></div>
+            </div>
+            <div class="rf">
+              <div class="rf-lbl">Macro Ratio (P/C/F)</div>
+              <div class="rf-val" id="macroRatio"></div>
+            </div>
+          </div>
+
+          <div style="margin-top:12px; border:1px solid #dde8f5; border-radius:5px; background:#f7faff; padding:12px;">
+            <div style="font-size:10px; font-weight:800; text-transform:uppercase; color:#94a3b8; margin-bottom:8px;">
+              Store Formulation (Per Serving Recipe)</div>
+            <table class="rt" style="font-size:11.5px; background:white; border:1px solid #dde8f5;">
+              <thead style="display:none;">
+                <tr>
+                  <th>Ingredient</th>
+                  <th>Grams</th>
+                </tr>
+              </thead>
+              <tbody id="recipeBody">
+                <!-- Dynamic Recipe -->
+              </tbody>
+            </table>
+            <div style="font-size:9.5px; color:#64748b; margin-top:8px;">* Batch scaling: Multiply grams by servings
+              required for production run.</div>
+          </div>
+
+          <!-- SPECIFICATION HISTORY (NEW) -->
+          <div id="specsHistory"
+            style="margin-top:15px; border-top:1px dashed #e2e8f0; padding-top:10px; display:none;">
+            <div style="font-size:10px; color:#64748b; font-weight:700; margin-bottom:5px; text-transform:uppercase;">
+              Previous Specification Versions</div>
+            <table class="rt" style="font-size:10px;">
+              <thead>
+                <tr>
+                  <th>Ver</th>
+                  <th>Date</th>
+                  <th>Reason/Note</th>
+                  <th>Calories</th>
+                  <th>Protein</th>
+                </tr>
+              </thead>
+              <tbody id="specsHistoryBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="rdiv"></div>
+
+        <!-- TRACE & RATIONALE -->
+        <div class="rs" style="margin-top:24px;">
+          <div class="rs-title" style="font-size:9.5px;">Calculation Trace</div>
+          <div class="rtrace" id="calcTrace"></div>
         </div>
 
         <!-- MICROS -->
@@ -1012,6 +1065,39 @@
           </table>
         </div>
 
+        <!-- DRUG NUTRIENT INTERACTIONS -->
+        <div class="rs" id="drugSection" style="display:none; margin-top:20px;">
+          <div class="rs-title">Drug-Nutrient Interaction Guidance</div>
+          <table class="clinical-history-table">
+            <thead>
+              <tr>
+                <th style="width:150px;">Target Drug</th>
+                <th>Potential Interaction / Effect</th>
+                <th>Clinical Advice / Adaptation</th>
+              </tr>
+            </thead>
+            <tbody id="drugInteractionsBody"></tbody>
+          </table>
+        </div>
+
+
+        <!-- MONITORING & REASSESSMENT — PRINT -->
+        <div class="rs" id="printMonitorSection" style="margin-top:20px;">
+          <div class="rs-title">Monitoring &amp; Reassessment Schedule</div>
+          <table style="width:100%; border-collapse:collapse; font-size:10.5px;">
+            <thead>
+              <tr style="background:#f1f5f9;">
+                <th style="padding:6px 8px; text-align:left; border:1px solid #e2e8f0; font-weight:700;">Frequency</th>
+                <th style="padding:6px 8px; text-align:left; border:1px solid #e2e8f0; font-weight:700;">Parameters</th>
+                <th style="padding:6px 8px; text-align:left; border:1px solid #e2e8f0; font-weight:700;">Action Threshold</th>
+                <th style="padding:6px 8px; text-align:left; border:1px solid #e2e8f0; font-weight:700;">Responsible</th>
+              </tr>
+            </thead>
+            <tbody id="printMonitorTable">
+              <tr><td colspan="4" style="padding:10px 8px; color:#94a3b8; font-style:italic; font-size:11px;">Run AI Audit to generate personalised monitoring schedule.</td></tr>
+            </tbody>
+          </table>
+        </div>
         <!-- CLINICAL HOLD ORDERS -->
         <div id="clinicalHoldOrdersSection" style="display:none; margin-top:20px;" class="rs">
           <div class="rs-title" style="color:#92400e; border-bottom-color:#f59e0b;">⏸ Clinical Hold Orders — Prescriber Action Required</div>
@@ -1051,74 +1137,6 @@
           <div style="font-size:9.5px; color:#1e40af; margin-top:8px; font-style:italic; padding-left:8px; border-left:3px solid #93c5fd;">
             &#9888;&#65039; Interventions listed here are ACTIVE pending MDT review. Do not discontinue without documented MDT consensus. Named lead clinician must be assigned and MDT date confirmed before this record is countersigned.
           </div>
-        </div>
-
-        <!-- MANUFACTURING -->
-        <div class="rs">
-          <div class="rs-title">Production Specifications</div>
-          <div class="rg rg4">
-            <div class="rf">
-              <div class="rf-lbl">Format</div>
-              <div class="rf-val" id="mForm"></div>
-            </div>
-            <div class="rf">
-              <div class="rf-lbl">Per Serving Energy</div>
-              <div class="rf-val" id="mCalories"></div>
-            </div>
-            <div class="rf">
-              <div class="rf-lbl">Per Serving Protein</div>
-              <div class="rf-val" id="mProtein"></div>
-            </div>
-            <div class="rf">
-              <div class="rf-lbl">Macro Ratio (P/C/F)</div>
-              <div class="rf-val" id="macroRatio"></div>
-            </div>
-          </div>
-
-          <div style="margin-top:12px; border:1px solid #dde8f5; border-radius:5px; background:#f7faff; padding:12px;">
-            <div style="font-size:10px; font-weight:800; text-transform:uppercase; color:#94a3b8; margin-bottom:8px;">
-              Store Formulation (Per Serving Recipe)</div>
-            <table class="rt" style="font-size:11.5px; background:white; border:1px solid #dde8f5;">
-              <thead style="display:none;">
-                <tr>
-                  <th>Ingredient</th>
-                  <th>Grams</th>
-                </tr>
-              </thead>
-              <tbody id="recipeBody">
-                <!-- Dynamic Recipe -->
-              </tbody>
-            </table>
-            <div style="font-size:9.5px; color:#64748b; margin-top:8px;">* Batch scaling: Multiply grams by servings
-              required for production run.</div>
-          </div>
-
-          <!-- SPECIFICATION HISTORY (NEW) -->
-          <div id="specsHistory"
-            style="margin-top:15px; border-top:1px dashed #e2e8f0; padding-top:10px; display:none;">
-            <div style="font-size:10px; color:#64748b; font-weight:700; margin-bottom:5px; text-transform:uppercase;">
-              Previous Specification Versions</div>
-            <table class="rt" style="font-size:10px;">
-              <thead>
-                <tr>
-                  <th>Ver</th>
-                  <th>Date</th>
-                  <th>Reason/Note</th>
-                  <th>Calories</th>
-                  <th>Protein</th>
-                </tr>
-              </thead>
-              <tbody id="specsHistoryBody"></tbody>
-            </table>
-          </div>
-        </div>
-
-        <div class="rdiv"></div>
-
-        <!-- TRACE & RATIONALE -->
-        <div class="rs" style="margin-top:24px;">
-          <div class="rs-title" style="font-size:9.5px;">Calculation Trace</div>
-          <div class="rtrace" id="calcTrace"></div>
         </div>
 
         <!-- REFEEDING SYNDROME PROTOCOL (shown only when risk detected) -->
@@ -1793,8 +1811,6 @@
         </div> <!-- end .container.page -->
 
           <button class="btn-warning" onclick="enableFollowUpMode()">🔄 Log Follow-up</button>
-          <button id="btnClaude" class="btn-secondary" style="background:#6d28d9; border-color:#5b21b6; color:white; font-size:11px;" onclick="generateClaudeInsight()">✨ Manual AI Refresh</button>
-          <button id="downloadPdfBtn" class="btn-primary" onclick="downloadNutritionPDF()">📥 Download PDF</button>
         </div>
 
         <script src="/js/storage.js"></script>
@@ -1819,6 +1835,14 @@
             return false;
           };
           console.log("ONVILOX_STABLE_V4_FIXED_LOADED");
+
+          // Global chat functions — must be at top level for HTML onclick attributes
+          window.toggleChat = function() {
+            const win = document.getElementById('aiChatWindow');
+            const isOpening = win.style.display !== 'flex';
+            win.style.display = isOpening ? 'flex' : 'none';
+            if (isOpening) { const inp = document.getElementById('chatInput'); if (inp) inp.focus(); }
+          };
           function setVal(id, val) {
             const el = document.getElementById(id);
             if (el) el.innerText = val ?? '-';
@@ -1924,6 +1948,11 @@
               return;
             }
             _initPatientProfile(patient);
+            // Expose inner functions globally after they are defined inside this closure
+            window.sendChatMessage = sendChatMessage;
+            window.enableFollowUpMode = enableFollowUpMode;
+            window.triggerFileUpload = triggerFileUpload;
+            setTimeout(() => window.toggleChat(), 800);
           });
 
           function _initPatientProfile(patient) {
@@ -2231,6 +2260,7 @@
                     console.log("AI Detected Clinical Data:", data.extractedData);
                     applyExtractedData(data.extractedData);
                     addMessage('✨ Clinical data detected! Form has been auto-populated.', 'ai');
+                    setTimeout(() => toggleChat(), 1500);
                 }
             } catch (err) {
               typing.remove();
@@ -4754,6 +4784,8 @@
                 : `<tr><td colspan="4" style="padding:15px;text-align:center;color:#64748b;font-style:italic;">Standard weekly clinical monitoring and weight reassessment plan applies.</td></tr>`;
               monTbl.innerHTML = rows;
               monSec.style.display = 'block';
+              const printMonTbl = document.getElementById('printMonitorTable');
+              if (printMonTbl) printMonTbl.innerHTML = rows;
             }
           }
 
