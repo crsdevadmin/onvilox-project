@@ -4,7 +4,7 @@
 //   AWS EC2:               "https://your-ec2-public-ip" (or domain)
 //   AWS App Runner:        "https://xxxx.region.awsapprunner.com"
 const CONFIG = {
-  API_BASE_URL: "https://api.gquence.in"
+  API_BASE_URL: "https://gquence.in"
 };
 
 console.log("ONVILOX_CONFIG_LOADED", CONFIG.API_BASE_URL);

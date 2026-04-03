@@ -2,13 +2,13 @@
 <html>
 <head>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Create Users - Onvilox</title>
+  <title>Create Users - Gquence</title>
   <link rel="stylesheet" href="css/app.css">
 </head>
 <body>
 
 <div class="topbar">
-  <div class="logo">Onvilox Admin</div>
+  <div class="logo">Gquence Admin</div>
   <div class="nav">
     <a href="/admin">Dashboard</a>
     <a href="/admin/stores">Stores</a>
@@ -396,7 +396,7 @@ async function createUserUI(){
   
   // Simulate sending SMS/Email
   const target = email || phone;
-  const notifMsg = `[SIMULATED NOTIFICATION]\n\nSending to: ${target}\n\n"Welcome to Onvilox! Your secure login is:\nUsername: ${target}\nPassword: ${res.password}"`;
+  const notifMsg = `[SIMULATED NOTIFICATION]\n\nSending to: ${target}\n\n"Welcome to Gquence! Your secure login is:\nUsername: ${target}\nPassword: ${res.password}"`;
   
   // Actually pop it up for the admin
   setTimeout(() => alert(notifMsg), 100);
