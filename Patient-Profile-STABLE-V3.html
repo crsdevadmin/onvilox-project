@@ -841,6 +841,11 @@
                 </thead>
                 <tbody>
                   <tr>
+                    <td>Protein</td>
+                    <td id="macroTableDailyProtein" class="vbig"></td>
+                    <td id="macroTablePerServingProtein"></td>
+                  </tr>
+                  <tr>
                     <td>Carbohydrates</td>
                     <td id="dailyCarbs" class="vbig"></td>
                     <td id="perServingCarbs"></td>
@@ -1158,59 +1163,129 @@
         </div>
 
         <!-- CLAUDE AI SECTIONS — placed outside CSS Grid for reliable PDF capture -->
-        <!-- CLAUDE AI: Clinical Alerts Section -->
-        <div id="claudeAlertsSection" style="display:none; margin-top:20px;">
-          <div class="rs-title" style="font-size:9.5px; margin-bottom:8px;">⚡ Clinical Safety Alerts (AI)</div>
-          <div id="claudeAlertsList"></div>
+
+        <!-- ══════════════════════════════════════════════════════════════ -->
+        <!-- SECTION 1: ACTION REQUIRED — HIGH priority items only, shown first -->
+        <!-- ══════════════════════════════════════════════════════════════ -->
+        <div id="aiActionRequired" style="display:none; margin-top:20px;">
+          <div style="background:#fff0f0; border:2px solid #ef4444; border-radius:8px; padding:14px 16px;">
+            <div style="font-size:10.5px; font-weight:800; color:#991b1b; text-transform:uppercase; letter-spacing:0.04em; margin-bottom:10px;">
+              ⚡ Action Required Before Approving
+            </div>
+            <div id="aiActionList"></div>
+            <div style="font-size:9.5px; color:#64748b; margin-top:10px; font-style:italic;">
+              Scroll down for full clinical detail in each section below.
+            </div>
+          </div>
         </div>
 
-        <!-- CLAUDE AI: Drug-Nutrient Interactions Table -->
-        <div id="claudeDrugSection" style="display:none; margin-top:20px;">
-          <div class="rs-title" style="font-size:9.5px; margin-bottom:8px;">💊 Drug-Nutrient Interaction Guidance (AI)</div>
-          <table style="width:100%; border-collapse:collapse; font-size:10.5px;">
-            <thead>
-              <tr style="background:#f1f5f9;">
-                <th style="padding:6px 8px; text-align:left; border:1px solid #e2e8f0; font-weight:700;">Drug</th>
-                <th style="padding:6px 8px; text-align:left; border:1px solid #e2e8f0; font-weight:700;">Interaction</th>
-                <th style="padding:6px 8px; text-align:left; border:1px solid #e2e8f0; font-weight:700;">Clinical Advice</th>
-                <th style="padding:6px 8px; text-align:center; border:1px solid #e2e8f0; font-weight:700;">Risk</th>
-              </tr>
-            </thead>
-            <tbody id="claudeDrugTable"></tbody>
-          </table>
+        <!-- ══════════════════════════════════════════════════════════════ -->
+        <!-- SECTION 2: CLINICAL ALERTS — all alerts, collapsible -->
+        <!-- ══════════════════════════════════════════════════════════════ -->
+        <div id="claudeAlertsSection" style="display:none; margin-top:16px;">
+          <div class="rs-title" style="font-size:9.5px; margin-bottom:0; cursor:pointer; user-select:none; display:flex; justify-content:space-between; align-items:center;"
+               onclick="(function(){ var b=document.getElementById('claudeAlertsBody'); var t=document.getElementById('claudeAlertsToggle'); if(b.style.display==='none'){b.style.display='block';t.textContent='▲';}else{b.style.display='none';t.textContent='▼';} })()">
+            <span>⚡ Clinical Safety Alerts (AI)</span><span id="claudeAlertsToggle" style="font-size:10px;">▲</span>
+          </div>
+          <div id="claudeAlertsBody" style="margin-top:8px;">
+            <div id="claudeAlertsList"></div>
+          </div>
         </div>
 
-        <!-- CLAUDE AI: Micronutrient Orders Table -->
-        <div id="claudeMicroSection" style="display:none; margin-top:20px;">
-          <div class="rs-title" style="font-size:9.5px; margin-bottom:8px;">🧬 Micronutrient & Functional Support Orders (AI)</div>
-          <table style="width:100%; border-collapse:collapse; font-size:10.5px;">
-            <thead>
-              <tr style="background:#f1f5f9;">
-                <th style="padding:6px 8px; text-align:left; border:1px solid #e2e8f0; font-weight:700;">Nutrient</th>
-                <th style="padding:6px 8px; text-align:left; border:1px solid #e2e8f0; font-weight:700;">Lab Value</th>
-                <th style="padding:6px 8px; text-align:left; border:1px solid #e2e8f0; font-weight:700;">Dose</th>
-                <th style="padding:6px 8px; text-align:left; border:1px solid #e2e8f0; font-weight:700;">Rationale</th>
-                <th style="padding:6px 8px; text-align:center; border:1px solid #e2e8f0; font-weight:700;">Status</th>
-              </tr>
-            </thead>
-            <tbody id="claudeMicroTable"></tbody>
-          </table>
+        <!-- ══════════════════════════════════════════════════════════════ -->
+        <!-- SECTION 3: DRUG-NUTRIENT INTERACTIONS — collapsible -->
+        <!-- ══════════════════════════════════════════════════════════════ -->
+        <div id="claudeDrugSection" style="display:none; margin-top:16px;">
+          <div class="rs-title" style="font-size:9.5px; margin-bottom:0; cursor:pointer; user-select:none; display:flex; justify-content:space-between; align-items:center;"
+               onclick="(function(){ var b=document.getElementById('claudeDrugBody'); var t=document.getElementById('claudeDrugToggle'); if(b.style.display==='none'){b.style.display='block';t.textContent='▲';}else{b.style.display='none';t.textContent='▼';} })()">
+            <span>💊 Drug-Nutrient Interaction Guidance (AI)</span><span id="claudeDrugToggle" style="font-size:10px;">▲</span>
+          </div>
+          <div id="claudeDrugBody" style="margin-top:8px;">
+            <table style="width:100%; border-collapse:collapse; font-size:10.5px;">
+              <thead>
+                <tr style="background:#f1f5f9;">
+                  <th style="padding:6px 8px; text-align:left; border:1px solid #e2e8f0; font-weight:700;">Drug</th>
+                  <th style="padding:6px 8px; text-align:left; border:1px solid #e2e8f0; font-weight:700;">Interaction</th>
+                  <th style="padding:6px 8px; text-align:left; border:1px solid #e2e8f0; font-weight:700;">Clinical Advice</th>
+                  <th style="padding:6px 8px; text-align:center; border:1px solid #e2e8f0; font-weight:700;">Risk</th>
+                </tr>
+              </thead>
+              <tbody id="claudeDrugTable"></tbody>
+            </table>
+          </div>
         </div>
 
-        <!-- CLAUDE AI: Monitoring Schedule Table -->
-        <div id="claudeMonitorSection" style="display:none; margin-top:20px;">
-          <div class="rs-title" style="font-size:9.5px; margin-bottom:8px;">📅 Monitoring & Reassessment Schedule (AI)</div>
-          <table style="width:100%; border-collapse:collapse; font-size:10.5px;">
-            <thead>
-              <tr style="background:#f1f5f9;">
-                <th style="padding:6px 8px; text-align:left; border:1px solid #e2e8f0; font-weight:700;">Frequency</th>
-                <th style="padding:6px 8px; text-align:left; border:1px solid #e2e8f0; font-weight:700;">Parameters</th>
-                <th style="padding:6px 8px; text-align:left; border:1px solid #e2e8f0; font-weight:700;">Action Threshold</th>
-                <th style="padding:6px 8px; text-align:left; border:1px solid #e2e8f0; font-weight:700;">Responsible</th>
-              </tr>
-            </thead>
-            <tbody id="claudeMonitorTable"></tbody>
-          </table>
+        <!-- ══════════════════════════════════════════════════════════════ -->
+        <!-- SECTION 4: MICRONUTRIENT ORDERS — collapsible -->
+        <!-- ══════════════════════════════════════════════════════════════ -->
+        <div id="claudeMicroSection" style="display:none; margin-top:16px;">
+          <div class="rs-title" style="font-size:9.5px; margin-bottom:0; cursor:pointer; user-select:none; display:flex; justify-content:space-between; align-items:center;"
+               onclick="(function(){ var b=document.getElementById('claudeMicroBody'); var t=document.getElementById('claudeMicroToggle'); if(b.style.display==='none'){b.style.display='block';t.textContent='▲';}else{b.style.display='none';t.textContent='▼';} })()">
+            <span>🧬 Micronutrient & Functional Support Orders (AI)</span><span id="claudeMicroToggle" style="font-size:10px;">▲</span>
+          </div>
+          <div id="claudeMicroBody" style="margin-top:8px;">
+            <table style="width:100%; border-collapse:collapse; font-size:10.5px;">
+              <thead>
+                <tr style="background:#f1f5f9;">
+                  <th style="padding:6px 8px; text-align:left; border:1px solid #e2e8f0; font-weight:700;">Nutrient</th>
+                  <th style="padding:6px 8px; text-align:left; border:1px solid #e2e8f0; font-weight:700;">Lab Value</th>
+                  <th style="padding:6px 8px; text-align:left; border:1px solid #e2e8f0; font-weight:700;">Dose</th>
+                  <th style="padding:6px 8px; text-align:left; border:1px solid #e2e8f0; font-weight:700;">Rationale</th>
+                  <th style="padding:6px 8px; text-align:center; border:1px solid #e2e8f0; font-weight:700;">Status</th>
+                </tr>
+              </thead>
+              <tbody id="claudeMicroTable"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ══════════════════════════════════════════════════════════════ -->
+        <!-- SECTION 5: MONITORING SCHEDULE — collapsible -->
+        <!-- ══════════════════════════════════════════════════════════════ -->
+        <div id="claudeMonitorSection" style="display:none; margin-top:16px;">
+          <div class="rs-title" style="font-size:9.5px; margin-bottom:0; cursor:pointer; user-select:none; display:flex; justify-content:space-between; align-items:center;"
+               onclick="(function(){ var b=document.getElementById('claudeMonitorBody'); var t=document.getElementById('claudeMonitorToggle'); if(b.style.display==='none'){b.style.display='block';t.textContent='▲';}else{b.style.display='none';t.textContent='▼';} })()">
+            <span>📅 Monitoring & Reassessment Schedule (AI)</span><span id="claudeMonitorToggle" style="font-size:10px;">▲</span>
+          </div>
+          <div id="claudeMonitorBody" style="margin-top:8px;">
+            <table style="width:100%; border-collapse:collapse; font-size:10.5px;">
+              <thead>
+                <tr style="background:#f1f5f9;">
+                  <th style="padding:6px 8px; text-align:left; border:1px solid #e2e8f0; font-weight:700;">Frequency</th>
+                  <th style="padding:6px 8px; text-align:left; border:1px solid #e2e8f0; font-weight:700;">Parameters</th>
+                  <th style="padding:6px 8px; text-align:left; border:1px solid #e2e8f0; font-weight:700;">Action Threshold</th>
+                  <th style="padding:6px 8px; text-align:left; border:1px solid #e2e8f0; font-weight:700;">Responsible</th>
+                </tr>
+              </thead>
+              <tbody id="claudeMonitorTable"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ══════════════════════════════════════════════════════════════ -->
+        <!-- SECTION 6: WHY THIS PLAN — clinical rationale, collapsed by default -->
+        <!-- ══════════════════════════════════════════════════════════════ -->
+        <div id="claudeRationaleSection" style="display:none; margin-top:16px;">
+          <div class="rs-title" style="font-size:9.5px; margin-bottom:0; cursor:pointer; user-select:none; display:flex; justify-content:space-between; align-items:center;"
+               onclick="(function(){ var b=document.getElementById('claudeRationaleBody'); var t=document.getElementById('claudeRationaleToggle'); if(b.style.display==='none'){b.style.display='block';t.textContent='▲';}else{b.style.display='none';t.textContent='▼';} })()">
+            <span>📋 Why This Plan — AI Clinical Review</span><span id="claudeRationaleToggle" style="font-size:10px;">▼</span>
+          </div>
+          <div id="claudeRationaleBody" style="display:none; margin-top:8px;">
+            <ul id="aiRationaleList" style="margin:0; padding-left:16px; list-style:none;"></ul>
+          </div>
+        </div>
+
+        <!-- ══════════════════════════════════════════════════════════════ -->
+        <!-- SECTION 7: AI AUDIT LOG — arithmetic checks, collapsed by default -->
+        <!-- ══════════════════════════════════════════════════════════════ -->
+        <div id="claudeAuditSection" style="display:none; margin-top:16px;">
+          <div class="rs-title" style="font-size:9.5px; margin-bottom:0; cursor:pointer; user-select:none; display:flex; justify-content:space-between; align-items:center; color:#94a3b8; border-color:#e2e8f0;"
+               onclick="(function(){ var b=document.getElementById('claudeAuditBody'); var t=document.getElementById('claudeAuditToggle'); if(b.style.display==='none'){b.style.display='block';t.textContent='▲';}else{b.style.display='none';t.textContent='▼';} })()">
+            <span>🔧 AI Audit Log — Arithmetic & Rule Verification</span><span id="claudeAuditToggle" style="font-size:10px;">▼</span>
+          </div>
+          <div id="claudeAuditBody" style="display:none; margin-top:8px;">
+            <ul id="aiAuditList" style="margin:0; padding-left:16px; list-style:none;"></ul>
+          </div>
         </div>
 
             </div>
@@ -3123,6 +3198,9 @@
 
             const bindPerServingCarbs = Math.round((bindDailyCarbs / bindServings) * 10) / 10;
             const bindPerServingFat = Math.round((bindDailyFat / bindServings) * 10) / 10;
+            const bindPerServingProtein = Math.round((fp.dailyProtein / bindServings) * 10) / 10;
+            setVal('macroTableDailyProtein', (fp.dailyProtein || 0) + ' g');
+            setVal('macroTablePerServingProtein', bindPerServingProtein + ' g');
             setVal('dailyCarbs', bindDailyCarbs + ' g');
             setVal('perServingCarbs', bindPerServingCarbs + ' g');
             setVal('dailyFat', (typeof bindDailyFat === 'number' ? bindDailyFat.toFixed(1) : bindDailyFat) + ' g');
@@ -4265,20 +4343,74 @@
                 vsEl.style.color = data.validationScore >= 8.5 ? '#16a34a' : (data.validationScore >= 6.5 ? '#d97706' : '#dc2626');
             }
 
-            // 1. Rationale (Prepend with cleanup)
+            // 1. Rationale → goes to "Why This Plan" collapsible section (NOT mixed into engine rationale)
             const crEl = document.getElementById('clinicalRationale');
-            if (crEl && data.rationale && data.rationale.length > 0) {
-              crEl.querySelectorAll('.ai-insight').forEach(el => el.remove());
-              const aiHtml = data.rationale.map(r => `<li class="ai-insight" style="color:#6d28d9; font-weight:600;">✨ ${r}</li>`).join('');
-              crEl.innerHTML = aiHtml + crEl.innerHTML;
+            // Clean up any old ai-insight items from clinicalRationale (legacy cleanup)
+            if (crEl) crEl.querySelectorAll('.ai-insight').forEach(el => el.remove());
+            const aiRationaleList = document.getElementById('aiRationaleList');
+            const claudeRationaleSection = document.getElementById('claudeRationaleSection');
+            if (aiRationaleList && data.rationale && data.rationale.length > 0) {
+              aiRationaleList.innerHTML = data.rationale.map(r =>
+                `<li style="color:#6d28d9; font-weight:600; margin-bottom:6px; border-left:3px solid #a78bfa; padding-left:8px;">✨ ${r}</li>`
+              ).join('');
+              if (claudeRationaleSection) claudeRationaleSection.style.display = 'block';
             }
 
-            // 2. Instructions (Prepend with cleanup)
+            // 2. Instructions (Prepend with cleanup — patient instructions stay in their section)
             const piEl = document.getElementById('patientInstructions');
             if (piEl && data.instructions && data.instructions.length > 0) {
               piEl.querySelectorAll('.ai-insight').forEach(el => el.remove());
               const aiHtml = data.instructions.map(t => `<li class="ai-insight" style="color:#6d28d9; font-weight:600; margin-bottom:4px;">✨ ${t}</li>`).join('');
               piEl.innerHTML = aiHtml + piEl.innerHTML;
+            }
+
+            // --- AUTO-SAVE AI CORRECTIONS to server for Rule Engine Manager ---
+            if (!skipPersistence && data.correctedPrescription && data.correctedPrescription.isOverpowered) {
+                const cp = data.correctedPrescription;
+                const engineFP = window.currentVersionedPlan
+                    ? (window.currentVersionedPlan.engineOutput || window.currentVersionedPlan.finalPlan || {})
+                    : {};
+                const pat = window.patient || {};
+                // Build list of changed fields
+                const changes = [];
+                const fields = ['dailyCalories','dailyProtein','dailyFat','dailyCarbs'];
+                fields.forEach(f => {
+                    if (cp[f] != null && engineFP[f] != null && Math.abs(cp[f] - engineFP[f]) > 0.5) {
+                        changes.push({ field: f, engineValue: engineFP[f], aiValue: cp[f] });
+                    }
+                });
+                // Include EXCLUDED micronutrients as corrections
+                (data.micronutrientOrders || []).filter(m => m.status === 'EXCLUDED').forEach(m => {
+                    changes.push({ field: m.nutrient, engineValue: 'prescribed', aiValue: 'EXCLUDED', note: m.rationale });
+                });
+                if (changes.length > 0) {
+                    const corrId = `corr_${window.currentVersionedPlan ? window.currentVersionedPlan.id : Date.now()}_${Date.now()}`;
+                    const apiBase = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : '';
+                    const u = (typeof auth !== 'undefined') ? auth.getCurrentUser() : null;
+                    fetch(`${apiBase}/api/ai-corrections`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': u && u.token ? 'Bearer ' + u.token : '' },
+                        body: JSON.stringify({
+                            id: corrId,
+                            patientId: pat.id,
+                            planId: window.currentVersionedPlan ? window.currentVersionedPlan.id : null,
+                            patientName: pat.name,
+                            cancer: pat.cancer,
+                            regimen: pat.regimen,
+                            changes: changes,
+                            reason: cp.reasoning,
+                            patientContext: {
+                                isDiabetic: !!(pat.hba1c >= 6.5 || pat.bloodSugar > 140),
+                                hasNAFLD: !!(pat.comorbidities || []).some(c => /nafld|nash|fatty liver/i.test(c)),
+                                hasCisplatin: !!(pat.regimen || '').toLowerCase().includes('cisplatin'),
+                                hasCachexia: !!(pat.weightLossPercent > 10 || pat.albumin < 3.0),
+                                hasSarcopenia: !!(pat.smi < 38 || pat.handGrip < 18),
+                                creatinine: pat.creatinine,
+                                weightLoss: pat.weightLossPercent
+                            }
+                        })
+                    }).catch(() => {}); // fire-and-forget, don't block UI
+                }
             }
 
             // --- AI AUDITOR: Overpower Logic (skip when called from PDF export context) ---
@@ -4363,25 +4495,24 @@
                 }
             }
 
-            // --- AI AUDITOR: Logic Refinements — visible in report + persisted ---
+            // --- AI AUDITOR: Logic Refinements → Audit Log section (not visible in main plan) ---
             if (data.logicRefinements && data.logicRefinements.length > 0) {
                 const logHistory = JSON.parse(localStorage.getItem('onvilox_logic_logs') || '[]');
                 logHistory.push({ date: new Date().toISOString(), patientId: window.patient?.id, suggestions: data.logicRefinements });
                 localStorage.setItem('onvilox_logic_logs', JSON.stringify(logHistory.slice(-20)));
                 console.log("AI Logic Refinements:", data.logicRefinements);
-                // Show in rationale block so clinician sees arithmetic/logic corrections
-                if (crEl) {
-                    data.logicRefinements.forEach(r => {
-                        const li = document.createElement('li');
-                        li.className = 'ai-insight';
-                        li.style = 'color:#b45309; font-weight:600; border-left:3px solid #f59e0b; padding-left:8px; margin-bottom:6px;';
-                        li.innerHTML = `🔧 <b>Plan Logic:</b> ${r}`;
-                        crEl.appendChild(li);
-                    });
+                // Route to Audit Log collapsible — NOT shown in main clinical view
+                const aiAuditList = document.getElementById('aiAuditList');
+                const claudeAuditSection = document.getElementById('claudeAuditSection');
+                if (aiAuditList) {
+                    aiAuditList.innerHTML = data.logicRefinements.map(r =>
+                        `<li style="color:#b45309; font-weight:600; border-left:3px solid #f59e0b; padding-left:8px; margin-bottom:6px; font-size:10.5px;">🔧 <b>Plan Logic:</b> ${r}</li>`
+                    ).join('');
+                    if (claudeAuditSection) claudeAuditSection.style.display = 'block';
                 }
             }
 
-            // 3. Clinical Alerts Section — always show after AI run
+            // 3. Clinical Alerts Section + Action Required banner
             const alertsSec = document.getElementById('claudeAlertsSection');
             const alertsList = document.getElementById('claudeAlertsList');
             if (alertsSec && alertsList) {
@@ -4393,6 +4524,48 @@
                 alertsList.innerHTML = '<div style="color:#16a34a;font-size:11px;padding:8px 4px;">✅ No additional clinical safety alerts — plan meets all audited criteria.</div>';
               }
               alertsSec.style.display = 'block';
+
+              // --- Populate Action Required banner with HIGH-priority items only ---
+              const actionReqEl = document.getElementById('aiActionRequired');
+              const actionListEl = document.getElementById('aiActionList');
+              if (actionReqEl && actionListEl) {
+                const actionItems = [];
+                // HIGH clinical alerts
+                alerts.filter(a => a.level === 'HIGH').forEach((a, i) => {
+                  actionItems.push(`<div style="display:flex;align-items:flex-start;gap:8px;padding:7px 0;border-bottom:1px solid #fecaca;font-size:11px;font-weight:700;color:#991b1b;">
+                    <span style="min-width:20px;font-weight:900;">${actionItems.length + 1}.</span>
+                    <span>🚨 <b>${a.type}:</b> ${a.message}</span></div>`);
+                });
+                // HIGH-risk drug interactions
+                (data.drugInteractions || []).filter(d => d.risk === 'HIGH').forEach(d => {
+                  actionItems.push(`<div style="display:flex;align-items:flex-start;gap:8px;padding:7px 0;border-bottom:1px solid #fecaca;font-size:11px;font-weight:700;color:#991b1b;">
+                    <span style="min-width:20px;font-weight:900;">${actionItems.length + 1}.</span>
+                    <span>💊 <b>${d.drug} — HIGH RISK:</b> ${d.advice}</span></div>`);
+                });
+                // EXCLUDED micronutrients (contraindicated)
+                (data.micronutrientOrders || []).filter(m => m.status === 'EXCLUDED').forEach(m => {
+                  actionItems.push(`<div style="display:flex;align-items:flex-start;gap:8px;padding:7px 0;border-bottom:1px solid #fecaca;font-size:11px;font-weight:700;color:#991b1b;">
+                    <span style="min-width:20px;font-weight:900;">${actionItems.length + 1}.</span>
+                    <span>⛔ <b>Remove ${m.nutrient}:</b> ${m.rationale}</span></div>`);
+                });
+                // AI prescription correction note (if overpower applied)
+                if (data.correctedPrescription && data.correctedPrescription.isOverpowered) {
+                  actionItems.push(`<div style="display:flex;align-items:flex-start;gap:8px;padding:7px 0;font-size:11px;font-weight:700;color:#7c3aed;">
+                    <span style="min-width:20px;font-weight:900;">${actionItems.length + 1}.</span>
+                    <span>⚖️ <b>Plan corrected by AI Auditor:</b> ${data.correctedPrescription.reasoning}</span></div>`);
+                }
+                if (actionItems.length > 0) {
+                  actionListEl.innerHTML = actionItems.join('');
+                  actionReqEl.style.display = 'block';
+                } else {
+                  // No high-priority items — show a clean pass banner
+                  actionListEl.innerHTML = '<div style="color:#16a34a;font-size:11px;font-weight:600;">✅ No high-priority actions — plan is clinically validated. Review details below and approve.</div>';
+                  actionReqEl.style.display = 'block';
+                  actionReqEl.querySelector('div').style.background = '#f0fdf4';
+                  actionReqEl.querySelector('div').style.borderColor = '#22c55e';
+                  actionReqEl.querySelector('div > div').style.color = '#166534';
+                }
+              }
 
               // --- AI AUTHORITATIVE: Update feeding route display if EN escalation mandated ---
               const enAlert = (Array.isArray(data.clinicalAlerts) ? data.clinicalAlerts : [])

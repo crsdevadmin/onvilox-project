@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rule Engine Manager - Onvilox</title>
+  <link rel="stylesheet" href="css/app.css">
+  <style>
+    .tab-bar { display:flex; gap:4px; margin-bottom:20px; border-bottom:2px solid #e2e8f0; }
+    .tab-btn { padding:8px 20px; font-size:12px; font-weight:700; border:none; background:none; cursor:pointer; color:#64748b; border-bottom:2px solid transparent; margin-bottom:-2px; }
+    .tab-btn.active { color:#0e2247; border-bottom-color:#0e2247; }
+    .section { display:none; }
+    .section.active { display:block; }
+    .rule-table { width:100%; border-collapse:collapse; font-size:11.5px; }
+    .rule-table th { background:#f1f5f9; padding:8px 10px; text-align:left; border:1px solid #e2e8f0; font-weight:700; color:#334155; }
+    .rule-table td { padding:8px 10px; border:1px solid #e2e8f0; vertical-align:top; color:#334155; }
+    .rule-table tr:hover td { background:#f8fafc; }
+    .badge { font-size:9px; font-weight:800; padding:2px 8px; border-radius:999px; text-transform:uppercase; }
+    .badge-pending { background:#fef3c7; color:#92400e; }
+    .badge-active  { background:#dcfce7; color:#166534; }
+    .badge-promoted{ background:#ede9fe; color:#6d28d9; }
+    .badge-rejected{ background:#fee2e2; color:#991b1b; }
+    .change-chip { display:inline-block; background:#f0f9ff; border:1px solid #bae6fd; border-radius:4px; padding:3px 8px; font-size:10px; font-weight:700; color:#0369a1; margin:2px; }
+    .change-chip.excluded { background:#fff0f0; border-color:#fca5a5; color:#991b1b; }
+    .btn-promote { background:#6d28d9; color:white; border:none; border-radius:4px; padding:5px 12px; font-size:10px; font-weight:700; cursor:pointer; }
+    .btn-reject  { background:#ef4444; color:white; border:none; border-radius:4px; padding:5px 12px; font-size:10px; font-weight:700; cursor:pointer; margin-left:4px; }
+    .btn-deactivate { background:#64748b; color:white; border:none; border-radius:4px; padding:5px 12px; font-size:10px; font-weight:700; cursor:pointer; margin-left:4px; }
+    .btn-delete { background:#dc2626; color:white; border:none; border-radius:4px; padding:5px 12px; font-size:10px; font-weight:700; cursor:pointer; margin-left:4px; }
+    .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:1000; align-items:center; justify-content:center; }
+    .modal-overlay.open { display:flex; }
+    .modal { background:white; border-radius:8px; padding:24px; width:520px; max-width:95vw; max-height:90vh; overflow-y:auto; }
+    .modal h3 { margin:0 0 16px; font-size:14px; color:#0e2247; }
+    .form-row { margin-bottom:12px; }
+    .form-row label { display:block; font-size:10.5px; font-weight:700; color:#475569; margin-bottom:4px; }
+    .form-row input, .form-row select, .form-row textarea { width:100%; padding:7px 10px; border:1px solid #cbd5e1; border-radius:5px; font-size:11.5px; box-sizing:border-box; }
+    .form-row textarea { height:70px; resize:vertical; }
+    .empty-state { text-align:center; padding:40px; color:#94a3b8; font-size:12px; }
+    .stats-row { display:flex; gap:12px; margin-bottom:20px; flex-wrap:wrap; }
+    .stat-card { background:white; border:1px solid #e2e8f0; border-radius:8px; padding:14px 18px; min-width:120px; }
+    .stat-num { font-size:24px; font-weight:900; color:#0e2247; }
+    .stat-lbl { font-size:10px; font-weight:700; color:#94a3b8; text-transform:uppercase; margin-top:2px; }
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">Onvilox Admin</div>
+  <div class="nav">
+    <a href="admin.html">Dashboard</a>
+    <a href="admin-stores.html">Stores</a>
+    <a href="admin-users.html">Create Users</a>
+    <a href="admin-mapping.html">Mapping</a>
+    <a href="admin-tracking.html">Tracking</a>
+    <a href="admin-reports.html">Reports</a>
+    <a href="admin-rules.html" style="font-weight:800; color:#6d28d9;">Rule Engine</a>
+    <a href="#" onclick="auth.logout()">Logout</a>
+  </div>
+</div>
+
+<div class="container page">
+
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Rule Engine Manager</h1>
+      <div class="page-subtitle">Review AI corrections → confirm to make them permanent engine rules. No coding required.</div>
+    </div>
+    <button class="btn btn-primary" onclick="loadAll()">↻ Refresh</button>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-row">
+    <div class="stat-card"><div class="stat-num" id="statPending">—</div><div class="stat-lbl">Pending Review</div></div>
+    <div class="stat-card"><div class="stat-num" id="statActive">—</div><div class="stat-lbl">Active Rules</div></div>
+    <div class="stat-card"><div class="stat-num" id="statPromoted">—</div><div class="stat-lbl">Promoted</div></div>
+    <div class="stat-card"><div class="stat-num" id="statRejected">—</div><div class="stat-lbl">Rejected</div></div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="switchTab('corrections')">📥 AI Corrections (Pending Review)</button>
+    <button class="tab-btn" onclick="switchTab('rules')">✅ Active Engine Rules</button>
+    <button class="tab-btn" onclick="switchTab('history')">📋 All History</button>
+  </div>
+
+  <!-- TAB: AI Corrections -->
+  <div id="tab-corrections" class="section active">
+    <p style="font-size:11.5px; color:#64748b; margin-bottom:14px;">
+      These are values the AI corrected after the engine calculated them. Review each one —
+      if the same pattern should apply to <b>all future patients</b>, click <b>Promote to Rule</b>.
+    </p>
+    <table class="rule-table" id="correctionsTable">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Patient</th>
+          <th>Cancer / Regimen</th>
+          <th>What Changed</th>
+          <th>AI Reason</th>
+          <th>Context</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="correctionsBody">
+        <tr><td colspan="8" class="empty-state">Loading...</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- TAB: Active Rules -->
+  <div id="tab-rules" class="section">
+    <p style="font-size:11.5px; color:#64748b; margin-bottom:14px;">
+      These rules are applied automatically by the engine to every future patient.
+      Edit or deactivate any rule at any time.
+    </p>
+    <table class="rule-table" id="rulesTable">
+      <thead>
+        <tr>
+          <th>Rule Name</th>
+          <th>Condition</th>
+          <th>Field</th>
+          <th>Operator</th>
+          <th>Value</th>
+          <th>Reason</th>
+          <th>Confirmed By</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="rulesBody">
+        <tr><td colspan="8" class="empty-state">Loading...</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- TAB: History -->
+  <div id="tab-history" class="section">
+    <p style="font-size:11.5px; color:#64748b; margin-bottom:14px;">
+      All AI corrections — pending, promoted, and rejected.
+    </p>
+    <table class="rule-table" id="historyTable">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Patient</th>
+          <th>Cancer / Regimen</th>
+          <th>What Changed</th>
+          <th>Reason</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody id="historyBody">
+        <tr><td colspan="6" class="empty-state">Loading...</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+</div>
+
+<!-- PROMOTE TO RULE MODAL -->
+<div class="modal-overlay" id="promoteModal">
+  <div class="modal">
+    <h3>⚖️ Promote Correction to Engine Rule</h3>
+    <p style="font-size:11px; color:#64748b; margin-bottom:16px;">
+      This rule will be saved to the database and applied automatically to all future patients.
+      Review and edit the values below before confirming.
+    </p>
+    <input type="hidden" id="modalCorrId">
+    <div class="form-row">
+      <label>Rule Name (short identifier)</label>
+      <input type="text" id="modalRuleName" placeholder="e.g. fat_cap_diabetic_steroid">
+    </div>
+    <div class="form-row">
+      <label>Condition — When does this rule apply?</label>
+      <textarea id="modalCondition" placeholder="e.g. Patient has HbA1c ≥ 6.5% OR blood sugar > 140 mg/dL OR is on steroid-containing regimen"></textarea>
+    </div>
+    <div class="form-row">
+      <label>Target Field</label>
+      <select id="modalField">
+        <option value="dailyFat">dailyFat (grams)</option>
+        <option value="dailyCarbs">dailyCarbs (grams)</option>
+        <option value="dailyProtein">dailyProtein (grams)</option>
+        <option value="dailyCalories">dailyCalories (kcal)</option>
+        <option value="fatPct">fatPct (% of calories)</option>
+        <option value="micronutrient_exclude">Micronutrient — EXCLUDE</option>
+        <option value="micronutrient_cap">Micronutrient — CAP dose</option>
+      </select>
+    </div>
+    <div class="form-row">
+      <label>Operator</label>
+      <select id="modalOperator">
+        <option value="max">max (cap at this value)</option>
+        <option value="min">min (floor at this value)</option>
+        <option value="set">set (fix to this exact value)</option>
+        <option value="exclude">exclude (remove from plan)</option>
+      </select>
+    </div>
+    <div class="form-row">
+      <label>Value</label>
+      <input type="text" id="modalValue" placeholder="e.g. 30 (for 30% fat cap) or EXCLUDED">
+    </div>
+    <div class="form-row">
+      <label>Clinical Reason (shown to developers)</label>
+      <textarea id="modalReason" placeholder="e.g. Diabetic + steroid protocol: fat must not exceed 30% of total calories for glycaemic safety."></textarea>
+    </div>
+    <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:16px;">
+      <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="confirmPromote()">✅ Confirm — Add to Engine Rules</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/db.js"></script>
+<script src="js/auth.js"></script>
+<script>
+
+  const apiBase = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : '';
+
+  function headers() {
+    const u = auth.getCurrentUser();
+    return { 'Content-Type': 'application/json', 'Authorization': u && u.token ? 'Bearer ' + u.token : '' };
+  }
+
+  let _corrections = [];
+  let _rules = [];
+
+  async function loadAll() {
+    try {
+      const [cRes, rRes] = await Promise.all([
+        fetch(`${apiBase}/api/ai-corrections`, { headers: headers() }),
+        fetch(`${apiBase}/api/engine-rules`, { headers: headers() })
+      ]);
+      _corrections = cRes.ok ? await cRes.json() : [];
+      _rules = rRes.ok ? await rRes.json() : [];
+      renderStats();
+      renderCorrections();
+      renderRules();
+      renderHistory();
+    } catch (e) {
+      console.error('Load error:', e);
+    }
+  }
+
+  function renderStats() {
+    document.getElementById('statPending').textContent = _corrections.filter(c => c.status === 'pending').length;
+    document.getElementById('statActive').textContent = _rules.filter(r => r.status === 'active').length;
+    document.getElementById('statPromoted').textContent = _corrections.filter(c => c.status === 'promoted').length;
+    document.getElementById('statRejected').textContent = _corrections.filter(c => c.status === 'rejected').length;
+  }
+
+  function changesHtml(changes) {
+    if (!changes || !changes.length) return '<span style="color:#94a3b8">—</span>';
+    return (typeof changes === 'string' ? JSON.parse(changes) : changes).map(ch => {
+      const isExcluded = ch.aiValue === 'EXCLUDED';
+      const label = isExcluded
+        ? `${ch.field}: EXCLUDED`
+        : `${ch.field}: ${ch.engineValue} → ${ch.aiValue}`;
+      return `<span class="change-chip${isExcluded ? ' excluded' : ''}">${label}</span>`;
+    }).join('');
+  }
+
+  function contextHtml(ctx) {
+    if (!ctx) return '—';
+    const c = typeof ctx === 'string' ? JSON.parse(ctx) : ctx;
+    const flags = [];
+    if (c.isDiabetic) flags.push('Diabetic');
+    if (c.hasNAFLD) flags.push('NAFLD');
+    if (c.hasCisplatin) flags.push('Cisplatin');
+    if (c.hasCachexia) flags.push('Cachexia');
+    if (c.hasSarcopenia) flags.push('Sarcopenia');
+    if (c.creatinine) flags.push(`Cr ${c.creatinine}`);
+    return flags.length ? flags.map(f => `<span style="background:#f1f5f9;border-radius:3px;padding:1px 5px;font-size:9.5px;font-weight:600;color:#334155;margin:1px;display:inline-block;">${f}</span>`).join('') : '—';
+  }
+
+  function renderCorrections() {
+    const pending = _corrections.filter(c => c.status === 'pending');
+    const tbody = document.getElementById('correctionsBody');
+    if (!pending.length) {
+      tbody.innerHTML = '<tr><td colspan="8" class="empty-state">No pending corrections — all caught up ✅</td></tr>';
+      return;
+    }
+    tbody.innerHTML = pending.map(c => `
+      <tr>
+        <td style="white-space:nowrap;color:#94a3b8;">${new Date(c.created_at).toLocaleDateString()}</td>
+        <td style="font-weight:700;">${c.patient_name || '—'}</td>
+        <td style="font-size:10.5px;">${c.cancer || '—'}<br><span style="color:#64748b;">${c.regimen || '—'}</span></td>
+        <td>${changesHtml(c.changes)}</td>
+        <td style="font-size:10.5px;max-width:220px;">${c.reason || '—'}</td>
+        <td>${contextHtml(c.patient_context)}</td>
+        <td><span class="badge badge-pending">Pending</span></td>
+        <td style="white-space:nowrap;">
+          <button class="btn-promote" onclick="openPromoteModal('${c.id}')">⚖️ Promote to Rule</button>
+          <button class="btn-reject" onclick="rejectCorrection('${c.id}')">✕ Reject</button>
+        </td>
+      </tr>`).join('');
+  }
+
+  function renderRules() {
+    const active = _rules.filter(r => r.status === 'active');
+    const tbody = document.getElementById('rulesBody');
+    if (!active.length) {
+      tbody.innerHTML = '<tr><td colspan="8" class="empty-state">No active rules yet — promote a correction to create one.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = active.map(r => `
+      <tr>
+        <td style="font-weight:700;color:#0e2247;">${r.rule_name}</td>
+        <td style="font-size:10.5px;">${r.condition_description || '—'}</td>
+        <td><span class="change-chip">${r.target_field}</span></td>
+        <td style="font-weight:700;color:#6d28d9;">${r.operator}</td>
+        <td style="font-weight:800;color:#0e2247;">${r.value}</td>
+        <td style="font-size:10.5px;max-width:200px;">${r.reason || '—'}</td>
+        <td style="font-size:10.5px;color:#64748b;">${r.confirmed_by || '—'}<br>${r.confirmed_at ? new Date(r.confirmed_at).toLocaleDateString() : ''}</td>
+        <td style="white-space:nowrap;">
+          <button class="btn-deactivate" onclick="deactivateRule('${r.id}')">⏸ Deactivate</button>
+          <button class="btn-delete" onclick="deleteRule('${r.id}')">✕ Delete</button>
+        </td>
+      </tr>`).join('');
+  }
+
+  function renderHistory() {
+    const tbody = document.getElementById('historyBody');
+    if (!_corrections.length) {
+      tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No corrections recorded yet.</td></tr>';
+      return;
+    }
+    const statusClass = { pending:'badge-pending', promoted:'badge-promoted', rejected:'badge-rejected' };
+    tbody.innerHTML = _corrections.map(c => `
+      <tr>
+        <td style="white-space:nowrap;color:#94a3b8;">${new Date(c.created_at).toLocaleDateString()}</td>
+        <td style="font-weight:700;">${c.patient_name || '—'}</td>
+        <td style="font-size:10.5px;">${c.cancer || '—'}<br><span style="color:#64748b;">${c.regimen || '—'}</span></td>
+        <td>${changesHtml(c.changes)}</td>
+        <td style="font-size:10.5px;max-width:220px;">${c.reason || '—'}</td>
+        <td><span class="badge ${statusClass[c.status]||'badge-pending'}">${c.status}</span></td>
+      </tr>`).join('');
+  }
+
+  function switchTab(name) {
+    document.querySelectorAll('.tab-btn').forEach((b,i) => {
+      const tabs = ['corrections','rules','history'];
+      b.classList.toggle('active', tabs[i] === name);
+    });
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+    document.getElementById('tab-' + name).classList.add('active');
+  }
+
+  // PROMOTE MODAL
+  function openPromoteModal(corrId) {
+    const corr = _corrections.find(c => c.id === corrId);
+    if (!corr) return;
+    document.getElementById('modalCorrId').value = corrId;
+    // Pre-fill from correction data
+    const changes = typeof corr.changes === 'string' ? JSON.parse(corr.changes) : (corr.changes || []);
+    const firstChange = changes[0] || {};
+    document.getElementById('modalRuleName').value = '';
+    document.getElementById('modalCondition').value = '';
+    document.getElementById('modalField').value = firstChange.field && ['dailyFat','dailyCarbs','dailyProtein','dailyCalories','fatPct'].includes(firstChange.field) ? firstChange.field : 'dailyFat';
+    document.getElementById('modalOperator').value = firstChange.aiValue === 'EXCLUDED' ? 'exclude' : 'max';
+    document.getElementById('modalValue').value = firstChange.aiValue || '';
+    document.getElementById('modalReason').value = corr.reason || '';
+    document.getElementById('promoteModal').classList.add('open');
+  }
+
+  function closeModal() {
+    document.getElementById('promoteModal').classList.remove('open');
+  }
+
+  async function confirmPromote() {
+    const corrId = document.getElementById('modalCorrId').value;
+    const body = {
+      ruleName: document.getElementById('modalRuleName').value.trim(),
+      conditionDescription: document.getElementById('modalCondition').value.trim(),
+      targetField: document.getElementById('modalField').value,
+      operator: document.getElementById('modalOperator').value,
+      value: document.getElementById('modalValue').value.trim(),
+      reason: document.getElementById('modalReason').value.trim(),
+      sourceCorrectionId: corrId
+    };
+    if (!body.ruleName || !body.conditionDescription || !body.value) {
+      alert('Please fill in Rule Name, Condition, and Value.');
+      return;
+    }
+    try {
+      const res = await fetch(`${apiBase}/api/engine-rules`, { method:'POST', headers:headers(), body:JSON.stringify(body) });
+      if (!res.ok) throw new Error(await res.text());
+      closeModal();
+      await loadAll();
+      alert('✅ Rule promoted and is now active in the engine.');
+    } catch (e) {
+      alert('Error: ' + e.message);
+    }
+  }
+
+  async function rejectCorrection(corrId) {
+    if (!confirm('Mark this correction as rejected? It will move to history.')) return;
+    await fetch(`${apiBase}/api/ai-corrections/${corrId}`, { method:'PUT', headers:headers(), body:JSON.stringify({ status:'rejected' }) });
+    await loadAll();
+  }
+
+  async function deactivateRule(ruleId) {
+    const rule = _rules.find(r => r.id === ruleId);
+    if (!rule) return;
+    if (!confirm(`Deactivate rule "${rule.rule_name}"? It will no longer apply to new patients.`)) return;
+    await fetch(`${apiBase}/api/engine-rules/${ruleId}`, {
+      method:'PUT', headers:headers(),
+      body:JSON.stringify({ status:'inactive', ruleName:rule.rule_name, conditionDescription:rule.condition_description, targetField:rule.target_field, operator:rule.operator, value:rule.value, reason:rule.reason })
+    });
+    await loadAll();
+  }
+
+  async function deleteRule(ruleId) {
+    if (!confirm('Permanently delete this rule?')) return;
+    await fetch(`${apiBase}/api/engine-rules/${ruleId}`, { method:'DELETE', headers:headers() });
+    await loadAll();
+  }
+
+  // Init
+  window.addEventListener('DOMContentLoaded', async () => {
+    if (typeof auth !== 'undefined') {
+      const u = auth.getCurrentUser();
+      if (!u) { window.location.href = 'index.html'; return; }
+      if (u.role !== 'ADMIN') { alert('Admin access only.'); window.location.href = 'index.html'; return; }
+    }
+    await loadAll();
+  });
+</script>
+</body>
+</html>

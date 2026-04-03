@@ -902,6 +902,157 @@ OUTPUT FORMAT — return ONLY valid JSON, no markdown, no text outside the JSON 
   })();
 });
 
+// ── RULE ENGINE MANAGER ──────────────────────────────────────────────────────
+
+// Create tables on startup if they don't exist
+(async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS ai_corrections (
+        id TEXT PRIMARY KEY,
+        patient_id TEXT,
+        plan_id TEXT,
+        patient_name TEXT,
+        cancer TEXT,
+        regimen TEXT,
+        changes JSONB,
+        reason TEXT,
+        patient_context JSONB,
+        status TEXT DEFAULT 'pending',
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS engine_rules (
+        id TEXT PRIMARY KEY,
+        rule_name TEXT NOT NULL,
+        condition_description TEXT,
+        target_field TEXT NOT NULL,
+        operator TEXT NOT NULL,
+        value TEXT NOT NULL,
+        reason TEXT,
+        source_correction_id TEXT,
+        confirmed_by TEXT,
+        status TEXT DEFAULT 'pending',
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        confirmed_at TIMESTAMPTZ
+      )
+    `);
+    console.log('Rule Engine tables ready.');
+  } catch (e) {
+    console.error('Rule Engine table init error:', e.message);
+  }
+})();
+
+// AI Corrections: Save (called automatically from patient profile when AI corrects)
+app.post('/api/ai-corrections', authenticateToken, async (req, res) => {
+  const { id, patientId, planId, patientName, cancer, regimen, changes, reason, patientContext } = req.body;
+  try {
+    await pool.query(
+      `INSERT INTO ai_corrections (id, patient_id, plan_id, patient_name, cancer, regimen, changes, reason, patient_context)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+       ON CONFLICT (id) DO NOTHING`,
+      [
+        id || `corr_${Date.now()}`,
+        patientId, planId, patientName, cancer, regimen,
+        JSON.stringify(changes || []),
+        reason,
+        JSON.stringify(patientContext || {})
+      ]
+    );
+    res.status(201).json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// AI Corrections: Get All (admin)
+app.get('/api/ai-corrections', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM ai_corrections ORDER BY created_at DESC');
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// AI Corrections: Update status (dismiss/acknowledge)
+app.put('/api/ai-corrections/:id', authenticateToken, async (req, res) => {
+  const { status } = req.body;
+  try {
+    await pool.query('UPDATE ai_corrections SET status=$1 WHERE id=$2', [status, req.params.id]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Engine Rules: Get All
+app.get('/api/engine-rules', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM engine_rules ORDER BY created_at DESC');
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Engine Rules: Get Active only (used by engine at runtime)
+app.get('/api/engine-rules/active', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query("SELECT * FROM engine_rules WHERE status='active' ORDER BY created_at DESC");
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Engine Rules: Create (admin promotes a correction to a rule)
+app.post('/api/engine-rules', authenticateToken, async (req, res) => {
+  const { ruleName, conditionDescription, targetField, operator, value, reason, sourceCorrectionId } = req.body;
+  try {
+    const id = `rule_${Date.now()}`;
+    const result = await pool.query(
+      `INSERT INTO engine_rules (id, rule_name, condition_description, target_field, operator, value, reason, source_correction_id, confirmed_by, status, confirmed_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'active',NOW()) RETURNING *`,
+      [id, ruleName, conditionDescription, targetField, operator, String(value), reason, sourceCorrectionId || null, req.user.id]
+    );
+    // Mark source correction as promoted
+    if (sourceCorrectionId) {
+      await pool.query("UPDATE ai_corrections SET status='promoted' WHERE id=$1", [sourceCorrectionId]);
+    }
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Engine Rules: Update (confirm active / reject / edit)
+app.put('/api/engine-rules/:id', authenticateToken, async (req, res) => {
+  const { status, ruleName, conditionDescription, targetField, operator, value, reason } = req.body;
+  try {
+    await pool.query(
+      `UPDATE engine_rules SET status=$1, rule_name=$2, condition_description=$3,
+       target_field=$4, operator=$5, value=$6, reason=$7,
+       confirmed_by=$8, confirmed_at=NOW() WHERE id=$9`,
+      [status, ruleName, conditionDescription, targetField, operator, String(value), reason, req.user.id, req.params.id]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Engine Rules: Delete
+app.delete('/api/engine-rules/:id', authenticateToken, async (req, res) => {
+  try {
+    await pool.query('DELETE FROM engine_rules WHERE id=$1', [req.params.id]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Start Server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
