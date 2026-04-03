@@ -2812,20 +2812,22 @@
               const fp = latest.finalPlan || latest.engineOutput || latest;
               const hasRecipe = fp.recipe && Array.isArray(fp.recipe) && fp.recipe.length > 0;
               const hasSafety = fp.safetyAlerts && Array.isArray(fp.safetyAlerts) && fp.safetyAlerts.length > 0;
-              
+
               // Only return if it has calories AND a valid recipe/safety (unless it's a 0-calorie edge case)
               if (fp && fp.dailyCalories > 0 && hasRecipe && hasSafety) return latest;
+
+              // Plan exists but needs repair — update IN PLACE, never create a new version
+              console.log("Plan needs repair. Updating in place (no new version)...");
+              const engineOutput = generateNutritionPlan(window.patient);
+              latest.finalPlan = Object.assign({}, engineOutput);
+              latest.engineOutput = engineOutput;
+              latest.overrideNotes = (latest.overrideNotes || '') + '; Auto-repair: Engine hardening applied';
+              updatePlan(latest);
+              return latest;
             }
-            console.log("Plan invalid or empty recipe/safety found. Re-generating to apply latest engine fixes...");
+            // No plan at all — create first plan
             const engineOutput = generateNutritionPlan(window.patient);
-            
-            const prevInsights = (latest && latest.claudeInsights) ? latest.claudeInsights : null;
-            const newPlan = createOrUpdatePlan(window.patient, engineOutput, {}, 'Auto-repair: Engine hardening applied');
-            if (prevInsights) {
-               newPlan.claudeInsights = prevInsights;
-               updatePlan(newPlan);
-            }
-            return newPlan;
+            return createOrUpdatePlan(window.patient, engineOutput, {}, 'Auto-repair: Engine hardening applied');
           }
 
           function bind(plan) {
