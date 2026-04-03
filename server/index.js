@@ -5,6 +5,8 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 require('dotenv').config();
 
+const path = require('path');
+
 const app = express();
 const corsOptions = {
   origin: '*',
@@ -14,6 +16,9 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
 app.use(express.json());
+
+// Serve frontend static files (HTML, JS, CSS) from the project root
+app.use(express.static(path.join(__dirname, '..')));
 
 // Database Connection
 const pool = new Pool({
