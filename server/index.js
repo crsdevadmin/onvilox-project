@@ -6,7 +6,13 @@ const jwt = require('jsonwebtoken');
 require('dotenv').config();
 
 const app = express();
-app.use(cors());
+const corsOptions = {
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Claude-Context']
+};
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 app.use(express.json());
 
 // Database Connection
@@ -83,7 +89,7 @@ app.post('/api/patients', authenticateToken, async (req, res) => {
         $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,
         $17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,
         $34,$35,$36,$37,$38,$39,$40,$41,$42,$43,$44,$45,$46,$47,$48,$49,$50,
-        $51,$52,$53,$54,$55,$56,$57,$58,$59,$60,$61
+        $51,$52,$53,$54,$55,$56,$57,$58,$59,$60,$61,$62
       )
       ON CONFLICT (id) DO UPDATE SET full_data = EXCLUDED.full_data`,
       [
@@ -336,8 +342,14 @@ app.put('/api/nutrition-plans/:id', authenticateToken, async (req, res) => {
 // Users: Get All (admin)
 app.get('/api/users', authenticateToken, async (req, res) => {
   try {
-    const result = await pool.query('SELECT id, name, email, role, hospital_name, created_at FROM users ORDER BY created_at DESC');
-    res.json(result.rows);
+    const result = await pool.query('SELECT id, name, email, phone, role, hospital_name, store_id, created_at FROM users ORDER BY created_at DESC');
+    const rows = result.rows.map(u => ({
+      ...u,
+      username: u.email || u.phone,
+      hospitalName: u.hospital_name,
+      storeId: u.store_id
+    }));
+    res.json(rows);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -351,6 +363,124 @@ app.post('/api/users', authenticateToken, async (req, res) => {
     const result = await pool.query(
       'INSERT INTO users (id, name, email, password_hash, role, hospital_name) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id, name, email, role, hospital_name',
       [id || `user_${Date.now()}`, name, email, hash, role, hospital_name]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Users: Delete
+app.delete('/api/users/:id', authenticateToken, async (req, res) => {
+  try {
+    await pool.query('DELETE FROM users WHERE id = $1', [req.params.id]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Users: Reset Password
+app.put('/api/users/:id/password', authenticateToken, async (req, res) => {
+  const { password } = req.body;
+  try {
+    const hash = await bcrypt.hash(password, 10);
+    await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [hash, req.params.id]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Stores: Get All
+app.get('/api/stores', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM stores ORDER BY created_at DESC');
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Stores: Create
+app.post('/api/stores', authenticateToken, async (req, res) => {
+  const { id, name, hospital, location } = req.body;
+  try {
+    const result = await pool.query(
+      'INSERT INTO stores (id, name, hospital, location) VALUES ($1,$2,$3,$4) RETURNING *',
+      [id || `store_${Date.now()}`, name, hospital || '', location || '']
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Stores: Delete
+app.delete('/api/stores/:id', authenticateToken, async (req, res) => {
+  try {
+    await pool.query('DELETE FROM stores WHERE id = $1', [req.params.id]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Manufacturing Jobs: Get All
+app.get('/api/manufacturing-jobs', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM manufacturing_jobs ORDER BY created_at DESC');
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Manufacturing Jobs: Create
+app.post('/api/manufacturing-jobs', authenticateToken, async (req, res) => {
+  const j = req.body;
+  try {
+    const result = await pool.query(
+      'INSERT INTO manufacturing_jobs (id, patient_id, store_id, doctor_id, status, history) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *',
+      [j.id, j.patientId, j.storeId, j.doctorId, j.status || 'APPROVED', JSON.stringify(j.history || [])]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Manufacturing Jobs: Update Status
+app.put('/api/manufacturing-jobs/:id', authenticateToken, async (req, res) => {
+  const { status, history } = req.body;
+  try {
+    const result = await pool.query(
+      'UPDATE manufacturing_jobs SET status=$1, history=$2, updated_at=NOW() WHERE id=$3 RETURNING *',
+      [status, JSON.stringify(history || []), req.params.id]
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Mappings: Get doctor-assistant map
+app.get('/api/mappings', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM doctor_assistant_map');
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Mappings: Create
+app.post('/api/mappings', authenticateToken, async (req, res) => {
+  const { assistantId, doctorId } = req.body;
+  try {
+    const result = await pool.query(
+      'INSERT INTO doctor_assistant_map (assistant_id, doctor_id) VALUES ($1,$2) RETURNING *',
+      [assistantId, doctorId]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -524,9 +654,26 @@ app.get('/api/list-models', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// In-memory job store for async AI report generation
+const __aiJobs = {};
+
+app.get('/api/claude-report/status/:jobId', (req, res) => {
+  const job = __aiJobs[req.params.jobId];
+  if (!job) return res.status(404).json({ error: 'Job not found' });
+  res.json(job);
+});
+
 app.post('/api/claude-report', async (req, res) => {
   const { patient, plan } = req.body;
   if (!patient || !plan) return res.status(400).json({ error: 'Context required.' });
+
+  // Return a jobId immediately so Cloudflare doesn't timeout
+  const jobId = 'job_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+  __aiJobs[jobId] = { status: 'pending' };
+  res.json({ jobId });
+
+  // Run Claude in background (no await — response already sent)
+  (async () => {
 
   try {
     const system = `You are the Onvilox Clinical AI Auditor — Oncology RD/PhD level. You receive a patient profile and a rules-engine-generated nutrition plan. Your job is to:
@@ -657,7 +804,7 @@ OUTPUT FORMAT — return ONLY valid JSON, no markdown, no text outside the JSON 
 
     const msg = await anthropic.messages.create({
       model: "claude-sonnet-4-6",
-      max_tokens: 16000,
+      max_tokens: 8192,
       system: system,
       messages: [{
         role: "user",
@@ -745,11 +892,14 @@ OUTPUT FORMAT — return ONLY valid JSON, no markdown, no text outside the JSON 
         monitoringSchedule: grabArr('monitoringSchedule')
       };
     }
-    res.json(data);
+    __aiJobs[jobId] = { status: 'done', data };
+    // Clean up job after 10 minutes
+    setTimeout(() => { delete __aiJobs[jobId]; }, 10 * 60 * 1000);
   } catch (error) {
     console.error("Claude Report Error:", error);
-    res.status(500).json({ error: error.message });
+    __aiJobs[jobId] = { status: 'error', error: error.message };
   }
+  })();
 });
 
 // Start Server

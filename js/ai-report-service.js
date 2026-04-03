@@ -100,27 +100,32 @@ const aiReportService = {
         const apiBase = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : '';
         const payload = this.preparePayload(patient, plan);
 
-        try {
-            const response = await fetch(`${apiBase}/api/claude-report`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json; charset=utf-8',
-                    'X-Claude-Context': 'PatientReport'
-                },
-                body: JSON.stringify(payload)
-            });
-
-            if (!response.ok) {
-                const errData = await response.json();
-                throw new Error(errData.details || errData.error || 'AI request failed');
-            }
-
-            const data = await response.json();
-            console.log("AI Auditor Response Received:", data);
-            return data;
-        } catch (error) {
-            console.error("AI Insight Generation Failed:", error);
-            throw error;
+        // Step 1: Submit job, get jobId immediately
+        const submitRes = await fetch(`${apiBase}/api/claude-report`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json; charset=utf-8' },
+            body: JSON.stringify(payload)
+        });
+        if (!submitRes.ok) {
+            const errData = await submitRes.json();
+            throw new Error(errData.error || 'AI request failed');
         }
+        const { jobId } = await submitRes.json();
+        if (!jobId) throw new Error('No jobId returned');
+
+        // Step 2: Poll until done (max 3 minutes, every 4 seconds)
+        const maxAttempts = 45;
+        for (let i = 0; i < maxAttempts; i++) {
+            await new Promise(r => setTimeout(r, 4000));
+            const pollRes = await fetch(`${apiBase}/api/claude-report/status/${jobId}`);
+            if (!pollRes.ok) continue;
+            const job = await pollRes.json();
+            if (job.status === 'done') {
+                console.log("AI Auditor Response Received:", job.data);
+                return job.data;
+            }
+            if (job.status === 'error') throw new Error(job.error || 'AI job failed');
+        }
+        throw new Error('AI report timed out after 3 minutes');
     }
 };
