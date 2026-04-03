@@ -643,7 +643,13 @@
           <div class="rrisk">
             <div class="rb rb-i" id="catBmi">BMI <span id="pBMI"></span></div>
             <div class="rb rb-h" id="catAsianBmi"><span id="pAsianBMI"></span></div>
-            <div class="rb rb-m" id="catNutrition">High Risk</div>
+            <div class="rb rb-m" id="catNutrition" style="position:relative;cursor:help;" title="">High Risk
+              <span id="mustTooltip" style="display:none;position:absolute;top:100%;left:0;margin-top:6px;background:#1e293b;color:#f1f5f9;border-radius:8px;padding:10px 13px;font-size:11px;font-weight:500;white-space:nowrap;z-index:999;box-shadow:0 4px 16px rgba(0,0,0,0.4);line-height:1.8;">
+                <b style="color:#94a3b8;font-size:10px;letter-spacing:0.08em;">MUST SCORE BREAKDOWN</b><br>
+                BMI: <span id="mustBmiPts"></span> pts &nbsp;|&nbsp; Weight Loss: <span id="mustWlPts"></span> pts &nbsp;|&nbsp; Acute Disease: <span id="mustAcutePts"></span> pts<br>
+                Total: <span id="mustTotalPts"></span> &nbsp;→&nbsp; <span id="mustRiskLabel"></span>
+              </span>
+            </div>
             <div class="rb rb-i">Clinical Fit: <span id="pFitScore"></span>%</div>
           </div>
 
@@ -3002,7 +3008,7 @@
             setVal('pAge', patient.age + ' years');
             setVal('pSex', patient.sex);
             setVal('pWeight', patient.weight + ' kg');
-            setVal('pWeight2', patient.weight + ' kg');
+            setVal('pWeight2', patient.weight);
             setVal('pHeight', patient.height + ' cm');
             setVal('pMUAC', (patient.muac ? patient.muac + ' cm' : '-'));
             const sex = (patient.sex || '').toLowerCase();
@@ -3094,7 +3100,7 @@
 
             setVal('pIBW', computeHamwiIBW() + ' kg');
             setVal('pUW', (patient.usualWeight ? patient.usualWeight + ' kg' : '-'));
-            setVal('pUW2', (patient.usualWeight ? patient.usualWeight + ' kg' : '-'));
+            setVal('pUW2', (patient.usualWeight ? patient.usualWeight : '-'));
             setVal('pWL', (patient.weightLossPercent ?? '-') + ' %');
             setVal('pCancer_header', patient.cancer);
             setVal('pRegimen_header', patient.regimen);
@@ -3595,6 +3601,31 @@
             const bmiVal = fp.bmi != null ? fp.bmi : computeBMI();
             setVal('riskBmi', bmiVal < 18.5 ? `Low BMI (${bmiVal})` : `Within range (${bmiVal})`);
             setVal('pFitScore', fp.feasibilityScore != null ? fp.feasibilityScore : '100');
+            const catEl = document.getElementById('catNutrition');
+            if (catEl) {
+              const mustScore = fp.mustTotal != null ? fp.mustTotal : 0;
+              let riskLabel, riskClass;
+              if (mustScore === 0)      { riskLabel = 'Low Risk';    riskClass = 'rb-s'; }
+              else if (mustScore === 1) { riskLabel = 'Medium Risk'; riskClass = 'rb-i'; }
+              else                      { riskLabel = 'High Risk';   riskClass = 'rb-m'; }
+              const tooltip = document.getElementById('mustTooltip');
+              catEl.childNodes[0].textContent = riskLabel + ' ';
+              catEl.className = 'rb ' + riskClass;
+              catEl.style.position = 'relative';
+              catEl.style.cursor = 'help';
+              if (tooltip) {
+                const bmiPts  = fp.mustBMIScore   != null ? fp.mustBMIScore   : (fp.bmi < 18.5 ? 2 : fp.bmi <= 20 ? 1 : 0);
+                const wlPts   = fp.mustWLScore    != null ? fp.mustWLScore    : 0;
+                const actPts  = fp.mustAcuteScore != null ? fp.mustAcuteScore : 0;
+                document.getElementById('mustBmiPts').textContent    = bmiPts;
+                document.getElementById('mustWlPts').textContent     = wlPts;
+                document.getElementById('mustAcutePts').textContent  = actPts;
+                document.getElementById('mustTotalPts').textContent  = mustScore;
+                document.getElementById('mustRiskLabel').textContent = riskLabel;
+                catEl.addEventListener('mouseenter', () => tooltip.style.display = 'block');
+                catEl.addEventListener('mouseleave', () => tooltip.style.display = 'none');
+              }
+            }
 
             // Mandatory Investigations Banner
             const miContainer = document.getElementById('mandatoryInvestigationsContainer');

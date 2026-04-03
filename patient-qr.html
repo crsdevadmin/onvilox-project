@@ -99,6 +99,20 @@
           </div>
         </div>
 
+        <!-- MUST SCORE BANNER -->
+        <div id="mustBanner" style="display:none;margin-bottom:14px;border-radius:12px;padding:14px 18px;border:1px solid #e5e7eb;background:#f8fafc;">
+          <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;color:#64748b;margin-bottom:8px;">MUST Score — Malnutrition Universal Screening Tool (BAPEN)</div>
+          <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;">
+            <div id="mustRiskBadge" style="padding:6px 14px;border-radius:999px;font-size:13px;font-weight:800;"></div>
+            <div style="display:flex;gap:16px;font-size:13px;color:#374151;">
+              <span>BMI score: <b id="qrMustBmi"></b> pts</span>
+              <span>Weight loss score: <b id="qrMustWl"></b> pts</span>
+              <span>Acute disease score: <b id="qrMustAcute"></b> pts</span>
+              <span>Total: <b id="qrMustTotal"></b></span>
+            </div>
+          </div>
+        </div>
+
         <div style="height:14px;"></div><div style="color:#6b7280;font-size:12.5px;margin:0 2px 14px;">This view reflects the latest saved patient data and nutrition plan available in Gquence.</div>
 
         <div class="qr-grid">
@@ -114,7 +128,7 @@
           </div>
 
           <div class="qr-section" id="planCard" style="display:none;">
-            <h3>Nutrition Prescription <small>(latest plan)</small></h3>
+            <h3>Nutrition Prescription <small>(recommended plan)</small></h3>
             <table class="qr-table">
               <tr><th>Daily Calories</th><td id="plCalories"></td></tr>
               <tr><th>Daily Protein</th><td id="plProtein"></td></tr>
@@ -256,6 +270,21 @@
     setText('plMicros', microParts.length ? microParts.join(' • ') : '-');
 
     setText('plNotes', plan.overrideNotes || '-');
+
+    // MUST score banner
+    if (fp.mustTotal != null) {
+      const mustScore = fp.mustTotal;
+      const banner = document.getElementById('mustBanner');
+      const badge  = document.getElementById('mustRiskBadge');
+      banner.style.display = '';
+      document.getElementById('qrMustBmi').textContent   = fp.mustBMIScore   ?? '-';
+      document.getElementById('qrMustWl').textContent    = fp.mustWLScore    ?? '-';
+      document.getElementById('qrMustAcute').textContent = fp.mustAcuteScore ?? '-';
+      document.getElementById('qrMustTotal').textContent = mustScore;
+      if (mustScore === 0)      { badge.textContent = 'Low Risk';    badge.style.background = '#dcfce7'; badge.style.color = '#166534'; }
+      else if (mustScore === 1) { badge.textContent = 'Medium Risk'; badge.style.background = '#fef9c3'; badge.style.color = '#854d0e'; }
+      else                      { badge.textContent = 'High Risk';   badge.style.background = '#fee2e2'; badge.style.color = '#991b1b'; }
+    }
 
     const meta = [];
     meta.push('Plan Source: ' + (plan.generatedBy || 'ENGINE'));

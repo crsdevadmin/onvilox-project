@@ -1052,7 +1052,7 @@ function generateNutritionPlan(patient, engineConfig) {
     hasRenalIssue,
     hasHighRiskRegimen: (chemFlags.bortezomib || regimen.includes('cisplatin') || regimen.includes('platin') || regimen.includes('lenalidomide')),
     weightBasis, ibw, calcWeight,
-    refeedingProtocol, mustTotal, mustRisk,
+    refeedingProtocol, mustTotal, mustRisk, mustBMIScore, mustWLScore, mustAcuteScore,
     prescribedRoute: (() => {
       const alreadyEnteral = (patient.feedingMethod || '').toLowerCase().includes('enteral');
       if (alreadyEnteral || actualIntake <= fv('intake_mandatory_en', 50)) return "Enteral Tube Feeding (Escalation)";
