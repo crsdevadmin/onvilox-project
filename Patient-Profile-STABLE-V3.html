@@ -978,6 +978,30 @@
                 <td>BCAA (Branched-Chain Amino Acids)</td>
                 <td id="bcaa"></td>
               </tr>
+              <tr id="glutathioneRow" style="display:none;">
+                <td>Glutathione</td>
+                <td id="glutathione"></td>
+              </tr>
+              <tr id="vitERow" style="display:none;">
+                <td>Vitamin E</td>
+                <td id="vitE"></td>
+              </tr>
+              <tr id="nacRow" style="display:none;">
+                <td>NAC (N-Acetylcysteine)</td>
+                <td id="nac"></td>
+              </tr>
+              <tr id="coenzymeQ10Row" style="display:none;">
+                <td>Coenzyme Q10</td>
+                <td id="coenzymeQ10"></td>
+              </tr>
+              <tr id="curcuminRow" style="display:none;">
+                <td>Curcumin</td>
+                <td id="curcumin"></td>
+              </tr>
+              <tr id="greenTeaRow" style="display:none;">
+                <td>Green Tea Extract</td>
+                <td id="greenTea"></td>
+              </tr>
             </tbody>
           </table>
         </div>
@@ -3295,6 +3319,37 @@
             } else {
               document.getElementById('alaRow').style.display = 'none';
             }
+
+            // --- Group 1 & 2 Antioxidant / Conditional Micronutrients ---
+            // Always shown when active chemo present; hidden for post-treatment / no-chemo patients
+            const antioxFields = [
+              { key: 'glutathione', rowId: 'glutathioneRow', elId: 'glutathione' },
+              { key: 'vitE',        rowId: 'vitERow',        elId: 'vitE' },
+              { key: 'nac',         rowId: 'nacRow',         elId: 'nac' },
+              { key: 'coenzymeQ10', rowId: 'coenzymeQ10Row', elId: 'coenzymeQ10' },
+              { key: 'curcumin',    rowId: 'curcuminRow',    elId: 'curcumin' },
+              { key: 'greenTea',    rowId: 'greenTeaRow',    elId: 'greenTea' },
+            ];
+            antioxFields.forEach(({ key, rowId, elId }) => {
+              const val = fp.micronutrients && fp.micronutrients[key];
+              const row = document.getElementById(rowId);
+              const el  = document.getElementById(elId);
+              if (!row || !el) return;
+              if (val) {
+                row.style.display = 'table-row';
+                const isRestricted = val.startsWith('CONTRAINDICATED') || val.startsWith('STRICTLY') || val.startsWith('RESTRICTED') || val.startsWith('HIGH-DOSE RESTRICTED');
+                const isCaution = val.startsWith('CAUTION') || val.startsWith('Use with caution') || val.startsWith('Pharmacological');
+                if (isRestricted) {
+                  el.innerHTML = `<span style="background:#fee2e2;border:1px solid #fca5a5;color:#991b1b;font-size:10px;font-weight:800;padding:2px 8px;border-radius:4px;display:inline-block;">⛔ RESTRICTED</span> <span style="font-size:11px;color:#374151;margin-left:6px;">${val}</span>`;
+                } else if (isCaution) {
+                  el.innerHTML = `<span style="background:#fef3c7;border:1px solid #fbbf24;color:#92400e;font-size:10px;font-weight:800;padding:2px 8px;border-radius:4px;display:inline-block;">⚠ CAUTION</span> <span style="font-size:11px;color:#374151;margin-left:6px;">${val}</span>`;
+                } else {
+                  el.textContent = val;
+                }
+              } else {
+                row.style.display = 'none';
+              }
+            });
 
             // --- CLINICAL HOLD ORDERS SECTION ---
             (function() {
