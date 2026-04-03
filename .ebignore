@@ -1,0 +1,13 @@
+server/node_modules/
+server/.env
+server/.env.local
+server/.elasticbeanstalk/
+*.log
+.git/
+.vscode/
+.claude/
+compare_data.js
+regex-test.js
+inject.py
+inject-theme.ps1
+test_models.js
