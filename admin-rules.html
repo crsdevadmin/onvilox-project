@@ -72,6 +72,7 @@
     <div class="stat-card"><div class="stat-num" id="statActive">—</div><div class="stat-lbl">Active Rules</div></div>
     <div class="stat-card"><div class="stat-num" id="statPromoted">—</div><div class="stat-lbl">Promoted</div></div>
     <div class="stat-card"><div class="stat-num" id="statRejected">—</div><div class="stat-lbl">Rejected</div></div>
+    <div class="stat-card"><div class="stat-num" id="statFormulas">—</div><div class="stat-lbl">Engine Formulas</div></div>
   </div>
 
   <!-- Tabs -->
@@ -79,6 +80,7 @@
     <button class="tab-btn active" onclick="switchTab('corrections')">📥 AI Corrections (Pending Review)</button>
     <button class="tab-btn" onclick="switchTab('rules')">✅ Active Engine Rules</button>
     <button class="tab-btn" onclick="switchTab('history')">📋 All History</button>
+    <button class="tab-btn" onclick="switchTab('formulas')">⚙️ Engine Formulas</button>
   </div>
 
   <!-- TAB: AI Corrections -->
@@ -153,6 +155,19 @@
     </table>
   </div>
 
+  <!-- TAB: Engine Formulas -->
+  <div id="tab-formulas" class="section">
+    <p style="font-size:11.5px; color:#64748b; margin-bottom:4px;">
+      All clinical constants currently hardcoded in the nutrition engine — seeded into the database for visibility and future dynamic loading.
+      Edit a value and click <b>Save</b> to update the database record.
+    </p>
+    <div style="font-size:10.5px; background:#fef3c7; border:1px solid #fbbf24; border-radius:6px; padding:8px 12px; margin-bottom:16px; color:#92400e; font-weight:600;">
+      ⚠️ Note: Editing here updates the database only. The engine still reads from JS code until Part 3 (engine DB integration) is deployed.
+      These values serve as the reference record and will become the live source of truth once engine DB reading is enabled.
+    </div>
+    <div id="formulasContent"><div class="empty-state">Loading...</div></div>
+  </div>
+
 </div>
 
 <!-- PROMOTE TO RULE MODAL -->
@@ -209,7 +224,7 @@
 </div>
 
 <script src="js/config.js"></script>
-<script src="js/db.js"></script>
+<script src="js/storage.js"></script>
 <script src="js/auth.js"></script>
 <script>
 
@@ -222,19 +237,23 @@
 
   let _corrections = [];
   let _rules = [];
+  let _formulas = [];
 
   async function loadAll() {
     try {
-      const [cRes, rRes] = await Promise.all([
+      const [cRes, rRes, fRes] = await Promise.all([
         fetch(`${apiBase}/api/ai-corrections`, { headers: headers() }),
-        fetch(`${apiBase}/api/engine-rules`, { headers: headers() })
+        fetch(`${apiBase}/api/engine-rules`, { headers: headers() }),
+        fetch(`${apiBase}/api/engine-formulas`, { headers: headers() })
       ]);
       _corrections = cRes.ok ? await cRes.json() : [];
       _rules = rRes.ok ? await rRes.json() : [];
+      _formulas = fRes.ok ? await fRes.json() : [];
       renderStats();
       renderCorrections();
       renderRules();
       renderHistory();
+      renderFormulas();
     } catch (e) {
       console.error('Load error:', e);
     }
@@ -245,6 +264,7 @@
     document.getElementById('statActive').textContent = _rules.filter(r => r.status === 'active').length;
     document.getElementById('statPromoted').textContent = _corrections.filter(c => c.status === 'promoted').length;
     document.getElementById('statRejected').textContent = _corrections.filter(c => c.status === 'rejected').length;
+    document.getElementById('statFormulas').textContent = _formulas.length || '—';
   }
 
   function changesHtml(changes) {
@@ -336,12 +356,103 @@
   }
 
   function switchTab(name) {
+    const tabs = ['corrections','rules','history','formulas'];
     document.querySelectorAll('.tab-btn').forEach((b,i) => {
-      const tabs = ['corrections','rules','history'];
       b.classList.toggle('active', tabs[i] === name);
     });
     document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
     document.getElementById('tab-' + name).classList.add('active');
+  }
+
+  const CATEGORY_LABELS = {
+    calories:     '🔥 Calorie Targets (kcal/kg)',
+    protein:      '💪 Protein Targets (g/kg)',
+    weight:       '⚖️ Ideal Body Weight — Devine Formula',
+    risk_scoring: '📊 Risk Scoring Thresholds',
+    sarcopenia:   '🦴 Sarcopenia Thresholds (EWGSOP2 / Janssen–Martin)',
+    safety_labs:  '🧪 Safety Lab Thresholds',
+    refeeding:    '⚠️ Refeeding Syndrome (NICE CG32)',
+    macros:       '🥗 Macro Distribution Ratios',
+    escalation:   '📈 Intake / Escalation Thresholds',
+    fluid:        '💧 Fluid Targets',
+    servings:     '🍽️ Serving Frequency'
+  };
+
+  function renderFormulas() {
+    const container = document.getElementById('formulasContent');
+    if (!_formulas.length) {
+      container.innerHTML = '<div class="empty-state">No formula constants found — check server connection.</div>';
+      return;
+    }
+    const groups = {};
+    _formulas.forEach(f => {
+      if (!groups[f.category]) groups[f.category] = [];
+      groups[f.category].push(f);
+    });
+    const catOrder = ['calories','protein','weight','risk_scoring','sarcopenia','safety_labs','refeeding','macros','escalation','fluid','servings'];
+    const orderedCats = [...catOrder.filter(c => groups[c]), ...Object.keys(groups).filter(c => !catOrder.includes(c))];
+
+    let html = '';
+    orderedCats.forEach(cat => {
+      const label = CATEGORY_LABELS[cat] || cat;
+      html += `
+        <div style="margin-bottom:28px;">
+          <div style="font-size:12px;font-weight:800;color:#0e2247;margin-bottom:8px;padding-bottom:6px;border-bottom:2px solid #e2e8f0;">${label}</div>
+          <table class="rule-table">
+            <thead>
+              <tr>
+                <th style="width:200px;">Constant ID</th>
+                <th>Description</th>
+                <th style="width:110px;">Value</th>
+                <th style="width:90px;">Unit</th>
+                <th>Clinical Source</th>
+                <th style="width:70px;">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${groups[cat].map(f => `
+                <tr>
+                  <td style="font-weight:700;font-family:monospace;font-size:10px;color:#6d28d9;">${f.name}</td>
+                  <td style="font-size:10.5px;">${f.description || '—'}</td>
+                  <td>
+                    <input type="text" id="fval_${f.id}" value="${f.value}"
+                      style="width:90px;padding:4px 6px;border:1px solid #cbd5e1;border-radius:4px;font-size:12px;font-weight:800;color:#0e2247;text-align:center;">
+                  </td>
+                  <td style="font-size:10.5px;color:#64748b;">${f.unit || '—'}</td>
+                  <td style="font-size:10.5px;color:#64748b;">${f.source || '—'}</td>
+                  <td>
+                    <button onclick="saveFormula('${f.id}')" style="background:#0e2247;color:white;border:none;border-radius:4px;padding:4px 10px;font-size:10px;font-weight:700;cursor:pointer;">
+                      💾 Save
+                    </button>
+                  </td>
+                </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>`;
+    });
+    container.innerHTML = html;
+  }
+
+  async function saveFormula(id) {
+    const input = document.getElementById('fval_' + id);
+    if (!input) return;
+    const value = input.value.trim();
+    if (!value) { alert('Value cannot be empty.'); return; }
+    try {
+      const res = await fetch(`${apiBase}/api/engine-formulas/${id}`, {
+        method: 'PUT',
+        headers: headers(),
+        body: JSON.stringify({ value })
+      });
+      if (!res.ok) throw new Error(await res.text());
+      input.style.background = '#dcfce7';
+      setTimeout(() => { input.style.background = ''; }, 2500);
+      // Update local cache
+      const f = _formulas.find(f => f.id === id);
+      if (f) f.value = value;
+    } catch (e) {
+      alert('Error saving: ' + e.message);
+    }
   }
 
   // PROMOTE MODAL

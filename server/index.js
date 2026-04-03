@@ -643,7 +643,11 @@ app.post('/api/chat', async (req, res) => {
     res.json(data);
   } catch (error) {
     console.error("Claude Chat Error:", error);
-    res.status(500).json({ error: 'Failed' });
+    if (error.status === 429) {
+      return res.status(429).json({ error: 'AI rate limit reached. Please wait a moment and try again.' });
+    }
+    const msg = error.message || 'AI extraction failed';
+    res.status(500).json({ error: msg });
   }
 });
 
@@ -938,6 +942,118 @@ OUTPUT FORMAT — return ONLY valid JSON, no markdown, no text outside the JSON 
         confirmed_at TIMESTAMPTZ
       )
     `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS engine_formulas (
+        id TEXT PRIMARY KEY,
+        category TEXT NOT NULL,
+        name TEXT NOT NULL,
+        description TEXT,
+        value TEXT NOT NULL,
+        unit TEXT,
+        source TEXT,
+        editable BOOLEAN DEFAULT true,
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+
+    // Seed engine_formulas if empty
+    const fCount = await pool.query('SELECT COUNT(*) FROM engine_formulas');
+    if (parseInt(fCount.rows[0].count) === 0) {
+      const formulas = [
+        // ── Calorie Targets ───────────────────────────────────────────────────
+        { id:'kcal_stable',               category:'calories',     name:'kcal_stable',               description:'Calorie target — Stable, no cachexia or significant risk',                                     value:'25',   unit:'kcal/kg',      source:'ESPEN Oncology 2021' },
+        { id:'kcal_moderate_risk',        category:'calories',     name:'kcal_moderate_risk',        description:'Calorie target — Moderate risk (WL ≥5%, ECOG ≥2, Age ≥70)',                                   value:'30',   unit:'kcal/kg',      source:'ESPEN Oncology 2021' },
+        { id:'kcal_cachexia',             category:'calories',     name:'kcal_cachexia',             description:'Calorie target — Cachexia/Severe (albumin <3.5, WL ≥10%, BMI <18.5, CRP >10, sarcopenia)',    value:'35',   unit:'kcal/kg',      source:'ESPEN Oncology 2021' },
+        { id:'kcal_active_chemo_min',     category:'calories',     name:'kcal_active_chemo_min',     description:'Minimum calorie floor for any active chemotherapy regimen (stable patients)',                   value:'28',   unit:'kcal/kg',      source:'ESPEN Oncology 2021' },
+        { id:'kcal_appetite_loss_floor',  category:'calories',     name:'kcal_appetite_loss_floor',  description:'Calorie floor when appetite loss side effect is present',                                       value:'32',   unit:'kcal/kg',      source:'Clinical' },
+        // ── Protein Targets ───────────────────────────────────────────────────
+        { id:'protein_baseline',          category:'protein',      name:'protein_baseline',          description:'Protein target — Baseline stable (no cachexia/moderate risk)',                                  value:'1.4',  unit:'g/kg',         source:'ESPEN Oncology 2021' },
+        { id:'protein_cachexia',          category:'protein',      name:'protein_cachexia',          description:'Protein target — Cachexia or moderate risk',                                                   value:'1.8',  unit:'g/kg',         source:'ESPEN Oncology 2021' },
+        { id:'protein_renal',             category:'protein',      name:'protein_renal',             description:'Protein cap — Renal disease/impairment (KDIGO strict limit, highest priority)',                 value:'0.8',  unit:'g/kg',         source:'KDIGO 2012' },
+        { id:'protein_elderly_min',       category:'protein',      name:'protein_elderly_min',       description:'Protein floor — Elderly patients (Age ≥70)',                                                   value:'1.5',  unit:'g/kg',         source:'ESPEN Geriatric 2018' },
+        { id:'protein_high_catabolism',   category:'protein',      name:'protein_high_catabolism',   description:'Protein target — High catabolism (Platinum/FOLFIRINOX/immunotherapy + cachexia or sarcopenia)', value:'2.0',  unit:'g/kg',         source:'ESPEN Oncology 2021' },
+        // ── Ideal Body Weight (Devine Formula) ───────────────────────────────
+        { id:'ibw_base_male',             category:'weight',       name:'ibw_base_male',             description:'IBW base weight for males at exactly 5 ft (Devine Formula)',                                    value:'50',   unit:'kg',           source:'Devine 1974' },
+        { id:'ibw_base_female',           category:'weight',       name:'ibw_base_female',           description:'IBW base weight for females at exactly 5 ft (Devine Formula)',                                  value:'45.5', unit:'kg',           source:'Devine 1974' },
+        { id:'ibw_per_inch',              category:'weight',       name:'ibw_per_inch',              description:'IBW increment per inch of height above 5 ft (Devine Formula)',                                  value:'2.3',  unit:'kg/inch',      source:'Devine 1974' },
+        { id:'adjbw_factor',              category:'weight',       name:'adjbw_factor',              description:'Adjusted Body Weight factor (fraction of excess weight added to IBW when BMI ≥30)',             value:'0.25', unit:'fraction',     source:'ASPEN' },
+        { id:'bmi_obesity_threshold',     category:'weight',       name:'bmi_obesity_threshold',     description:'BMI threshold above which AdjBW replaces Actual Body Weight for calorie calculation',           value:'30',   unit:'kg/m²',        source:'ESPEN/ASPEN' },
+        // ── Risk Scoring ──────────────────────────────────────────────────────
+        { id:'albumin_low_threshold',     category:'risk_scoring', name:'albumin_low_threshold',     description:'Albumin below this value adds +2 to nutrition risk score',                                      value:'3.5',  unit:'g/dL',         source:'GLIM Criteria 2019' },
+        { id:'albumin_critical_threshold',category:'risk_scoring', name:'albumin_critical_threshold',description:'Albumin below this value used as a compound malnutrition factor',                               value:'3.0',  unit:'g/dL',         source:'Clinical' },
+        { id:'weight_loss_high',          category:'risk_scoring', name:'weight_loss_high',          description:'Weight loss at or above this value adds +2 to risk score (cachexia trigger)',                   value:'10',   unit:'%',            source:'GLIM/MUST' },
+        { id:'weight_loss_moderate',      category:'risk_scoring', name:'weight_loss_moderate',      description:'Weight loss at or above this value adds +1 to risk score (moderate risk trigger)',              value:'5',    unit:'%',            source:'GLIM/MUST' },
+        { id:'bmi_low_threshold',         category:'risk_scoring', name:'bmi_low_threshold',         description:'BMI below this value adds +2 to risk score (cachexia trigger)',                                 value:'18.5', unit:'kg/m²',        source:'MUST Score' },
+        { id:'bmi_must_moderate',         category:'risk_scoring', name:'bmi_must_moderate',         description:'BMI at or below this value adds +1 to MUST score',                                             value:'20',   unit:'kg/m²',        source:'MUST Score' },
+        { id:'ecog_moderate_threshold',   category:'risk_scoring', name:'ecog_moderate_threshold',   description:'ECOG at or above this value triggers moderate risk classification and +1 risk score',           value:'2',    unit:'ECOG',         source:'ESPEN' },
+        { id:'age_elderly_threshold',     category:'risk_scoring', name:'age_elderly_threshold',     description:'Age at or above this value triggers moderate risk classification',                               value:'70',   unit:'years',        source:'ESPEN Geriatric 2018' },
+        { id:'risk_score_moderate',       category:'risk_scoring', name:'risk_score_moderate',       description:'Risk score threshold for Moderate nutrition risk classification',                                 value:'2',    unit:'score',        source:'Clinical' },
+        { id:'risk_score_high',           category:'risk_scoring', name:'risk_score_high',           description:'Risk score threshold for High nutrition risk classification',                                    value:'4',    unit:'score',        source:'Clinical' },
+        // ── Sarcopenia Thresholds ─────────────────────────────────────────────
+        { id:'smi_l3_male',               category:'sarcopenia',   name:'smi_l3_male',               description:'L3-SMI sarcopenia threshold for males (Janssen/Martin CT method)',                              value:'55',   unit:'cm²/m²',       source:'Janssen 2004 / Martin 2013' },
+        { id:'smi_l3_female',             category:'sarcopenia',   name:'smi_l3_female',             description:'L3-SMI sarcopenia threshold for females (Janssen/Martin CT method)',                            value:'38.5', unit:'cm²/m²',       source:'Janssen 2004 / Martin 2013' },
+        { id:'asmi_male',                 category:'sarcopenia',   name:'asmi_male',                 description:'Appendicular SMI sarcopenia threshold for males (EWGSOP2 DXA/BIA method)',                      value:'7.0',  unit:'kg/m²',        source:'EWGSOP2 2019' },
+        { id:'asmi_female',               category:'sarcopenia',   name:'asmi_female',               description:'Appendicular SMI sarcopenia threshold for females (EWGSOP2 DXA/BIA method)',                    value:'5.7',  unit:'kg/m²',        source:'EWGSOP2 2019' },
+        { id:'grip_male',                 category:'sarcopenia',   name:'grip_male',                 description:'Hand grip strength sarcopenia threshold for males',                                              value:'26',   unit:'kg',           source:'EWGSOP2 2019' },
+        { id:'grip_female',               category:'sarcopenia',   name:'grip_female',               description:'Hand grip strength sarcopenia threshold for females',                                            value:'18',   unit:'kg',           source:'EWGSOP2 2019' },
+        // ── Safety Lab Thresholds ─────────────────────────────────────────────
+        { id:'creatinine_renal_danger',   category:'safety_labs',  name:'creatinine_renal_danger',   description:'Creatinine above this value triggers KDIGO renal protocol (protein cap to 0.8g/kg)',            value:'1.3',  unit:'mg/dL',        source:'KDIGO 2012' },
+        { id:'creatinine_cisplatin_warn', category:'safety_labs',  name:'creatinine_cisplatin_warn', description:'Creatinine at this level on cisplatin triggers nephrotoxicity warning',                         value:'1.2',  unit:'mg/dL',        source:'Clinical' },
+        { id:'creatinine_low',            category:'safety_labs',  name:'creatinine_low',            description:'Creatinine below this value flags possible muscle wasting',                                      value:'0.6',  unit:'mg/dL',        source:'Clinical' },
+        { id:'blood_sugar_danger',        category:'safety_labs',  name:'blood_sugar_danger',        description:'Blood glucose above this value triggers diabetic danger protocol',                                value:'180',  unit:'mg/dL',        source:'ADA' },
+        { id:'blood_sugar_diabetic',      category:'safety_labs',  name:'blood_sugar_diabetic',      description:'Blood glucose above this value in a known diabetic triggers metabolic alert',                    value:'140',  unit:'mg/dL',        source:'ADA' },
+        { id:'sodium_danger',             category:'safety_labs',  name:'sodium_danger',             description:'Sodium below this value triggers HIGH hyponatremia alert',                                       value:'130',  unit:'mmol/L',       source:'Clinical' },
+        { id:'sodium_warning',            category:'safety_labs',  name:'sodium_warning',            description:'Sodium below this value triggers mild hyponatremia warning',                                     value:'135',  unit:'mmol/L',       source:'Clinical' },
+        { id:'potassium_high',            category:'safety_labs',  name:'potassium_high',            description:'Potassium above this value triggers hyperkalemia protocol',                                      value:'5.0',  unit:'mmol/L',       source:'Clinical' },
+        { id:'potassium_danger',          category:'safety_labs',  name:'potassium_danger',          description:'Potassium above this value is a danger-level hyperkalemia',                                      value:'5.5',  unit:'mmol/L',       source:'Clinical' },
+        { id:'hemoglobin_anemia',         category:'safety_labs',  name:'hemoglobin_anemia',         description:'Hemoglobin below this value triggers anemia protocol (iron + B12)',                              value:'10',   unit:'g/dL',         source:'WHO' },
+        { id:'hemoglobin_low',            category:'safety_labs',  name:'hemoglobin_low',            description:'Hemoglobin below this value adds +1 to nutrition risk score',                                   value:'12',   unit:'g/dL',         source:'WHO' },
+        { id:'vitd_deficiency',           category:'safety_labs',  name:'vitd_deficiency',           description:'Vitamin D below this value triggers deficiency correction (4000 IU/day)',                        value:'20',   unit:'ng/mL',        source:'Endocrine Society' },
+        { id:'vitd_insufficient',         category:'safety_labs',  name:'vitd_insufficient',         description:'Vitamin D below this value is classified as insufficient',                                       value:'30',   unit:'ng/mL',        source:'Endocrine Society' },
+        { id:'magnesium_low',             category:'safety_labs',  name:'magnesium_low',             description:'Magnesium below this value triggers correction protocol (200–400mg Mg)',                         value:'1.7',  unit:'mg/dL',        source:'Clinical' },
+        { id:'tsh_high',                  category:'safety_labs',  name:'tsh_high',                  description:'TSH above this value triggers metabolic rate flag',                                              value:'5.0',  unit:'mU/L',         source:'Clinical' },
+        { id:'prealbumin_low',            category:'safety_labs',  name:'prealbumin_low',            description:'Prealbumin below this value used as a compound malnutrition factor',                             value:'18',   unit:'mg/dL',        source:'Clinical' },
+        { id:'urea_high',                 category:'safety_labs',  name:'urea_high',                 description:'Urea at or above this value contributes to renal issue flag (alongside creatinine)',             value:'50',   unit:'mmol/L',       source:'Clinical' },
+        { id:'wbc_neutropenia',           category:'safety_labs',  name:'wbc_neutropenia',           description:'WBC below this value triggers neutropenia food safety protocol (no live cultures)',              value:'3500', unit:'/µL',          source:'ESMO' },
+        { id:'wbc_severe_neutropenia',    category:'safety_labs',  name:'wbc_severe_neutropenia',    description:'WBC below this value triggers severe neutropenia danger protocol (G-CSF assessment)',            value:'2000', unit:'/µL',          source:'ESMO' },
+        { id:'alt_liver_threshold',       category:'safety_labs',  name:'alt_liver_threshold',       description:'ALT above this value signals liver compromise (+2 risk score)',                                  value:'50',   unit:'IU/L',         source:'Clinical' },
+        { id:'ast_liver_threshold',       category:'safety_labs',  name:'ast_liver_threshold',       description:'AST above this value signals liver compromise (+2 risk score)',                                  value:'50',   unit:'IU/L',         source:'Clinical' },
+        { id:'bilirubin_liver_threshold', category:'safety_labs',  name:'bilirubin_liver_threshold', description:'Bilirubin above this value signals liver compromise (+2 risk score)',                            value:'1.2',  unit:'mg/dL',        source:'Clinical' },
+        // ── Refeeding Syndrome (NICE CG32) ────────────────────────────────────
+        { id:'rf_high_bmi',               category:'refeeding',    name:'rf_high_bmi',               description:'BMI below this value is a NICE CG32 high-risk refeeding criterion',                             value:'16',   unit:'kg/m²',        source:'NICE CG32' },
+        { id:'rf_high_weight_loss',       category:'refeeding',    name:'rf_high_weight_loss',       description:'Weight loss above this value is a NICE CG32 high-risk refeeding criterion',                     value:'15',   unit:'%',            source:'NICE CG32' },
+        { id:'rf_high_potassium',         category:'refeeding',    name:'rf_high_potassium',         description:'Potassium below this value is a NICE CG32 high-risk refeeding criterion',                       value:'3.5',  unit:'mmol/L',       source:'NICE CG32' },
+        { id:'rf_high_phosphate',         category:'refeeding',    name:'rf_high_phosphate',         description:'Phosphate below this value is a NICE CG32 high-risk refeeding criterion',                       value:'0.8',  unit:'mmol/L',       source:'NICE CG32' },
+        { id:'rf_high_magnesium',         category:'refeeding',    name:'rf_high_magnesium',         description:'Magnesium below this value is a NICE CG32 high-risk refeeding criterion',                       value:'0.75', unit:'mmol/L',       source:'NICE CG32' },
+        { id:'rf_high_start_kcal',        category:'refeeding',    name:'rf_high_start_kcal',        description:'Starting calorie dose for HIGH refeeding risk patients (Days 1–3)',                             value:'5',    unit:'kcal/kg',      source:'NICE CG32' },
+        { id:'rf_at_risk_start_kcal',     category:'refeeding',    name:'rf_at_risk_start_kcal',     description:'Starting calorie dose for AT RISK refeeding patients (Days 1–2)',                               value:'10',   unit:'kcal/kg',      source:'NICE CG32' },
+        { id:'rf_at_risk_criteria_min',   category:'refeeding',    name:'rf_at_risk_criteria_min',   description:'Minimum number of at-risk criteria (of 4) required to classify as refeeding at-risk',           value:'2',    unit:'criteria',     source:'NICE CG32' },
+        // ── Macro Distribution ────────────────────────────────────────────────
+        { id:'carb_ratio_standard',       category:'macros',       name:'carb_ratio_standard',       description:'Carbohydrate share of non-protein calories — standard patients',                                 value:'0.45', unit:'fraction',     source:'Clinical' },
+        { id:'carb_ratio_diabetic',       category:'macros',       name:'carb_ratio_diabetic',       description:'Carbohydrate share of non-protein calories — diabetic or inflamed (CRP >5)',                    value:'0.35', unit:'fraction',     source:'Clinical' },
+        // ── Intake / Escalation ───────────────────────────────────────────────
+        { id:'intake_critical',           category:'escalation',   name:'intake_critical',           description:'Oral intake at or below this value triggers immediate enteral tube escalation danger alert',     value:'30',   unit:'% oral intake', source:'ESPEN' },
+        { id:'intake_mandatory_en',       category:'escalation',   name:'intake_mandatory_en',       description:'Oral intake at or below this value makes enteral nutrition mandatory',                           value:'50',   unit:'% oral intake', source:'ESPEN' },
+        { id:'intake_full_replacement',   category:'escalation',   name:'intake_full_replacement',   description:'Oral intake at or below this value triggers full calorie/protein prescription (no deficit gap)', value:'60',   unit:'% oral intake', source:'ESPEN' },
+        // ── Fluid Targets ─────────────────────────────────────────────────────
+        { id:'fluid_min_per_kg',          category:'fluid',        name:'fluid_min_per_kg',          description:'Minimum daily fluid target',                                                                     value:'30',   unit:'ml/kg',        source:'ESPEN' },
+        { id:'fluid_max_per_kg',          category:'fluid',        name:'fluid_max_per_kg',          description:'Maximum daily fluid target',                                                                     value:'35',   unit:'ml/kg',        source:'ESPEN' },
+        // ── Serving Frequency ─────────────────────────────────────────────────
+        { id:'servings_base',             category:'servings',     name:'servings_base',             description:'Standard servings per day (baseline)',                                                           value:'3',    unit:'servings',     source:'Clinical' },
+        { id:'servings_high_threshold',   category:'servings',     name:'servings_high_threshold',   description:'Daily calorie level above which servings increase to 4 (to reduce per-serving volume)',         value:'1800', unit:'kcal',         source:'Clinical' },
+        { id:'servings_high_count',       category:'servings',     name:'servings_high_count',       description:'Servings per day when calories ≥1800 or appetite loss/nausea present',                         value:'4',    unit:'servings',     source:'Clinical' },
+        { id:'servings_very_high_threshold',category:'servings',   name:'servings_very_high_threshold','description':'Daily calorie level above which servings increase to 5',                                     value:'2400', unit:'kcal',         source:'Clinical' },
+        { id:'servings_very_high_count',  category:'servings',     name:'servings_very_high_count',  description:'Servings per day when calories ≥2400',                                                          value:'5',    unit:'servings',     source:'Clinical' },
+      ];
+      for (const f of formulas) {
+        await pool.query(
+          `INSERT INTO engine_formulas (id, category, name, description, value, unit, source, editable)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,true) ON CONFLICT (id) DO NOTHING`,
+          [f.id, f.category, f.name, f.description, f.value, f.unit, f.source]
+        );
+      }
+      console.log(`Engine formulas seeded: ${formulas.length} constants.`);
+    }
     console.log('Rule Engine tables ready.');
   } catch (e) {
     console.error('Rule Engine table init error:', e.message);
@@ -1047,6 +1163,31 @@ app.put('/api/engine-rules/:id', authenticateToken, async (req, res) => {
 app.delete('/api/engine-rules/:id', authenticateToken, async (req, res) => {
   try {
     await pool.query('DELETE FROM engine_rules WHERE id=$1', [req.params.id]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Engine Formulas: Get All
+app.get('/api/engine-formulas', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM engine_formulas ORDER BY category, id');
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Engine Formulas: Update value (admin edits a constant)
+app.put('/api/engine-formulas/:id', authenticateToken, async (req, res) => {
+  const { value } = req.body;
+  if (!value && value !== 0) return res.status(400).json({ error: 'value required' });
+  try {
+    await pool.query(
+      'UPDATE engine_formulas SET value=$1, updated_at=NOW() WHERE id=$2',
+      [String(value), req.params.id]
+    );
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });

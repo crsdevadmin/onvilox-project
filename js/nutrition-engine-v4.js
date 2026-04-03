@@ -98,7 +98,13 @@ function generateNutritionPlan(patient) {
     taxane: regimen.includes('taxane') || regimen.includes('paclitaxel') || regimen.includes('docetaxel'),
     rchop: regimen.includes('r-chop') || regimen.includes('rchop') || regimen.includes('chop'),
     vincristine: regimen.includes('vincristine') || regimen.includes('r-chop') || regimen.includes('rchop') || regimen.includes('chop'),
-    steroid: regimen.includes('prednisolone') || regimen.includes('prednisone') || regimen.includes('r-chop') || regimen.includes('rchop') || regimen.includes('chop') || regimen.includes('dexamethasone') || regimen.includes('dexa')
+    steroid: regimen.includes('prednisolone') || regimen.includes('prednisone') || regimen.includes('r-chop') || regimen.includes('rchop') || regimen.includes('chop') || regimen.includes('dexamethasone') || regimen.includes('dexa'),
+    olaparib: regimen.includes('olaparib') || regimen.includes('lynparza'),
+    gemcitabine: regimen.includes('gemcitabine') || regimen.includes('gem-cis') || regimen.includes('gemcis') || regimen.includes('abc-02'),
+    nivolumab: regimen.includes('nivolumab') || regimen.includes('opdivo'),
+    durvalumab: regimen.includes('durvalumab') || regimen.includes('imfinzi'),
+    atezolizumab: regimen.includes('atezolizumab') || regimen.includes('tecentriq'),
+    bevacizumab: regimen.includes('bevacizumab') || regimen.includes('avastin')
   };
 
   var drugs = [];
@@ -106,6 +112,12 @@ function generateNutritionPlan(patient) {
   if (chemFlags.bortezomib) drugs.push("Bortezomib");
   if (regimen.includes('lenalidomide') || regimen.includes('revlimid')) drugs.push("Lenalidomide");
   if (chemFlags.pembrolizumab) drugs.push("Pembrolizumab");
+  if (chemFlags.nivolumab) drugs.push("Nivolumab");
+  if (chemFlags.durvalumab) drugs.push("Durvalumab");
+  if (chemFlags.atezolizumab) drugs.push("Atezolizumab");
+  if (chemFlags.bevacizumab) drugs.push("Bevacizumab");
+  if (chemFlags.olaparib) drugs.push("Olaparib (Lynparza)");
+  if (chemFlags.gemcitabine) drugs.push("Gemcitabine");
   if (chemFlags.rchop) drugs.push("R-CHOP (Rituximab + Cyclophosphamide + Doxorubicin + Vincristine + Prednisolone)");
   else if (chemFlags.ac) drugs.push("AC (Adriamycin + Cyclophosphamide)");
   if (chemFlags.vincristine && !chemFlags.rchop) drugs.push("Vincristine");
@@ -213,8 +225,13 @@ function generateNutritionPlan(patient) {
   else if (riskScore >= 2) nutritionRisk = 'Moderate';
 
   const tumorBurden = patient.tumorBurden === 'High (Bulky)';
+  // Advanced/metastatic cancer is a cachexia-equivalent regardless of tumorBurden string
+  const isAdvancedMetastatic = cancer.includes('metastatic') || cancer.includes('advanced') ||
+    (patient.cancerStage || '').toLowerCase().includes('iv') ||
+    (patient.cancerStage || '').toLowerCase().includes('stage 4') ||
+    (patient.palliativeStage || '').toLowerCase().includes('palliative');
 
-  const cachexia = albumin < 3.5 || weightLossPercent >= 10 || bmi < 18.5 || crp > 10 || sarcopenia || tumorBurden;
+  const cachexia = albumin < 3.5 || weightLossPercent >= 10 || bmi < 18.5 || crp > 10 || sarcopenia || tumorBurden || isAdvancedMetastatic;
   const moderateRisk = weightLossPercent >= 5 || ecog >= 2 || age >= 70;
 
   let kcalPerKg = 25; // Tier 1: Baseline Stable
@@ -394,13 +411,26 @@ function generateNutritionPlan(patient) {
     interactions.push({ drug: "Vincristine — R-CHOP", effect: "Peripheral Neuropathy + B6 Toxicity Risk", advice: "B6 STRICTLY CAPPED at <100 mg/day in any B-Complex prescribed — high-dose B6 paradoxically worsens Vincristine-induced peripheral neuropathy. ALA (alpha-lipoic acid) CANNOT be prescribed for neuropathy prevention as Doxorubicin co-administration in R-CHOP (combined single infusion) makes phase-separation impossible throughout the entire treatment course." });
     interactions.push({ drug: "Prednisolone — R-CHOP Corticosteroid", effect: "Steroid-Induced Hyperglycaemia", advice: "Prednisolone drives post-prandial insulin resistance — most severe 4–8 hours after dose. Blood glucose monitoring MANDATORY before and 2h after each Prednisolone dose. Fat restricted to <30% of total calories when T2DM + BS ≥180 mg/dL co-present. Endocrinology referral MANDATORY in confirmed T2DM or HbA1c ≥6.5%." });
   }
+  if (chemFlags.olaparib) {
+    interactions.push({ drug: "Olaparib (Lynparza) — PARP Inhibitor", effect: "Anaemia + GI Toxicity + Fat-Soluble Vitamin Absorption Risk", advice: "Olaparib commonly causes Grade 1–2 anaemia (CBC every 4 weeks mandatory), nausea/vomiting (small frequent meals, anti-emetic timing with meals), and fatigue. Fat-soluble vitamins (A, D, E, K) may be affected by GI side effects. Vitamin D monitoring every 8 weeks. High-antioxidant supplements (high-dose Vit C, NAC) should be used cautiously — discuss with oncologist as PARP inhibitor efficacy relies partly on DNA damage accumulation. Avoid grapefruit (CYP3A4 interaction with Olaparib)." });
+  }
+  if (chemFlags.gemcitabine) {
+    interactions.push({ drug: "Gemcitabine", effect: "Myelosuppression + Hepatotoxicity + Fluid Retention", advice: "Gemcitabine causes significant myelosuppression (CBC weekly) — neutropenia protocol active if WBC <3500. Liver enzymes (ALT/AST) must be monitored every cycle; bilirubin elevation is common in biliary/pancreatic cancers. Fluid retention may occur — monitor weight and sodium. Protein adequacy (≥1.4 g/kg) is critical to counteract catabolism during Gemcitabine cycles." });
+  }
+  if (chemFlags.nivolumab || chemFlags.durvalumab || chemFlags.atezolizumab) {
+    const ioAgent = chemFlags.nivolumab ? 'Nivolumab' : chemFlags.durvalumab ? 'Durvalumab' : 'Atezolizumab';
+    interactions.push({ drug: `${ioAgent} — Checkpoint Inhibitor`, effect: "Immune-Related Adverse Events (irAEs) + TSH Mandatory", advice: `TSH monitoring every treatment cycle is MANDATORY. Immune enterocolitis risk — diarrhoea >3/day requires immediate escalation. Fatigue assessment must rule out immune thyroiditis before attributing to chemotherapy. If fatigue present and TSH not available: clinical hold on attribution pending thyroid panel.` });
+  }
+  if (chemFlags.bevacizumab) {
+    interactions.push({ drug: "Bevacizumab (Avastin) — Anti-VEGF", effect: "Wound Healing Impairment + Protein Demand + Thrombosis Risk", advice: "Protein adequacy is clinically critical — bevacizumab impairs wound healing and demands higher protein for tissue integrity (minimum 1.4 g/kg, target 1.8 g/kg if cachexia present). Omega-3 >3 g/day should be reviewed — mild antiplatelet effect may compound bevacizumab thrombosis/bleeding risk. Blood pressure monitoring with each nutrition assessment." });
+  }
 
   const micronutrients = {
     vitD: hasRenalIssue ? '2000 IU/day (Renal Cap)' : (vitD > 0 && vitD < 20 ? '4000 IU/day (Deficiency correction; 25-OH-VitD recheck at 8 weeks required)' : (vitD < 30 ? '2000–4000 IU/day' : '1000–2000 IU/day')),
     vitC: chemFlags.rchop ? '500 mg/day MAX — HOLD on ALL R-CHOP infusion days (Doxorubicin antioxidant contraindication; combined single infusion — no phase-separation possible)' : chemFlags.ac ? (chemFlags.taxane ? '500 mg/day — HOLD on AC infusion days; Taxane phase: titration to 1000 mg/day requires oncologist sign-off (prescriber order required before dispensing)' : '500 mg/day — HOLD on AC infusion days; inter-cycle only with oncologist approval') : (chemFlags.bortezomib ? '500 mg/day (Antioxidant Cap for Safety)' : (hasRenalIssue ? '500 mg/day (Renal Cap)' : ((crp > 5 || tumorBurden) && !chemFlags.bortezomib ? '2000 mg/day' : '1000 mg/day'))),
     zinc: zinc > 0 && zinc < 60 ? '15–25 mg/day (Correction Protocol) + 2mg Copper' : '15 mg/day',
-    omega3: (crp > 5 || cachexia || cancer.includes('pancreatic')) ? '3–4 g/day' : '2 g/day',
-    epa: (cachexia || tumorBurden || cancer.includes('pancreatic')) ? '2.2 - 3.0 g EPA/day' : 'None',
+    omega3: (crp > 5 || cachexia || cancer.includes('pancreatic') || cancer.includes('biliary') || cancer.includes('cholangiocarcinoma')) ? '3–4 g/day' : '2 g/day',
+    epa: (cachexia || tumorBurden || isAdvancedMetastatic || cancer.includes('pancreatic') || cancer.includes('biliary') || cancer.includes('cholangiocarcinoma')) ? '2.2 - 3.0 g EPA/day' : 'None',
     leucine: (sarcopenia || tumorBurden || ecog >= 2) ? '5 g/day' : '3 g/day',
     glutamine: (patient.giIssues || hasMucositis || hasNausea || regimen.includes('folfirinox') || hasIBD || hasPelvicRadiation) ? (tumorBurden ? '30 g/day — MDT REVIEW REQUIRED (High Tumor Burden)' : '30 g/day') : 'Consider if GI toxicity persists',
     bcaa: (alt > 50 || ast > 50 || bilirubin > 1.2) ? '20 g/day for Hepatic Protection' : (sarcopenia ? '10 g/day' : null),
@@ -605,8 +635,9 @@ function generateNutritionPlan(patient) {
   if (dailyCalories >= 1800 || hasAppetiteLoss || hasNausea) servingsPerDay = 4;
   if (dailyCalories >= 2400) servingsPerDay = 5;
 
-  const perServingCalories = Math.round((dailyCalories / servingsPerDay) * 10) / 10;
-  const perServingProtein = Math.round((dailyProtein / servingsPerDay) * 10) / 10;
+  // Integer division so perServingCalories * servingsPerDay === onsCalories exactly (no rounding drift)
+  const perServingCalories = Math.round(dailyCalories / servingsPerDay);
+  const perServingProtein = Math.round(dailyProtein / servingsPerDay);
 
   const proteinCalories = dailyProtein * 4;
   const remainingCalories = Math.max(0, dailyCalories - proteinCalories);
@@ -903,6 +934,41 @@ function generateNutritionPlan(patient) {
     const alreadyHasCT = mandatoryInvestigations.some(i => i.item.includes('CT L3'));
     if (!alreadyHasCT) {
       mandatoryInvestigations.push({ item: 'CT L3 Imaging — Confirm Skeletal Muscle Index', urgency: 'MODERATE' });
+    }
+  }
+  // Anaemia: iron panel always required before empirical iron supplementation
+  if (hemoglobin > 0 && hemoglobin < 12) {
+    mandatoryInvestigations.push({ item: 'Iron Panel (Ferritin, Serum Iron, TIBC, Transferrin Saturation) — Required before iron supplementation', urgency: 'CRITICAL' });
+  }
+  // Biliary tract / hepatic / pancreatic: LFTs + tumour markers always required
+  if (cancer.includes('biliary') || cancer.includes('cholangiocarcinoma') || cancer.includes('hepatocellular') || cancer.includes('hcc') || cancer.includes('pancreatic')) {
+    mandatoryInvestigations.push({ item: 'LFT Full Panel (ALT, AST, ALP, GGT, Bilirubin) — Biliary/Hepatic cancer: baseline + every cycle', urgency: 'CRITICAL' });
+    if (cancer.includes('biliary') || cancer.includes('cholangiocarcinoma')) {
+      mandatoryInvestigations.push({ item: 'CA19-9 Tumour Marker — Biliary tract cancer: baseline + every 2 cycles', urgency: 'MODERATE' });
+    }
+  }
+  // Advanced/metastatic: albumin + prealbumin mandatory to confirm cachexia
+  if (isAdvancedMetastatic && albumin === 0) {
+    mandatoryInvestigations.push({ item: 'Serum Albumin — Advanced/Metastatic disease: cachexia assessment mandatory', urgency: 'CRITICAL' });
+  }
+  if (isAdvancedMetastatic && prealbumin === 0) {
+    mandatoryInvestigations.push({ item: 'Prealbumin — Advanced disease: acute nutritional status marker (shorter half-life than albumin)', urgency: 'MODERATE' });
+  }
+  // Olaparib: CBC every 4 weeks mandated
+  if (chemFlags.olaparib) {
+    mandatoryInvestigations.push({ item: 'CBC (Full Blood Count) every 4 weeks — Olaparib haematological toxicity monitoring', urgency: 'CRITICAL' });
+  }
+  // Gemcitabine: weekly CBC + per-cycle LFT
+  if (chemFlags.gemcitabine) {
+    mandatoryInvestigations.push({ item: 'CBC weekly during Gemcitabine — myelosuppression monitoring', urgency: 'CRITICAL' });
+    mandatoryInvestigations.push({ item: 'LFT per Gemcitabine cycle — hepatotoxicity monitoring', urgency: 'CRITICAL' });
+  }
+  // Immunotherapy: TSH every cycle
+  if (chemFlags.nivolumab || chemFlags.durvalumab || chemFlags.atezolizumab) {
+    if (tsh === 0 || isNaN(tsh)) {
+      mandatoryInvestigations.push({ item: 'TSH (Thyroid Function) — Checkpoint inhibitor: mandatory every cycle; current result missing', urgency: 'CRITICAL' });
+    } else {
+      mandatoryInvestigations.push({ item: 'TSH (Thyroid Function) — Checkpoint inhibitor: repeat every cycle', urgency: 'CRITICAL' });
     }
   }
 

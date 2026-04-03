@@ -888,10 +888,16 @@ async function sendChatMessage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message: text, contextObj: ctx })
     });
-    
+
     const data = await response.json();
     typing.remove();
     console.log("Onvilox AI Response:", data);
+
+    if (!response.ok) {
+        const errMsg = data.error || `Server error (${response.status})`;
+        addMessage(`AI error: ${errMsg}`, 'ai');
+        return;
+    }
 
     if (data.reply) {
         addMessageHtml(data.reply, 'ai');
@@ -904,6 +910,7 @@ async function sendChatMessage() {
         addMessage('✨ Clinical data detected! Patient form has been auto-populated.', 'ai');
     } else {
         console.warn("AI Response contained no fillable clinical data.");
+        if (!data.reply) addMessage('No clinical data found in the pasted text. Try including lab values, patient details, or diagnosis information.', 'ai');
     }
   } catch (err) {
     typing.remove();

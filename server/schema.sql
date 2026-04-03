@@ -106,3 +106,49 @@ CREATE TABLE nutrition_plans (
     generated_by VARCHAR(100), -- ENGINE, DOCTOR_OVERRIDE
     generated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- 5. AI Corrections (Rule Engine Manager)
+-- Auto-saved when Claude AI corrects engine values for a patient
+CREATE TABLE ai_corrections (
+    id TEXT PRIMARY KEY,
+    patient_id TEXT,
+    plan_id TEXT,
+    patient_name TEXT,
+    cancer TEXT,
+    regimen TEXT,
+    changes JSONB,           -- Array of {field, engineValue, aiValue, note}
+    reason TEXT,             -- AI's clinical reasoning for the correction
+    patient_context JSONB,   -- Flags: isDiabetic, hasNAFLD, hasCisplatin, etc.
+    status TEXT DEFAULT 'pending',  -- pending | promoted | rejected
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 6. Engine Rules (Confirmed corrections promoted to permanent rules)
+CREATE TABLE engine_rules (
+    id TEXT PRIMARY KEY,
+    rule_name TEXT NOT NULL,
+    condition_description TEXT,  -- Human-readable: "When patient has Diabetes + Steroid regimen"
+    target_field TEXT NOT NULL,  -- dailyFat, dailyCalories, dailyProtein, etc.
+    operator TEXT NOT NULL,      -- max | min | set | exclude
+    value TEXT NOT NULL,         -- The cap/floor/target value
+    reason TEXT,                 -- Clinical justification
+    source_correction_id TEXT,   -- Which ai_corrections row this was promoted from
+    confirmed_by TEXT,           -- Admin user ID who promoted it
+    status TEXT DEFAULT 'pending',  -- pending | active | inactive
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    confirmed_at TIMESTAMPTZ
+);
+
+-- 7. Engine Formulas (Clinical constants seeded from the JS engine)
+-- Reference record of all hardcoded thresholds — future: engine reads from here
+CREATE TABLE engine_formulas (
+    id TEXT PRIMARY KEY,
+    category TEXT NOT NULL,    -- calories | protein | weight | safety_labs | etc.
+    name TEXT NOT NULL,        -- Constant identifier (matches JS variable)
+    description TEXT,          -- What this constant does clinically
+    value TEXT NOT NULL,       -- Current value (editable by admin)
+    unit TEXT,                 -- kcal/kg | g/kg | mmol/L | % | etc.
+    source TEXT,               -- Clinical guideline: ESPEN 2021 | KDIGO | NICE CG32
+    editable BOOLEAN DEFAULT true,
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
