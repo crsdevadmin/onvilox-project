@@ -442,17 +442,73 @@ function generateNutritionPlan(patient, engineConfig) {
     glutamine: (patient.giIssues || hasMucositis || hasNausea || regimen.includes('folfirinox') || hasIBD || hasPelvicRadiation) ? (tumorBurden ? '30 g/day — MDT REVIEW REQUIRED (High Tumor Burden)' : '30 g/day') : 'Consider if GI toxicity persists',
     bcaa: (alt > 50 || ast > 50 || bilirubin > 1.2) ? '20 g/day for Hepatic Protection' : (sarcopenia ? '10 g/day' : null),
     magnesium: (patient.magnesium < 1.7 || regimen.includes('cisplatin')) ? '400 mg (Correction Protocol)' : 'Standard',
-    bComplex: chemFlags.vincristine ? 'B-Complex — B6 STRICTLY CAPPED at <100 mg/day (Vincristine neuropathy protocol: high-dose B6 paradoxically worsens peripheral neuropathy)' : (regimen.includes('taxane') || regimen.includes('folfirinox')) ? 'High-potency B-Complex' : 'Standard dose',
+    bComplex: (() => {
+      if (chemFlags.vincristine) return 'B-Complex — B6 STRICTLY CAPPED at <100 mg/day (Vincristine neuropathy protocol: high-dose B6 paradoxically worsens peripheral neuropathy)';
+      if (regimen.includes('pemetrexed') || regimen.includes('methotrexate')) return 'B12 1000 mcg/day MANDATORY (Pemetrexed/Antifolate protocol — reduces haematological and GI toxicity per oncology guideline). B6 standard dose.';
+      if (regimen.includes('taxane') || regimen.includes('folfirinox')) return 'High-potency B-Complex';
+      return 'Standard dose';
+    })(),
     folate: (() => {
       const markers = (patient.genomicMarkers || []);
       const hasMthfr = markers.some(m => m.includes('MTHFR'));
       if (hasMthfr) return '5 mg/day (Methylfolate)';
-      return (patient.folate > 0 && patient.folate < 3 || hemoglobin < 10) ? '5 mg/day' : (regimen.includes('pemetrexed') || regimen.includes('methotrexate') ? '1 mg/day (per oncology protocol)' : '1.0 mg/day');
+      return (patient.folate > 0 && patient.folate < 3 || hemoglobin < 10) ? '5 mg/day' : (regimen.includes('pemetrexed') || regimen.includes('methotrexate') ? '1 mg/day MANDATORY (per oncology protocol — must begin 7 days before first Pemetrexed dose)' : '1.0 mg/day');
     })(),
     chromium: isDiabetic ? '400 mcg/day (Glycemic monitoring protocol active)' : null,
     ala: (isDiabetic && !chemFlags.bortezomib && !chemFlags.ac && !regimen.includes('cisplatin')) ? '600 mg/day' : null,
     microbiome: hasNeutropenia ? 'Soluble Fiber ONLY — PROBIOTICS STRICTLY CONTRAINDICATED (active neutropenia/WBC <3500)' : ((regimen.includes('folfirinox') || hasIBD) ? 'Soluble Fiber + Probiotic' : null),
-    iron: (hemoglobin > 0 && hemoglobin < 10) ? '100 mg elemental iron + B12 support — HOLD pending iron panel (Ferritin, Serum Iron, TIBC, Transferrin Saturation)' : null
+    iron: (hemoglobin > 0 && hemoglobin < 10) ? '100 mg elemental iron + B12 support — HOLD pending iron panel (Ferritin, Serum Iron, TIBC, Transferrin Saturation)' : null,
+
+    // ── Group 1: High-Risk Antioxidants ──────────────────────────────────────
+    // Context-based restriction — never a blanket ban; differentiate deficiency correction vs pharmacological dosing
+
+    glutathione: (() => {
+      if (chemFlags.ac || chemFlags.rchop) return 'CONTRAINDICATED during anthracycline cycles — high-dose glutathione reduces Doxorubicin ROS-dependent cytotoxicity. Dietary sources (cruciferous vegetables) permitted. Reassess after treatment completion.';
+      if (regimen.includes('cisplatin') || regimen.includes('platin')) return 'RESTRICTED during platinum-based chemotherapy — antioxidant activity may attenuate cisplatin efficacy. Pharmacological dosing contraindicated. Resume consideration post-treatment with oncologist sign-off.';
+      if (hasPelvicRadiation) return 'RESTRICTED during active radiation — antioxidant supplementation may reduce radiation cytotoxicity. Dietary glutathione sources acceptable. Review after radiation completion.';
+      if (activeChemo) return 'CAUTION during active chemotherapy — high-dose glutathione supplementation not recommended without oncologist approval. Physiological dietary sources acceptable.';
+      return 'May be considered post-treatment for recovery support with oncologist review.';
+    })(),
+
+    vitE: (() => {
+      if (chemFlags.ac || chemFlags.rchop || regimen.includes('cisplatin') || regimen.includes('platin')) return 'HIGH-DOSE RESTRICTED (>400 IU/day) — Vitamin E antioxidant activity may reduce platinum/anthracycline cytotoxicity. Physiological dose ONLY: 15 mg/day (RDA). Do not exceed without oncologist approval.';
+      if (hasPelvicRadiation) return 'HIGH-DOSE RESTRICTED during active radiation (>400 IU/day). Physiological dose: 15 mg/day permitted. Reassess at radiation completion.';
+      if (activeChemo) return 'Physiological dose: 15 mg/day (RDA). High-dose supplementation (>400 IU/day) requires oncologist approval during active chemotherapy.';
+      return 'Standard: 15 mg/day (RDA). High-dose supplementation discuss with oncologist.';
+    })(),
+
+    nac: (() => {
+      if (chemFlags.ac || chemFlags.rchop || regimen.includes('cisplatin') || regimen.includes('platin')) return 'CONTRAINDICATED during platinum/anthracycline chemotherapy — NAC is a potent glutathione precursor; antioxidant activity may reduce ROS-dependent cytotoxicity. Resume consideration only after chemotherapy completion with oncologist sign-off.';
+      if (hasPelvicRadiation) return 'RESTRICTED during active radiation — NAC antioxidant activity may reduce radiation efficacy. Review at radiation completion.';
+      if (activeChemo) return 'RESTRICTED during active chemotherapy — NAC antioxidant mechanism not recommended without oncologist approval. Not for concurrent use with most cytotoxic regimens.';
+      return 'May be considered post-treatment with oncologist approval.';
+    })(),
+
+    coenzymeQ10: (() => {
+      if (chemFlags.ac || chemFlags.rchop) return 'RESTRICTED during active anthracycline cycles — CoQ10 antioxidant activity may reduce Doxorubicin efficacy. NOTE: CoQ10 is sometimes used POST-anthracycline for cardioprotection — discuss timing with cardiologist/oncologist after treatment completion.';
+      if (activeChemo) return 'Use with caution during active chemotherapy — antioxidant activity. Discuss with oncologist before prescribing. Not recommended concurrently with most cytotoxic regimens without explicit oncology approval.';
+      return 'May be considered for cardioprotection post-anthracycline or during non-antioxidant-sensitive regimens with oncologist review.';
+    })(),
+
+    // ── Group 2: Conditional Use ──────────────────────────────────────────────
+
+    selenium: (() => {
+      if (chemFlags.ac || chemFlags.rchop || regimen.includes('cisplatin') || regimen.includes('platin')) return 'Pharmacological selenium (>200 mcg/day) RESTRICTED during platinum/anthracycline chemotherapy. Physiological correction (55–100 mcg/day) PERMITTED if deficiency confirmed (plasma selenium <70 mcg/L). Check selenium levels before supplementing.';
+      if (activeChemo) return 'Physiological dose (55–100 mcg/day) acceptable if deficiency confirmed. Pharmacological dosing (>200 mcg/day) requires oncologist approval during active treatment.';
+      return 'Standard: 55–100 mcg/day. Check plasma selenium if deficiency suspected. Avoid high-dose supplementation without confirmed deficiency.';
+    })(),
+
+    curcumin: (() => {
+      if (regimen.includes('taxane') || regimen.includes('paclitaxel') || regimen.includes('docetaxel') || regimen.includes('imatinib') || regimen.includes('erlotinib') || regimen.includes('gefitinib')) return 'RESTRICTED — Curcumin inhibits CYP3A4 and may increase toxicity or alter plasma levels of taxanes and targeted agents (imatinib, erlotinib, gefitinib). Contraindicated during active taxane-based or targeted therapy regimens. Food-form turmeric in cooking is acceptable.';
+      if (activeChemo) return 'Use with caution — potential CYP3A4 interaction may affect drug metabolism. Food-form turmeric (cooking) acceptable. Pharmacological curcumin supplementation: discuss with oncologist before use during active treatment.';
+      return 'Food-form turmeric acceptable. Pharmacological curcumin supplementation: discuss with oncologist. Monitor for CYP3A4 interactions if on concurrent medications.';
+    })(),
+
+    greenTea: (() => {
+      if (chemFlags.bortezomib) return 'STRICTLY CONTRAINDICATED — Green tea catechins (EGCG) directly inhibit Bortezomib proteasome inhibition, reducing drug efficacy. Avoid ALL green tea supplements and high-concentration green tea beverages during entire Bortezomib course.';
+      if (activeChemo) return 'RESTRICTED — Green tea extract (high EGCG) has significant antioxidant activity. Avoid concentrated green tea extract supplements during active chemotherapy. Brewed green tea (1–2 cups/day) is generally acceptable — discuss with oncologist.';
+      return 'Brewed green tea (1–2 cups/day) acceptable. Avoid concentrated green tea extract supplements. Monitor for interactions with anticoagulants (mild antiplatelet effect).';
+    })()
   };
 
   if (cancer.includes('myeloma')) {
