@@ -82,7 +82,7 @@
 <div class="topbar">
   <div class="logo">Onvilox</div>
   <div class="nav">
-    <a href="doctor.html">Dashboard</a>
+    <a href="/dashboard">Dashboard</a>
     <a href="#" onclick="auth.logout()">Logout</a>
     <button id="themeToggleBtn" onclick="toggleTheme()" class="theme-toggle-btn" style="margin-left: 20px;">
       <span id="themeIcon"></span> <span id="themeLabel">Dark</span>
@@ -531,7 +531,7 @@
 <div style="margin-top:30px;">
   
   <button class="btn-primary" onclick="submitPatient()">Create Patient</button>
-  <button class="btn-secondary" onclick="location.href='doctor.html'">Cancel</button>
+  <button class="btn-secondary" onclick="location.href='/dashboard'">Cancel</button>
 </div>
 
 </div>
@@ -688,7 +688,7 @@ function submitPatient(){
     createOrUpdatePlan(saved, engineOutput, {}, 'Initial automated baseline');
     
     // 4. Fast Redirect to Dashboard (where AI will trigger/status will show)
-    window.location.href = 'doctor.html';
+    window.location.href='/dashboard';
   } catch (err) {
     console.error("Clinical Save Error:", err);
     alert("Error saving patient: " + err.message);

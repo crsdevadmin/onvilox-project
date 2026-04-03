@@ -10,7 +10,7 @@
 <div class="topbar">
   <div class="logo">Onvilox Store</div>
   <div class="nav">
-    <a href="store.html">Dashboard</a>
+    <a href="/store">Dashboard</a>
     <a href="#" onclick="auth.logout()">Logout</a>
     <button id="themeToggleBtn" onclick="toggleTheme()" class="btn-secondary btn-sm" style="margin-left: 20px; border-radius: 30px; padding: 6px 14px; cursor: pointer;">🌙 Dark Mode</button>
   </div>
@@ -162,11 +162,11 @@ function render(){
           </div>
 
           <div style="margin-top:14px; display:flex; flex-wrap:wrap; gap:10px;">
-            <button class="btn-primary" onclick="event.stopPropagation(); location.href='store-patient.html?job=${j.id}'" style="display:flex; align-items:center; gap:6px;" title="Update Production Status">
+            <button class="btn-primary" onclick="event.stopPropagation(); location.href='/store/job?job=${j.id}'" style="display:flex; align-items:center; gap:6px;" title="Update Production Status">
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M11 2a3 3 0 0 1 2.995 2.824L14 5v6a3 3 0 0 1-2.824 2.995L11 14H5a3 3 0 0 1-2.995-2.824L2 11V5a3 3 0 0 1 2.824-2.995L5 2h6zm-1.5 6h-3a.5.5 0 0 0 0 1h3a.5.5 0 0 0 0-1zm.5-3h-4a.5.5 0 0 0 0 1h4a.5.5 0 0 0 0-1z"/></svg>
               Production
             </button>
-            <button class="btn-secondary" onclick="event.stopPropagation(); location.href='patient-profile.html?id=${p.id}'" style="display:flex; align-items:center; gap:6px;" title="View Report">
+            <button class="btn-secondary" onclick="event.stopPropagation(); location.href='/patients/profile?id=${p.id}'" style="display:flex; align-items:center; gap:6px;" title="View Report">
                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M8.636 3.5a.5.5 0 0 0-.5-.5H1.5A1.5 1.5 0 0 0 0 4.5v10A1.5 1.5 0 0 0 1.5 16h10a1.5 1.5 0 0 0 1.5-1.5V7.864a.5.5 0 0 0-1 0V14.5a.5.5 0 0 1-.5.5h-10a.5.5 0 0 1-.5-.5v-10a.5.5 0 0 1 .5-.5h6.636a.5.5 0 0 0 .5-.5z"/><path fill-rule="evenodd" d="M16 .5a.5.5 0 0 0-.5-.5h-5a.5.5 0 0 0 0 1h3.793L6.146 9.146a.5.5 0 1 0 .708.708L15 1.707V5.5a.5.5 0 0 0 1 0v-5z"/></svg>
                Report
             </button>

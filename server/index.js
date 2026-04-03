@@ -1199,6 +1199,30 @@ app.put('/api/engine-formulas/:id', authenticateToken, async (req, res) => {
   }
 });
 
+// Clean URL routing — serve HTML files without .html extension
+const cleanRoutes = {
+  '/login':            'index.html',
+  '/dashboard':        'doctor.html',
+  '/patients/create':  'Patient-Create-STABLE-V3.html',
+  '/patients/profile': 'Patient-Profile-STABLE-V3.html',
+  '/store':            'store.html',
+  '/store/job':        'store-patient.html',
+  '/patient-view':     'patient-view.html',
+  '/patient-qr':       'patient-qr.html',
+  '/admin':            'admin.html',
+  '/admin/stores':     'admin-stores.html',
+  '/admin/users':      'admin-users.html',
+  '/admin/mapping':    'admin-mapping.html',
+  '/admin/tracking':   'admin-tracking.html',
+  '/admin/reports':    'admin-reports.html',
+  '/admin/rules':      'admin-rules.html',
+};
+Object.entries(cleanRoutes).forEach(([route, file]) => {
+  app.get(route, (req, res) => res.sendFile(path.join(__dirname, '..', file)));
+});
+// Root → login page
+app.get('/', (req, res) => res.sendFile(path.join(__dirname, '..', 'index.html')));
+
 // Start Server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));

@@ -360,13 +360,13 @@
 <div class="topbar">
   <div class="logo">Onvilox Admin</div>
   <div class="nav">
-    <a href="admin.html">Dashboard</a>
-    <a href="admin-stores.html">Stores</a>
-    <a href="admin-users.html">Create Users</a>
-    <a href="admin-mapping.html">Mapping</a>
-    <a href="admin-tracking.html">Tracking</a>
-    <a href="admin-reports.html">Reports</a>
-    <a href="admin-rules.html" style="color:var(--violet);font-weight:800;">Rule Engine</a>
+    <a href="/admin">Dashboard</a>
+    <a href="/admin/stores">Stores</a>
+    <a href="/admin/users">Create Users</a>
+    <a href="/admin/mapping">Mapping</a>
+    <a href="/admin/tracking">Tracking</a>
+    <a href="/admin/reports">Reports</a>
+    <a href="/admin/rules" style="color:var(--violet);font-weight:800;">Rule Engine</a>
     <a href="#" onclick="auth.logout()">Logout</a>
   </div>
 </div>
@@ -915,8 +915,8 @@
   window.addEventListener('DOMContentLoaded', async () => {
     if (typeof auth !== 'undefined') {
       const u = auth.getCurrentUser();
-      if (!u) { window.location.href = 'index.html'; return; }
-      if (u.role !== 'ADMIN') { alert('Admin access only.'); window.location.href = 'index.html'; return; }
+      if (!u) { window.location.href='/login'; return; }
+      if (u.role !== 'ADMIN') { alert('Admin access only.'); window.location.href='/login'; return; }
     }
     await loadAll();
   });

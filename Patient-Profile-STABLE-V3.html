@@ -578,7 +578,7 @@
   <div class="topbar">
     <div class="logo">Onvilox</div>
     <div class="nav">
-      <a href="doctor.html">Dashboard</a>
+      <a href="/dashboard">Dashboard</a>
       <a href="#" onclick="auth.logout()">Logout</a>
       <button id="themeToggleBtn" onclick="toggleTheme()" class="theme-toggle-btn" style="margin-left: 20px;">
         <span id="themeIcon">🌙</span> <span id="themeLabel">Dark</span>
@@ -1890,7 +1890,7 @@
             window.patient = patient;
             if (!patient) {
               alert('Patient not found');
-              window.location.href = 'doctor.html';
+              window.location.href='/dashboard';
               return;
             }
             _initPatientProfile(patient);
@@ -2775,7 +2775,7 @@
 
             alert('Patient approved and sent to production.' + (isHighRisk ? ' (AI Auditor is running a final check...)' : ''));
             setTimeout(() => {
-                window.location.href = 'doctor.html';
+                window.location.href='/dashboard';
             }, 1000);
           }
 

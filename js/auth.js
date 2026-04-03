@@ -11,7 +11,7 @@
 
   function logout(){
     localStorage.removeItem(db.key(SESSION_KEY));
-    window.location.href = 'index.html';
+    window.location.href = '/login';
   }
 
   // async: calls server API, returns { ok, route } or { ok:false, error }
@@ -53,15 +53,15 @@
   }
 
   function routeForRole(role){
-    if(role === 'SUPER_ADMIN' || role === 'ADMIN') return 'admin.html';
-    if(role === 'DOCTOR' || role === 'ASSISTANT') return 'doctor.html';
-    if(role === 'STORE') return 'store.html';
-    return 'index.html';
+    if(role === 'SUPER_ADMIN' || role === 'ADMIN') return '/admin';
+    if(role === 'DOCTOR' || role === 'ASSISTANT') return '/dashboard';
+    if(role === 'STORE') return '/store';
+    return '/login';
   }
 
   function requireRole(allowedRoles){
     const u = getCurrentUser();
-    if(!u){ window.location.href='index.html'; return; }
+    if(!u){ window.location.href='/login'; return; }
     if(Array.isArray(allowedRoles) && allowedRoles.length){
       if(!allowedRoles.includes(u.role)){
         window.location.href = routeForRole(u.role);

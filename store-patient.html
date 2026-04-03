@@ -11,7 +11,7 @@
 <div class="topbar">
   <div class="logo">Onvilox Store</div>
   <div class="nav">
-    <a href="store.html">Dashboard</a>
+    <a href="/store">Dashboard</a>
     <a href="#" onclick="auth.logout()">Logout</a>
     <button id="themeToggleBtn" onclick="toggleTheme()" class="btn-secondary btn-sm" style="margin-left: 20px; border-radius: 30px; padding: 6px 14px; cursor: pointer;">🌙 Dark Mode</button>
   </div>
@@ -50,7 +50,7 @@
 
   <div style="margin-top:16px;display:flex;gap:12px;flex-wrap:wrap;">
     <button class="btn-primary" id="viewReportBtn">View Full Patient Report / PDF</button>
-    <button class="btn-secondary" onclick="location.href='store.html'">Back</button>
+    <button class="btn-secondary" onclick="location.href='/store'">Back</button>
   </div>
 </div>
 
@@ -61,7 +61,7 @@
     <button class="btn-warning" onclick="setStatus('READY')">Mark Ready</button>
     <button class="btn-primary" onclick="setStatus('DISPATCHED')">Mark Dispatched</button>
     <button class="btn-primary" onclick="setStatus('DELIVERED')">Mark Delivered</button>
-    <button class="btn-secondary" onclick="location.href='store.html'">Back</button>
+    <button class="btn-secondary" onclick="location.href='/store'">Back</button>
   </div>
 </div>
 
@@ -88,20 +88,20 @@ const job = jobs.find(j => j.id === jobId);
 
 if(!job){
   alert('Job not found');
-  window.location.href='store.html';
+  window.location.href='/store';
   return;
 }
 
 if(me.storeId && job.storeId !== me.storeId){
   alert('This job does not belong to your store.');
-  window.location.href='store.html';
+  window.location.href='/store';
   return;
 }
 
 const patient = getPatientById(job.patientId);
 if(!patient){
   alert('Patient not found');
-  window.location.href='store.html';
+  window.location.href='/store';
   return;
 }
 
@@ -168,7 +168,7 @@ document.getElementById('nFat').innerText = plan.macroFat + ' g';
 document.getElementById('nProteinType').innerText = plan.proteinType;
 
 document.getElementById('viewReportBtn').onclick = function(){
-  location.href = 'patient-profile.html?id=' + encodeURIComponent(patient.id) + '&view=store';
+  location.href='/patients/profile?id=' + encodeURIComponent(patient.id) + '&view=store';
 };
 }); // end initStore().then
 </script>

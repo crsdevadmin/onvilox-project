@@ -10,13 +10,13 @@
 <div class="topbar">
   <div class="logo">Onvilox Admin</div>
   <div class="nav">
-    <a href="admin.html">Dashboard</a>
-    <a href="admin-stores.html">Stores</a>
-    <a href="admin-users.html">Create Users</a>
-    <a href="admin-mapping.html">Mapping</a>
-    <a href="admin-tracking.html">Tracking</a>
-    <a href="admin-reports.html">Reports</a>
-    <a href="admin-rules.html">Rule Engine</a>
+    <a href="/admin">Dashboard</a>
+    <a href="/admin/stores">Stores</a>
+    <a href="/admin/users">Create Users</a>
+    <a href="/admin/mapping">Mapping</a>
+    <a href="/admin/tracking">Tracking</a>
+    <a href="/admin/reports">Reports</a>
+    <a href="/admin/rules">Rule Engine</a>
     <a href="#" onclick="auth.logout()">Logout</a>
     <button id="themeToggleBtn" onclick="toggleTheme()" class="btn-secondary btn-sm" style="margin-left: 20px; border-radius: 30px; padding: 6px 14px; cursor: pointer;">🌙 Dark Mode</button>
   </div>
@@ -257,7 +257,7 @@ function render(){
       <td>${j ? `<span class="status ${String(j.status||'').toLowerCase()}">${j.status}</span>` : '-'}</td>
       <td>${fmtDate((j && j.updatedAt) || p.updatedAt || p.createdAt)}</td>
       <td>
-        <a class="btn-secondary" href="patient-profile.html?id=${encodeURIComponent(p.id)}" target="_blank" rel="noopener" style="padding: 6px 10px; border-radius: 6px; display:inline-flex; align-items:center; justify-content:center;" title="Open Profile">
+        <a class="btn-secondary" href="/patients/profile?id=${encodeURIComponent(p.id)}" target="_blank" rel="noopener" style="padding: 6px 10px; border-radius: 6px; display:inline-flex; align-items:center; justify-content:center;" title="Open Profile">
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M8.636 3.5a.5.5 0 0 0-.5-.5H1.5A1.5 1.5 0 0 0 0 4.5v10A1.5 1.5 0 0 0 1.5 16h10a1.5 1.5 0 0 0 1.5-1.5V7.864a.5.5 0 0 0-1 0V14.5a.5.5 0 0 1-.5.5h-10a.5.5 0 0 1-.5-.5v-10a.5.5 0 0 1 .5-.5h6.636a.5.5 0 0 0 .5-.5z"/><path fill-rule="evenodd" d="M16 .5a.5.5 0 0 0-.5-.5h-5a.5.5 0 0 0 0 1h3.793L6.146 9.146a.5.5 0 1 0 .708.708L15 1.707V5.5a.5.5 0 0 0 1 0v-5z"/></svg>
         </a>
       </td>
