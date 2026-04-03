@@ -2,42 +2,357 @@
 <html>
 <head>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Rule Engine Manager - Onvilox</title>
+  <title>Rule Engine Manager — Onvilox</title>
   <link rel="stylesheet" href="css/app.css">
   <style>
-    .tab-bar { display:flex; gap:4px; margin-bottom:20px; border-bottom:2px solid #e2e8f0; }
-    .tab-btn { padding:8px 20px; font-size:12px; font-weight:700; border:none; background:none; cursor:pointer; color:#64748b; border-bottom:2px solid transparent; margin-bottom:-2px; }
-    .tab-btn.active { color:#0e2247; border-bottom-color:#0e2247; }
-    .section { display:none; }
-    .section.active { display:block; }
-    .rule-table { width:100%; border-collapse:collapse; font-size:11.5px; }
-    .rule-table th { background:#f1f5f9; padding:8px 10px; text-align:left; border:1px solid #e2e8f0; font-weight:700; color:#334155; }
-    .rule-table td { padding:8px 10px; border:1px solid #e2e8f0; vertical-align:top; color:#334155; }
-    .rule-table tr:hover td { background:#f8fafc; }
-    .badge { font-size:9px; font-weight:800; padding:2px 8px; border-radius:999px; text-transform:uppercase; }
-    .badge-pending { background:#fef3c7; color:#92400e; }
-    .badge-active  { background:#dcfce7; color:#166534; }
-    .badge-promoted{ background:#ede9fe; color:#6d28d9; }
-    .badge-rejected{ background:#fee2e2; color:#991b1b; }
-    .change-chip { display:inline-block; background:#f0f9ff; border:1px solid #bae6fd; border-radius:4px; padding:3px 8px; font-size:10px; font-weight:700; color:#0369a1; margin:2px; }
-    .change-chip.excluded { background:#fff0f0; border-color:#fca5a5; color:#991b1b; }
-    .btn-promote { background:#6d28d9; color:white; border:none; border-radius:4px; padding:5px 12px; font-size:10px; font-weight:700; cursor:pointer; }
-    .btn-reject  { background:#ef4444; color:white; border:none; border-radius:4px; padding:5px 12px; font-size:10px; font-weight:700; cursor:pointer; margin-left:4px; }
-    .btn-deactivate { background:#64748b; color:white; border:none; border-radius:4px; padding:5px 12px; font-size:10px; font-weight:700; cursor:pointer; margin-left:4px; }
-    .btn-delete { background:#dc2626; color:white; border:none; border-radius:4px; padding:5px 12px; font-size:10px; font-weight:700; cursor:pointer; margin-left:4px; }
-    .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:1000; align-items:center; justify-content:center; }
-    .modal-overlay.open { display:flex; }
-    .modal { background:white; border-radius:8px; padding:24px; width:520px; max-width:95vw; max-height:90vh; overflow-y:auto; }
-    .modal h3 { margin:0 0 16px; font-size:14px; color:#0e2247; }
-    .form-row { margin-bottom:12px; }
-    .form-row label { display:block; font-size:10.5px; font-weight:700; color:#475569; margin-bottom:4px; }
-    .form-row input, .form-row select, .form-row textarea { width:100%; padding:7px 10px; border:1px solid #cbd5e1; border-radius:5px; font-size:11.5px; box-sizing:border-box; }
-    .form-row textarea { height:70px; resize:vertical; }
-    .empty-state { text-align:center; padding:40px; color:#94a3b8; font-size:12px; }
-    .stats-row { display:flex; gap:12px; margin-bottom:20px; flex-wrap:wrap; }
-    .stat-card { background:white; border:1px solid #e2e8f0; border-radius:8px; padding:14px 18px; min-width:120px; }
-    .stat-num { font-size:24px; font-weight:900; color:#0e2247; }
-    .stat-lbl { font-size:10px; font-weight:700; color:#94a3b8; text-transform:uppercase; margin-top:2px; }
+    /* ── Tab Bar ─────────────────────────────── */
+    .tab-bar {
+      display: flex;
+      gap: 4px;
+      padding: 6px;
+      background: var(--bg-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      margin-bottom: 24px;
+      width: fit-content;
+    }
+    .tab-btn {
+      padding: 8px 18px;
+      font-size: 12.5px;
+      font-weight: 700;
+      font-family: var(--font-body);
+      border: none;
+      background: none;
+      cursor: pointer;
+      color: var(--text-3);
+      border-radius: 7px;
+      letter-spacing: 0.02em;
+      transition: all 0.18s;
+      white-space: nowrap;
+    }
+    .tab-btn:hover { color: var(--text-2); background: var(--surface); }
+    .tab-btn.active { background: var(--surface-2); color: var(--violet); box-shadow: 0 0 0 1px rgba(139,92,246,0.25); }
+    .tab-btn.active[data-tab="corrections"] { color: var(--amber); box-shadow: 0 0 0 1px rgba(245,158,11,0.25); }
+    .tab-btn.active[data-tab="rules"]        { color: var(--green); box-shadow: 0 0 0 1px rgba(16,185,129,0.25); }
+    .tab-btn.active[data-tab="formulas"]     { color: var(--cyan);  box-shadow: 0 0 0 1px rgba(34,211,238,0.25); }
+
+    .section { display: none; }
+    .section.active { display: block; }
+
+    /* ── Stats Row ───────────────────────────── */
+    .stats-row { display: flex; gap: 14px; margin-bottom: 28px; flex-wrap: wrap; }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px 22px;
+      min-width: 130px;
+      flex: 1;
+      transition: border-color 0.2s;
+      position: relative;
+      overflow: hidden;
+    }
+    .stat-card::after {
+      content: '';
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 2px;
+      border-radius: 0 0 var(--radius) var(--radius);
+    }
+    .stat-card.s-amber::after { background: var(--amber); }
+    .stat-card.s-green::after  { background: var(--green); }
+    .stat-card.s-violet::after { background: var(--violet); }
+    .stat-card.s-rose::after   { background: var(--rose); }
+    .stat-card.s-cyan::after   { background: var(--cyan); }
+    .stat-num {
+      font-family: var(--font-display);
+      font-size: 30px;
+      font-weight: 900;
+      letter-spacing: -0.04em;
+      line-height: 1;
+      margin-bottom: 6px;
+    }
+    .stat-card.s-amber .stat-num { color: var(--amber); }
+    .stat-card.s-green  .stat-num { color: var(--green); }
+    .stat-card.s-violet .stat-num { color: var(--violet); }
+    .stat-card.s-rose   .stat-num { color: var(--rose); }
+    .stat-card.s-cyan   .stat-num { color: var(--cyan); }
+    .stat-lbl {
+      font-size: 10.5px;
+      font-weight: 700;
+      color: var(--text-3);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    /* ── Badges ──────────────────────────────── */
+    .badge {
+      font-size: 9.5px;
+      font-weight: 800;
+      padding: 3px 9px;
+      border-radius: 999px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      display: inline-block;
+    }
+    .badge-pending  { background: rgba(245,158,11,0.12); color: var(--amber);  border: 1px solid rgba(245,158,11,0.2); }
+    .badge-active   { background: rgba(16,185,129,0.12); color: var(--green);  border: 1px solid rgba(16,185,129,0.2); }
+    .badge-promoted { background: rgba(139,92,246,0.12); color: var(--violet); border: 1px solid rgba(139,92,246,0.2); }
+    .badge-rejected { background: rgba(244,63,94,0.12);  color: var(--rose);   border: 1px solid rgba(244,63,94,0.2); }
+    .badge-inactive { background: rgba(126,149,184,0.12); color: var(--text-3); border: 1px solid var(--border); }
+
+    /* ── Change Chips ────────────────────────── */
+    .change-chip {
+      display: inline-block;
+      background: rgba(34,211,238,0.08);
+      border: 1px solid rgba(34,211,238,0.2);
+      border-radius: 5px;
+      padding: 2px 8px;
+      font-size: 10.5px;
+      font-weight: 700;
+      color: var(--cyan);
+      margin: 2px;
+      font-family: 'Courier New', monospace;
+    }
+    .change-chip.excluded {
+      background: rgba(244,63,94,0.08);
+      border-color: rgba(244,63,94,0.2);
+      color: var(--rose);
+    }
+    .context-pill {
+      display: inline-block;
+      background: rgba(139,92,246,0.08);
+      border: 1px solid rgba(139,92,246,0.15);
+      border-radius: 4px;
+      padding: 2px 7px;
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--violet);
+      margin: 1px;
+    }
+
+    /* ── Operator Pill ───────────────────────── */
+    .op-pill {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-size: 10.5px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+    }
+    .op-max  { background: rgba(245,158,11,0.12); color: var(--amber);  border: 1px solid rgba(245,158,11,0.2); }
+    .op-min  { background: rgba(16,185,129,0.12); color: var(--green);  border: 1px solid rgba(16,185,129,0.2); }
+    .op-set  { background: rgba(34,211,238,0.12); color: var(--cyan);   border: 1px solid rgba(34,211,238,0.2); }
+    .op-exclude { background: rgba(244,63,94,0.12); color: var(--rose); border: 1px solid rgba(244,63,94,0.2); }
+
+    /* ── Action Buttons ──────────────────────── */
+    .btn-action {
+      display: inline-flex; align-items: center; gap: 5px;
+      border: none; border-radius: 7px;
+      padding: 6px 13px; font-size: 11px; font-weight: 700;
+      font-family: var(--font-body); cursor: pointer;
+      transition: all 0.18s; white-space: nowrap;
+    }
+    .btn-promote {
+      background: rgba(139,92,246,0.15); color: var(--violet);
+      border: 1px solid rgba(139,92,246,0.3);
+    }
+    .btn-promote:hover { background: rgba(139,92,246,0.25); box-shadow: 0 0 14px rgba(139,92,246,0.2); transform: translateY(-1px); }
+    .btn-reject {
+      background: rgba(244,63,94,0.1); color: var(--rose);
+      border: 1px solid rgba(244,63,94,0.25);
+    }
+    .btn-reject:hover { background: rgba(244,63,94,0.2); transform: translateY(-1px); }
+    .btn-deactivate {
+      background: rgba(126,149,184,0.08); color: var(--text-2);
+      border: 1px solid var(--border-2);
+    }
+    .btn-deactivate:hover { background: var(--surface-2); color: var(--text); transform: translateY(-1px); }
+    .btn-delete {
+      background: rgba(244,63,94,0.08); color: var(--rose);
+      border: 1px solid rgba(244,63,94,0.2);
+    }
+    .btn-delete:hover { background: rgba(244,63,94,0.18); transform: translateY(-1px); }
+
+    /* ── Table container ─────────────────────── */
+    .table-wrap {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .table-wrap table { font-size: 12.5px; }
+    .table-wrap th { background: var(--bg-2); font-size: 10px; }
+    .table-wrap td { font-size: 12px; }
+
+    /* ── Empty state ─────────────────────────── */
+    .empty-state {
+      text-align: center;
+      padding: 56px 40px;
+      color: var(--text-3);
+      font-size: 13px;
+      font-style: italic;
+    }
+    .empty-icon { font-size: 36px; margin-bottom: 12px; opacity: 0.5; }
+
+    /* ── Alert banners ───────────────────────── */
+    .alert-amber {
+      background: rgba(245,158,11,0.07);
+      border: 1px solid rgba(245,158,11,0.2);
+      border-radius: var(--radius-sm);
+      padding: 12px 16px;
+      font-size: 12px;
+      color: #fbbf24;
+      font-weight: 600;
+      margin-bottom: 20px;
+      display: flex; align-items: flex-start; gap: 10px;
+    }
+    .alert-green {
+      background: rgba(16,185,129,0.07);
+      border: 1px solid rgba(16,185,129,0.2);
+      border-radius: var(--radius-sm);
+      padding: 12px 16px;
+      font-size: 12px;
+      color: var(--green);
+      font-weight: 600;
+      margin-bottom: 20px;
+      display: flex; align-items: flex-start; gap: 10px;
+    }
+
+    /* ── Section header ──────────────────────── */
+    .section-desc {
+      font-size: 13px;
+      color: var(--text-2);
+      margin-bottom: 16px;
+      line-height: 1.6;
+    }
+
+    /* ── Modal ───────────────────────────────── */
+    .modal-overlay {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.7);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      z-index: 1000;
+      align-items: center; justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: var(--surface);
+      border: 1px solid var(--border-2);
+      border-radius: var(--radius-lg);
+      padding: 32px;
+      width: 560px; max-width: 95vw;
+      max-height: 90vh; overflow-y: auto;
+      box-shadow: 0 30px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(139,92,246,0.15);
+      animation: modalSlide 0.25s cubic-bezier(0.22,1,0.36,1);
+    }
+    @keyframes modalSlide {
+      from { opacity:0; transform: scale(0.96) translateY(12px); }
+      to   { opacity:1; transform: scale(1) translateY(0); }
+    }
+    .modal-header {
+      display: flex; align-items: center; gap: 12px;
+      margin-bottom: 24px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .modal-icon {
+      width: 40px; height: 40px; border-radius: 10px;
+      background: rgba(139,92,246,0.12);
+      border: 1px solid rgba(139,92,246,0.25);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+    }
+    .modal-title { font-family: var(--font-display); font-size: 16px; font-weight: 800; color: var(--text); letter-spacing: -0.02em; }
+    .modal-subtitle { font-size: 11.5px; color: var(--text-3); margin-top: 2px; }
+    .form-row { margin-bottom: 16px; }
+    .form-row label {
+      display: block;
+      font-size: 10.5px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.09em;
+      color: var(--text-3); margin-bottom: 7px;
+    }
+    .modal-footer { display: flex; gap: 10px; justify-content: flex-end; margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border); }
+
+    /* ── Formulas section ────────────────────── */
+    .formula-category {
+      margin-bottom: 24px;
+    }
+    .formula-cat-header {
+      display: flex; align-items: center; gap: 10px;
+      font-size: 12.5px; font-weight: 800;
+      color: var(--text);
+      font-family: var(--font-display);
+      letter-spacing: -0.01em;
+      margin-bottom: 12px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--border);
+    }
+    .formula-cat-header span.cat-icon {
+      font-size: 16px;
+    }
+    .formula-value-input {
+      width: 100px !important;
+      padding: 7px 10px !important;
+      font-size: 13px !important;
+      font-weight: 800 !important;
+      font-family: 'Courier New', monospace !important;
+      color: var(--cyan) !important;
+      text-align: center !important;
+      background: var(--bg) !important;
+      border-color: rgba(34,211,238,0.2) !important;
+      border-radius: 7px !important;
+    }
+    .formula-value-input:focus {
+      border-color: var(--cyan) !important;
+      box-shadow: 0 0 0 2px rgba(34,211,238,0.15) !important;
+    }
+    .btn-save-formula {
+      background: rgba(34,211,238,0.1);
+      color: var(--cyan);
+      border: 1px solid rgba(34,211,238,0.25);
+      border-radius: 7px;
+      padding: 7px 14px;
+      font-size: 11px; font-weight: 700;
+      font-family: var(--font-body);
+      cursor: pointer;
+      transition: all 0.18s;
+      white-space: nowrap;
+    }
+    .btn-save-formula:hover { background: rgba(34,211,238,0.18); box-shadow: 0 0 12px rgba(34,211,238,0.15); transform: translateY(-1px); }
+    .mono-id {
+      font-family: 'Courier New', monospace;
+      font-size: 10.5px;
+      color: var(--violet);
+      font-weight: 700;
+    }
+
+    /* ── Page header ─────────────────────────── */
+    .page-header {
+      display: flex; align-items: flex-start; justify-content: space-between;
+      gap: 16px; margin-bottom: 28px; flex-wrap: wrap;
+    }
+    .page-title {
+      font-family: var(--font-display);
+      font-size: 26px; font-weight: 900;
+      letter-spacing: -0.04em;
+      color: var(--text);
+      display: flex; align-items: center; gap: 12px;
+    }
+    .page-title .title-badge {
+      font-size: 11px; font-weight: 700; padding: 3px 10px;
+      background: rgba(139,92,246,0.12);
+      color: var(--violet);
+      border: 1px solid rgba(139,92,246,0.25);
+      border-radius: 999px;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      vertical-align: middle;
+    }
+    .page-subtitle { font-size: 13px; color: var(--text-3); margin-top: 4px; max-width: 500px; line-height: 1.5; }
   </style>
 </head>
 <body>
@@ -51,174 +366,224 @@
     <a href="admin-mapping.html">Mapping</a>
     <a href="admin-tracking.html">Tracking</a>
     <a href="admin-reports.html">Reports</a>
-    <a href="admin-rules.html" style="font-weight:800; color:#6d28d9;">Rule Engine</a>
+    <a href="admin-rules.html" style="color:var(--violet);font-weight:800;">Rule Engine</a>
     <a href="#" onclick="auth.logout()">Logout</a>
   </div>
 </div>
 
 <div class="container page">
 
+  <!-- Page Header -->
   <div class="page-header">
     <div>
-      <h1 class="page-title">Rule Engine Manager</h1>
-      <div class="page-subtitle">Review AI corrections → confirm to make them permanent engine rules. No coding required.</div>
+      <div class="page-title">
+        Rule Engine Manager
+        <span class="title-badge">Live</span>
+      </div>
+      <div class="page-subtitle">Review AI corrections → promote patterns to permanent engine rules. Formula constants are read from the database at runtime.</div>
     </div>
-    <button class="btn btn-primary" onclick="loadAll()">↻ Refresh</button>
+    <button class="btn-primary btn-sm" onclick="loadAll()" style="margin-top:4px;">↻ Refresh</button>
   </div>
 
   <!-- Stats -->
   <div class="stats-row">
-    <div class="stat-card"><div class="stat-num" id="statPending">—</div><div class="stat-lbl">Pending Review</div></div>
-    <div class="stat-card"><div class="stat-num" id="statActive">—</div><div class="stat-lbl">Active Rules</div></div>
-    <div class="stat-card"><div class="stat-num" id="statPromoted">—</div><div class="stat-lbl">Promoted</div></div>
-    <div class="stat-card"><div class="stat-num" id="statRejected">—</div><div class="stat-lbl">Rejected</div></div>
-    <div class="stat-card"><div class="stat-num" id="statFormulas">—</div><div class="stat-lbl">Engine Formulas</div></div>
+    <div class="stat-card s-amber">
+      <div class="stat-num" id="statPending">—</div>
+      <div class="stat-lbl">Pending Review</div>
+    </div>
+    <div class="stat-card s-green">
+      <div class="stat-num" id="statActive">—</div>
+      <div class="stat-lbl">Active Rules</div>
+    </div>
+    <div class="stat-card s-violet">
+      <div class="stat-num" id="statPromoted">—</div>
+      <div class="stat-lbl">Promoted</div>
+    </div>
+    <div class="stat-card s-rose">
+      <div class="stat-num" id="statRejected">—</div>
+      <div class="stat-lbl">Rejected</div>
+    </div>
+    <div class="stat-card s-cyan">
+      <div class="stat-num" id="statFormulas">—</div>
+      <div class="stat-lbl">Formula Constants</div>
+    </div>
   </div>
 
   <!-- Tabs -->
   <div class="tab-bar">
-    <button class="tab-btn active" onclick="switchTab('corrections')">📥 AI Corrections (Pending Review)</button>
-    <button class="tab-btn" onclick="switchTab('rules')">✅ Active Engine Rules</button>
-    <button class="tab-btn" onclick="switchTab('history')">📋 All History</button>
-    <button class="tab-btn" onclick="switchTab('formulas')">⚙️ Engine Formulas</button>
+    <button class="tab-btn active" data-tab="corrections" onclick="switchTab('corrections')">📥 AI Corrections</button>
+    <button class="tab-btn" data-tab="rules" onclick="switchTab('rules')">✅ Active Rules</button>
+    <button class="tab-btn" data-tab="history" onclick="switchTab('history')">📋 History</button>
+    <button class="tab-btn" data-tab="formulas" onclick="switchTab('formulas')">⚙️ Formula Constants</button>
   </div>
 
+  <!-- ─────────────────────────────────────────────────── -->
   <!-- TAB: AI Corrections -->
+  <!-- ─────────────────────────────────────────────────── -->
   <div id="tab-corrections" class="section active">
-    <p style="font-size:11.5px; color:#64748b; margin-bottom:14px;">
-      These are values the AI corrected after the engine calculated them. Review each one —
-      if the same pattern should apply to <b>all future patients</b>, click <b>Promote to Rule</b>.
+    <p class="section-desc">
+      These values were corrected by Claude AI after the engine calculated them for a patient.
+      If a correction pattern should apply to <strong style="color:var(--text);">all future patients</strong>, click <strong style="color:var(--violet);">Promote to Rule</strong>.
     </p>
-    <table class="rule-table" id="correctionsTable">
-      <thead>
-        <tr>
-          <th>Date</th>
-          <th>Patient</th>
-          <th>Cancer / Regimen</th>
-          <th>What Changed</th>
-          <th>AI Reason</th>
-          <th>Context</th>
-          <th>Status</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <tbody id="correctionsBody">
-        <tr><td colspan="8" class="empty-state">Loading...</td></tr>
-      </tbody>
-    </table>
-  </div>
-
-  <!-- TAB: Active Rules -->
-  <div id="tab-rules" class="section">
-    <p style="font-size:11.5px; color:#64748b; margin-bottom:14px;">
-      These rules are applied automatically by the engine to every future patient.
-      Edit or deactivate any rule at any time.
-    </p>
-    <table class="rule-table" id="rulesTable">
-      <thead>
-        <tr>
-          <th>Rule Name</th>
-          <th>Condition</th>
-          <th>Field</th>
-          <th>Operator</th>
-          <th>Value</th>
-          <th>Reason</th>
-          <th>Confirmed By</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <tbody id="rulesBody">
-        <tr><td colspan="8" class="empty-state">Loading...</td></tr>
-      </tbody>
-    </table>
-  </div>
-
-  <!-- TAB: History -->
-  <div id="tab-history" class="section">
-    <p style="font-size:11.5px; color:#64748b; margin-bottom:14px;">
-      All AI corrections — pending, promoted, and rejected.
-    </p>
-    <table class="rule-table" id="historyTable">
-      <thead>
-        <tr>
-          <th>Date</th>
-          <th>Patient</th>
-          <th>Cancer / Regimen</th>
-          <th>What Changed</th>
-          <th>Reason</th>
-          <th>Status</th>
-        </tr>
-      </thead>
-      <tbody id="historyBody">
-        <tr><td colspan="6" class="empty-state">Loading...</td></tr>
-      </tbody>
-    </table>
-  </div>
-
-  <!-- TAB: Engine Formulas -->
-  <div id="tab-formulas" class="section">
-    <p style="font-size:11.5px; color:#64748b; margin-bottom:4px;">
-      All clinical constants currently hardcoded in the nutrition engine — seeded into the database for visibility and future dynamic loading.
-      Edit a value and click <b>Save</b> to update the database record.
-    </p>
-    <div style="font-size:10.5px; background:#fef3c7; border:1px solid #fbbf24; border-radius:6px; padding:8px 12px; margin-bottom:16px; color:#92400e; font-weight:600;">
-      ⚠️ Note: Editing here updates the database only. The engine still reads from JS code until Part 3 (engine DB integration) is deployed.
-      These values serve as the reference record and will become the live source of truth once engine DB reading is enabled.
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Patient</th>
+            <th>Cancer / Regimen</th>
+            <th>What Changed</th>
+            <th>AI Reason</th>
+            <th>Context Flags</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="correctionsBody">
+          <tr><td colspan="8" class="empty-state">
+            <div class="empty-icon">🤖</div>
+            Loading corrections...
+          </td></tr>
+        </tbody>
+      </table>
     </div>
-    <div id="formulasContent"><div class="empty-state">Loading...</div></div>
   </div>
 
-</div>
+  <!-- ─────────────────────────────────────────────────── -->
+  <!-- TAB: Active Rules -->
+  <!-- ─────────────────────────────────────────────────── -->
+  <div id="tab-rules" class="section">
+    <div class="alert-green">
+      <span style="font-size:16px;flex-shrink:0;">⚡</span>
+      <span>These rules are <strong>live</strong> — applied automatically to every patient plan at runtime. Deactivate or delete any rule to stop it immediately.</span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Rule Name</th>
+            <th>Condition</th>
+            <th>Field</th>
+            <th>Op</th>
+            <th>Value</th>
+            <th>Clinical Reason</th>
+            <th>Confirmed By</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="rulesBody">
+          <tr><td colspan="8" class="empty-state">
+            <div class="empty-icon">✅</div>
+            No active rules yet — promote a correction to create one.
+          </td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
 
+  <!-- ─────────────────────────────────────────────────── -->
+  <!-- TAB: History -->
+  <!-- ─────────────────────────────────────────────────── -->
+  <div id="tab-history" class="section">
+    <p class="section-desc">All AI corrections — pending, promoted, and rejected.</p>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Patient</th>
+            <th>Cancer / Regimen</th>
+            <th>What Changed</th>
+            <th>AI Reason</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="historyBody">
+          <tr><td colspan="6" class="empty-state">
+            <div class="empty-icon">📋</div>
+            Loading history...
+          </td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ─────────────────────────────────────────────────── -->
+  <!-- TAB: Engine Formulas -->
+  <!-- ─────────────────────────────────────────────────── -->
+  <div id="tab-formulas" class="section">
+    <div class="alert-green">
+      <span style="font-size:16px;flex-shrink:0;">✅</span>
+      <span>
+        <strong>Part 3 active —</strong> the engine now reads these constants from the database at every page load.
+        Edit a value and click <strong>Save</strong>; the next plan generated will use the updated value immediately — no code deploy needed.
+      </span>
+    </div>
+    <div id="formulasContent">
+      <div class="empty-state"><div class="empty-icon">⚙️</div>Loading formula constants...</div>
+    </div>
+  </div>
+
+</div><!-- /container -->
+
+<!-- ─────────────────────────────────────────────────────── -->
 <!-- PROMOTE TO RULE MODAL -->
+<!-- ─────────────────────────────────────────────────── -->
 <div class="modal-overlay" id="promoteModal">
   <div class="modal">
-    <h3>⚖️ Promote Correction to Engine Rule</h3>
-    <p style="font-size:11px; color:#64748b; margin-bottom:16px;">
-      This rule will be saved to the database and applied automatically to all future patients.
-      Review and edit the values below before confirming.
-    </p>
+    <div class="modal-header">
+      <div class="modal-icon">⚖️</div>
+      <div>
+        <div class="modal-title">Promote Correction to Engine Rule</div>
+        <div class="modal-subtitle">This rule will be saved to the database and applied to all future patients.</div>
+      </div>
+    </div>
     <input type="hidden" id="modalCorrId">
     <div class="form-row">
-      <label>Rule Name (short identifier)</label>
+      <label>Rule Name <span style="color:var(--rose);">*</span></label>
       <input type="text" id="modalRuleName" placeholder="e.g. fat_cap_diabetic_steroid">
     </div>
     <div class="form-row">
-      <label>Condition — When does this rule apply?</label>
-      <textarea id="modalCondition" placeholder="e.g. Patient has HbA1c ≥ 6.5% OR blood sugar > 140 mg/dL OR is on steroid-containing regimen"></textarea>
+      <label>Condition — When does this rule apply? <span style="color:var(--rose);">*</span></label>
+      <textarea id="modalCondition" style="height:72px;resize:vertical;" placeholder="e.g. Patient has HbA1c ≥ 6.5% or is on steroid-containing regimen"></textarea>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+      <div class="form-row">
+        <label>Target Field</label>
+        <select id="modalField">
+          <option value="dailyFat">dailyFat (grams)</option>
+          <option value="dailyCarbs">dailyCarbs (grams)</option>
+          <option value="dailyProtein">dailyProtein (grams)</option>
+          <option value="dailyCalories">dailyCalories (kcal)</option>
+          <option value="kcalPerKg">kcalPerKg</option>
+          <option value="proteinPerKg">proteinPerKg</option>
+          <option value="servingsPerDay">servingsPerDay</option>
+          <option value="fatPct">fatPct (% of calories)</option>
+          <option value="micronutrient_exclude">Micronutrient — EXCLUDE</option>
+          <option value="micronutrient_cap">Micronutrient — CAP dose</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label>Operator</label>
+        <select id="modalOperator">
+          <option value="max">max — cap at value</option>
+          <option value="min">min — floor at value</option>
+          <option value="set">set — fix exact value</option>
+          <option value="exclude">exclude — remove field</option>
+        </select>
+      </div>
     </div>
     <div class="form-row">
-      <label>Target Field</label>
-      <select id="modalField">
-        <option value="dailyFat">dailyFat (grams)</option>
-        <option value="dailyCarbs">dailyCarbs (grams)</option>
-        <option value="dailyProtein">dailyProtein (grams)</option>
-        <option value="dailyCalories">dailyCalories (kcal)</option>
-        <option value="fatPct">fatPct (% of calories)</option>
-        <option value="micronutrient_exclude">Micronutrient — EXCLUDE</option>
-        <option value="micronutrient_cap">Micronutrient — CAP dose</option>
-      </select>
-    </div>
-    <div class="form-row">
-      <label>Operator</label>
-      <select id="modalOperator">
-        <option value="max">max (cap at this value)</option>
-        <option value="min">min (floor at this value)</option>
-        <option value="set">set (fix to this exact value)</option>
-        <option value="exclude">exclude (remove from plan)</option>
-      </select>
-    </div>
-    <div class="form-row">
-      <label>Value</label>
-      <input type="text" id="modalValue" placeholder="e.g. 30 (for 30% fat cap) or EXCLUDED">
+      <label>Value <span style="color:var(--rose);">*</span></label>
+      <input type="text" id="modalValue" placeholder="e.g. 30">
     </div>
     <div class="form-row">
       <label>Clinical Reason (shown to developers)</label>
-      <textarea id="modalReason" placeholder="e.g. Diabetic + steroid protocol: fat must not exceed 30% of total calories for glycaemic safety."></textarea>
+      <textarea id="modalReason" style="height:72px;resize:vertical;" placeholder="e.g. Diabetic + steroid protocol: fat must not exceed 30% of total calories for glycaemic safety."></textarea>
     </div>
-    <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:16px;">
-      <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-primary" onclick="confirmPromote()">✅ Confirm — Add to Engine Rules</button>
+    <div class="modal-footer">
+      <button class="btn-secondary btn-sm" onclick="closeModal()">Cancel</button>
+      <button class="btn-primary btn-sm" onclick="confirmPromote()" style="background:var(--violet);color:white;">✅ Confirm — Add to Engine Rules</button>
     </div>
   </div>
 </div>
@@ -268,7 +633,7 @@
   }
 
   function changesHtml(changes) {
-    if (!changes || !changes.length) return '<span style="color:#94a3b8">—</span>';
+    if (!changes || !changes.length) return '<span style="color:var(--text-3)">—</span>';
     return (typeof changes === 'string' ? JSON.parse(changes) : changes).map(ch => {
       const isExcluded = ch.aiValue === 'EXCLUDED';
       const label = isExcluded
@@ -279,7 +644,7 @@
   }
 
   function contextHtml(ctx) {
-    if (!ctx) return '—';
+    if (!ctx) return '<span style="color:var(--text-3)">—</span>';
     const c = typeof ctx === 'string' ? JSON.parse(ctx) : ctx;
     const flags = [];
     if (c.isDiabetic) flags.push('Diabetic');
@@ -288,28 +653,40 @@
     if (c.hasCachexia) flags.push('Cachexia');
     if (c.hasSarcopenia) flags.push('Sarcopenia');
     if (c.creatinine) flags.push(`Cr ${c.creatinine}`);
-    return flags.length ? flags.map(f => `<span style="background:#f1f5f9;border-radius:3px;padding:1px 5px;font-size:9.5px;font-weight:600;color:#334155;margin:1px;display:inline-block;">${f}</span>`).join('') : '—';
+    return flags.length
+      ? flags.map(f => `<span class="context-pill">${f}</span>`).join('')
+      : '<span style="color:var(--text-3)">—</span>';
+  }
+
+  function opHtml(op) {
+    const cls = { max:'op-max', min:'op-min', set:'op-set', exclude:'op-exclude' };
+    return `<span class="op-pill ${cls[op] || 'op-set'}">${op}</span>`;
   }
 
   function renderCorrections() {
     const pending = _corrections.filter(c => c.status === 'pending');
     const tbody = document.getElementById('correctionsBody');
     if (!pending.length) {
-      tbody.innerHTML = '<tr><td colspan="8" class="empty-state">No pending corrections — all caught up ✅</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="8" class="empty-state"><div class="empty-icon">✅</div>No pending corrections — all caught up!</td></tr>';
       return;
     }
     tbody.innerHTML = pending.map(c => `
       <tr>
-        <td style="white-space:nowrap;color:#94a3b8;">${new Date(c.created_at).toLocaleDateString()}</td>
-        <td style="font-weight:700;">${c.patient_name || '—'}</td>
-        <td style="font-size:10.5px;">${c.cancer || '—'}<br><span style="color:#64748b;">${c.regimen || '—'}</span></td>
+        <td style="white-space:nowrap;color:var(--text-3);font-size:11.5px;">${new Date(c.created_at).toLocaleDateString()}</td>
+        <td style="font-weight:700;color:var(--text);">${c.patient_name || '—'}</td>
+        <td style="font-size:11.5px;">
+          <div style="color:var(--text);font-weight:600;">${c.cancer || '—'}</div>
+          <div style="color:var(--text-3);font-size:10.5px;margin-top:2px;">${c.regimen || '—'}</div>
+        </td>
         <td>${changesHtml(c.changes)}</td>
-        <td style="font-size:10.5px;max-width:220px;">${c.reason || '—'}</td>
+        <td style="font-size:11.5px;max-width:200px;line-height:1.5;color:var(--text-2);">${c.reason || '—'}</td>
         <td>${contextHtml(c.patient_context)}</td>
         <td><span class="badge badge-pending">Pending</span></td>
-        <td style="white-space:nowrap;">
-          <button class="btn-promote" onclick="openPromoteModal('${c.id}')">⚖️ Promote to Rule</button>
-          <button class="btn-reject" onclick="rejectCorrection('${c.id}')">✕ Reject</button>
+        <td>
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            <button class="btn-action btn-promote" onclick="openPromoteModal('${c.id}')">⚖️ Promote to Rule</button>
+            <button class="btn-action btn-reject" onclick="rejectCorrection('${c.id}')">✕ Reject</button>
+          </div>
         </td>
       </tr>`).join('');
   }
@@ -318,21 +695,26 @@
     const active = _rules.filter(r => r.status === 'active');
     const tbody = document.getElementById('rulesBody');
     if (!active.length) {
-      tbody.innerHTML = '<tr><td colspan="8" class="empty-state">No active rules yet — promote a correction to create one.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="8" class="empty-state"><div class="empty-icon">⚡</div>No active rules yet — promote a correction to create one.</td></tr>';
       return;
     }
     tbody.innerHTML = active.map(r => `
       <tr>
-        <td style="font-weight:700;color:#0e2247;">${r.rule_name}</td>
-        <td style="font-size:10.5px;">${r.condition_description || '—'}</td>
+        <td style="font-weight:800;color:var(--text);font-family:var(--font-display);">${r.rule_name}</td>
+        <td style="font-size:11.5px;color:var(--text-2);max-width:180px;line-height:1.5;">${r.condition_description || '—'}</td>
         <td><span class="change-chip">${r.target_field}</span></td>
-        <td style="font-weight:700;color:#6d28d9;">${r.operator}</td>
-        <td style="font-weight:800;color:#0e2247;">${r.value}</td>
-        <td style="font-size:10.5px;max-width:200px;">${r.reason || '—'}</td>
-        <td style="font-size:10.5px;color:#64748b;">${r.confirmed_by || '—'}<br>${r.confirmed_at ? new Date(r.confirmed_at).toLocaleDateString() : ''}</td>
-        <td style="white-space:nowrap;">
-          <button class="btn-deactivate" onclick="deactivateRule('${r.id}')">⏸ Deactivate</button>
-          <button class="btn-delete" onclick="deleteRule('${r.id}')">✕ Delete</button>
+        <td>${opHtml(r.operator)}</td>
+        <td style="font-weight:900;color:var(--cyan);font-family:monospace;font-size:14px;">${r.value}</td>
+        <td style="font-size:11.5px;color:var(--text-2);max-width:180px;line-height:1.5;">${r.reason || '—'}</td>
+        <td style="font-size:11px;color:var(--text-3);">
+          ${r.confirmed_by || '—'}
+          ${r.confirmed_at ? `<div style="font-size:10px;margin-top:2px;">${new Date(r.confirmed_at).toLocaleDateString()}</div>` : ''}
+        </td>
+        <td>
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            <button class="btn-action btn-deactivate" onclick="deactivateRule('${r.id}')">⏸ Deactivate</button>
+            <button class="btn-action btn-delete" onclick="deleteRule('${r.id}')">✕ Delete</button>
+          </div>
         </td>
       </tr>`).join('');
   }
@@ -340,90 +722,90 @@
   function renderHistory() {
     const tbody = document.getElementById('historyBody');
     if (!_corrections.length) {
-      tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No corrections recorded yet.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="6" class="empty-state"><div class="empty-icon">📋</div>No corrections recorded yet.</td></tr>';
       return;
     }
     const statusClass = { pending:'badge-pending', promoted:'badge-promoted', rejected:'badge-rejected' };
     tbody.innerHTML = _corrections.map(c => `
       <tr>
-        <td style="white-space:nowrap;color:#94a3b8;">${new Date(c.created_at).toLocaleDateString()}</td>
-        <td style="font-weight:700;">${c.patient_name || '—'}</td>
-        <td style="font-size:10.5px;">${c.cancer || '—'}<br><span style="color:#64748b;">${c.regimen || '—'}</span></td>
+        <td style="white-space:nowrap;color:var(--text-3);font-size:11.5px;">${new Date(c.created_at).toLocaleDateString()}</td>
+        <td style="font-weight:700;color:var(--text);">${c.patient_name || '—'}</td>
+        <td style="font-size:11.5px;">
+          <div style="color:var(--text);font-weight:600;">${c.cancer || '—'}</div>
+          <div style="color:var(--text-3);font-size:10.5px;margin-top:2px;">${c.regimen || '—'}</div>
+        </td>
         <td>${changesHtml(c.changes)}</td>
-        <td style="font-size:10.5px;max-width:220px;">${c.reason || '—'}</td>
+        <td style="font-size:11.5px;max-width:220px;line-height:1.5;color:var(--text-2);">${c.reason || '—'}</td>
         <td><span class="badge ${statusClass[c.status]||'badge-pending'}">${c.status}</span></td>
       </tr>`).join('');
   }
 
   function switchTab(name) {
-    const tabs = ['corrections','rules','history','formulas'];
-    document.querySelectorAll('.tab-btn').forEach((b,i) => {
-      b.classList.toggle('active', tabs[i] === name);
-    });
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
     document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
     document.getElementById('tab-' + name).classList.add('active');
   }
 
   const CATEGORY_LABELS = {
-    calories:     '🔥 Calorie Targets (kcal/kg)',
-    protein:      '💪 Protein Targets (g/kg)',
-    weight:       '⚖️ Ideal Body Weight — Devine Formula',
-    risk_scoring: '📊 Risk Scoring Thresholds',
-    sarcopenia:   '🦴 Sarcopenia Thresholds (EWGSOP2 / Janssen–Martin)',
-    safety_labs:  '🧪 Safety Lab Thresholds',
-    refeeding:    '⚠️ Refeeding Syndrome (NICE CG32)',
-    macros:       '🥗 Macro Distribution Ratios',
-    escalation:   '📈 Intake / Escalation Thresholds',
-    fluid:        '💧 Fluid Targets',
-    servings:     '🍽️ Serving Frequency'
+    calories:     { icon: '🔥', label: 'Calorie Targets' },
+    protein:      { icon: '💪', label: 'Protein Targets' },
+    weight:       { icon: '⚖️', label: 'Ideal Body Weight — Devine Formula' },
+    risk_scoring: { icon: '📊', label: 'Risk Scoring Thresholds' },
+    sarcopenia:   { icon: '🦴', label: 'Sarcopenia Thresholds (EWGSOP2 / Janssen–Martin)' },
+    safety_labs:  { icon: '🧪', label: 'Safety Lab Thresholds' },
+    refeeding:    { icon: '⚠️', label: 'Refeeding Syndrome — NICE CG32' },
+    macros:       { icon: '🥗', label: 'Macro Distribution Ratios' },
+    escalation:   { icon: '📈', label: 'Intake / Escalation Thresholds' },
+    fluid:        { icon: '💧', label: 'Fluid Targets' },
+    servings:     { icon: '🍽️', label: 'Serving Frequency' }
   };
 
   function renderFormulas() {
     const container = document.getElementById('formulasContent');
     if (!_formulas.length) {
-      container.innerHTML = '<div class="empty-state">No formula constants found — check server connection.</div>';
+      container.innerHTML = '<div class="empty-state"><div class="empty-icon">⚙️</div>No formula constants found — check server connection.</div>';
       return;
     }
     const groups = {};
-    _formulas.forEach(f => {
-      if (!groups[f.category]) groups[f.category] = [];
-      groups[f.category].push(f);
-    });
+    _formulas.forEach(f => { if (!groups[f.category]) groups[f.category] = []; groups[f.category].push(f); });
     const catOrder = ['calories','protein','weight','risk_scoring','sarcopenia','safety_labs','refeeding','macros','escalation','fluid','servings'];
     const orderedCats = [...catOrder.filter(c => groups[c]), ...Object.keys(groups).filter(c => !catOrder.includes(c))];
 
     let html = '';
     orderedCats.forEach(cat => {
-      const label = CATEGORY_LABELS[cat] || cat;
+      const meta = CATEGORY_LABELS[cat] || { icon: '📌', label: cat };
       html += `
-        <div style="margin-bottom:28px;">
-          <div style="font-size:12px;font-weight:800;color:#0e2247;margin-bottom:8px;padding-bottom:6px;border-bottom:2px solid #e2e8f0;">${label}</div>
-          <table class="rule-table">
+        <div class="formula-category table-wrap" style="margin-bottom:20px;">
+          <div style="padding:16px 20px 0;">
+            <div class="formula-cat-header">
+              <span class="cat-icon">${meta.icon}</span>
+              ${meta.label}
+              <span style="font-size:10px;color:var(--text-3);font-weight:600;font-family:var(--font-body);margin-left:4px;">${groups[cat].length} constants</span>
+            </div>
+          </div>
+          <table>
             <thead>
               <tr>
                 <th style="width:200px;">Constant ID</th>
                 <th>Description</th>
-                <th style="width:110px;">Value</th>
+                <th style="width:120px;">Value</th>
                 <th style="width:90px;">Unit</th>
                 <th>Clinical Source</th>
-                <th style="width:70px;">Action</th>
+                <th style="width:80px;">Action</th>
               </tr>
             </thead>
             <tbody>
               ${groups[cat].map(f => `
                 <tr>
-                  <td style="font-weight:700;font-family:monospace;font-size:10px;color:#6d28d9;">${f.name}</td>
-                  <td style="font-size:10.5px;">${f.description || '—'}</td>
+                  <td><span class="mono-id">${f.name}</span></td>
+                  <td style="font-size:12px;color:var(--text-2);line-height:1.5;">${f.description || '—'}</td>
                   <td>
-                    <input type="text" id="fval_${f.id}" value="${f.value}"
-                      style="width:90px;padding:4px 6px;border:1px solid #cbd5e1;border-radius:4px;font-size:12px;font-weight:800;color:#0e2247;text-align:center;">
+                    <input type="text" id="fval_${f.id}" value="${f.value}" class="formula-value-input">
                   </td>
-                  <td style="font-size:10.5px;color:#64748b;">${f.unit || '—'}</td>
-                  <td style="font-size:10.5px;color:#64748b;">${f.source || '—'}</td>
+                  <td style="font-size:11.5px;color:var(--text-3);">${f.unit || '—'}</td>
+                  <td style="font-size:11px;color:var(--text-3);">${f.source || '—'}</td>
                   <td>
-                    <button onclick="saveFormula('${f.id}')" style="background:#0e2247;color:white;border:none;border-radius:4px;padding:4px 10px;font-size:10px;font-weight:700;cursor:pointer;">
-                      💾 Save
-                    </button>
+                    <button class="btn-save-formula" onclick="saveFormula('${f.id}')">💾 Save</button>
                   </td>
                 </tr>`).join('')}
             </tbody>
@@ -445,9 +827,9 @@
         body: JSON.stringify({ value })
       });
       if (!res.ok) throw new Error(await res.text());
-      input.style.background = '#dcfce7';
-      setTimeout(() => { input.style.background = ''; }, 2500);
-      // Update local cache
+      input.style.borderColor = 'var(--green)';
+      input.style.color = 'var(--green)';
+      setTimeout(() => { input.style.borderColor = ''; input.style.color = ''; }, 2500);
       const f = _formulas.find(f => f.id === id);
       if (f) f.value = value;
     } catch (e) {
@@ -460,12 +842,12 @@
     const corr = _corrections.find(c => c.id === corrId);
     if (!corr) return;
     document.getElementById('modalCorrId').value = corrId;
-    // Pre-fill from correction data
     const changes = typeof corr.changes === 'string' ? JSON.parse(corr.changes) : (corr.changes || []);
     const firstChange = changes[0] || {};
     document.getElementById('modalRuleName').value = '';
     document.getElementById('modalCondition').value = '';
-    document.getElementById('modalField').value = firstChange.field && ['dailyFat','dailyCarbs','dailyProtein','dailyCalories','fatPct'].includes(firstChange.field) ? firstChange.field : 'dailyFat';
+    const validFields = ['dailyFat','dailyCarbs','dailyProtein','dailyCalories','kcalPerKg','proteinPerKg','servingsPerDay','fatPct'];
+    document.getElementById('modalField').value = (firstChange.field && validFields.includes(firstChange.field)) ? firstChange.field : 'dailyFat';
     document.getElementById('modalOperator').value = firstChange.aiValue === 'EXCLUDED' ? 'exclude' : 'max';
     document.getElementById('modalValue').value = firstChange.aiValue || '';
     document.getElementById('modalReason').value = corr.reason || '';
@@ -496,7 +878,6 @@
       if (!res.ok) throw new Error(await res.text());
       closeModal();
       await loadAll();
-      alert('✅ Rule promoted and is now active in the engine.');
     } catch (e) {
       alert('Error: ' + e.message);
     }
@@ -524,6 +905,11 @@
     await fetch(`${apiBase}/api/engine-rules/${ruleId}`, { method:'DELETE', headers:headers() });
     await loadAll();
   }
+
+  // Close modal on backdrop click
+  document.getElementById('promoteModal').addEventListener('click', function(e) {
+    if (e.target === this) closeModal();
+  });
 
   // Init
   window.addEventListener('DOMContentLoaded', async () => {
