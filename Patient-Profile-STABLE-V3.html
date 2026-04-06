@@ -641,42 +641,52 @@
           <div class="rs-title">Clinical Assessment</div>
 
           <div class="rrisk">
-            <div class="rb rb-i" id="catBmi">BMI <span id="pBMI"></span></div>
+            <div class="rb rb-i" id="catBmi">BMI <span id="pBMI"></span> kg/m²</div>
             <div class="rb rb-h" id="catAsianBmi"><span id="pAsianBMI"></span></div>
-            <div class="rb rb-m" id="catNutrition" style="position:relative;cursor:help;" title="">High Risk
-              <span id="mustTooltip" style="display:none;position:absolute;top:100%;left:0;margin-top:6px;background:#1e293b;color:#f1f5f9;border-radius:8px;padding:10px 13px;font-size:11px;font-weight:500;white-space:nowrap;z-index:999;box-shadow:0 4px 16px rgba(0,0,0,0.4);line-height:1.8;">
-                <b style="color:#94a3b8;font-size:10px;letter-spacing:0.08em;">MUST SCORE BREAKDOWN</b><br>
-                BMI: <span id="mustBmiPts"></span> pts &nbsp;|&nbsp; Weight Loss: <span id="mustWlPts"></span> pts &nbsp;|&nbsp; Acute Disease: <span id="mustAcutePts"></span> pts<br>
-                Total: <span id="mustTotalPts"></span> &nbsp;→&nbsp; <span id="mustRiskLabel"></span>
-              </span>
-            </div>
-            <div class="rb rb-i">Clinical Fit: <span id="pFitScore"></span>%</div>
           </div>
 
           <!-- CLINICAL ASSESSMENT — COMPACT LAB TABLE -->
           <div style="margin-top:14px;">
 
             <!-- ONCOLOGY ROW -->
-            <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-bottom:10px;">
-              <div style="background:#fff8f0; border:1px solid #fed7aa; border-radius:6px; padding:9px 12px;">
-                <div style="font-size:8.5px; font-weight:800; text-transform:uppercase; color:#92400e; letter-spacing:0.08em; margin-bottom:3px;">Cancer / Stage</div>
-                <div style="font-size:12px; font-weight:700; color:#0f172a;"><span id="pCancer_card"></span> · <span id="pStage"></span></div>
-              </div>
-              <div style="background:#fff8f0; border:1px solid #fed7aa; border-radius:6px; padding:9px 12px;">
-                <div style="font-size:8.5px; font-weight:800; text-transform:uppercase; color:#92400e; letter-spacing:0.08em; margin-bottom:3px;">Regimen</div>
-                <div style="font-size:12px; font-weight:700; color:#0f172a;" id="pRegimen_card"></div>
-              </div>
-              <div style="background:#fff8f0; border:1px solid #fed7aa; border-radius:6px; padding:9px 12px;">
-                <div style="font-size:8.5px; font-weight:800; text-transform:uppercase; color:#92400e; letter-spacing:0.08em; margin-bottom:3px;">Tumor Burden · ECOG · Diet</div>
-                <div style="font-size:11.5px; font-weight:700; color:#0f172a;"><span id="pTumorBurden"></span> · ECOG <span id="pECOG"></span> · <span id="pVegetarian"></span></div>
-              </div>
-            </div>
+            <table style="width:100%; border-collapse:collapse; margin-bottom:10px;">
+              <tr>
+                <td style="background:#fff8f0; border:1px solid #fed7aa; border-radius:6px; padding:9px 12px; width:30%;">
+                  <div style="font-size:8.5px; font-weight:800; text-transform:uppercase; color:#92400e; letter-spacing:0.08em; margin-bottom:3px;">Cancer / Stage</div>
+                  <div style="font-size:12px; font-weight:700; color:#0f172a;"><span id="pCancer_card"></span> · <span id="pStage"></span></div>
+                </td>
+                <td style="background:#fff8f0; border:1px solid #fed7aa; border-radius:6px; padding:9px 12px; width:25%;">
+                  <div style="font-size:8.5px; font-weight:800; text-transform:uppercase; color:#92400e; letter-spacing:0.08em; margin-bottom:3px;">Regimen</div>
+                  <div style="font-size:12px; font-weight:700; color:#0f172a;" id="pRegimen_card"></div>
+                </td>
+                <td style="background:#fff8f0; border:1px solid #fed7aa; border-radius:6px; padding:9px 12px; width:15%;">
+                  <div style="font-size:8.5px; font-weight:800; text-transform:uppercase; color:#92400e; letter-spacing:0.08em; margin-bottom:3px;">Tumor Burden</div>
+                  <div style="font-size:12px; font-weight:700; color:#0f172a;" id="pTumorBurden"></div>
+                </td>
+                <td style="background:#fff8f0; border:1px solid #fed7aa; border-radius:6px; padding:9px 12px; width:15%;">
+                  <div style="font-size:8.5px; font-weight:800; text-transform:uppercase; color:#92400e; letter-spacing:0.08em; margin-bottom:3px;">ECOG Status</div>
+                  <div style="font-size:12px; font-weight:700; color:#0f172a;">ECOG <span id="pECOG"></span></div>
+                </td>
+                <td style="background:#fff8f0; border:1px solid #fed7aa; border-radius:6px; padding:9px 12px; width:15%;">
+                  <div style="font-size:8.5px; font-weight:800; text-transform:uppercase; color:#92400e; letter-spacing:0.08em; margin-bottom:3px;">Diet</div>
+                  <div style="font-size:12px; font-weight:700; color:#0f172a;" id="pVegetarian"></div>
+                </td>
+              </tr>
+            </table>
 
             <!-- CLINICAL STATS: 4-col quick strip -->
             <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:6px; margin-bottom:10px;">
               <div style="background:#f0f9ff; border:1px solid #bae6fd; border-radius:6px; padding:8px 10px; text-align:center;">
-                <div style="font-size:8px; font-weight:800; text-transform:uppercase; color:#0369a1; margin-bottom:2px;">Weight / Usual</div>
+                <div style="font-size:8px; font-weight:800; text-transform:uppercase; color:#0369a1; margin-bottom:2px;">Actual Weight / Usual</div>
                 <div style="font-size:12.5px; font-weight:800; color:#0e2247;"><span id="pWeight2"></span> / <span id="pUW2"></span> kg</div>
+                <span id="pIBW" style="display:none;"></span>
+                <div style="margin-top:6px;">
+                  <select id="weightBasisSelect" onchange="applyWeightBasis(this.value)" style="font-size:10px;font-weight:700;border:1px solid #bae6fd;border-radius:4px;padding:2px 5px;background:#e0f2fe;color:#0369a1;cursor:pointer;">
+                    <option value="ibw">IBW (Hamwi)</option>
+                    <option value="actual">Current Weight</option>
+                  </select>
+                  <div id="ibwDisplay" style="font-size:10px;color:#64748b;margin-top:2px;"></div>
+                </div>
               </div>
               <div style="background:#fef9c3; border:1px solid #fde047; border-radius:6px; padding:8px 10px; text-align:center;">
                 <div style="font-size:8px; font-weight:800; text-transform:uppercase; color:#854d0e; margin-bottom:2px;">Weight Loss</div>
@@ -697,11 +707,12 @@
 
               <!-- COL A: METABOLIC & ORGAN -->
               <div style="border:1px solid #e2e8f0; border-radius:6px; overflow:hidden;">
-                <div style="background:#e0f2fe; padding:5px 10px; font-size:8.5px; font-weight:900; text-transform:uppercase; letter-spacing:0.08em; color:#0369a1;">Metabolic &amp; Organ</div>
+                <div style="background:#e0f2fe; padding:5px 10px; font-size:8.5px; font-weight:900; text-transform:uppercase; letter-spacing:0.08em; color:#0369a1;">Biochemical Parameters</div>
                 <table style="width:100%; border-collapse:collapse; font-size:11px;">
                   <tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:4px 8px; color:#64748b;">Creatinine</td><td style="padding:4px 8px; font-weight:700; text-align:right;" id="pCreatinine"></td></tr>
-                  <tr style="border-bottom:1px solid #f1f5f9; background:#fafafa;"><td style="padding:4px 8px; color:#64748b;">CRP</td><td style="padding:4px 8px; font-weight:700; text-align:right; color:#dc2626;" id="pCRP_val"></td></tr>
-                  <tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:4px 8px; color:#64748b;">ALT / AST</td><td style="padding:4px 8px; font-weight:700; text-align:right;" id="pLiver"></td></tr>
+                  <tr style="border-bottom:1px solid #f1f5f9; background:#fafafa;"><td style="padding:4px 8px; color:#64748b;">CRP</td><td style="padding:4px 8px; font-weight:700; text-align:right;" id="pCRP_val"></td></tr>
+                  <tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:4px 8px; color:#64748b;">ALT</td><td style="padding:4px 8px; font-weight:700; text-align:right;" id="pALT"></td></tr>
+                  <tr style="border-bottom:1px solid #f1f5f9; background:#fafafa;"><td style="padding:4px 8px; color:#64748b;">AST</td><td style="padding:4px 8px; font-weight:700; text-align:right;" id="pAST"></td></tr>
                   <tr style="border-bottom:1px solid #f1f5f9; background:#fafafa;"><td style="padding:4px 8px; color:#64748b;">Bilirubin</td><td style="padding:4px 8px; font-weight:700; text-align:right;" id="pBilirubin"></td></tr>
                   <tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:4px 8px; color:#64748b;">Blood Sugar</td><td style="padding:4px 8px; font-weight:700; text-align:right;" id="pBloodSugar"></td></tr>
                   <tr style="border-bottom:1px solid #f1f5f9; background:#fafafa;"><td style="padding:4px 8px; color:#64748b;">TSH</td><td style="padding:4px 8px; font-weight:700; text-align:right;" id="pTSH"></td></tr>
@@ -716,7 +727,7 @@
               <div style="border:1px solid #e2e8f0; border-radius:6px; overflow:hidden;">
                 <div style="background:#ede9fe; padding:5px 10px; font-size:8.5px; font-weight:900; text-transform:uppercase; letter-spacing:0.08em; color:#5b21b6;">Nutritional Labs</div>
                 <table style="width:100%; border-collapse:collapse; font-size:11px;">
-                  <tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:4px 8px; color:#64748b;">Albumin</td><td style="padding:4px 8px; font-weight:700; text-align:right; color:#d97706;" id="pAlbumin"></td></tr>
+                  <tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:4px 8px; color:#64748b;">Albumin</td><td style="padding:4px 8px; font-weight:700; text-align:right;" id="pAlbumin"></td></tr>
                   <tr style="border-bottom:1px solid #f1f5f9; background:#fafafa;"><td style="padding:4px 8px; color:#64748b;">Prealbumin</td><td style="padding:4px 8px; font-weight:700; text-align:right;" id="pPrealbumin"></td></tr>
                   <tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:4px 8px; color:#64748b;">Hemoglobin</td><td style="padding:4px 8px; font-weight:700; text-align:right;" id="pHemoglobin"></td></tr>
                   <tr style="border-bottom:1px solid #f1f5f9; background:#fafafa;"><td style="padding:4px 8px; color:#64748b;">Vitamin D</td><td style="padding:4px 8px; font-weight:700; text-align:right;" id="pVitD"></td></tr>
@@ -1140,10 +1151,7 @@
         </div>
 
         <!-- REFEEDING SYNDROME PROTOCOL (shown only when risk detected) -->
-        <div class="rs" id="refeedingSection" style="margin-top:16px; display:none;">
-          <div class="rs-title" style="font-size:9.5px;">Refeeding Syndrome Protocol (NICE CG32)</div>
-          <div id="refeedingBody"></div>
-        </div>
+        <div id="refeedingSection" style="display:none;"><div id="refeedingBody"></div></div>
 
         <div class="rs" style="margin-top:16px;">
           <div class="rs-title" style="font-size:9.5px;">Clinical Rationale</div>
@@ -1155,14 +1163,7 @@
           <ul class="rrat" id="patientInstructions" style="font-size:11.5px; color:#475569;"></ul>
         </div>
 
-        <div class="rs" style="margin-top:16px;">
-          <div class="rs-title" style="font-size:9.5px;">Structured Dietary &amp; Meal Plan</div>
-          <div id="dietaryPlanContainer" style="font-size:11.5px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:12px; margin-top:5px; color:#334155; display:none;">
-            <div style="margin-bottom:8px;"><strong>Recommended Texture:</strong> <span id="dietTexture" style="color:#0f172a; font-weight:600;"></span></div>
-            <div style="margin-bottom:8px;"><strong>Clinical Strategies:</strong> <div id="dietStrategies" style="margin-top:2px; line-height:1.4;"></div></div>
-            <div><strong>Safe Meal Examples:</strong> <ul id="dietMealExamples" style="margin:5px 0 0 15px; padding:0; line-height:1.4;"></ul></div>
-          </div>
-        </div>
+        <div id="dietaryPlanContainer" style="display:none;"></div>
 
         <!-- V3 Outcome Probability Engine -->
         <div id="v3OutcomeModule" style="margin-top:16px; border:2px solid #0ea5e9; border-radius:10px; background:#f0f9ff; padding:15px; display:none;">
@@ -1225,6 +1226,21 @@
               Scroll down for full clinical detail in each section below.
             </div>
           </div>
+        </div>
+
+        <!-- AI NOT GENERATED BANNER — shown when no insights are saved -->
+        <div id="aiNotGeneratedBanner" style="display:none; margin-top:16px; background:#fefce8; border:1.5px dashed #ca8a04; border-radius:8px; padding:12px 16px; display:flex; align-items:center; justify-content:space-between; gap:12px;">
+          <div style="display:flex; align-items:center; gap:10px;">
+            <span style="font-size:18px;">⚠️</span>
+            <div>
+              <div style="font-weight:700; color:#92400e; font-size:12px;">AI Report Not Generated</div>
+              <div style="font-size:10.5px; color:#78350f; margin-top:2px;">Clinical AI audit has not been run for this patient. Click to generate.</div>
+            </div>
+          </div>
+          <button onclick="document.getElementById('aiNotGeneratedBanner').style.display='none'; generateClaudeInsight();"
+                  style="background:#6d28d9; color:white; border:none; border-radius:6px; padding:6px 14px; font-size:11px; font-weight:700; cursor:pointer; white-space:nowrap;">
+            ✨ Generate AI Report
+          </button>
         </div>
 
         <!-- ══════════════════════════════════════════════════════════════ -->
@@ -1858,14 +1874,23 @@
             const vf = parseFloat(v);
             if (isNaN(vf) || vf === 0) return '-';
             const { lo, hi, critLo, critHi } = ranges || {};
-            let color = '#22c55e'; let title = 'Normal';
-            if ((critLo !== undefined && vf < critLo) || (critHi !== undefined && vf > critHi)) {
-              color = '#ef4444'; title = 'Critical';
-            } else if ((lo !== undefined && vf < lo) || (hi !== undefined && vf > hi)) {
-              color = '#f59e0b'; title = 'Borderline';
+            let color = '#16a34a'; let arrow = '→'; let label = 'Normal';
+            if (critHi !== undefined && vf > critHi) {
+              color = '#dc2626'; arrow = '↑↑'; label = 'Critical High';
+            } else if (critLo !== undefined && vf < critLo) {
+              color = '#dc2626'; arrow = '↓↓'; label = 'Critical Low';
+            } else if (hi !== undefined && vf > hi) {
+              color = '#d97706'; arrow = '↑'; label = 'High';
+            } else if (lo !== undefined && vf < lo) {
+              color = '#d97706'; arrow = '↓'; label = 'Low';
             }
-            const dot = `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;margin-left:5px;vertical-align:middle;background:${color};" title="${title}"></span>`;
-            return `${vf}${unit ? ' ' + unit : ''}${dot}`;
+            const rangeStr = (lo !== undefined && hi !== undefined) ? `${lo}–${hi}` : (hi !== undefined ? `<${hi}` : '');
+            const rangeLine = rangeStr ? `<div style="font-size:9px;color:#94a3b8;margin-top:1px;">Ref: ${rangeStr} ${unit}</div>` : '';
+            return `<div style="text-align:right;">
+              <span style="font-weight:700;">${vf} ${unit || ''}</span>
+              <span style="font-weight:900;color:${color};margin-left:4px;" title="${label}">${arrow}</span>
+              ${rangeLine}
+            </div>`;
           }
           // INTAKE CALCULATOR LOGIC
           function addIntakeRow() {
@@ -1948,11 +1973,6 @@
               return;
             }
             _initPatientProfile(patient);
-            // Expose inner functions globally after they are defined inside this closure
-            window.sendChatMessage = sendChatMessage;
-            window.enableFollowUpMode = enableFollowUpMode;
-            window.triggerFileUpload = triggerFileUpload;
-            setTimeout(() => window.toggleChat(), 800);
           });
 
           function _initPatientProfile(patient) {
@@ -2242,6 +2262,7 @@
 
             addMessage(text, 'user');
             input.value = '';
+            window.toggleChat();
 
             const typing = addTyping();
 
@@ -2260,7 +2281,6 @@
                     console.log("AI Detected Clinical Data:", data.extractedData);
                     applyExtractedData(data.extractedData);
                     addMessage('✨ Clinical data detected! Form has been auto-populated.', 'ai');
-                    setTimeout(() => toggleChat(), 1500);
                 }
             } catch (err) {
               typing.remove();
@@ -2304,79 +2324,6 @@
             if (count > 0) {
               window.patient = { ...window.patient, ...data };
               savePatient(window.patient);
-            }
-          }
-
-          async function generateClaudeInsight() {
-            const btn = document.getElementById('btnClaude');
-            
-            // Hard refresh patient data from storage if somehow lost
-            if(!window.patient) {
-                const params = new URLSearchParams(window.location.search);
-                const id = params.get('id');
-                if(id) window.patient = getPatientById(id);
-            }
-
-            if(!window.patient) {
-                alert("Critical Error: Patient record not found. Please refresh the page.");
-                return;
-            }
-            
-            // Force generate latest plan context
-            if (typeof generateNutritionPlan === 'function') {
-                window.currentPlan = generateNutritionPlan(window.patient);
-            }
-
-            if(!window.currentPlan) {
-                window.currentVersionedPlan = generateNutritionPlan(window.patient);
-            }
-
-            if(!window.currentVersionedPlan) {
-                alert("Critical Error: Nutrition plan calculation failed. Check patient weight/labs.");
-                return;
-            }
-
-            const originalText = btn.innerHTML;
-            btn.innerHTML = '✨ Thinking...';
-            btn.disabled = true;
-
-            try {
-              // Refresh plan context one last time
-              let flatPlan = null;
-              if (typeof generateNutritionPlan === 'function') {
-                flatPlan = generateNutritionPlan(window.patient);
-              } else if (window.currentVersionedPlan) {
-                flatPlan = window.currentVersionedPlan.finalPlan;
-              }
-
-              if (!flatPlan) throw new Error("Could not determine nutrition plan for AI analysis.");
-
-              const apiBase = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : '';
-              const response = await fetch(`${apiBase}/api/claude-report`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json; charset=utf-8',
-                  'X-Claude-Context': 'PatientReport'
-                },
-                body: JSON.stringify({ 
-                    patient: window.patient, 
-                    plan: flatPlan.finalPlan || flatPlan 
-                })
-              });
-
-              const data = await response.json();
-              if (data.error) throw new Error(data.error);
-
-              // REFACTOR: Use the unified rendering logic for audits and persistence
-              renderClaudeInsight(data);
-
-              btn.innerHTML = '✨ Report Updated!';
-              setTimeout(() => { btn.innerHTML = originalText; btn.disabled = false; }, 3000);
-            } catch (err) {
-              console.error("Claude Sync Error:", err);
-              alert("Claude Integration Error: " + err.message + "\nCheck if the server is running and ANTHROPIC_API_KEY is set.");
-              btn.innerHTML = originalText;
-              btn.disabled = false;
             }
           }
 
@@ -2458,7 +2405,7 @@
               tumorBurden: text.match(/tumor burden\s*[:\-]?\s*(low|moderate|high|bulky)/i)?.[1],
               feeding: (() => {
                 if (text.includes('oral') && text.includes('diet')) return 'Oral Feeding (Normal Diet)';
-                if (text.includes('ons') || text.includes('supplement')) return 'Oral Nutrition Supplements (ONS)';
+                if (text.includes('ons') || text.includes('supplement')) return 'Oral Feeding (Normal Diet)';
                 if (text.includes('nasogastric') || text.includes('ng')) return 'Enteral Feeding - Nasogastric Tube (NG)';
                 if (text.includes('peg')) return 'Enteral Feeding - PEG Tube';
                 if (text.includes('tpn') || text.includes('parenteral')) return 'Parenteral Nutrition (TPN)';
@@ -2798,16 +2745,6 @@
               return;
             }
 
-            // --- AUTO AI AUDIT FOR HIGH RISK ---
-            const isHighRisk = (eng && eng.auditContext && (eng.auditContext.intake < 60 || eng.auditContext.proteinGap > 10));
-            if (isHighRisk) {
-                console.log("High Risk Patient Detected. Running Auto-Audit...");
-                // Note: We don't await this to keep UI snappy, but we notify.
-                generateClaudeInsight().then(() => {
-                    console.log("Auto-Audit Completed.");
-                });
-            }
-
             const storeId = mappingService.getStoreForDoctor(me.id);
             if (!storeId) {
               alert('Doctor is not mapped to a store. Admin must map doctor → store.');
@@ -2876,6 +2813,23 @@
           function computeBMI() {
             const h = parseFloat(patient.height) / 100;
             return round1(parseFloat(patient.weight) / (h * h));
+          }
+
+          function applyWeightBasis(value) {
+            window.patient.weightBasisOverride = value === 'ibw' ? 'ibw' : undefined;
+            const ibwKg = computeHamwiIBW();
+            const ibwDisp = document.getElementById('ibwDisplay');
+            if (ibwDisp) ibwDisp.textContent = `IBW: ${ibwKg} kg | Actual: ${window.patient.weight} kg`;
+
+            if (typeof generateNutritionPlan === 'function' && typeof createOrUpdatePlan === 'function') {
+              const note = value === 'actual'
+                ? `Weight basis changed to Current Weight (${window.patient.weight} kg) by doctor`
+                : `Weight basis changed to IBW (${ibwKg} kg) by doctor`;
+              const engineOutput = generateNutritionPlan(window.patient);
+              const newPlan = createOrUpdatePlan(window.patient, engineOutput, {}, note);
+              window.currentVersionedPlan = newPlan;
+              bind(newPlan);
+            }
           }
 
           function computeHamwiIBW() {
@@ -3044,12 +2998,8 @@
             const sex = (patient.sex || '').toLowerCase();
             const hbLo = sex === 'male' ? 13 : 12;
             setHTML('pCreatinine', labBadge(patient.creatinine, 'mg/dL', {lo:0.7, hi:1.3, critHi:1.5}));
-            setHTML('pLiver', (() => {
-              if (!patient.alt && !patient.ast) return '-';
-              const altB = labBadge(patient.alt, '', {lo:7, hi:56, critHi:200});
-              const astB = labBadge(patient.ast, 'U/L', {lo:5, hi:40, critHi:200});
-              return `${patient.alt ? altB : '-'} / ${patient.ast ? astB : '-'}`;
-            })());
+            setHTML('pALT', labBadge(patient.alt, 'U/L', {lo:7, hi:56, critHi:200}));
+            setHTML('pAST', labBadge(patient.ast, 'U/L', {lo:5, hi:40, critHi:200}));
             setHTML('pBilirubin', labBadge(patient.bilirubin, 'mg/dL', {lo:0.1, hi:1.2, critHi:2.0}));
             setHTML('pBloodSugar', labBadge(patient.bloodSugar, 'mg/dL', {lo:70, hi:99, critHi:180}));
             setHTML('pSodium', labBadge(patient.sodium, 'mEq/L', {lo:136, hi:145, critLo:130, critHi:150}));
@@ -3065,9 +3015,10 @@
             setHTML('pZinc', labBadge(patient.zinc, 'μg/dL', {lo:60, hi:120, critLo:40}));
             setHTML('pMagnesium', labBadge(patient.magnesium, 'mg/dL', {lo:1.7, hi:2.2, critLo:1.5}));
             setVal('pMicrobiome', fp.micronutrients.microbiome || '-');
-            setVal('pFat', (patient.fatPercent ? patient.fatPercent + ' %' : '-'));
-            setVal('pSMI', (patient.smi ? patient.smi + ' cm²/m²' : '-'));
-            setVal('pHandGrip', (patient.handGrip ? patient.handGrip + ' kg' : '-'));
+            const isMale = sex === 'male';
+            setHTML('pSMI', labBadge(patient.smi, 'cm²/m²', isMale ? {lo:7.26, hi:30} : {lo:5.45, hi:30}));
+            setHTML('pHandGrip', labBadge(patient.handGrip, 'kg', isMale ? {lo:27, hi:60, critLo:20} : {lo:16, hi:40, critLo:10}));
+            setHTML('pFat', labBadge(patient.fatPercent, '%', isMale ? {lo:10, hi:25} : {lo:20, hi:35}));
             setVal('pActivity', patient.activityLevel || '-');
             setVal('pVegetarian', (patient.vegetarian ? 'Vegetarian' : 'Non-Vegetarian'));
             setVal('pBSA', (patient.bsa ? patient.bsa + ' m²' : '-'));
@@ -3118,7 +3069,7 @@
 
             const calculatedBMI = computeBMI();
             setVal('pBMI', calculatedBMI);
-            setVal('pBMI_top', calculatedBMI);
+            setVal('pBMI_top', calculatedBMI + ' kg/m²');
             const asianBmiCat = computeAsianBMI(calculatedBMI);
             setVal('pAsianBMI', `BMI (Asian): ${asianBmiCat}`);
 
@@ -3128,9 +3079,16 @@
               catAsian.className = 'rb ' + (['Overweight', 'Obese'].includes(asianBmiCat) ? 'rb-h' : 'rb-i');
             }
 
-            setVal('pIBW', computeHamwiIBW() + ' kg');
+            const ibwKg = computeHamwiIBW();
+            setVal('pIBW', ibwKg + ' kg');
             setVal('pUW', (patient.usualWeight ? patient.usualWeight + ' kg' : '-'));
             setVal('pUW2', (patient.usualWeight ? patient.usualWeight : '-'));
+
+            // Initialize weight basis dropdown
+            const wbSel = document.getElementById('weightBasisSelect');
+            const ibwDisp = document.getElementById('ibwDisplay');
+            if (wbSel) wbSel.value = patient.weightBasisOverride || 'ibw';
+            if (ibwDisp) ibwDisp.textContent = `IBW: ${ibwKg} kg | Actual: ${patient.weight} kg`;
             setVal('pWL', (patient.weightLossPercent ?? '-') + ' %');
             setVal('pCancer_header', patient.cancer);
             setVal('pRegimen_header', patient.regimen);
@@ -3526,8 +3484,10 @@
               document.getElementById('bcaaRow').style.display = 'none';
             }
 
-            setVal('mCalories', fp.perServingCalories + ' kcal');
-            setVal('mProtein', fp.perServingProtein + ' g');
+            const recipeKcal = (fp.recipe && fp.recipe.recipeKcal) ? fp.recipe.recipeKcal : fp.perServingCalories;
+            const recipeProtein = (fp.recipe && fp.recipe.recipeProtein) ? fp.recipe.recipeProtein : fp.perServingProtein;
+            setVal('mCalories', recipeKcal + ' kcal');
+            setVal('mProtein', recipeProtein + ' g');
             setVal('mCarbs', bindPerServingCarbs + ' g');
             setVal('mFat', bindPerServingFat + ' g');
 
@@ -3563,16 +3523,6 @@
               });
             }
 
-            // --- Enhanced Dietary Plan Binding (V3.1) ---
-            const dpContainer = document.getElementById('dietaryPlanContainer');
-            if (dpContainer && fp.dietaryPlan) {
-              dpContainer.style.display = 'block';
-              const dt = document.getElementById('dietTexture'); if (dt) dt.innerText = fp.dietaryPlan.texture;
-              const ds = document.getElementById('dietStrategies'); if (ds) ds.innerHTML = (fp.dietaryPlan.strategies || []).map(s => `• ${s}`).join('<br>');
-              const dm = document.getElementById('dietMealExamples'); if (dm) dm.innerHTML = (fp.dietaryPlan.mealExamples || []).map(m => `<li>${m}</li>`).join('');
-            } else if (dpContainer) {
-              dpContainer.style.display = 'none';
-            }
 
             const ma = document.getElementById('manufacturingAlerts');
             if (ma) {
@@ -3682,8 +3632,8 @@
             setVal('servingHeader', `Per Serving (${fp.servingsPerDay || 2}x Daily)`);
             setVal('servingsPerDay', (fp.servingsPerDay || 2) + ' servings/day');
             setVal('servingsPerDay2', (fp.servingsPerDay || 2) + ' servings/day');
-            setVal('servingCalories', fp.perServingCalories + ' kcal');
-            setVal('servingProtein', fp.perServingProtein + ' g');
+            setVal('servingCalories', recipeKcal + ' kcal');
+            setVal('servingProtein', recipeProtein + ' g');
             setVal('servingTolerance', (fp.servingsPerDay || 2) >= 4 ? 'Smaller, more frequent feeds selected to improve tolerance during treatment.' : 'Moderate serving volume selected based on current intake pattern.');
             setVal('servingReview', 'If nausea, bloating or poor intake persists, consider smaller feeds, slower escalation and clinician review.');
 
@@ -3726,18 +3676,27 @@
             trace.push(`<b>Base Energy Required:</b> ${kcalPerKg} kcal/kg/day → ${calcWt} kg (calc weight) × ${kcalPerKg} = <b>${baseCal} kcal/day</b>.`);
 
             const reducedIntake = patient.reducedFoodIntake || 0;
+            const actualIntakePct2 = 100 - reducedIntake;
             if (reducedIntake > 0) {
               const isEnteral = (patient.feedingMethod || '').includes('Enteral');
               if (isEnteral) {
                 trace.push(`<b>Feeding Rule (Total):</b> Enteral route used. Plan fulfills 100% of base → <b>${fp.dailyCalories} kcal/day target</b>.`);
               } else {
-                trace.push(`<b>Deficit Adjustment (Supplement):</b> Intake gap is ${reducedIntake}%. Plan fulfills the deficit portion → ${baseCal} × ${reducedIntake}% = <b>${fp.dailyCalories} kcal/day target</b>.`);
+                const dietKcal = Math.round(baseCal * (actualIntakePct2 / 100));
+                const formulaKcal = fp.dailyCalories;
+                trace.push(`<b>Intake Split:</b> Patient eating ${actualIntakePct2}% orally → Diet estimated <b>${dietKcal} kcal/day</b>. Formula bridges the ${reducedIntake}% deficit → <b>${formulaKcal} kcal/day</b>. Total delivery: ${dietKcal + formulaKcal} kcal/day (target ${baseCal} kcal/day).`);
               }
             }
 
             const baseProt = fp.baseProtein || Math.round(calcWt * proteinPerKg);
             const protNote = (age >= 70 && proteinPerKg < 1.5 && !fp.hasRenalIssue) ? ' (Adjusted to 1.5 min for elderly)' : (fp.hasRenalIssue ? ' (Renal Restricted)' : '');
-            trace.push(`<b>Protein rule applied:</b> ${proteinPerKg} g/kg/day${protNote} → ${calcWt} kg (calc weight) × ${proteinPerKg} = ${baseProt} g/day. <b>Final Prescription: ${fp.dailyProtein} g/day</b>.`);
+            const dietProt = fp.estimatedDietaryProtein || 0;
+            const formProt = fp.dailyProtein || 0;
+            const totalProt = fp.totalDailyProtein || (dietProt + formProt);
+            const protSplitStr = dietProt > 0
+              ? ` — Diet ~${dietProt}g + Formula ${formProt}g = Total ${totalProt}g/day (Target: ${baseProt}g)`
+              : ` — Formula: ${formProt}g/day`;
+            trace.push(`<b>Protein rule applied:</b> ${proteinPerKg} g/kg/day${protNote} → ${calcWt} kg × ${proteinPerKg} = ${baseProt} g/day.${protSplitStr}`);
             trace.push(`<b>Serving pattern:</b> daily target ÷ ${fp.servingsPerDay || 2} servings/day for better tolerance.`);
 
             const carbSource = (fp.recipe && fp.recipe.carb) ? fp.recipe.carb.name : 'Standard';
@@ -3770,52 +3729,6 @@
             const ctEl = document.getElementById('calcTrace');
             if (ctEl) ctEl.innerHTML = trace.map(x => `<div>${x}</div>`).join('');
 
-            // Refeeding Protocol Panel
-            const rfSec = document.getElementById('refeedingSection');
-            const rfBody = document.getElementById('refeedingBody');
-            if (fp.refeedingProtocol && rfSec && rfBody) {
-              rfSec.style.display = 'block';
-              const rf = fp.refeedingProtocol;
-              const rfColor = rf.risk === 'HIGH' ? '#dc2626' : '#d97706';
-              const rfBg = rf.risk === 'HIGH' ? '#fef2f2' : '#fffbeb';
-              const rfBorder = rf.risk === 'HIGH' ? '#fca5a5' : '#fde68a';
-              // Build escalation table rows
-              const schedRows = (rf.escalationSchedule || []).map((s, i) => {
-                const isTarget = i === (rf.escalationSchedule.length - 1);
-                const rowBg = isTarget ? '#f0fdf4' : (i === 0 ? '#fff7ed' : '#ffffff');
-                const phaseColor = isTarget ? '#16a34a' : (i === 0 ? rfColor : '#374151');
-                return `<tr style="background:${rowBg};">
-                  <td style="padding:5px 8px; font-weight:700; color:${phaseColor}; font-size:11px; white-space:nowrap;">${s.phase}</td>
-                  <td style="padding:5px 8px; font-weight:900; color:${phaseColor}; font-size:12px; text-align:right; white-space:nowrap;">${s.kcal} kcal</td>
-                  <td style="padding:5px 8px; font-size:10.5px; color:#6b7280;">${s.note}</td>
-                </tr>`;
-              }).join('');
-              rfBody.innerHTML = `
-                <div style="background:${rfBg}; border:2px solid ${rfBorder}; border-radius:8px; padding:14px;">
-                  <div style="font-size:10px; font-weight:900; text-transform:uppercase; color:${rfColor}; letter-spacing:0.08em; margin-bottom:6px;">
-                    Refeeding Syndrome — ${rf.risk} RISK (NICE CG32)
-                  </div>
-                  <div style="font-size:11.5px; color:#1e293b; margin-bottom:4px;"><b>Criteria:</b> ${rf.criteria}</div>
-                  <div style="font-size:11.5px; color:${rfColor}; font-weight:700; margin-bottom:8px;"><b>Thiamine:</b> ${rf.thiamine}</div>
-                  <div style="font-size:10px; font-weight:800; text-transform:uppercase; color:#374151; margin-bottom:4px; letter-spacing:0.05em;">Calorie Escalation Schedule</div>
-                  <table style="width:100%; border-collapse:collapse; border:1px solid ${rfBorder}; border-radius:6px; overflow:hidden;">
-                    <thead>
-                      <tr style="background:${rfBorder};">
-                        <th style="padding:5px 8px; font-size:10px; text-align:left; color:#374151;">Phase</th>
-                        <th style="padding:5px 8px; font-size:10px; text-align:right; color:#374151;">Target</th>
-                        <th style="padding:5px 8px; font-size:10px; text-align:left; color:#374151;">Clinical Note</th>
-                      </tr>
-                    </thead>
-                    <tbody>${schedRows}</tbody>
-                  </table>
-                  <div style="margin-top:8px; font-size:10px; color:#6b7280; font-style:italic;">
-                    ⚠ The operative prescription above reflects the <b>full therapeutic target</b> (Day 7+).
-                    Initiate at Days 1–3 dose and escalate per schedule. Do not dispense full-target formula volume on Day 1.
-                  </div>
-                </div>`;
-            } else if (rfSec) {
-              rfSec.style.display = 'none';
-            }
 
             // Protocols Section (NEW: Enteral, Electrolyte, Follow-up)
             const protocols = [];
@@ -3872,15 +3785,19 @@
                 window.currentVersionedPlan = ensurePlan();
                 bind(window.currentVersionedPlan);
                 
-                // AUTO-GENERATE or LOAD Claude AI insight
+                // LOAD or AUTO-GENERATE Claude AI insight
                 if (params.get('print') !== '1') {
                   const cp = window.currentVersionedPlan;
                   if (cp && cp.claudeInsights) {
-                    renderClaudeInsight(cp.claudeInsights, true); // true = skip persistence
+                    // Case 1: Insights already saved — render from cache, no API call
+                    renderClaudeInsight(cp.claudeInsights, true);
+                  } else if (params.get('new') === '1') {
+                    // Case 2: Brand new patient — auto-generate once
+                    setTimeout(() => { generateClaudeInsight(); }, 800);
                   } else {
-                    setTimeout(() => {
-                      generateClaudeInsight();
-                    }, 800);
+                    // Case 3: Old patient, no insights — show banner
+                    const banner = document.getElementById('aiNotGeneratedBanner');
+                    if (banner) banner.style.display = 'flex';
                   }
                 }
               } catch (e) {
@@ -4285,7 +4202,7 @@
               'safetyAlertsBlock', 'drugSection', 'clinicalHoldOrdersSection',
               'mdtReviewSection', 'refeedingSection', 'v3OutcomeModule',
               'clinicalProtocolsContainer', 'mandatoryInvestigationsContainer',
-              'dietaryPlanContainer', 'progressSection', 'specsHistory'
+              'progressSection', 'specsHistory'
             ];
             const sectionPrevDisplays = {};
             pdfVisibleSections.forEach(id => {
@@ -4441,6 +4358,9 @@
           function renderClaudeInsight(data, skipPersistence) {
             if (!data) return;
             console.log("renderClaudeInsight received:", JSON.stringify({ score: data.validationScore, alertCount: (data.clinicalAlerts||[]).length, drugCount: (data.drugInteractions||[]).length, microCount: (data.micronutrientOrders||[]).length, monitorCount: (data.monitoringSchedule||[]).length, rationaleCount: (data.rationale||[]).length }));
+            // Hide "not generated" banner once insights arrive
+            const banner = document.getElementById('aiNotGeneratedBanner');
+            if (banner) banner.style.display = 'none';
             // Always cache the latest insights for PDF export (survives overpower plan replacement)
             window._lastClaudeInsights = data;
 
@@ -4800,6 +4720,11 @@
              }
           }
           setTimeout(cleanupOldVersions, 3000);
+          // Expose chat functions globally from inside _initPatientProfile scope
+          window.sendChatMessage = sendChatMessage;
+          window.enableFollowUpMode = enableFollowUpMode;
+          window.triggerFileUpload = triggerFileUpload;
+          setTimeout(() => window.toggleChat(), 800);
           } // end _initPatientProfile
         </script>
 </body>

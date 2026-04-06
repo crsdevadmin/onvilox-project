@@ -25,6 +25,8 @@ function generateNutritionPlan(patient, engineConfig) {
   const zinc = parseFloat(patient.zinc || 0);
   const prealbumin = parseFloat(patient.prealbumin || 0);
   const wbc = parseFloat(patient.wbc || 0);
+  const anc = parseFloat(patient.anc || 0);
+  const platelet = parseFloat(patient.platelet || 0);
   const age = parseInt(patient.age || 0);
   const ecog = parseInt(patient.ecogStatus || 0);
   const gender = (patient.sex || '').toLowerCase();
@@ -33,30 +35,31 @@ function generateNutritionPlan(patient, engineConfig) {
   
   const bmi = height ? (weight / Math.pow(height / 100, 2)) : 0;
 
-  // IBW (Devine formula) and AdjBW for obese patients — ESPEN/ASPEN calorie basis
+  // IBW (Hamwi formula) and AdjBW for obese patients — ESPEN/ASPEN calorie basis
   let ibw = 0;
   if (height > 0) {
     const heightInches = height / 2.54;
     ibw = gender === 'male'
-      ? Math.max(0, fv('ibw_base_male', 50) + fv('ibw_per_inch', 2.3) * (heightInches - 60))
-      : Math.max(0, fv('ibw_base_female', 45.5) + fv('ibw_per_inch', 2.3) * (heightInches - 60));
+      ? Math.max(0, fv('ibw_base_male', 48.0) + fv('ibw_per_inch_male', 2.7) * (heightInches - 60))
+      : Math.max(0, fv('ibw_base_female', 45.5) + fv('ibw_per_inch_female', 2.2) * (heightInches - 60));
     ibw = Math.round(ibw * 10) / 10;
   }
   let calcWeight = weight;
   let weightBasis = `Actual Body Weight (${weight} kg)`;
-  if (bmi >= fv('bmi_obesity_threshold', 30) && ibw > 0 && weight > ibw * 1.2) {
-    const adjBW = Math.round((ibw + fv('adjbw_factor', 0.25) * (weight - ibw)) * 10) / 10;
-    calcWeight = adjBW;
-    weightBasis = `Adjusted Body Weight (AdjBW) = IBW ${ibw} kg + 25% × (Actual ${weight} kg − IBW) = ${adjBW} kg`;
-  } else if (ibw > 0) {
-    weightBasis = `Actual Body Weight (${weight} kg); BMI ${Math.round(bmi * 10) / 10} — IBW adjustment not required`;
+  if (patient.weightBasisOverride === 'actual') {
+    calcWeight = weight;
+    weightBasis = `Current Body Weight (${weight} kg)`;
+  } else {
+    // Default: IBW
+    calcWeight = ibw > 0 ? ibw : weight;
+    weightBasis = ibw > 0 ? `IBW / Hamwi Formula (${ibw} kg)` : `Current Body Weight (${weight} kg) — height not available for IBW`;
   }
 
   const isVegetarian = !!patient.vegetarian;
   
   const smi = parseFloat(patient.smi || 0);
   const handGrip = parseFloat(patient.handGrip || 0);
-  let sarcopenia = patient.sarcopeniaStatus === 'Sarcopenic';
+  let sarcopenia = patient.sarcopeniaStatus === 'Yes' || patient.sarcopeniaStatus === 'Sarcopenic';
   
   // SMI Unit detection (ASMI kg/m2 vs L3-SMI cm2/m2)
   const isL3SMI = smi > 15; 
@@ -141,15 +144,24 @@ function generateNutritionPlan(patient, engineConfig) {
   // V3 Safety Engine (Step 6) - Initialized later in function
   let safetyAlerts = [];
 
-  // Neutropenia detection — affects formula sterility, probiotics, food safety
-  const hasNeutropenia = wbc > 0 && wbc < fv('wbc_neutropenia', 3500);
-  const hasSevereNeutropenia = wbc > 0 && wbc < fv('wbc_severe_neutropenia', 2000);
+  // Neutropenia detection — ANC is definitive; WBC used as fallback
+  const hasNeutropenia = (anc > 0 ? anc < 1500 : (wbc > 0 && wbc < fv('wbc_neutropenia', 3500)));
+  const hasSevereNeutropenia = (anc > 0 ? anc < 500 : (wbc > 0 && wbc < fv('wbc_severe_neutropenia', 2000)));
+  const hasThrombocytopenia = platelet > 0 && platelet < 100;
   // Steroid-induced hyperglycaemia triple trigger
   const hasTripleTrigger = chemFlags.steroid && isDiabetic && bloodSugar >= 180;
 
   // --- STEP 4 & 6: LAB INTERPRETATION & SAFETY ---
   if (hemoglobin > 0 && hemoglobin < fv('hemoglobin_anemia', 10)) {
     safetyAlerts.push({ condition: 'ANEMIA (Hb < 10)', severity: 'Moderate', action: 'Iron + B12 protocol indicated — HOLD iron initiation until iron panel confirmed (Ferritin, Serum Iron, TIBC, Transferrin Saturation).' });
+  }
+  if (hasSevereNeutropenia) {
+    safetyAlerts.push({ condition: `SEVERE NEUTROPENIA (ANC ${anc > 0 ? anc : '<2000 WBC'})`, severity: 'High', action: 'Neutropenic diet protocol: no raw fruits/vegetables, no fresh juices, no fermented foods, no probiotics. All food must be well-cooked. Infection risk is critical.' });
+  } else if (hasNeutropenia) {
+    safetyAlerts.push({ condition: `NEUTROPENIA (ANC ${anc > 0 ? anc : 'WBC <3500'})`, severity: 'Moderate', action: 'Modified neutropenic diet: avoid raw sprouts, unpasteurized products, undercooked proteins. Probiotics CONTRAINDICATED.' });
+  }
+  if (hasThrombocytopenia) {
+    safetyAlerts.push({ condition: `THROMBOCYTOPENIA (Platelets ${platelet} ×10³/μL)`, severity: platelet < 50 ? 'High' : 'Moderate', action: platelet < 50 ? 'Avoid fish oil / Omega-3 supplementation (antiplatelet effect). Avoid vitamin E >400 IU. Soft diet to prevent mucosal bleeding.' : 'Monitor Omega-3 dosing — limit to ≤1g/day. Avoid high-dose vitamin E. Soft foods preferred.' });
   }
   if (patient.potassium > fv('potassium_high', 5.0)) {
     safetyAlerts.push({ condition: 'HYPERKALEMIA (>5.0)', severity: 'High', action: 'Restrict potassium sources; adjust formula to K-free matrix.' });
@@ -357,17 +369,11 @@ function generateNutritionPlan(patient, engineConfig) {
   const dailyCalories = isFullReplacement ? baseDailyCalories : Math.round(baseDailyCalories * (reducedFoodIntake / 100));
   const dailyProtein = isFullReplacement ? baseDailyProtein : Math.round(baseDailyProtein * (reducedFoodIntake / 100));
 
-  // Estimate dietary contribution from the PARTIAL intake (e.g. 60%)
-  const estimatedDietaryProtein = isFullReplacement ? 0 : Math.round((weight * 0.8) * (actualIntake / 100));
-  
-  // BRIDGE THE GAP: Ensure prescription covers whatever the diet is missing to reach 100% target
-  let prescribedProtein = dailyProtein;
-  if (!isFullReplacement) {
-    const deliveryGap = baseDailyProtein - (dailyProtein + estimatedDietaryProtein);
-    if (deliveryGap > 0) {
-      prescribedProtein += deliveryGap;
-    }
-  }
+  // Estimate dietary protein from partial oral intake — proportional to the target rate (not a fixed 0.8 g/kg assumption)
+  const estimatedDietaryProtein = isFullReplacement ? 0 : Math.round(baseDailyProtein * (actualIntake / 100));
+
+  // Formula bridges the remaining gap to reach 100% protein target
+  const prescribedProtein = isFullReplacement ? baseDailyProtein : Math.max(0, baseDailyProtein - estimatedDietaryProtein);
 
   const totalProteinDelivery = prescribedProtein + estimatedDietaryProtein;
 
@@ -820,20 +826,39 @@ function generateNutritionPlan(patient, engineConfig) {
     const selectedFat = getIng('mct_powder');
     const selectedOmega = getIng('omega3_powder');
 
+    const oGrams = (crp > 5 || cachexia || (cancer && cancer.includes('pancreatic'))) ? 1.3 : 0.7;
+
+    // Step 1: protein grams
     const pGrams = Math.round(macroProtein / (selectedProtein.pPerGram || 1));
     const carbsFromProtein = pGrams * (selectedProtein.cPerGram || 0);
     const fatFromProtein = pGrams * (selectedProtein.fPerGram || 0);
-    const neededCarbs = Math.max(0, macroCarbs - carbsFromProtein);
+
+    // Step 2: fat grams (MCT) — must be calculated before carbs because MCT has a carb fraction
     const neededFat = Math.max(0, macroFat - fatFromProtein);
-    const cGrams = Math.round(neededCarbs / (selectedCarb.cPerGram || 1));
     const fGrams = Math.round(neededFat / (selectedFat.fPerGram || 1));
-    const oGrams = (crp > 5 || cachexia || (cancer && cancer.includes('pancreatic'))) ? 1.3 : 0.7; 
+    const carbsFromFat = fGrams * (selectedFat.cPerGram || 0);
+    const carbsFromOmega = oGrams * (selectedOmega.cPerGram || 0);
+
+    // Step 3: carb grams — subtract carbs already contributed by protein, MCT, and omega-3
+    const neededCarbs = Math.max(0, macroCarbs - carbsFromProtein - carbsFromFat - carbsFromOmega);
+    const cGrams = Math.round(neededCarbs / (selectedCarb.cPerGram || 1));
+
+    // Step 4: compute actual recipe kcal from ingredient grams (ground truth for display)
+    const recipeKcal = Math.round(
+      pGrams * selectedProtein.kcalPerGram +
+      cGrams * selectedCarb.kcalPerGram +
+      fGrams * selectedFat.kcalPerGram +
+      oGrams * selectedOmega.kcalPerGram
+    );
+    // Actual protein delivered by recipe
+    const recipeProtein = Math.round(pGrams * selectedProtein.pPerGram);
 
     return {
       protein: { id: selectedProtein.id, name: selectedProtein.name, grams: pGrams, rationale: selectedProtein.healingRationale },
       carb: { id: selectedCarb.id, name: selectedCarb.name, grams: cGrams, rationale: selectedCarb.healingRationale },
       fat: { id: selectedFat.id, name: selectedFat.name, grams: fGrams, rationale: "Metabolic energy without glycemic load" },
       omega: (oGrams > 0) ? { id: 'omega3_powder', name: 'Omega-3 Powder', grams: oGrams, rationale: "Anti-inflammatory / EPA support." } : null,
+      recipeKcal, recipeProtein,
       bcaa: (patient.alt > 50 || patient.ast > 50 || patient.bilirubin > 1.2) ? { id: 'bcaa_powder', name: 'BCAA (2:1:1 Mix)', grams: 20, rationale: "Hepatic Protection dose." } : null,
       glutamine: (pGrams > 0 && (patient.giIssues || (sideEffects && sideEffects.includes('Mucositis')) || (regimen && regimen.includes('folfirinox')) || hasIBD)) ? { id: 'glutamine', name: 'L-Glutamine powder', grams: 10, rationale: "Mucosal protection." } : null
     };
@@ -946,20 +971,67 @@ function generateNutritionPlan(patient, engineConfig) {
     dietaryPlan.strategies.push("Small, frequent snacks instead of large meals.", "Focus on cold or neutral-temperature foods to minimize odors.", "Dry ginger or ginger tea may help alleviate symptoms.");
   }
 
-  // Culturally Adapted Meal Examples
-  if (isVegetarian) {
-    dietaryPlan.mealExamples = [
-        "Soft Dal (Lentils) with mashed rice and ghee",
-        "Mashed Paneer/Tofu with mild spices",
-        "Greek yogurt with blended fruit puree",
-        "Soft-cooked khichdi (rice and lentil porridge)"
+  // Culturally Adapted Indian Meal Examples
+  if (hasSevereNeutropenia) {
+    // Neutropenic diet — all food must be well-cooked, no raw items
+    dietaryPlan.mealExamples = isVegetarian ? [
+        "Well-cooked moong dal khichdi with ghee (pressure-cooked, no raw garnish)",
+        "Soft idli with well-cooked sambar (no raw coconut chutney)",
+        "Boiled and mashed sweet potato with a pinch of jeera and ghee",
+        "Pasteurised dahi (curd) mixed with soft cooked rice — no fresh fruits",
+        "Soft upma made with semolina and well-cooked vegetables",
+        "Boiled banana or chiku (sapodilla) — no raw fruits with skin"
+    ] : [
+        "Well-cooked chicken stew with soft white rice (pressure-cooked, no raw garnish)",
+        "Boiled egg bhurji (scrambled) with toasted plain bread — fully cooked through",
+        "Clear chicken shorba (broth) with soft-cooked rice noodles",
+        "Soft fish curry (rohu or katla) with well-cooked rice — no raw coriander",
+        "Egg rice (well-cooked) with mild masala and ghee",
+        "Minced chicken with soft roti — no raw onion or salad"
+    ];
+  } else if (hasNeutropenia) {
+    dietaryPlan.mealExamples = isVegetarian ? [
+        "Moong dal khichdi with ghee — avoid raw garnishes",
+        "Soft idli with cooked sambar — avoid raw chutneys",
+        "Mashed sweet potato with ghee and jeera",
+        "Cooked rice with well-heated pasteurised dahi",
+        "Soft poha (flattened rice) with cooked vegetables"
+    ] : [
+        "Chicken shorba with soft rice — avoid raw garnish",
+        "Well-cooked egg curry with plain rice",
+        "Soft fish fry (fully cooked) with dal and rice",
+        "Boiled egg with toasted bread — no raw vegetables",
+        "Chicken khichdi — pressure-cooked, mild spices"
+    ];
+  } else if (isVegetarian) {
+    dietaryPlan.mealExamples = hasMucositis ? [
+        "Soft moong dal khichdi with ghee — cool to room temperature before eating",
+        "Mashed paneer in mild cream gravy — no chilli or acidic ingredients",
+        "Curd rice with soft cooked vegetables — no pickles or tamarind",
+        "Soft idli with coconut chutney (no tomato-based sambar)",
+        "Mashed banana with a teaspoon of honey and warm milk"
+    ] : [
+        "Moong dal khichdi with ghee and soft-cooked vegetables",
+        "Paneer tikka (lightly spiced, grilled) with mint chutney and roti",
+        "Rajma or chana curry with brown rice",
+        "Vegetable upma with a glass of buttermilk",
+        "Curd rice with grated carrot and mild seasoning",
+        "Ragi porridge or dalia (broken wheat) with jaggery and ghee"
     ];
   } else {
-    dietaryPlan.mealExamples = [
-        "Steamed fish (Basa/Tilapia) with mashed potatoes",
-        "Clear chicken soup with shredded soft chicken",
-        "Soft scrambled eggs with a dash of cream",
-        "Mashed tuna with mayonnaise"
+    dietaryPlan.mealExamples = hasMucositis ? [
+        "Soft chicken stew with plain rice — no spice, no lemon",
+        "Clear chicken or mutton shorba — lukewarm, no pepper",
+        "Boiled egg mashed with ghee and soft rice",
+        "Soft fish in mild cream curry with plain rice",
+        "Warm daliya (broken wheat) porridge with ghee"
+    ] : [
+        "Chicken curry (mild) with steamed basmati rice and raita",
+        "Egg bhurji with whole wheat roti and sliced cucumber",
+        "Grilled pomfret or rohu fish with dal tadka and rice",
+        "Mutton keema with soft roti and onion-tomato salad",
+        "Chicken shorba with soft idli — light and protein-rich",
+        "Boiled eggs with poha and green chutney"
     ];
   }
 

@@ -15,7 +15,7 @@ const corsOptions = {
 };
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
-app.use(express.json());
+app.use(express.json({ limit: '2mb' }));
 
 // Serve frontend static files (HTML, JS, CSS) from the project root
 app.use(express.static(path.join(__dirname, '..')));
@@ -552,15 +552,29 @@ app.post('/api/chat', async (req, res) => {
   if (!message) return res.status(400).json({ error: 'No message provided.' });
 
   try {
-    const systemPrompt = `Onvilox AI Copilot (PhD/RD). Goal: Extract clinical data.
-    RULE: Use ONLY the keys in the schema. NO emojis in keys. NO custom keys like "RED_FLAGS".
-    RULE: Map all "Red Flags" or "Additional Clinical Data" to the "notes" key.
-    RULE: "cancer" MUST include the specific subtype in format "Cancer Type - Subtype". Examples: "Breast Cancer - Triple Negative", "Breast Cancer - HER2+", "Breast Cancer - HR+/HER2-", "Breast Cancer - Metastatic HR+", "Lung Cancer - NSCLC Adenocarcinoma", "Lung Cancer - NSCLC Squamous", "Lung Cancer - EGFR Mutant", "Lung Cancer - ALK+", "Lung Cancer - SCLC Extensive", "Colorectal Cancer - Stage III", "Colorectal Cancer - Metastatic", "Lymphoma - DLBCL", "Lymphoma - Hodgkin", "Multiple Myeloma - Standard", "Ovarian Cancer - Epithelial". NEVER return just "Breast Cancer" or "Lung Cancer" without the subtype.
-    RULE: "feedingMethod" MUST be EXACTLY one of: "Oral Feeding (Normal Diet)" | "Oral Nutrition Supplements (ONS)" | "Enteral Feeding – Nasogastric Tube (NG)" | "Enteral Feeding – PEG Tube" | "Enteral Feeding – Jejunostomy (J-Tube)" | "Parenteral Nutrition (TPN)" | "Combination Feeding (Oral + Enteral)" | "Combination Feeding (Enteral + Parenteral)". Never return "Oral" or "Enteral" alone.
-    RULE: "regimen" must use protocol notation matching clinical usage — e.g., "AC -> Taxane ± Pembrolizumab", "FOLFOX", "R-CHOP", "Carboplatin + Paclitaxel ± Pembrolizumab", "TCH (Docetaxel + Carboplatin + Trastuzumab)". Do NOT use shorthand like "AC-T Protocol".
-    RULE: "sex" must be "Male" or "Female" (not M/F).
-    Schema: { "name":str, "age":num, "sex":"Male"/"Female", "weight":num, "height":num, "usualWeight":num, "reducedFoodIntake":num, "albumin":num, "crp":num, "cancer":str, "regimen":str, "creatinine":num, "alt":num, "ast":num, "bilirubin":num, "bloodSugar":num, "sodium":num, "potassium":num, "urea":num, "muac":num, "prealbumin":num, "vitD":num, "vitB12":num, "folate":num, "zinc":num, "magnesium":num, "tsh":num, "hba1c":num, "hemoglobin":num, "sarcopeniaStatus":str, "activityLevel":str, "ecogStatus":num, "leanBodyMass":num, "smi":num, "handGrip":num, "fatPercent":num, "feedingMethod":str, "giIssues":bool, "comorbidities":[], "sideEffects":[], "existingSupplements":[], "allergies":[], "metastasisSites":[], "genomicMarkers":[], "notes":str }
-    Format: { "reply": "Short answer (<3 sentences)", "extractedData": { ...found values... } }`;
+    const systemPrompt = `You are a clinical nutrition AI Copilot (PhD/RD level) for an oncology platform. You operate in two modes:
+
+MODE 1 — EXTRACT: When the user provides real patient data (pasted notes, lab reports, clinical summaries), extract all available values from the text.
+
+MODE 2 — GENERATE: When the user asks you to "give", "create", "simulate", "generate", or "show" a patient case, generate a complete, clinically realistic synthetic patient. Use Indian epidemiological context by default unless another region is specified. Indian context means: use typical Indian names, Asian BMI thresholds (overweight ≥23, obese ≥27.5), realistic Indian lab normals, common Indian comorbidities (Type 2 Diabetes, hypertension prevalence), and appropriate body weight/height for Indian adults. Generate ALL schema fields with realistic values — do not leave fields empty. The reply in generate mode should give a 3-4 sentence clinical summary of the generated case explaining the key nutritional risk factors and why these values were chosen.
+
+SHARED RULES (apply to both modes):
+RULE: Use ONLY the keys in the schema. NO emojis in keys. NO custom keys like "RED_FLAGS".
+RULE: Map all "Red Flags" or "Additional Clinical Data" to the "notes" key.
+RULE: "cancer" MUST include the specific subtype in format "Cancer Type - Subtype". Examples: "Breast Cancer - Triple Negative", "Breast Cancer - HER2+", "Breast Cancer - HR+/HER2-", "Breast Cancer - Metastatic HR+", "Lung Cancer - NSCLC Adenocarcinoma", "Lung Cancer - NSCLC Squamous", "Lung Cancer - EGFR Mutant", "Lung Cancer - ALK+", "Lung Cancer - SCLC Extensive", "Colorectal Cancer - Stage III", "Colorectal Cancer - Metastatic", "Lymphoma - DLBCL", "Lymphoma - Hodgkin", "Lymphoma - Follicular", "Lymphoma - Mantle Cell", "Multiple Myeloma - Standard", "Ovarian Cancer - Epithelial". NEVER return just "Breast Cancer" or "Lung Cancer" or "Lymphoma" without the subtype.
+RULE: "feedingMethod" MUST be EXACTLY one of: "Oral Feeding (Normal Diet)" | "Enteral Feeding – Nasogastric Tube (NG)" | "Enteral Feeding – PEG Tube" | "Enteral Feeding – Jejunostomy (J-Tube)" | "Parenteral Nutrition (TPN)" | "Combination Feeding (Oral + Enteral)" | "Combination Feeding (Enteral + Parenteral)". Never return "Oral" or "Enteral" alone. If patient uses oral nutrition supplements, map to "Oral Feeding (Normal Diet)".
+RULE: "regimen" must use protocol notation matching clinical usage — e.g., "AC -> Taxane ± Pembrolizumab", "FOLFOX", "R-CHOP", "Carboplatin + Paclitaxel ± Pembrolizumab", "TCH (Docetaxel + Carboplatin + Trastuzumab)". Do NOT use shorthand like "AC-T Protocol".
+RULE: "sex" must be "Male" or "Female" (not M/F).
+RULE: "reducedFoodIntake" is a percentage (0-100) of normal intake the patient is currently eating. E.g. 70 means eating 70% of usual intake.
+RULE: "ecogStatus" must be 0, 1, 2, 3, or 4.
+RULE: "cancerStage" must be EXACTLY one of: "Stage I" | "Stage II" | "Stage III" | "Stage IV" | "Recurrent". Always include this.
+RULE: "tumorBurden" must be EXACTLY one of: "Low" | "Moderate" | "High (Bulky)". Always include this.
+RULE: "regimen" must always be included — use the standard clinical protocol name for the cancer type and stage (e.g. "R-CHOP" for DLBCL, "R-CVP" for low-grade NHL, "FOLFOX" for colorectal, "AC -> Taxane" for breast cancer).
+RULE: "activityLevel" must be one of: "Sedentary" | "Lightly Active" | "Moderately Active" | "Highly Active".
+RULE: "sarcopeniaStatus" must be one of: "No" | "Yes" | "Unknown".
+RULE: "comorbidities", "sideEffects", "existingSupplements", "allergies", "metastasisSites", "genomicMarkers" must be arrays of strings.
+Schema: { "name":str, "age":num, "sex":"Male"/"Female", "weight":num, "height":num, "usualWeight":num, "reducedFoodIntake":num, "albumin":num, "crp":num, "cancer":str, "cancerStage":"Stage I"/"Stage II"/"Stage III"/"Stage IV"/"Recurrent", "tumorBurden":"Low"/"Moderate"/"High (Bulky)", "regimen":str, "creatinine":num, "alt":num, "ast":num, "bilirubin":num, "bloodSugar":num, "sodium":num, "potassium":num, "urea":num, "muac":num, "prealbumin":num, "vitD":num, "vitB12":num, "folate":num, "zinc":num, "magnesium":num, "tsh":num, "hba1c":num, "hemoglobin":num, "wbc":num, "anc":num, "platelet":num, "sarcopeniaStatus":str, "activityLevel":str, "ecogStatus":num, "leanBodyMass":num, "smi":num, "handGrip":num, "fatPercent":num, "feedingMethod":str, "giIssues":bool, "comorbidities":[], "sideEffects":[], "existingSupplements":[], "allergies":[], "metastasisSites":[], "genomicMarkers":[], "notes":str }
+Format: { "reply": "Clinical summary (3-4 sentences for generate mode, <3 sentences for extract mode)", "extractedData": { ...all values... } }`;
 
     const msg = await anthropic.messages.create({
       model: "claude-haiku-4-5-20251001",
@@ -704,10 +718,10 @@ ENTERAL ESCALATION:
 
 PROTEIN SAFETY:
 - The renal protein cap of 0.8 g/kg applies ONLY when creatinine > 1.3 mg/dL (KDIGO guideline). If creatinine ≤ 1.3, this cap must NOT be applied.
-- For cachexia OR sarcopenia patients with creatinine ≤ 1.3: minimum protein is 1.8 g/kg.
-- For patients with BOTH (cachexia OR sarcopenia) AND (immunotherapy checkpoint inhibitor — pembrolizumab, nivolumab, atezolizumab, durvalumab — OR platinum agents): minimum protein is 2.0 g/kg due to combined immunometabolic and anti-catabolic demand.
-- If totalDailyProtein is below weight × 1.6 g/kg AND creatinine ≤ 1.3 AND cachexia or sarcopenia present: generate HIGH alert "PROTEIN_CRITICAL_UNDERDOSE", set isOverpowered:true, correctedPrescription.dailyProtein = weight × 1.8 (or × 2.0 if immunotherapy or platinum also present).
-- If totalDailyProtein is below weight × 1.9 g/kg AND patient has BOTH (cachexia or sarcopenia) AND (immunotherapy or platinum): generate HIGH alert "PROTEIN_UNDERDOSE_IMMUNOTHERAPY", set isOverpowered:true, correctedPrescription.dailyProtein = weight × 2.0. State that 2.0 g/kg is the minimum for this immunometabolic profile and that underdosing accelerates muscle catabolism, worsens sarcopenia, and increases chemotherapy toxicity risk.
+- For cachexia OR sarcopenia patients with creatinine ≤ 1.3: minimum protein is 1.6 g/kg.
+- For patients with BOTH (cachexia OR sarcopenia) AND (immunotherapy checkpoint inhibitor — pembrolizumab, nivolumab, atezolizumab, durvalumab — OR platinum agents): minimum protein is 1.6 g/kg due to combined immunometabolic and anti-catabolic demand.
+- If totalDailyProtein is below plan.calcWeight × 1.4 g/kg AND creatinine ≤ 1.3 AND cachexia or sarcopenia present: generate HIGH alert "PROTEIN_CRITICAL_UNDERDOSE", set isOverpowered:true, correctedPrescription.dailyProtein = plan.calcWeight × 1.6.
+- If totalDailyProtein is below plan.calcWeight × 1.5 g/kg AND patient has BOTH (cachexia or sarcopenia) AND (immunotherapy or platinum): generate HIGH alert "PROTEIN_UNDERDOSE_IMMUNOTHERAPY", set isOverpowered:true, correctedPrescription.dailyProtein = plan.calcWeight × 1.6. State that 1.6 g/kg is the minimum for this immunometabolic profile and that underdosing accelerates muscle catabolism, worsens sarcopenia, and increases chemotherapy toxicity risk.
 
 ANTIFOLATE TOXICITY:
 - If the regimen contains Pemetrexed, Methotrexate, or FOLFIRINOX AND patient folate < 5 ng/mL: generate HIGH alert type "FOLATE_DEFICIENCY_ANTIFOLATE".
@@ -788,10 +802,12 @@ SCORING (max 9.8):
 - Do NOT round up to 10.0. A plan with 3+ HIGH issues should score ≤ 5.3.
 
 OVERPOWER CORRECTION:
+- The plan object contains plan.calcWeight (the weight the engine used — IBW or actual) and plan.kcalPerKg. ALWAYS use plan.calcWeight for all calorie validation, NOT the raw patient weight.
 - Set isOverpowered: true and provide correctedPrescription values if:
   (a) protein is underdosed per PROTEIN SAFETY rules above, OR
-  (b) totalDailyCalories deviates > 15% from weight × appropriate kcal/kg (25–35 kcal/kg based on cachexia/sarcopenia), OR
+  (b) plan.kcalPerKg is clinically incorrect for this patient's condition — e.g. engine used 28 kcal/kg but stable non-cachexia maintenance should be 25 kcal/kg, or cachexia patient got 25 when they need 30–35. Correct correctedPrescription.dailyCalories = plan.calcWeight × correct kcal/kg. Deviation threshold: any kcal/kg value outside the clinically appropriate range for this patient. OR
   (c) NAFLD / NASH / non-alcoholic fatty liver disease is in comorbidities AND (dailyFat × 9) > (totalDailyCalories × 0.30) — fat ceiling 30% is a hard clinical protocol for hepatic steatosis.
+- For case (b): state the correct kcal/kg value, why it was chosen (cachexia, maintenance, refeeding risk), and compute correctedPrescription.dailyCalories = plan.calcWeight × correct kcal/kg.
 - For case (c): correctedPrescription.dailyCalories = input totalDailyCalories (unchanged), correctedPrescription.dailyProtein = input totalDailyProtein (unchanged). Compute correctedPrescription.dailyFat = floor(totalDailyCalories × 0.30 / 9) and correctedPrescription.dailyCarbs = floor((totalDailyCalories - (dailyProtein × 4) - (correctedDailyFat × 9)) / 4). Reasoning must state: "NAFLD fat ceiling 30% violated — fat [X]g ([X]%) corrected to [Y]g (30%); excess redistributed to carbohydrates [Z]g."
 - Always provide a clinical reasoning string explaining the correction.
 
@@ -800,6 +816,17 @@ Every safety violation you identify — whether mentioned in rationale, logicRef
 
 BRAND NAMES — STRICT RULE:
 NEVER mention any commercial product name, brand name, or trade name (e.g. Prosure, Ensure, Fresubin, Peptamen, Nepro, Glucerna, Abbott, Nestle, Fresenius, Danone, or any other manufacturer brand). Use only generic clinical/nutrient descriptions (e.g. "high-protein ONS formula", "omega-3 enriched enteral supplement", "immunonutrition formula with EPA/DHA"). This rule applies to every field in the output including rationale, instructions, clinicalAlerts, micronutrientOrders, and dietaryGuidance.
+
+NUMERICAL CONSISTENCY — CRITICAL RULE — APPLIES TO ALL FIELDS (rationale, instructions, clinicalAlerts, drugInteractions, everything):
+The plan object contains the authoritative calculated values. You MUST use these exact numbers everywhere. NEVER recalculate protein, calories, or any macro independently.
+- plan.totalDailyProtein = the total protein target (diet + formula). Use this number when telling the patient their daily protein goal. NEVER apply g/kg × patient weight yourself.
+- plan.dailyProtein = the formula/supplement protein only (what the prescription provides).
+- plan.estimatedDietaryProtein = protein estimated from oral diet.
+- plan.totalDailyCalories = total daily calorie requirement.
+- plan.dailyCalories = formula calorie contribution only.
+- plan.calcWeight = the weight used for calculation (IBW or actual). NEVER use patient.weight for any calculation.
+- plan.kcalPerKg and plan.proteinPerKg = the rates the engine applied.
+If you disagree with a value (e.g. protein seems low for sarcopenia), set isOverpowered:true and provide correctedPrescription — do NOT silently use a different number in instructions while leaving the plan unchanged. Every number in instructions, rationale, and alerts must match either plan values or correctedPrescription values. A patient instruction saying "consume 136g protein" while plan.totalDailyProtein=95g is a critical inconsistency and must never occur.
 
 OUTPUT FORMAT — return ONLY valid JSON, no markdown, no text outside the JSON object. CRITICAL: never embed literal newline or tab characters inside JSON string values — use \\n and \\t escape sequences if line breaks are needed in text, or omit them entirely. All string values must be valid single-line JSON strings.
 {

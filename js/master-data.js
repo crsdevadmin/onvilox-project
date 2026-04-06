@@ -79,7 +79,6 @@ const cancerRegimenMap = {
 // Feeding Methods
 const feedingMethods = [
   "Oral Feeding (Normal Diet)",
-  "Oral Nutrition Supplements (ONS)",
   "Enteral Feeding – Nasogastric Tube (NG)",
   "Enteral Feeding – PEG Tube",
   "Enteral Feeding – Jejunostomy (J-Tube)",

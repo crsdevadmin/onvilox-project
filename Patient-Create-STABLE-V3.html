@@ -149,6 +149,15 @@
   </div>
 
   <div class="form-group">
+    <label>Calculation Weight Basis</label>
+    <select id="weightBasisOverride">
+      <option value="ibw">IBW — Ideal Body Weight (Hamwi Formula)</option>
+      <option value="actual">Actual / Current Weight</option>
+    </select>
+    <div style="font-size:11px; color:#64748b; margin-top:4px;">Determines which weight is used for kcal &amp; protein targets. IBW is recommended for oncology patients.</div>
+  </div>
+
+  <div class="form-group">
     <label class="required">Height (cm)</label>
     <input type="number" id="height" oninput="validateField(this,'Height'); updateCompletenessScore(); updateBSAAuto()" min="30" max="250" step="0.1" required>
     <div class="validation-msg" id="height_msg"></div>
@@ -254,6 +263,21 @@
         <div class="validation-msg" id="hemoglobin_msg"></div>
       </div>
       <div class="form-group">
+        <label>WBC (cells/μL) <span id="wbc_status" class="status-badge"></span></label>
+        <input type="number" id="wbc" step="1" placeholder="e.g. 5000" oninput="updateLabStatus('wbc', this.value)">
+        <div class="range-hint">Normal: 4000 - 11000 cells/μL</div>
+      </div>
+      <div class="form-group">
+        <label>ANC (cells/μL) <span id="anc_status" class="status-badge"></span></label>
+        <input type="number" id="anc" step="1" placeholder="e.g. 2000" oninput="updateLabStatus('anc', this.value)">
+        <div class="range-hint">Normal: 1500 - 8000 cells/μL</div>
+      </div>
+      <div class="form-group">
+        <label>Platelets (×10³/μL) <span id="platelet_status" class="status-badge"></span></label>
+        <input type="number" id="platelet" step="1" placeholder="e.g. 200" oninput="updateLabStatus('platelet', this.value)">
+        <div class="range-hint">Normal: 150 - 400 ×10³/μL</div>
+      </div>
+      <div class="form-group">
         <label>Vitamin D (ng/mL) <span id="vit_d_status" class="status-badge"></span></label>
         <input type="number" id="vitD" step="1" oninput="updateLabStatus('vitD', this.value)">
         <div class="range-hint">Normal: 30 - 100 ng/mL</div>
@@ -351,7 +375,6 @@
         <select id="feedingMethod" onchange="validateField(this,'Feeding Method'); toggleIntakeUI(); updateCompletenessScore()" required>
           <option value="">Select Method</option>
           <option>Oral Feeding (Normal Diet)</option>
-          <option>Oral Nutrition Supplements (ONS)</option>
           <option>Enteral Feeding - Nasogastric Tube (NG)</option>
           <option>Enteral Feeding - PEG Tube</option>
           <option>Enteral Feeding - Jejunostomy (J-Tube)</option>
@@ -548,7 +571,6 @@
 
 <script>
 auth.requireRole(['DOCTOR','ASSISTANT']);
-loadEngineConfig(); // Part 3: load formula constants + active rules from DB
 
 function tagsToArray(containerId){
   const c = document.getElementById(containerId);
@@ -623,6 +645,7 @@ function submitPatient(){
     sex: document.getElementById('sex').value,
     usualWeight: parseFloat(document.getElementById('usualWeight').value),
     weight: parseFloat(document.getElementById('weight').value),
+    weightBasisOverride: document.getElementById('weightBasisOverride').value,
     height: parseFloat(document.getElementById('height').value),
     bsa: parseFloat(document.getElementById('bsa').value || 0),
     leanBodyMass: parseFloat(document.getElementById('leanBodyMass').value || 0),
@@ -665,6 +688,9 @@ function submitPatient(){
     bloodSugar: parseFloat(document.getElementById('bloodSugar').value) || 0,
     hba1c: parseFloat(document.getElementById('hba1c').value) || 0,
     hemoglobin: parseFloat(document.getElementById('hemoglobin').value) || 0,
+    wbc: parseFloat(document.getElementById('wbc').value) || 0,
+    anc: parseFloat(document.getElementById('anc').value) || 0,
+    platelet: parseFloat(document.getElementById('platelet').value) || 0,
     tsh: parseFloat(document.getElementById('tsh').value) || 0,
     vitD: parseFloat(document.getElementById('vitD').value) || 0,
     vitB12: parseFloat(document.getElementById('vitB12').value) || 0,
@@ -687,8 +713,8 @@ function submitPatient(){
     // 3. Create baseline versioned plan (without AI insights yet)
     createOrUpdatePlan(saved, engineOutput, {}, 'Initial automated baseline');
     
-    // 4. Fast Redirect to Dashboard (where AI will trigger/status will show)
-    window.location.href='/dashboard';
+    // 4. Redirect to patient profile with ?new=1 so AI auto-generates on first load
+    window.location.href='/Patient-Profile-STABLE-V3.html?id=' + saved.id + '&new=1';
   } catch (err) {
     console.error("Clinical Save Error:", err);
     alert("Error saving patient: " + err.message);
@@ -730,6 +756,21 @@ function updateLabStatus(id, val) {
   } else if(id === 'hemoglobin') {
     if(num < 12) { status = 'Low'; cls = 'status-danger'; }
     else if(num > 18) { status = 'High'; cls = 'status-warn'; }
+    else { status = 'Normal'; cls = 'status-normal'; }
+  } else if(id === 'wbc') {
+    if(num < 2000) { status = 'Severe↓'; cls = 'status-danger'; }
+    else if(num < 3500) { status = 'Low'; cls = 'status-warn'; }
+    else if(num > 11000) { status = 'High'; cls = 'status-warn'; }
+    else { status = 'Normal'; cls = 'status-normal'; }
+  } else if(id === 'anc') {
+    if(num < 500) { status = 'Severe'; cls = 'status-danger'; }
+    else if(num < 1000) { status = 'Moderate↓'; cls = 'status-danger'; }
+    else if(num < 1500) { status = 'Mild↓'; cls = 'status-warn'; }
+    else { status = 'Normal'; cls = 'status-normal'; }
+  } else if(id === 'platelet') {
+    if(num < 50) { status = 'Severe↓'; cls = 'status-danger'; }
+    else if(num < 100) { status = 'Low'; cls = 'status-warn'; }
+    else if(num > 400) { status = 'High'; cls = 'status-warn'; }
     else { status = 'Normal'; cls = 'status-normal'; }
   } else if(id === 'vitD') {
     if(num < 20) { status = 'Deficiency'; cls = 'status-danger'; }
@@ -874,6 +915,7 @@ async function sendChatMessage() {
   if(!text) return;
   addMessage(text, 'user');
   input.value = '';
+  toggleChat();
 
   const typing = addTyping();
   try {
@@ -909,7 +951,6 @@ async function sendChatMessage() {
         console.log("Auto-filling clinical fields from AI extraction:", Object.keys(fillData));
         applyExtractionData(fillData);
         addMessage('✨ Clinical data detected! Patient form has been auto-populated.', 'ai');
-        setTimeout(() => toggleChat(), 1500);
     } else {
         console.warn("AI Response contained no fillable clinical data.");
         if (!data.reply) addMessage('No clinical data found in the pasted text. Try including lab values, patient details, or diagnosis information.', 'ai');
@@ -1007,6 +1048,9 @@ function applyExtractionData(data) {
   setVal('creatinine', data.creatinine);
   setVal('bloodSugar', data.bloodSugar);
   setVal('hemoglobin', data.hemoglobin);
+  setVal('wbc', data.wbc);
+  setVal('anc', data.anc);
+  setVal('platelet', data.platelet);
   setVal('alt', data.alt);
   setVal('ast', data.ast);
   setVal('bilirubin', data.bilirubin);
@@ -1119,7 +1163,7 @@ function applyExtractionData(data) {
         } else if (fmRaw.includes('enteral') || fmRaw.includes('tube feed') || fmRaw.includes('tube-feed')) {
           fmMatch = 'Enteral Feeding – Nasogastric Tube (NG)';
         } else if (fmRaw.includes('supplement') || fmRaw.includes('ons')) {
-          fmMatch = 'Oral Nutrition Supplements (ONS)';
+          fmMatch = 'Oral Feeding (Normal Diet)';
         } else if (fmRaw.includes('oral')) {
           fmMatch = 'Oral Feeding (Normal Diet)';
         }
@@ -1184,6 +1228,7 @@ window.toggleIntakeUI = function() {
 };
 
 window.onload = function() {
+  if (typeof loadEngineConfig === 'function') loadEngineConfig();
   if (typeof initIntakeCalc === 'function') initIntakeCalc();
   window.toggleIntakeUI();
   if (typeof updateCompletenessScore === 'function') updateCompletenessScore();
