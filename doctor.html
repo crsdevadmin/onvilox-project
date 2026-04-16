@@ -129,11 +129,11 @@
   <script src="/js/seed.js?v=3.1"></script>
   <script src="/js/auth.js?v=3.1"></script>
   <script src="/js/mappings.js?v=3.1"></script>
-  <script src="/js/patient-store.js?v=3.1"></script>
-  <script src="/js/nutrition-engine-v4.js?v=3.1"></script>
+  <script src="/js/patient-store.js?v=3.2"></script>
+  <script src="/js/nutrition-engine-v4.js?v=3.9"></script>
   <script src="/js/engine-config.js"></script>
   <script src="/js/manufacturing.js?v=3.1"></script>
-  <script src="/js/ai-report-service.js?v=3.1"></script>
+  <script src="/js/ai-report-service.js?v=3.2"></script>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
@@ -248,9 +248,21 @@
         if (!hasAI && !__aiTriggers[p.id]) {
           __aiTriggers[p.id] = true;
           aiReportService.generateInsights(p, latestPlan || generateNutritionPlan(p)).then(data => {
-            const planToUpdate = latestPlan || createOrUpdatePlan(p, generateNutritionPlan(p), {}, 'Auto-trigger from dashboard');
-            planToUpdate.claudeInsights = data;
-            updatePlan(planToUpdate);
+            // Re-check cache — a plan may have been created while AI was running
+            const freshPlan = getLatestPlanForPatient(p.id) || latestPlan;
+            if (freshPlan) {
+              // Plan already in DB — just update it with insights (PUT)
+              freshPlan.claudeInsights = data;
+              updatePlan(freshPlan);
+            } else {
+              // No plan exists yet — build it and POST with claudeInsights already included
+              // (avoids the race condition between POST create + PUT update)
+              const engineOutput = generateNutritionPlan(p);
+              const newPlan = createOrUpdatePlan(p, engineOutput, {}, 'Auto-trigger from dashboard');
+              newPlan.claudeInsights = data;
+              // POST again as UPSERT so claudeInsights is saved atomically in full_data
+              savePlan(newPlan);
+            }
             render(); // Re-render to show "READY"
           }).catch(err => {
             console.error("Dashboard AI Trigger Failed:", err);
@@ -274,7 +286,7 @@
           <a href="/patients/profile?id=${p.id}" class="btn-primary" style="padding: 6px 10px; border-radius: 6px; display:flex; align-items:center; justify-content:center; ${!hasAI ? 'opacity:0.5; pointer-events:none;' : ''}" title="${hasAI ? 'Edit / Report' : 'Analyzing clinical data...'}">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207 11.207 2.5zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293l6.5-6.5zm-9.761 5.175-.106.106-1.528 3.821 3.821-1.528.106-.106A.5.5 0 0 1 5 12.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.468-.325z"/></svg>
           </a>
-          <button class="btn-secondary" onclick="openPdf('${p.id}')" style="padding: 6px 10px; border-radius: 6px; display:flex; align-items:center; justify-content:center; ${!hasAI ? 'opacity:0.5; pointer-events:none;' : ''}" title="${hasAI ? 'Download PDF' : 'Analyzing clinical data...'}">
+          <button class="btn-secondary" onclick="openPdf('${p.id}', this)" style="padding: 6px 10px; border-radius: 6px; display:flex; align-items:center; justify-content:center; ${!hasAI ? 'opacity:0.5; pointer-events:none;' : ''}" title="${hasAI ? 'Download PDF' : 'Analyzing clinical data...'}">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/><path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/></svg>
           </button>
           <button class="btn-secondary" onclick="confirmDelete('${p.id}', '${p.name.replace(/'/g, "\\'")}')" style="padding: 6px 10px; border-radius: 6px; display:flex; align-items:center; justify-content:center; color:#dc2626;" title="Delete Patient Record">
@@ -401,9 +413,33 @@
       window.open(__qrCurrentLink, '_blank', 'noopener');
     }
 
-    function openPdf(patientId) {
-      const url = `Patient-Profile-STABLE-V3.html?id=${encodeURIComponent(patientId)}&print=1&v=cache_bust_${Date.now()}`;
-      window.open(url, '_blank', 'noopener');
+    function openPdf(patientId, btn) {
+      // Render in a hidden off-screen iframe — no new tab opens
+      if (btn) { btn.disabled = true; btn.title = 'Preparing PDF...'; }
+
+      const url = `/patients/profile?id=${encodeURIComponent(patientId)}&print=1`;
+      const iframe = document.createElement('iframe');
+      iframe.setAttribute('data-pdf-iframe', patientId);
+      // Off-screen but with real dimensions so html2canvas can capture the DOM
+      iframe.style.cssText = 'position:fixed;left:-9999px;top:0;width:1400px;height:900px;border:none;';
+      document.body.appendChild(iframe);
+
+      const cleanup = () => {
+        if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
+        if (btn) { btn.disabled = false; btn.title = 'Download PDF'; }
+      };
+      // Safety timeout: remove iframe after 45s regardless
+      const timeout = setTimeout(cleanup, 45000);
+
+      window.addEventListener('message', function handler(e) {
+        if (e.data && e.data.type === 'pdfReady' && e.data.patientId === patientId) {
+          clearTimeout(timeout);
+          window.removeEventListener('message', handler);
+          setTimeout(cleanup, 1500); // slight delay so download can start
+        }
+      });
+
+      iframe.src = url;
     }
 
     function confirmDelete(id, name) {

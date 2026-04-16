@@ -752,12 +752,13 @@
     weight:       { icon: '⚖️', label: 'Ideal Body Weight — Hamwi Formula' },
     risk_scoring: { icon: '📊', label: 'Risk Scoring Thresholds' },
     sarcopenia:   { icon: '🦴', label: 'Sarcopenia Thresholds (EWGSOP2 / Janssen–Martin)' },
-    safety_labs:  { icon: '🧪', label: 'Safety Lab Thresholds' },
-    refeeding:    { icon: '⚠️', label: 'Refeeding Syndrome — NICE CG32' },
-    macros:       { icon: '🥗', label: 'Macro Distribution Ratios' },
-    escalation:   { icon: '📈', label: 'Intake / Escalation Thresholds' },
-    fluid:        { icon: '💧', label: 'Fluid Targets' },
-    servings:     { icon: '🍽️', label: 'Serving Frequency' }
+    safety_labs:    { icon: '🧪', label: 'Safety Lab Thresholds' },
+    macros:         { icon: '🥗', label: 'Macro Distribution Ratios' },
+    escalation:     { icon: '📈', label: 'Intake / Escalation Thresholds' },
+    fluid:          { icon: '💧', label: 'Fluid Targets' },
+    servings:       { icon: '🍽️', label: 'Serving Frequency' },
+    micronutrients:      { icon: '💊', label: 'Micronutrient RDA — FSSAI / ICMR-NIN 2020' },
+    clinical_protocols:  { icon: '🩺', label: 'Clinical Protocols — Correction & Therapeutic Doses' }
   };
 
   function renderFormulas() {
@@ -768,21 +769,66 @@
     }
     const groups = {};
     _formulas.forEach(f => { if (!groups[f.category]) groups[f.category] = []; groups[f.category].push(f); });
-    const catOrder = ['calories','protein','weight','risk_scoring','sarcopenia','safety_labs','refeeding','macros','escalation','fluid','servings'];
+    const catOrder = ['calories','protein','weight','risk_scoring','sarcopenia','safety_labs','macros','escalation','fluid','servings','micronutrients','clinical_protocols'];
     const orderedCats = [...catOrder.filter(c => groups[c]), ...Object.keys(groups).filter(c => !catOrder.includes(c))];
+
+    const toNutrientLabel = name => name.replace(/^micro_/, '').split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 
     let html = '';
     orderedCats.forEach(cat => {
       const meta = CATEGORY_LABELS[cat] || { icon: '📌', label: cat };
-      html += `
-        <div class="formula-category table-wrap" style="margin-bottom:20px;">
-          <div style="padding:16px 20px 0;">
-            <div class="formula-cat-header">
-              <span class="cat-icon">${meta.icon}</span>
-              ${meta.label}
-              <span style="font-size:10px;color:var(--text-3);font-weight:600;font-family:var(--font-body);margin-left:4px;">${groups[cat].length} constants</span>
-            </div>
+      const catItems = groups[cat];
+
+      // Detect _male/_female pairs (for gender-specific RDA table)
+      const femaleMap = {};
+      catItems.filter(f => f.name.endsWith('_female')).forEach(f => { femaleMap[f.name.slice(0, -7)] = f; });
+      const pairs = [];
+      const pairedNames = new Set();
+      catItems.filter(f => f.name.endsWith('_male')).forEach(mf => {
+        const base = mf.name.slice(0, -5);
+        if (femaleMap[base]) {
+          pairs.push({ base, male: mf, female: femaleMap[base] });
+          pairedNames.add(mf.name);
+          pairedNames.add(femaleMap[base].name);
+        }
+      });
+      const regularItems = catItems.filter(f => !pairedNames.has(f.name));
+
+      let genderSection = '';
+      if (pairs.length > 0) {
+        genderSection = `
+          <div style="padding:12px 20px 2px;">
+            <div style="font-size:10.5px;font-weight:700;color:var(--text-3);letter-spacing:0.7px;text-transform:uppercase;margin-bottom:6px;">FSSAI / ICMR-NIN 2020 — Gender-Specific RDA</div>
           </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Nutrient</th>
+                <th style="width:130px;">Male Value</th>
+                <th style="width:130px;">Female Value</th>
+                <th style="width:80px;">Unit</th>
+                <th>Source</th>
+                <th style="width:80px;">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${pairs.map(p => `
+                <tr>
+                  <td style="font-size:12px;color:var(--text-2);font-weight:500;">${toNutrientLabel(p.base)}</td>
+                  <td><input type="text" id="fval_${p.male.id}" value="${p.male.value}" class="formula-value-input" placeholder="Male"></td>
+                  <td><input type="text" id="fval_${p.female.id}" value="${p.female.value}" class="formula-value-input" placeholder="Female"></td>
+                  <td style="font-size:11.5px;color:var(--text-3);">${p.male.unit || '—'}</td>
+                  <td style="font-size:11px;color:var(--text-3);">${p.male.source || '—'}</td>
+                  <td><button class="btn-save-formula" onclick="saveGenderPair('${p.male.id}','${p.female.id}',this)">💾 Save</button></td>
+                </tr>`).join('')}
+            </tbody>
+          </table>
+          ${regularItems.length > 0 ? '<div style="height:4px;border-top:1px solid var(--border);margin:0 20px;opacity:0.4;"></div>' : ''}`;
+      }
+
+      let regularSection = '';
+      if (regularItems.length > 0) {
+        regularSection = `
           <table>
             <thead>
               <tr>
@@ -795,21 +841,29 @@
               </tr>
             </thead>
             <tbody>
-              ${groups[cat].map(f => `
+              ${regularItems.map(f => `
                 <tr>
                   <td><span class="mono-id">${f.name}</span></td>
                   <td style="font-size:12px;color:var(--text-2);line-height:1.5;">${f.description || '—'}</td>
-                  <td>
-                    <input type="text" id="fval_${f.id}" value="${f.value}" class="formula-value-input">
-                  </td>
+                  <td><input type="text" id="fval_${f.id}" value="${f.value}" class="formula-value-input"></td>
                   <td style="font-size:11.5px;color:var(--text-3);">${f.unit || '—'}</td>
                   <td style="font-size:11px;color:var(--text-3);">${f.source || '—'}</td>
-                  <td>
-                    <button class="btn-save-formula" onclick="saveFormula('${f.id}')">💾 Save</button>
-                  </td>
+                  <td><button class="btn-save-formula" onclick="saveFormula('${f.id}')">💾 Save</button></td>
                 </tr>`).join('')}
             </tbody>
-          </table>
+          </table>`;
+      }
+
+      html += `
+        <div class="formula-category table-wrap" style="margin-bottom:20px;">
+          <div style="padding:16px 20px 0;">
+            <div class="formula-cat-header">
+              <span class="cat-icon">${meta.icon}</span>
+              ${meta.label}
+              <span style="font-size:10px;color:var(--text-3);font-weight:600;font-family:var(--font-body);margin-left:4px;">${catItems.length} constants</span>
+            </div>
+          </div>
+          ${genderSection}${regularSection}
         </div>`;
     });
     container.innerHTML = html;
@@ -832,9 +886,48 @@
       setTimeout(() => { input.style.borderColor = ''; input.style.color = ''; }, 2500);
       const f = _formulas.find(f => f.id === id);
       if (f) f.value = value;
+      // Show inline saved confirmation next to the button
+      const btn = input.closest('tr') ? input.closest('tr').querySelector('.btn-save-formula') : null;
+      if (btn) {
+        const orig = btn.textContent;
+        btn.textContent = '✅ Saved';
+        btn.style.background = '#16a34a';
+        btn.style.color = '#fff';
+        setTimeout(() => { btn.textContent = orig; btn.style.background = ''; btn.style.color = ''; }, 2500);
+      }
     } catch (e) {
       alert('Error saving: ' + e.message);
     }
+  }
+
+  async function saveGenderPair(maleId, femaleId, btn) {
+    const mInput = document.getElementById('fval_' + maleId);
+    const fInput = document.getElementById('fval_' + femaleId);
+    if (!mInput || !fInput) return;
+    const mVal = mInput.value.trim();
+    const fVal = fInput.value.trim();
+    if (!mVal || !fVal) { alert('Both Male and Female values are required.'); return; }
+    try {
+      const [r1, r2] = await Promise.all([
+        fetch(`${apiBase}/api/engine-formulas/${maleId}`, { method:'PUT', headers:headers(), body:JSON.stringify({value:mVal}) }),
+        fetch(`${apiBase}/api/engine-formulas/${femaleId}`, { method:'PUT', headers:headers(), body:JSON.stringify({value:fVal}) })
+      ]);
+      if (!r1.ok) throw new Error(await r1.text());
+      if (!r2.ok) throw new Error(await r2.text());
+      [mInput, fInput].forEach(inp => {
+        inp.style.borderColor = 'var(--green)'; inp.style.color = 'var(--green)';
+        setTimeout(() => { inp.style.borderColor = ''; inp.style.color = ''; }, 2500);
+      });
+      const mf = _formulas.find(f => f.id === maleId);
+      const ff = _formulas.find(f => f.id === femaleId);
+      if (mf) mf.value = mVal;
+      if (ff) ff.value = fVal;
+      if (btn) {
+        const orig = btn.textContent;
+        btn.textContent = '✅ Saved'; btn.style.background = '#16a34a'; btn.style.color = '#fff';
+        setTimeout(() => { btn.textContent = orig; btn.style.background = ''; btn.style.color = ''; }, 2500);
+      }
+    } catch (e) { alert('Error saving: ' + e.message); }
   }
 
   // PROMOTE MODAL

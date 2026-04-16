@@ -25,8 +25,26 @@
         fetch(_apiBase() + '/api/patients', { headers: _headers() }),
         fetch(_apiBase() + '/api/nutrition-plans', { headers: _headers() })
       ]);
-      if (pRes.ok) _cache.patients = await pRes.json();
-      if (plRes.ok) _cache.plans = await plRes.json();
+      if (pRes.ok) {
+        const apiPatients = await pRes.json();
+        // Merge: include any locally-saved patients not yet confirmed by the API
+        // (race condition: redirect can happen before the POST completes)
+        const localPatients = db.getTable('patients', []);
+        const apiIds = new Set(apiPatients.map(p => p.id));
+        const pendingLocals = localPatients.filter(p => !apiIds.has(p.id));
+        _cache.patients = apiPatients.concat(pendingLocals);
+      } else {
+        _cache.patients = db.getTable('patients', []);
+      }
+      if (plRes.ok) {
+        const apiPlans = await plRes.json();
+        const localPlans = db.getTable('nutrition_plans', []);
+        const apiPlanIds = new Set(apiPlans.map(p => p.id));
+        const pendingLocalPlans = localPlans.filter(p => !apiPlanIds.has(p.id));
+        _cache.plans = apiPlans.concat(pendingLocalPlans);
+      } else {
+        _cache.plans = db.getTable('nutrition_plans', []);
+      }
     } catch (e) {
       console.warn('initStore: server unreachable, falling back to localStorage:', e.message);
       _cache.patients = db.getTable('patients', []);
@@ -69,12 +87,12 @@
   // ── Write helpers ─────────────────────────────────────────────────
 
   function _post(path, body) {
-    return fetch(_apiBase() + path, { method: 'POST', headers: _headers(), body: JSON.stringify(body) })
+    return fetch(_apiBase() + path, { method: 'POST', headers: _headers(), body: JSON.stringify(body), keepalive: true })
       .catch(e => console.warn('API POST failed (' + path + '):', e.message));
   }
 
   function _put(path, body) {
-    return fetch(_apiBase() + path, { method: 'PUT', headers: _headers(), body: JSON.stringify(body) })
+    return fetch(_apiBase() + path, { method: 'PUT', headers: _headers(), body: JSON.stringify(body), keepalive: true })
       .catch(e => console.warn('API PUT failed (' + path + '):', e.message));
   }
 
@@ -106,9 +124,11 @@
     }
     patient.storeId = null;
 
-    // Update cache immediately
-    if (_cache.patients) _cache.patients.push(patient);
-    db.setTable('patients', getPatients());
+    // Update cache and localStorage immediately (even if cache was not yet initialised)
+    const _existingPatients = _cache.patients || db.getTable('patients', []);
+    _existingPatients.push(patient);
+    _cache.patients = _existingPatients;
+    db.setTable('patients', _existingPatients);
 
     // Sync to server in background
     _post('/api/patients', patient);
@@ -184,8 +204,12 @@
   // ── Nutrition Plan versioning ──────────────────────────────────────
 
   function savePlan(plan) {
-    if (_cache.plans) _cache.plans.push(plan);
-    db.setTable('nutrition_plans', getPlans());
+    const _existingPlans = _cache.plans || db.getTable('nutrition_plans', []);
+    // Replace if already in cache (e.g. called again after claudeInsights added), else push
+    const idx = _existingPlans.findIndex(p => p.id === plan.id);
+    if (idx >= 0) _existingPlans[idx] = plan; else _existingPlans.push(plan);
+    _cache.plans = _existingPlans;
+    db.setTable('nutrition_plans', _existingPlans);
     _post('/api/nutrition-plans', plan);
   }
 

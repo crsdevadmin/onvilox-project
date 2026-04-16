@@ -692,13 +692,25 @@
                 <div style="font-size:8px; font-weight:800; text-transform:uppercase; color:#854d0e; margin-bottom:2px;">Weight Loss</div>
                 <div style="font-size:12.5px; font-weight:800; color:#dc2626;" id="pWL"></div>
               </div>
-              <div style="background:#f0fdf4; border:1px solid #86efac; border-radius:6px; padding:8px 10px; text-align:center;">
-                <div style="font-size:8px; font-weight:800; text-transform:uppercase; color:#166534; margin-bottom:2px;">Oral Intake</div>
-                <div style="font-size:12.5px; font-weight:800; color:#0f172a;" id="pFoodIntake"></div>
+              <div style="background:#f0fdf4; border:1px solid #86efac; border-radius:6px; padding:8px 10px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:7px;">
+                  <div style="font-size:8px; font-weight:800; text-transform:uppercase; color:#166534; letter-spacing:0.06em;">Feeding Route</div>
+                  <span id="pFeedingRouteBadge" style="font-size:11px; font-weight:800; color:#0f172a;"></span>
+                </div>
+                <div style="border-top:1px solid #86efac; padding-top:7px; display:flex; justify-content:space-between; align-items:center;">
+                  <div style="font-size:8px; font-weight:800; text-transform:uppercase; color:#166534; letter-spacing:0.06em;">Oral Intake</div>
+                  <span id="pFoodIntake" style="font-size:12.5px; font-weight:800; color:#0f172a;"></span>
+                </div>
               </div>
-              <div style="background:#fdf4ff; border:1px solid #e9d5ff; border-radius:6px; padding:8px 10px; text-align:center;">
-                <div style="font-size:8px; font-weight:800; text-transform:uppercase; color:#6b21a8; margin-bottom:2px;">Sarcopenia · MUAC</div>
-                <div style="font-size:11px; font-weight:700; color:#0f172a;"><span id="pSarcopenia"></span> · <span id="pMUAC"></span></div>
+              <div style="background:#fdf4ff; border:1px solid #e9d5ff; border-radius:6px; padding:8px 10px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:7px;">
+                  <div style="font-size:8px; font-weight:800; text-transform:uppercase; color:#6b21a8; letter-spacing:0.06em;">Sarcopenia</div>
+                  <span id="pSarcopenia"></span>
+                </div>
+                <div style="border-top:1px solid #e9d5ff; padding-top:7px; display:flex; justify-content:space-between; align-items:center;">
+                  <div style="font-size:8px; font-weight:800; text-transform:uppercase; color:#6b21a8; letter-spacing:0.06em;">MUAC</div>
+                  <span id="pMUAC" style="font-size:12px; font-weight:800; color:#0f172a;"></span>
+                </div>
               </div>
             </div>
 
@@ -748,8 +760,7 @@
                   <tr style="border-bottom:1px solid #f1f5f9; background:#fafafa;"><td style="padding:4px 8px; color:#64748b;">Fat %</td><td style="padding:4px 8px; font-weight:700; text-align:right;" id="pFat"></td></tr>
                   <tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:4px 8px; color:#64748b;">BSA (m²)</td><td style="padding:4px 8px; font-weight:700; text-align:right;" id="pBSA"></td></tr>
                   <tr style="border-bottom:1px solid #f1f5f9; background:#fafafa;"><td style="padding:4px 8px; color:#64748b;">Activity</td><td style="padding:4px 8px; font-weight:700; text-align:right;" id="pActivity"></td></tr>
-                  <tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:4px 8px; color:#64748b;">Feeding Route</td><td style="padding:4px 8px; font-weight:700; text-align:right;" id="pFeeding"></td></tr>
-                  <tr style="border-bottom:1px solid #f1f5f9; background:#fafafa;"><td style="padding:4px 8px; color:#64748b;">Metastasis</td><td style="padding:4px 8px; font-weight:700; text-align:right; font-size:10px;" id="pMetastasis"></td></tr>
+                  <tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:4px 8px; color:#64748b;">Metastasis</td><td style="padding:4px 8px; font-weight:700; text-align:right; font-size:10px;" id="pMetastasis"></td></tr>
                   <tr><td style="padding:4px 8px; color:#64748b;">Genomics</td><td style="padding:4px 8px; font-weight:700; text-align:right; font-size:10px;" id="pHxGenomicMarkers"></td></tr>
                 </table>
               </div>
@@ -797,12 +808,7 @@
           </table>
         </div>
 
-        <!-- CLINICAL SAFETY ALERTS (NEW V5) -->
-        <div id="safetyAlertsBlock" class="rs" style="display:none; margin-top:20px;">
-          <div class="rs-title" style="color:#991b1b; border-bottom-color:#991b1b;">Clinical Safety Alerts (Step 6)
-          </div>
-          <div id="safetyAlertsList"></div>
-        </div>
+        <div id="safetyAlertsBlock" style="display:none;"><div id="safetyAlertsList"></div></div>
 
         <!-- NEW: CLINICAL PROTOCOLS CONTAINER -->
         <div id="clinicalProtocolsContainer" class="rs" style="display:none; margin-top:20px;"></div>
@@ -979,117 +985,181 @@
           <table class="rt">
             <thead>
               <tr>
-                <th>Nutrient</th>
-                <th>Recommended Dose</th>
+                <th style="width:160px;">Nutrient</th>
+                <th style="width:200px;">Recommended Dose</th>
+                <th>Clinical Reason / Basis</th>
               </tr>
             </thead>
             <tbody>
               <tr>
                 <td>Vitamin D</td>
                 <td id="vitD"></td>
+                <td id="vitD_reason" style="font-size:10.5px;color:#475569;"></td>
               </tr>
               <tr>
                 <td>Vitamin C</td>
                 <td id="vitC"></td>
+                <td id="vitC_reason" style="font-size:10.5px;color:#475569;"></td>
               </tr>
               <tr>
                 <td>Zinc</td>
                 <td id="zinc"></td>
+                <td id="zinc_reason" style="font-size:10.5px;color:#475569;"></td>
               </tr>
               <tr id="ironRow" style="display:none;">
                 <td>Iron</td>
                 <td id="iron"></td>
+                <td id="iron_reason" style="font-size:10.5px;color:#475569;"></td>
               </tr>
-              <tr id="calciumRow" style="display:none;">
+              <tr id="calciumRow">
                 <td>Calcium</td>
                 <td id="calcium"></td>
+                <td id="calcium_reason" style="font-size:10.5px;color:#475569;"></td>
               </tr>
               <tr>
                 <td>Omega-3 / EPA+DHA</td>
                 <td id="omega3"></td>
+                <td id="omega3_reason" style="font-size:10.5px;color:#475569;"></td>
               </tr>
               <tr>
                 <td>EPA</td>
                 <td id="epa"></td>
+                <td id="epa_reason" style="font-size:10.5px;color:#475569;"></td>
               </tr>
               <tr>
                 <td>Leucine</td>
                 <td id="leucine"></td>
+                <td id="leucine_reason" style="font-size:10.5px;color:#475569;"></td>
               </tr>
               <tr>
                 <td>HMB</td>
                 <td id="hmb"></td>
+                <td id="hmb_reason" style="font-size:10.5px;color:#475569;"></td>
               </tr>
               <tr>
                 <td>Glutamine</td>
                 <td id="glutamine"></td>
+                <td id="glutamine_reason" style="font-size:10.5px;color:#475569;"></td>
               </tr>
               <tr>
-                <td>Selenium & Magnesium</td>
-                <td><span id="selenium"></span> / <span id="magnesium"></span></td>
+                <td>Selenium</td>
+                <td id="selenium"></td>
+                <td id="selenium_reason" style="font-size:10.5px;color:#475569;"></td>
+              </tr>
+              <tr>
+                <td>Magnesium</td>
+                <td id="magnesium"></td>
+                <td id="magnesium_reason" style="font-size:10.5px;color:#475569;"></td>
               </tr>
               <tr>
                 <td>B-Complex</td>
                 <td id="bComplex"></td>
+                <td id="bComplex_reason" style="font-size:10.5px;color:#475569;"></td>
               </tr>
               <tr>
                 <td>Folate</td>
                 <td id="folate"></td>
+                <td id="folate_reason" style="font-size:10.5px;color:#475569;"></td>
+              </tr>
+              <tr>
+                <td>Vitamin B12</td>
+                <td id="vitB12"></td>
+                <td id="vitB12_reason" style="font-size:10.5px;color:#475569;"></td>
+              </tr>
+              <tr>
+                <td>Thiamine (B1)</td>
+                <td id="thiamine"></td>
+                <td id="thiamine_reason" style="font-size:10.5px;color:#475569;"></td>
+              </tr>
+              <tr>
+                <td>Riboflavin (B2)</td>
+                <td id="riboflavin"></td>
+                <td id="riboflavin_reason" style="font-size:10.5px;color:#475569;"></td>
+              </tr>
+              <tr>
+                <td>Niacin (B3)</td>
+                <td id="niacin"></td>
+                <td id="niacin_reason" style="font-size:10.5px;color:#475569;"></td>
+              </tr>
+              <tr>
+                <td>Vitamin B6</td>
+                <td id="vitB6"></td>
+                <td id="vitB6_reason" style="font-size:10.5px;color:#475569;"></td>
+              </tr>
+              <tr>
+                <td>Iodine</td>
+                <td id="iodine"></td>
+                <td id="iodine_reason" style="font-size:10.5px;color:#475569;"></td>
+              </tr>
+              <tr>
+                <td>Vitamin K</td>
+                <td id="vitK"></td>
+                <td id="vitK_reason" style="font-size:10.5px;color:#475569;"></td>
+              </tr>
+              <tr>
+                <td>Sodium</td>
+                <td id="sodium"></td>
+                <td id="sodium_reason" style="font-size:10.5px;color:#475569;"></td>
+              </tr>
+              <tr>
+                <td>Potassium</td>
+                <td id="potassium"></td>
+                <td id="potassium_reason" style="font-size:10.5px;color:#475569;"></td>
+              </tr>
+              <tr>
+                <td>Dietary Fiber</td>
+                <td id="fiber"></td>
+                <td id="fiber_reason" style="font-size:10.5px;color:#475569;"></td>
               </tr>
               <tr id="chromiumRow" style="display:none;">
                 <td>Chromium</td>
                 <td id="chromium"></td>
+                <td id="chromium_reason" style="font-size:10.5px;color:#475569;"></td>
               </tr>
               <tr id="alaRow" style="display:none;">
                 <td>Alpha Lipoic Acid (ALA)</td>
                 <td id="ala"></td>
+                <td id="ala_reason" style="font-size:10.5px;color:#475569;"></td>
               </tr>
               <tr id="bcaaRow" style="display:none;">
                 <td>BCAA (Branched-Chain Amino Acids)</td>
                 <td id="bcaa"></td>
+                <td id="bcaa_reason" style="font-size:10.5px;color:#475569;"></td>
               </tr>
               <tr id="glutathioneRow" style="display:none;">
                 <td>Glutathione</td>
                 <td id="glutathione"></td>
+                <td id="glutathione_reason" style="font-size:10.5px;color:#475569;"></td>
               </tr>
               <tr id="vitERow" style="display:none;">
                 <td>Vitamin E</td>
                 <td id="vitE"></td>
+                <td id="vitE_reason" style="font-size:10.5px;color:#475569;"></td>
               </tr>
               <tr id="nacRow" style="display:none;">
                 <td>NAC (N-Acetylcysteine)</td>
                 <td id="nac"></td>
+                <td id="nac_reason" style="font-size:10.5px;color:#475569;"></td>
               </tr>
               <tr id="coenzymeQ10Row" style="display:none;">
                 <td>Coenzyme Q10</td>
                 <td id="coenzymeQ10"></td>
+                <td id="coenzymeQ10_reason" style="font-size:10.5px;color:#475569;"></td>
               </tr>
               <tr id="curcuminRow" style="display:none;">
                 <td>Curcumin</td>
                 <td id="curcumin"></td>
+                <td id="curcumin_reason" style="font-size:10.5px;color:#475569;"></td>
               </tr>
               <tr id="greenTeaRow" style="display:none;">
                 <td>Green Tea Extract</td>
                 <td id="greenTea"></td>
+                <td id="greenTea_reason" style="font-size:10.5px;color:#475569;"></td>
               </tr>
             </tbody>
           </table>
         </div>
 
-        <!-- DRUG NUTRIENT INTERACTIONS -->
-        <div class="rs" id="drugSection" style="display:none; margin-top:20px;">
-          <div class="rs-title">Drug-Nutrient Interaction Guidance</div>
-          <table class="clinical-history-table">
-            <thead>
-              <tr>
-                <th style="width:150px;">Target Drug</th>
-                <th>Potential Interaction / Effect</th>
-                <th>Clinical Advice / Adaptation</th>
-              </tr>
-            </thead>
-            <tbody id="drugInteractionsBody"></tbody>
-          </table>
-        </div>
 
 
         <!-- MONITORING & REASSESSMENT — PRINT -->
@@ -1109,124 +1179,26 @@
             </tbody>
           </table>
         </div>
-        <!-- CLINICAL HOLD ORDERS -->
-        <div id="clinicalHoldOrdersSection" style="display:none; margin-top:20px;" class="rs">
-          <div class="rs-title" style="color:#92400e; border-bottom-color:#f59e0b;">⏸ Clinical Hold Orders — Prescriber Action Required</div>
-          <table style="width:100%; border-collapse:collapse; font-size:11px; margin-top:8px;">
-            <thead>
-              <tr style="background:#fef3c7;">
-                <th style="padding:7px 8px; text-align:left; border:1px solid #fbbf24; font-weight:700; color:#92400e; width:18%;">Supplement / Drug</th>
-                <th style="padding:7px 8px; text-align:left; border:1px solid #fbbf24; font-weight:700; color:#92400e; width:28%;">Hold Reason</th>
-                <th style="padding:7px 8px; text-align:left; border:1px solid #fbbf24; font-weight:700; color:#92400e; width:30%;">Release / Restart Criteria</th>
-                <th style="padding:7px 8px; text-align:left; border:1px solid #fbbf24; font-weight:700; color:#92400e; width:10%;">Order Date</th>
-                <th style="padding:7px 8px; text-align:left; border:1px solid #fbbf24; font-weight:700; color:#92400e; width:14%;">Prescriber Signature</th>
-              </tr>
-            </thead>
-            <tbody id="clinicalHoldOrdersBody"></tbody>
-          </table>
-          <div style="font-size:9.5px; color:#92400e; margin-top:8px; font-style:italic; padding-left:2px; border-left:3px solid #f59e0b; padding-left:8px;">
-            ⚠️ Dispensing must not proceed without a signed prescriber order against each hold. Chemotherapy-phase holds require oncologist countersignature before any reinstatement.
-          </div>
-        </div>
-
-        <!-- MDT REVIEW ACTIONS -->
-        <div id="mdtReviewSection" style="display:none; margin-top:16px;" class="rs">
-          <div class="rs-title" style="color:#1e40af; border-bottom-color:#93c5fd;">&#128203; Pending MDT Reviews — Clinical Decision Required</div>
-          <table style="width:100%; border-collapse:collapse; font-size:11px; margin-top:8px;">
-            <thead>
-              <tr style="background:#eff6ff;">
-                <th style="padding:7px 8px; text-align:left; border:1px solid #93c5fd; font-weight:700; color:#1e40af; width:18%;">Intervention</th>
-                <th style="padding:7px 8px; text-align:left; border:1px solid #93c5fd; font-weight:700; color:#1e40af; width:28%;">Review Rationale</th>
-                <th style="padding:7px 8px; text-align:left; border:1px solid #93c5fd; font-weight:700; color:#1e40af; width:24%;">Monitoring Criteria</th>
-                <th style="padding:7px 8px; text-align:left; border:1px solid #93c5fd; font-weight:700; color:#1e40af; width:12%;">MDT Meeting Date</th>
-                <th style="padding:7px 8px; text-align:left; border:1px solid #93c5fd; font-weight:700; color:#1e40af; width:10%;">Agenda Item Ref</th>
-                <th style="padding:7px 8px; text-align:left; border:1px solid #93c5fd; font-weight:700; color:#1e40af; width:8%;">Lead Clinician</th>
-              </tr>
-            </thead>
-            <tbody id="mdtReviewBody"></tbody>
-          </table>
-          <div style="font-size:9.5px; color:#1e40af; margin-top:8px; font-style:italic; padding-left:8px; border-left:3px solid #93c5fd;">
-            &#9888;&#65039; Interventions listed here are ACTIVE pending MDT review. Do not discontinue without documented MDT consensus. Named lead clinician must be assigned and MDT date confirmed before this record is countersigned.
-          </div>
-        </div>
-
         <!-- REFEEDING SYNDROME PROTOCOL (shown only when risk detected) -->
-        <div id="refeedingSection" style="display:none;"><div id="refeedingBody"></div></div>
 
         <div class="rs" style="margin-top:16px;">
           <div class="rs-title" style="font-size:9.5px;">Clinical Rationale</div>
           <ul class="rrat" id="clinicalRationale"></ul>
         </div>
 
-        <div class="rs" style="margin-top:16px;">
-          <div class="rs-title" style="font-size:9.5px;">Patient Guidance</div>
-          <ul class="rrat" id="patientInstructions" style="font-size:11.5px; color:#475569;"></ul>
-        </div>
-
+        <ul id="patientInstructions" style="display:none;"></ul>
         <div id="dietaryPlanContainer" style="display:none;"></div>
+        <div id="v3OutcomeModule" style="display:none;"><div id="outcomePct"></div><div id="aiValidationScore"></div><div id="outcomeTitle"></div><div id="outcomeDesc"></div><div id="outcomeBar"></div></div>
+        <ul id="outcomePredictions" style="display:none;"></ul>
 
-        <!-- V3 Outcome Probability Engine -->
-        <div id="v3OutcomeModule" style="margin-top:16px; border:2px solid #0ea5e9; border-radius:10px; background:#f0f9ff; padding:15px; display:none;">
-          <div style="display:flex; align-items:center; gap:12px; margin-bottom:10px;">
-            <div style="background:#0ea5e9; color:white; font-size:10px; font-weight:900; padding:3px 8px; border-radius:4px; text-transform:uppercase;">V3 CDSS Logic</div>
-            <div style="font-weight:700; color:#0369a1; font-size:14px;">Outcome Probability</div>
-          </div>
-          <div style="display:flex; align-items:center; gap:20px;">
-            <div id="outcomePct" style="font-size:32px; font-weight:800; color:#0ea5e9; min-width:80px;">0%</div>
-            <div style="border-left:2px solid #e0f2fe; padding-left:15px;">
-              <div id="aiValidationScore" style="font-size:24px; font-weight:900; color:#6d28d9; line-height:1;">--</div>
-              <div style="font-size:9px; font-weight:800; color:#6d28d9; text-transform:uppercase; margin-top:2px;">Clinical Validation</div>
-            </div>
-            <div style="flex:1;">
-              <div style="font-weight:600; color:#1e293b; font-size:12.5px;" id="outcomeTitle">Standard Forecast</div>
-              <div style="font-size:11px; color:#475569; margin-top:4px;" id="outcomeDesc">Calculating clinical probability based on risk factors, ECOG, and tumor burden.</div>
-            </div>
-          </div>
-          <div style="margin-top:12px; height:8px; background:#e0f2fe; border-radius:4px; overflow:hidden;">
-            <div id="outcomeBar" style="height:100%; width:0%; background:#0ea5e9; transition:width 1s ease;"></div>
-          </div>
-          <div style="font-size:9px; color:#64748b; margin-top:8px; font-style:italic;">* Quantified prediction based on 4-week stabilization protocol.</div>
-        </div>
-
-        <div class="rs" style="margin-top:16px;">
-          <div class="rs-title" style="font-size:9.5px;">Detailed Clinical Forecasts</div>
-          <ul class="rrat" id="outcomePredictions" style="font-size:11.5px; color:#0369a1;"></ul>
-        </div>
-
-        <div class="rs" style="margin-top:16px;">
-          <div class="rs-title" style="font-size:9.5px;">Daily Diet Integration</div>
-          <ul class="rrat" id="dietIntegration" style="font-size:11.5px; color:#1e293b; font-weight:500;"></ul>
-        </div>
-
-        <div class="rs" style="margin-top:16px;">
-          <div class="rs-title" style="font-size:9.5px;">Manufacturing Alerts (Store)</div>
-          <ul class="rrat" id="manufacturingAlerts" style="font-size:11.5px; color:#dc2626; font-weight:600;"></ul>
-          <div style="font-size:11px; color:#64748b; margin-top:10px; padding-left:14px; font-style:italic;" id="riskMonitor"></div>
-          <div style="font-size:11px; color:#64748b; margin-top:4px; padding-left:14px; font-style:italic;" id="riskNote"></div>
-        </div>
-
-        <!-- MANDATORY INVESTIGATIONS (Engine-Computed) -->
-        <div id="mandatoryInvestigationsContainer" style="display:none; margin-top:16px;" class="rs">
-          <div class="rs-title" style="font-size:9.5px; margin-bottom:8px; color:#991b1b; border-color:#fca5a5;">&#128302; Mandatory Investigations Required Before Approval</div>
-          <div id="mandatoryInvestigationsList"></div>
-        </div>
+        <ul id="manufacturingAlerts" style="display:none;"></ul>
+        <div id="riskMonitor" style="display:none;"></div>
+        <div id="riskNote" style="display:none;"></div>
 
         <!-- CLAUDE AI SECTIONS — placed outside CSS Grid for reliable PDF capture -->
 
         <!-- ══════════════════════════════════════════════════════════════ -->
-        <!-- SECTION 1: ACTION REQUIRED — HIGH priority items only, shown first -->
-        <!-- ══════════════════════════════════════════════════════════════ -->
-        <div id="aiActionRequired" style="display:none; margin-top:20px;">
-          <div style="background:#fff0f0; border:2px solid #ef4444; border-radius:8px; padding:14px 16px;">
-            <div style="font-size:10.5px; font-weight:800; color:#991b1b; text-transform:uppercase; letter-spacing:0.04em; margin-bottom:10px;">
-              ⚡ Action Required Before Approving
-            </div>
-            <div id="aiActionList"></div>
-            <div style="font-size:9.5px; color:#64748b; margin-top:10px; font-style:italic;">
-              Scroll down for full clinical detail in each section below.
-            </div>
-          </div>
-        </div>
+        <div id="aiActionRequired" style="display:none;"><div id="aiActionList"></div></div>
 
         <!-- AI NOT GENERATED BANNER — shown when no insights are saved -->
         <div id="aiNotGeneratedBanner" style="display:none; margin-top:16px; background:#fefce8; border:1.5px dashed #ca8a04; border-radius:8px; padding:12px 16px; display:flex; align-items:center; justify-content:space-between; gap:12px;">
@@ -1244,17 +1216,7 @@
         </div>
 
         <!-- ══════════════════════════════════════════════════════════════ -->
-        <!-- SECTION 2: CLINICAL ALERTS — all alerts, collapsible -->
-        <!-- ══════════════════════════════════════════════════════════════ -->
-        <div id="claudeAlertsSection" style="display:none; margin-top:16px;">
-          <div class="rs-title" style="font-size:9.5px; margin-bottom:0; cursor:pointer; user-select:none; display:flex; justify-content:space-between; align-items:center;"
-               onclick="(function(){ var b=document.getElementById('claudeAlertsBody'); var t=document.getElementById('claudeAlertsToggle'); if(b.style.display==='none'){b.style.display='block';t.textContent='▲';}else{b.style.display='none';t.textContent='▼';} })()">
-            <span>⚡ Clinical Safety Alerts (AI)</span><span id="claudeAlertsToggle" style="font-size:10px;">▲</span>
-          </div>
-          <div id="claudeAlertsBody" style="margin-top:8px;">
-            <div id="claudeAlertsList"></div>
-          </div>
-        </div>
+        <div id="claudeAlertsSection" style="display:none;"><div id="claudeAlertsBody"><div id="claudeAlertsList"></div></div></div>
 
         <!-- ══════════════════════════════════════════════════════════════ -->
         <!-- SECTION 3: DRUG-NUTRIENT INTERACTIONS — collapsible -->
@@ -1279,27 +1241,10 @@
           </div>
         </div>
 
-        <!-- ══════════════════════════════════════════════════════════════ -->
-        <!-- SECTION 4: MICRONUTRIENT ORDERS — collapsible -->
-        <!-- ══════════════════════════════════════════════════════════════ -->
-        <div id="claudeMicroSection" style="display:none; margin-top:16px;">
-          <div class="rs-title" style="font-size:9.5px; margin-bottom:0; cursor:pointer; user-select:none; display:flex; justify-content:space-between; align-items:center;"
-               onclick="(function(){ var b=document.getElementById('claudeMicroBody'); var t=document.getElementById('claudeMicroToggle'); if(b.style.display==='none'){b.style.display='block';t.textContent='▲';}else{b.style.display='none';t.textContent='▼';} })()">
-            <span>🧬 Micronutrient & Functional Support Orders (AI)</span><span id="claudeMicroToggle" style="font-size:10px;">▲</span>
-          </div>
-          <div id="claudeMicroBody" style="margin-top:8px;">
-            <table style="width:100%; border-collapse:collapse; font-size:10.5px;">
-              <thead>
-                <tr style="background:#f1f5f9;">
-                  <th style="padding:6px 8px; text-align:left; border:1px solid #e2e8f0; font-weight:700;">Nutrient</th>
-                  <th style="padding:6px 8px; text-align:left; border:1px solid #e2e8f0; font-weight:700;">Lab Value</th>
-                  <th style="padding:6px 8px; text-align:left; border:1px solid #e2e8f0; font-weight:700;">Dose</th>
-                  <th style="padding:6px 8px; text-align:left; border:1px solid #e2e8f0; font-weight:700;">Rationale</th>
-                  <th style="padding:6px 8px; text-align:center; border:1px solid #e2e8f0; font-weight:700;">Status</th>
-                </tr>
-              </thead>
-              <tbody id="claudeMicroTable"></tbody>
-            </table>
+        <!-- SECTION 4: MICRONUTRIENT ORDERS removed (duplicate of engine table above) -->
+        <div id="claudeMicroSection" style="display:none;">
+          <div id="claudeMicroBody" style="display:none;">
+            <tbody id="claudeMicroTable"></tbody>
           </div>
         </div>
 
@@ -1437,7 +1382,7 @@
                 <label class="required">CRP (mg/L) <span id="epCRP_status" class="status-badge"></span></label>
                 <input id="epCRP" type="number" min="0" max="500" step="0.1"
                   oninput="validateNumber('epCRP','CRP',0,500); updateLabStatus('epCRP', this.value)">
-                <div class="range-hint">Normal: < 10 mg/L</div>
+                <div class="range-hint">Normal: &lt; 5 mg/L &nbsp;|&nbsp; Elevated: 5–10 mg/L &nbsp;|&nbsp; High: ≥ 10 mg/L</div>
                     <div class="validation-msg" id="epCRP_msg"></div>
                 </div>
                 <div class="form-group">
@@ -1637,6 +1582,17 @@
                     <div class="validation-msg" id="epFeeding_msg"></div>
                   </div>
                   <div class="form-group">
+                    <label>Oral Intake Level</label>
+                    <select id="epFoodIntake">
+                      <option value="0">≥ 50% — Adequate oral intake (no escalation)</option>
+                      <option value="60">~40% oral intake — Escalation required</option>
+                      <option value="70">~30% oral intake — Escalation required</option>
+                      <option value="80">~20% oral intake — Escalation required</option>
+                      <option value="90">~10% oral intake — Escalation required</option>
+                      <option value="100">Nil by Mouth — Full enteral replacement</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
                     <label class="required">GI Issues (Hydrolyzed?)</label>
                     <select id="epGi">
                       <option value="false">No</option>
@@ -1817,16 +1773,17 @@
               </div>
 
 
-                <button class="btn-warning" type="button" onclick="savePatientEditsAndAudit()" style="background:#6d28d9; border-color:#5b21b6; color:white; font-weight:700;">💾 Update Plan & AI Audit</button>
-                <button id="approveBtn" class="btn-primary" type="button" onclick="approveFromReport()">Approve & Finalize</button>
+                <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:center;">
+                  <button class="btn-warning" type="button" onclick="savePatientEditsAndAudit()" style="background:#6d28d9; border-color:#5b21b6; color:white; font-weight:700;">💾 Update Plan & AI Audit</button>
+                  <button id="approveBtn" class="btn-primary" type="button" onclick="approveFromReport()">Approve & Finalize</button>
+                  <button class="btn-warning" onclick="enableFollowUpMode()">🔄 Log Follow-up</button>
+                </div>
               </div>
             </div> <!-- end .card -->
           </div> <!-- end #editPatientSection -->
 
           <!-- Redundant Override section removed as requested -->
         </div> <!-- end .container.page -->
-
-          <button class="btn-warning" onclick="enableFollowUpMode()">🔄 Log Follow-up</button>
         </div>
 
         <script src="/js/storage.js"></script>
@@ -1839,8 +1796,8 @@
         <script src="/js/manufacturing.js"></script>
         <script src="/js/master-data.js"></script>
         <script src="/js/ingredients.js"></script>
-        <script src="/js/patient-store.js"></script>
-        <script src="/js/nutrition-engine-v4.js"></script>
+        <script src="/js/patient-store.js?v=3.2"></script>
+        <script src="/js/nutrition-engine-v4.js?v=4.0"></script>
         <script src="/js/engine-config.js"></script>
         <script src="/js/ai-report-service.js"></script>
         <script src="/js/intake-calculator.js"></script>
@@ -1940,9 +1897,13 @@
             const res = window.lastCalculatedIntakeRes;
             // epWL is labeled actual intake in UI but stores deficit internally? No, epWL is weight loss.
             // reducedFoodIntake (epFoodIntake in form) stores the GAP percentage.
+            // Snap calculated deficit to the nearest select option.
             const epFI = document.getElementById('epFoodIntake');
             if (epFI) {
-              epFI.value = res.deficitPercent;
+              const deficit = res.deficitPercent || 0;
+              const opts = [0, 60, 70, 80, 90, 100];
+              const snapped = opts.reduce((prev, curr) => Math.abs(curr - deficit) < Math.abs(prev - deficit) ? curr : prev);
+              epFI.value = snapped;
               epFI.classList.add('ai-filled');
               setTimeout(() => epFI.classList.remove('ai-filled'), 2000);
             }
@@ -1965,7 +1926,21 @@
 
           // Load DB data before rendering patient profile
           initStore().then(() => {
-            const patient = getPatientById(patientId);
+            let patient = getPatientById(patientId);
+            // Fallback: new patient may not be in API yet — check sessionStorage
+            if (!patient) {
+              try {
+                const pending = JSON.parse(sessionStorage.getItem('onvilox_pending_patient') || 'null');
+                if (pending && pending.id == patientId) {
+                  patient = pending;
+                  sessionStorage.removeItem('onvilox_pending_patient');
+                  // Add to in-memory cache so subsequent getPatientById calls find it
+                  const cached = getPatients();
+                  cached.push(patient);
+                  savePatients(cached);
+                }
+              } catch(e) {}
+            }
             window.patient = patient;
             if (!patient) {
               alert('Patient not found');
@@ -2819,7 +2794,7 @@
             window.patient.weightBasisOverride = value === 'ibw' ? 'ibw' : undefined;
             const ibwKg = computeHamwiIBW();
             const ibwDisp = document.getElementById('ibwDisplay');
-            if (ibwDisp) ibwDisp.textContent = `IBW: ${ibwKg} kg | Actual: ${window.patient.weight} kg`;
+            if (ibwDisp) ibwDisp.textContent = `IBW: ${ibwKg} kg`;
 
             if (typeof generateNutritionPlan === 'function' && typeof createOrUpdatePlan === 'function') {
               const note = value === 'actual'
@@ -2858,14 +2833,17 @@
             return round1(idealWeight);
           }
 
-          function recomputeFromDaily(dailyCalories, dailyProtein) {
+          function recomputeFromDaily(dailyCalories, dailyProtein, totalDailyCalories) {
             const p = window.patient || {};
+            // totalDailyCalories = full 24h target (for servings/NAFLD ceiling)
+            // dailyCalories = formula/ONS portion only (for per-serving values)
+            const totalKcalRef = totalDailyCalories || dailyCalories;
             const sideEffects = (Array.isArray(p.sideEffects) ? p.sideEffects : []).map(s => (s || '').toLowerCase());
             const hasAppetiteLoss = sideEffects.some(s => s.includes('appetite') || s.includes('satiety'));
             const hasNausea = sideEffects.some(s => s.includes('nausea') || s.includes('vomit'));
             let servingsPerDay = 3;
-            if (dailyCalories >= 1800 || hasAppetiteLoss || hasNausea || p.giIssues) servingsPerDay = 4;
-            if (dailyCalories >= 2400) servingsPerDay = 5;
+            if (totalKcalRef >= 1800 || hasAppetiteLoss || hasNausea || p.giIssues) servingsPerDay = 4;
+            if (totalKcalRef >= 2400) servingsPerDay = 5;
 
             const perServingCalories = Math.round(dailyCalories / servingsPerDay);
             const perServingProtein = Math.round(dailyProtein / servingsPerDay);
@@ -2881,10 +2859,11 @@
             const fatCalories = Math.max(remainingCalories - carbCalories, 0);
             let dailyFat = Math.round((fatCalories / 9) * 10) / 10;
 
-            // NAFLD/Fatty Liver: enforce fat ceiling at 30% of total daily calories
+            // Fat ceiling: NAFLD, T2DM, COPD — all require ≤30% fat of total daily calories
             const hasNAFLD = lowerComorbidities.some(c => c.includes('fatty liver') || c.includes('nafld') || c.includes('nash'));
-            if (hasNAFLD) {
-              const maxFatKcal = dailyCalories * 0.30;
+            const hasCOPD = lowerComorbidities.some(c => c.includes('copd') || c.includes('chronic obstructive'));
+            if (hasNAFLD || isDiabetic || hasCOPD) {
+              const maxFatKcal = totalKcalRef * 0.30;
               if (dailyFat * 9 > maxFatKcal) {
                 const excessFatKcal = (dailyFat * 9) - maxFatKcal;
                 dailyFat = Math.round((maxFatKcal / 9) * 10) / 10;
@@ -3023,7 +3002,32 @@
             setVal('pVegetarian', (patient.vegetarian ? 'Vegetarian' : 'Non-Vegetarian'));
             setVal('pBSA', (patient.bsa ? patient.bsa + ' m²' : '-'));
             setVal('pLBM', (patient.leanBodyMass ? patient.leanBodyMass + ' kg' : '-'));
-            setVal('pSarcopenia', fp.sarcopenia ? 'YES (SMI/Grip Triggered)' : (patient.sarcopeniaStatus || 'None'));
+            // Sarcopenia badge
+            (function() {
+              const el = document.getElementById('pSarcopenia');
+              if (!el) return;
+              const sarcoVal = fp.sarcopenia ? 'YES' : (patient.sarcopeniaStatus || 'None');
+              const isYes = fp.sarcopenia || sarcoVal === 'Sarcopenic';
+              const isRisk = sarcoVal === 'At Risk';
+              if (isYes) {
+                el.innerHTML = '<span style="background:#fef2f2;border:1px solid #fca5a5;color:#b91c1c;font-size:9px;font-weight:900;padding:3px 9px;border-radius:20px;display:inline-block;letter-spacing:0.04em;">YES</span>';
+              } else if (isRisk) {
+                el.innerHTML = '<span style="background:#fff7ed;border:1px solid #fdba74;color:#c2410c;font-size:9px;font-weight:900;padding:3px 9px;border-radius:20px;display:inline-block;letter-spacing:0.04em;">AT RISK</span>';
+              } else {
+                el.innerHTML = '<span style="background:#f0fdf4;border:1px solid #86efac;color:#15803d;font-size:9px;font-weight:900;padding:3px 9px;border-radius:20px;display:inline-block;letter-spacing:0.04em;">NONE</span>';
+              }
+            })();
+            // MUAC with colour
+            (function() {
+              const el = document.getElementById('pMUAC');
+              if (!el) return;
+              const muacVal = parseFloat(patient.muac || 0);
+              if (!muacVal) { el.textContent = '—'; el.style.color = '#94a3b8'; return; }
+              const isLow = muacVal < 23;
+              el.textContent = muacVal + ' cm';
+              el.style.color = isLow ? '#dc2626' : '#15803d';
+              el.title = isLow ? 'Below normal (< 23 cm)' : 'Within normal range';
+            })();
             setVal('pTumorBurden', patient.tumorBurden || 'Not Stated');
             setVal('pStage', patient.cancerStage || '-');
             setVal('pECOG', patient.ecogStatus || '0');
@@ -3042,6 +3046,14 @@
             const epH = document.getElementById('epHeight'); if (epH) epH.value = patient.height || '';
             const epAlb = document.getElementById('epAlbumin'); if (epAlb) epAlb.value = patient.albumin || '';
             const epUw = document.getElementById('epUW'); if (epUw) epUw.value = patient.usualWeight || '';
+            (function() {
+              const epFI2 = document.getElementById('epFoodIntake');
+              if (!epFI2) return;
+              const deficit = parseFloat(patient.reducedFoodIntake || 0);
+              const opts = [0, 60, 70, 80, 90, 100];
+              const snapped = opts.reduce((prev, curr) => Math.abs(curr - deficit) < Math.abs(prev - deficit) ? curr : prev);
+              epFI2.value = snapped;
+            })();
             const epCrp = document.getElementById('epCRP'); if (epCrp) epCrp.value = patient.crp || 0;
             const epMuac = document.getElementById('epMUAC'); if (epMuac) epMuac.value = patient.muac || 0;
             const epCr = document.getElementById('epCreatinine'); if (epCr) epCr.value = patient.creatinine || '';
@@ -3079,7 +3091,7 @@
               catAsian.className = 'rb ' + (['Overweight', 'Obese'].includes(asianBmiCat) ? 'rb-h' : 'rb-i');
             }
 
-            const ibwKg = computeHamwiIBW();
+            const ibwKg = fp.ibw || computeHamwiIBW();
             setVal('pIBW', ibwKg + ' kg');
             setVal('pUW', (patient.usualWeight ? patient.usualWeight + ' kg' : '-'));
             setVal('pUW2', (patient.usualWeight ? patient.usualWeight : '-'));
@@ -3088,7 +3100,7 @@
             const wbSel = document.getElementById('weightBasisSelect');
             const ibwDisp = document.getElementById('ibwDisplay');
             if (wbSel) wbSel.value = patient.weightBasisOverride || 'ibw';
-            if (ibwDisp) ibwDisp.textContent = `IBW: ${ibwKg} kg | Actual: ${patient.weight} kg`;
+            if (ibwDisp) ibwDisp.textContent = `IBW: ${ibwKg} kg`;
             setVal('pWL', (patient.weightLossPercent ?? '-') + ' %');
             setVal('pCancer_header', patient.cancer);
             setVal('pRegimen_header', patient.regimen);
@@ -3099,6 +3111,7 @@
             // New Clinical History fields
             const actualIntakePct = 100 - (patient.reducedFoodIntake || 0);
             setVal('pFoodIntake', actualIntakePct + ' %');
+            setVal('pFeedingRouteBadge', fp.prescribedRoute || patient.feedingMethod || 'Oral');
             const allergiesText = (Array.isArray(patient.allergies) && patient.allergies.length > 0) ? patient.allergies.join(', ') : (patient.allergies || 'None reported');
             setVal('pHxAllergies', allergiesText);
             setVal('pSupplements', Array.isArray(patient.existingSupplements) ? patient.existingSupplements.join(', ') : (patient.existingSupplements || 'None'));
@@ -3138,27 +3151,6 @@
               safetyBlock.style.display = 'none';
             }
 
-            // Bind Drug Interactions if any
-            const drugSec = document.getElementById('drugSection');
-            const drugBody = document.getElementById('drugInteractionsBody');
-            const hasHighRisk = fp.hasHighRiskRegimen;
-
-            if (hasHighRisk || (fp.interactions && fp.interactions.length > 0)) {
-              drugSec.style.display = 'block';
-              if (hasHighRisk && (!fp.interactions || fp.interactions.length === 0)) {
-                drugBody.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:20px; color:#64748b;">Mandatory safety screening active for this regimen. No specific flags.</td></tr>';
-              } else {
-                drugBody.innerHTML = fp.interactions.map(i => `
-          <tr>
-            <td style="font-weight:700; color:#0e2247;">${i.drug}</td>
-            <td>${i.effect}</td>
-            <td style="font-style:italic; color:#1e40af;">${i.advice}</td>
-          </tr>
-        `).join('');
-              }
-            } else {
-              drugSec.style.display = 'none';
-            }
 
 
 
@@ -3172,20 +3164,26 @@
               : (fp.estimatedDietaryProtein > 0 ? totalPro - fp.estimatedDietaryProtein : totalPro);
             const dietPro = fp.estimatedDietaryProtein || 0;
 
-            const proteinText = dietPro > 0
-              ? `${totalPro}g Total (Diet: ${dietPro}g + Formula: ${onsPro}g)`
-              : `${totalPro}g (Full Replacement Formula)`;
-            const kcalBreakText = dietPro > 0
-              ? `${totalKcal} kcal / ${proteinText} — Formula: ${onsKcal} kcal`
-              : `${totalKcal} kcal / ${proteinText}`;
-            setVal('totalDailyTarget', kcalBreakText);
 
-            // Hero block shows TOTAL 24h target, not formula-only portion
-            setVal('dailyCalories', totalKcal + ' kcal');
-            setVal('dailyProtein', totalPro + ' g');
-            // Per-serving values are based on formula portion (what the patient administers per feed)
-            setVal('perServingCalories', fp.perServingCalories + ' kcal');
-            setVal('perServingProtein', fp.perServingProtein + ' g');
+            // Hero block shows FORMULA/ONS product values (deficit to manufacture)
+            // Use recipe-actual kcal × servings so daily total always equals per-serving × servings
+            const heroServings = fp.servingsPerDay || 4;
+            const heroKcal = (fp.recipe && fp.recipe.recipeKcal) ? fp.recipe.recipeKcal * heroServings : onsKcal;
+            const heroProtein = (fp.recipe && fp.recipe.recipeProtein) ? fp.recipe.recipeProtein * heroServings : onsPro;
+            setVal('dailyCalories', heroKcal + ' kcal');
+            setVal('dailyProtein', heroProtein + ' g');
+
+            // Rebuild breakdown text using recipe-actual values so it matches the hero
+            const breakProteinText = dietPro > 0
+              ? `${heroProtein}g Total (Diet: ${dietPro}g + Formula: ${onsPro}g)`
+              : `${heroProtein}g (Full Replacement Formula)`;
+            const breakKcalText = dietPro > 0
+              ? `${heroKcal} kcal / ${breakProteinText} — Formula: ${heroKcal} kcal`
+              : `${heroKcal} kcal / ${breakProteinText}`;
+            setVal('totalDailyTarget', breakKcalText);
+            // Per-serving values are based on recipe actual (what the patient administers per feed)
+            setVal('perServingCalories', (fp.recipe && fp.recipe.recipeKcal ? fp.recipe.recipeKcal : fp.perServingCalories) + ' kcal');
+            setVal('perServingProtein', (fp.recipe && fp.recipe.recipeProtein ? fp.recipe.recipeProtein : fp.perServingProtein) + ' g');
 
             // Fix macro ratio — computed after NAFLD ceiling is applied below, so use fp values here
             // (bindDailyCarbs/bindDailyFat are declared in the block below; ratio uses fp directly but
@@ -3203,8 +3201,11 @@
             // display corrected values. Dispensing staff never see a protocol-violating macro table.
             const bindComorbidities = (Array.isArray(patient.comorbidities) ? patient.comorbidities : []).map(c => (c || '').toLowerCase());
             const bindHasNAFLD = bindComorbidities.some(c => c.includes('fatty liver') || c.includes('nafld') || c.includes('nash'));
-            if (bindHasNAFLD && bindDailyCalories > 0 && bindDailyFat * 9 > bindDailyCalories * 0.30) {
-                const maxFatKcal = bindDailyCalories * 0.30;
+            const bindIsDiabetic = bindComorbidities.some(c => c.includes('diabetes') || c.includes('t2dm')) || parseFloat(patient.hba1c || 0) >= 6.5 || (patient.bloodSugar || 0) > 180;
+            const bindHasCOPD = bindComorbidities.some(c => c.includes('copd') || c.includes('chronic obstructive'));
+            const needsFatCeiling = (bindHasNAFLD || bindIsDiabetic || bindHasCOPD) && totalKcal > 0;
+            if (needsFatCeiling && bindDailyFat * 9 > totalKcal * 0.30) {
+                const maxFatKcal = totalKcal * 0.30;
                 const excessFatKcal = (bindDailyFat * 9) - maxFatKcal;
                 bindDailyFat = Math.round((maxFatKcal / 9) * 10) / 10;
                 bindDailyCarbs = Math.round(bindDailyCarbs + excessFatKcal / 4);
@@ -3259,14 +3260,8 @@
               document.getElementById('ironRow').style.display = 'none';
             }
 
-            if (fp.micronutrients.calcium) {
-              document.getElementById('calciumRow').style.display = 'table-row';
-              setVal('calcium', fp.micronutrients.calcium);
-            } else {
-              document.getElementById('calciumRow').style.display = 'none';
-            }
-
-            setVal('zinc', fp.micronutrients.zinc || '15-30 mg');
+            setVal('calcium', fp.micronutrients.calcium || '—');
+            setVal('zinc', fp.micronutrients.zinc || '—');
             setVal('omega3', fp.micronutrients.omega3 || 'None prescribed');
             setVal('epa', fp.micronutrients.epa || 'None prescribed');
             setVal('leucine', fp.micronutrients.leucine || 'Not elevated');
@@ -3286,6 +3281,16 @@
             setVal('magnesium', fp.micronutrients.magnesium || 'Standard');
             setVal('bComplex', fp.micronutrients.bComplex || 'Standard');
             setVal('folate', fp.micronutrients.folate || 'Standard');
+            setVal('vitB12', fp.micronutrients.vitB12 || '500 mcg/day (Maintenance — FSSAI RDA)');
+            setVal('thiamine',  fp.micronutrients.thiamine  || '—');
+            setVal('riboflavin',fp.micronutrients.riboflavin|| '—');
+            setVal('niacin',    fp.micronutrients.niacin    || '—');
+            setVal('vitB6',     fp.micronutrients.vitB6     || '—');
+            setVal('iodine',    fp.micronutrients.iodine    || '—');
+            setVal('vitK',      fp.micronutrients.vitK      || '—');
+            setVal('sodium',    fp.micronutrients.sodium    || '—');
+            setVal('potassium', fp.micronutrients.potassium || '—');
+            setVal('fiber',     fp.micronutrients.fiber     || '—');
 
             if (fp.micronutrients.chromium) {
               setVal('chromium', fp.micronutrients.chromium);
@@ -3330,20 +3335,95 @@
               const el  = document.getElementById(elId);
               if (!row || !el) return;
               if (val) {
-                row.style.display = 'table-row';
                 const isRestricted = val.startsWith('CONTRAINDICATED') || val.startsWith('STRICTLY') || val.startsWith('RESTRICTED') || val.startsWith('HIGH-DOSE RESTRICTED');
-                const isCaution = val.startsWith('CAUTION') || val.startsWith('Use with caution') || val.startsWith('Pharmacological');
                 if (isRestricted) {
-                  el.innerHTML = `<span style="background:#fee2e2;border:1px solid #fca5a5;color:#991b1b;font-size:10px;font-weight:800;padding:2px 8px;border-radius:4px;display:inline-block;">⛔ RESTRICTED</span> <span style="font-size:11px;color:#374151;margin-left:6px;">${val}</span>`;
-                } else if (isCaution) {
-                  el.innerHTML = `<span style="background:#fef3c7;border:1px solid #fbbf24;color:#92400e;font-size:10px;font-weight:800;padding:2px 8px;border-radius:4px;display:inline-block;">⚠ CAUTION</span> <span style="font-size:11px;color:#374151;margin-left:6px;">${val}</span>`;
+                  // Restricted supplements are not prescribed — hide the row entirely
+                  row.style.display = 'none';
                 } else {
-                  el.textContent = val;
+                  row.style.display = 'table-row';
+                  const isCaution = val.startsWith('CAUTION') || val.startsWith('Use with caution') || val.startsWith('Pharmacological');
+                  if (isCaution) {
+                    el.innerHTML = `<span style="background:#fef3c7;border:1px solid #fbbf24;color:#92400e;font-size:10px;font-weight:800;padding:2px 8px;border-radius:4px;display:inline-block;">⚠ CAUTION</span> <span style="font-size:11px;color:#374151;margin-left:6px;">${val}</span>`;
+                  } else {
+                    el.textContent = val;
+                  }
                 }
               } else {
                 row.style.display = 'none';
               }
             });
+
+            // --- MICRONUTRIENT CLINICAL REASONS ---
+            (function() {
+              const mu = fp.micronutrients || {};
+              const pat = window.patient || {};
+              const sex = (pat.sex || '').toLowerCase();
+              const vitDVal = parseFloat(pat.vitD || 0);
+              const zincVal = parseFloat(pat.zinc || 0);
+              const hemoglobin = parseFloat(pat.hemoglobin || 0);
+              const crp = parseFloat(pat.crp || 0);
+              const alt = parseFloat(pat.alt || 0);
+              const ast = parseFloat(pat.ast || 0);
+              const bilirubin = parseFloat(pat.bilirubin || 0);
+              const isCachexia = !!(fp.cachexia);
+              const isSarcopenia = !!(fp.sarcopenia);
+              const isTumorBurden = !!(pat.tumorBurden);
+              const ecog = parseInt(pat.ecogStatus || 0);
+              const isDiabetic = parseFloat(pat.hba1c || 0) >= 6.5 || parseFloat(pat.bloodSugar || 0) > 180 ||
+                (Array.isArray(pat.comorbidities) && pat.comorbidities.some(c => typeof c === 'string' && (c.toLowerCase().includes('diabetes') || c.toLowerCase().includes('t2dm'))));
+
+              const reasonMap = {
+                vitD: vitDVal > 0 && vitDVal < 20
+                  ? 'Vitamin D deficiency confirmed (< 20 ng/mL). Repletion required: impaired bone mineralisation, reduced innate immunity, and compromised anti-tumour signalling. Malabsorption risk elevated in enteral-dependent patients.'
+                  : vitDVal > 0 && vitDVal < 30
+                  ? 'Vitamin D insufficiency (20–30 ng/mL). Maintenance dosing to support immune modulation, bone density, and oncology-specific anti-inflammatory pathways.'
+                  : 'Preventive supplementation: vitamin D supports immune function, muscle strength, and bone protection throughout oncology treatment.',
+                vitC: 'Antioxidant co-factor for collagen synthesis, immune function, and iron absorption. Dose adjusted per regimen antioxidant safety protocol — high-dose restricted during platinum/anthracycline cycles to avoid attenuating cytotoxic ROS activity.',
+                zinc: zincVal > 0 && zincVal < 60
+                  ? 'Zinc deficiency detected (< 60 μg/dL). Correction required: zinc is essential for wound healing, immune function, mucositis recovery, and taste restoration during chemotherapy.'
+                  : 'Prophylactic support for wound healing, immune competence, taste recovery, and mucosal barrier integrity during active treatment.',
+                iron: 'Anaemia detected (Hb < 10 g/dL). Iron supplementation indicated pending iron panel confirmation (ferritin, serum iron, TIBC, transferrin saturation). On clinical hold until etiology confirmed to exclude functional/inflammatory anaemia.',
+                calcium: 'Bone protection and neuromuscular function. Indicated with corticosteroid use, bone metastases, or immobility — all of which accelerate calcium loss and increase fracture risk.',
+                omega3: crp > 5 || isCachexia
+                  ? 'Elevated inflammatory markers (CRP > 5 mg/L) or cachexia confirmed. Omega-3 (EPA+DHA) targets TNF-α and IL-6 driven muscle catabolism, reduces systemic inflammation, and supports appetite in cancer-related anorexia.'
+                  : 'Anti-inflammatory support. Omega-3 modulates pro-inflammatory cytokine activity and reduces treatment-related inflammatory burden.',
+                epa: isCachexia || isTumorBurden
+                  ? 'EPA (eicosapentaenoic acid) is the primary anti-cachectic omega-3 fraction. Prescribed specifically for cancer cachexia and high tumour burden where weight loss and muscle wasting are driven by inflammatory mediators (PIF, LMF).'
+                  : 'EPA targets tumour-derived inflammatory factors and supports lean mass preservation during active chemotherapy.',
+                leucine: isSarcopenia || isTumorBurden || ecog >= 2
+                  ? 'mTORC1 activator — leucine directly stimulates muscle protein synthesis at the ribosomal level. Prescribed for sarcopenia, high tumour burden, or ECOG ≥ 2 where anabolic resistance and accelerated muscle catabolism are established.'
+                  : 'Branched-chain amino acid precursor to mTOR signalling; supports muscle protein synthesis and anti-catabolic defence during treatment.',
+                hmb: 'HMB (β-hydroxy β-methylbutyrate) — leucine metabolite. Preserves lean body mass by reducing ubiquitin-proteasome-mediated muscle degradation. Indicated in severe cachexia or rapid unintentional weight loss.',
+                glutamine: 'Primary fuel source for enterocytes and rapidly dividing mucosal cells. Supports intestinal barrier integrity, reduces chemotherapy-induced mucositis severity, and buffers GI toxicity from cytotoxic regimens.',
+                selenium: 'Selenium is the essential cofactor for glutathione peroxidase — the body\'s primary antioxidant enzyme. Supports immune defence, thyroid function, and reduces oxidative stress from treatment-related free radical generation.',
+                magnesium: mu.magnesium && mu.magnesium.includes('Correction')
+                  ? 'Cisplatin-induced renal magnesium wasting confirmed. Magnesium repletion protocol mandatory: hypomagnesaemia increases neuromuscular excitability, cardiac arrhythmia risk, and potentiates Cisplatin nephrotoxicity.'
+                  : 'Magnesium supports energy metabolism, neuromuscular function, and glucose regulation. Standard maintenance prescribed per oncology protocol.',
+                bComplex: 'B vitamins support energy production, neurological function, DNA synthesis, and red blood cell formation. Doses adjusted per regimen: B12 mandatory for antifolate therapy, B6 capped for Vincristine-containing regimens.',
+                folate: 'Folate is essential for DNA synthesis and cell division. Protocol dose mandated for antifolate regimens (Pemetrexed/Methotrexate) to reduce haematological and GI toxicity. MTHFR mutation requires methylfolate form.',
+                vitB12: (function() {
+                  const b12Val = parseFloat(pat.vitB12 || 0);
+                  const regimen = (pat.chemoRegimen || '').toLowerCase();
+                  if (regimen.includes('pemetrexed') || regimen.includes('methotrexate')) return 'B12 MANDATORY for Pemetrexed/antifolate protocol. Required to begin ≥7 days before first dose and continue throughout treatment — prevents severe haematological (neutropenia, thrombocytopenia) and GI toxicity.';
+                  if (b12Val > 0 && b12Val < 200) return 'B12 deficiency confirmed (< 200 pg/mL). High-dose repletion required. Sublingual or IM preferred — oral absorption is unreliable where intrinsic factor is compromised (post-GI surgery, atrophic gastritis). Recheck at 8 weeks.';
+                  if (b12Val > 0 && b12Val < 400) return 'B12 insufficiency (200–400 pg/mL). Supplementation indicated to restore adequate methylation, myelin synthesis, and red blood cell maturation. Monitor every 3 months during active treatment.';
+                  return 'B12 supports DNA methylation, neurological function, and red blood cell production. Standard maintenance dose prescribed as part of oncology nutritional protocol.';
+                })(),
+                chromium: 'Chromium potentiates insulin receptor sensitivity and improves glucose uptake. Prescribed for steroid-induced or treatment-related hyperglycaemia (diabetes confirmed or HbA1c ≥ 6.5%).',
+                ala: 'Alpha-lipoic acid — mitochondrial antioxidant and cofactor. Prescribed for peripheral neuropathy prevention in diabetic patients on taxane-based regimens. Contraindicated during platinum/anthracycline cycles due to ROS interference.',
+                bcaa: alt > 50 || ast > 50 || bilirubin > 1.2
+                  ? 'Elevated liver transaminases detected. BCAAs are catabolised peripherally (not hepatically), providing anabolic substrate while reducing nitrogen load on the compromised liver. Hepatic encephalopathy prevention protocol.'
+                  : 'BCAAs support muscle protein synthesis in sarcopenia. Leucine, isoleucine, and valine bypass hepatic first-pass metabolism for direct muscle anabolic effect.',
+                coenzymeQ10: 'Mitochondrial electron transport chain co-factor. Use with caution during active chemotherapy — antioxidant properties may attenuate cytotoxic ROS mechanisms. Primarily indicated post-anthracycline for cardioprotection.',
+                curcumin: 'CYP3A4 inhibitor — curcumin alters plasma levels of taxanes and targeted agents. Food-form turmeric in cooking is acceptable. Pharmacological doses require oncologist approval during active targeted or taxane therapy.',
+                greenTea: 'Green tea extract (concentrated EGCG) has significant antioxidant activity — avoid during active chemotherapy. Brewed tea (1–2 cups/day) is generally acceptable. Monitor for mild antiplatelet effect if on anticoagulants.'
+              };
+
+              Object.keys(reasonMap).forEach(function(key) {
+                const el = document.getElementById(key + '_reason');
+                if (el) el.textContent = reasonMap[key] || '';
+              });
+            })();
 
             // --- CLINICAL HOLD ORDERS SECTION ---
             (function() {
@@ -3500,15 +3580,31 @@
             if (rb && fp.recipe) {
               rb.innerHTML = '';
               const r = fp.recipe;
+              // Look up macro contributions from IngredientLibrary for transparency
+              const getLib = id => (typeof IngredientLibrary !== 'undefined' ? IngredientLibrary.find(i => i.id === id) : null) || {};
               [r.protein, r.carb, r.fat, r.omega, r.bcaa, r.glutamine].forEach(ing => {
                 if (!ing || !ing.grams) return;
+                const lib = getLib(ing.id);
+                const carbContrib = lib.cPerGram > 0 ? Math.round(ing.grams * lib.cPerGram * 10) / 10 : 0;
+                const fatContrib  = lib.fPerGram > 0 ? Math.round(ing.grams * lib.fPerGram * 10) / 10 : 0;
+                const protContrib = lib.pPerGram > 0 ? Math.round(ing.grams * lib.pPerGram * 10) / 10 : 0;
+                // Build macro breakdown sub-line (only show non-zero contributions that are not the primary macro)
+                const macroHints = [];
+                if (protContrib > 0) macroHints.push(`${protContrib}g protein`);
+                if (carbContrib > 0) macroHints.push(`${carbContrib}g carbs`);
+                if (fatContrib  > 0) macroHints.push(`${fatContrib}g fat`);
+                const macroNote = macroHints.length ? `<div style="font-size:9px;color:#94a3b8;margin-top:1px;">Contributes: ${macroHints.join(', ')}</div>` : '';
+                const gramsLabel = ing.deliveredProtein != null
+                  ? `${ing.grams} g <span style="font-size:9px;color:#64748b;font-weight:500;display:block;">(delivers ${ing.deliveredProtein}g protein)</span>`
+                  : `${ing.grams} g`;
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
         <td style="padding: 10px 13px;">
           <div style="font-weight:700; color:#334155;">${ing.name}</div>
           <div style="font-size:10px; color:#64748b; font-weight:500; margin-top:2px;">${ing.rationale || ''}</div>
+          ${macroNote}
         </td>
-        <td style="text-align:right; font-weight:800; color:#0e2247; vertical-align:middle;">${ing.grams} g</td>
+        <td style="text-align:right; font-weight:800; color:#0e2247; vertical-align:middle;">${gramsLabel}</td>
       `;
                 rb.appendChild(tr);
               });
@@ -3532,34 +3628,6 @@
               });
             }
 
-            // V3 Outcome Prediction Module
-            if (fp.outcomePrediction) {
-              const module = document.getElementById('v3OutcomeModule');
-              const pct = document.getElementById('outcomePct');
-              const bar = document.getElementById('outcomeBar');
-              const desc = document.getElementById('outcomeDesc');
-              const title = document.getElementById('outcomeTitle');
-
-              if (module) {
-                module.style.display = 'block';
-                pct.innerText = fp.outcomePrediction.percentage + '%';
-                bar.style.width = fp.outcomePrediction.percentage + '%';
-                desc.innerText = fp.outcomePrediction.description;
-                title.innerText = `Prediction: ${fp.outcomePrediction.timeframe}`;
-
-                // Dynamic coloring
-                if (fp.outcomePrediction.percentage < 40) {
-                  pct.style.color = '#ef4444';
-                  bar.style.background = '#ef4444';
-                } else if (fp.outcomePrediction.percentage < 70) {
-                  pct.style.color = '#f59e0b';
-                  bar.style.background = '#f59e0b';
-                } else {
-                  pct.style.color = '#0ea5e9';
-                  bar.style.background = '#0ea5e9';
-                }
-              }
-            }
 
             const op = document.getElementById('outcomePredictions');
             if (op && fp.outcomes) {
@@ -3595,8 +3663,9 @@
               catEl.style.cursor = 'help';
               if (tooltip) {
                 const bmiPts  = fp.mustBMIScore   != null ? fp.mustBMIScore   : (fp.bmi < 18.5 ? 2 : fp.bmi <= 20 ? 1 : 0);
-                const wlPts   = fp.mustWLScore    != null ? fp.mustWLScore    : 0;
-                const actPts  = fp.mustAcuteScore != null ? fp.mustAcuteScore : 0;
+                const wlPts   = fp.mustWLScore    != null ? fp.mustWLScore    : (patient.weightLossPercent > 10 ? 2 : patient.weightLossPercent >= 5 ? 1 : 0);
+                const reducedIntakePct = 100 - (patient.reducedFoodIntake || 0);
+                const actPts  = fp.mustAcuteScore != null ? fp.mustAcuteScore : (reducedIntakePct <= 30 ? 2 : 0);
                 document.getElementById('mustBmiPts').textContent    = bmiPts;
                 document.getElementById('mustWlPts').textContent     = wlPts;
                 document.getElementById('mustAcutePts').textContent  = actPts;
@@ -3653,7 +3722,7 @@
             let proteinPerKg = fp.proteinPerKg || (cachexia ? 1.8 : 1.4);
 
             const trace = [];
-            const ibwVal = computeHamwiIBW();
+            const ibwVal = fp.ibw || computeHamwiIBW();
             const uwStr = patient.usualWeight ? `, Usual Weight ${patient.usualWeight} kg` : '';
             const crpStr = patient.crp ? `, CRP ${patient.crp} mg/L` : '';
             const sarcStr = (patient.smi || patient.handGrip) ? `, SMI ${patient.smi}, Grip ${patient.handGrip}kg` : '';
@@ -3679,8 +3748,11 @@
             const actualIntakePct2 = 100 - reducedIntake;
             if (reducedIntake > 0) {
               const isEnteral = (patient.feedingMethod || '').includes('Enteral');
-              if (isEnteral) {
-                trace.push(`<b>Feeding Rule (Total):</b> Enteral route used. Plan fulfills 100% of base → <b>${fp.dailyCalories} kcal/day target</b>.`);
+              // Full replacement also triggered when oral intake < 50% (ESPEN escalation threshold)
+              const isFullReplacementMode = isEnteral || (actualIntakePct2 < 50);
+              if (isFullReplacementMode) {
+                const reason = isEnteral ? 'Enteral route' : `Oral intake ${actualIntakePct2}% < 50% escalation threshold`;
+                trace.push(`<b>Feeding Rule (Full Replacement):</b> ${reason} — formula fulfills 100% of daily target → <b>${fp.dailyCalories} kcal/day</b>.`);
               } else {
                 const dietKcal = Math.round(baseCal * (actualIntakePct2 / 100));
                 const formulaKcal = fp.dailyCalories;
@@ -3724,7 +3796,7 @@
               trace.push(`${overrideHeader}${changes.join(', ') || 'Modifications accepted.'}${plan.overrideNotes ? `<br><b>Justification:</b> ${plan.overrideNotes}` : ''}`);
             }
 
-            trace.push(`<div style="margin-top:10px;color:#6b7280;font-size:13px;">Guideline notes: ESPEN Oncology 2021 + NICE CG32 refeeding screening applied. Weight basis per ASPEN/ESPEN (AdjBW used when BMI ≥ 30 and weight >120% IBW). MUST screening per BAPEN.</div>`);
+            trace.push(`<div style="margin-top:10px;color:#6b7280;font-size:13px;">Guideline notes: ESPEN Oncology 2021. Weight basis per ASPEN/ESPEN (AdjBW used when BMI ≥ 30 and weight >120% IBW). MUST screening per BAPEN.</div>`);
 
             const ctEl = document.getElementById('calcTrace');
             if (ctEl) ctEl.innerHTML = trace.map(x => `<div>${x}</div>`).join('');
@@ -3791,11 +3863,9 @@
                   if (cp && cp.claudeInsights) {
                     // Case 1: Insights already saved — render from cache, no API call
                     renderClaudeInsight(cp.claudeInsights, true);
-                  } else if (params.get('new') === '1') {
-                    // Case 2: Brand new patient — auto-generate once
-                    setTimeout(() => { generateClaudeInsight(); }, 800);
                   } else {
-                    // Case 3: Old patient, no insights — show banner
+                    // Case 2: No insights yet — show banner, user clicks to generate
+                    // Never auto-trigger: prevents repeat runs on refresh, shared links, or new browsers
                     const banner = document.getElementById('aiNotGeneratedBanner');
                     if (banner) banner.style.display = 'flex';
                   }
@@ -3849,7 +3919,7 @@
 
             // recompute dependent fields if calories/protein changed
             if (overrides.dailyCalories || overrides.dailyProtein) {
-              const d = recomputeFromDaily(dailyCalories, dailyProtein);
+              const d = recomputeFromDaily(dailyCalories, dailyProtein, engineOutput.totalDailyCalories);
               overrides.perServingCalories = d.perServingCalories;
               overrides.perServingProtein = d.perServingProtein;
               overrides.macroCarbs = d.macroCarbs;
@@ -3923,7 +3993,7 @@
               else { status = 'Normal'; cls = 'status-normal'; }
             } else if (key === 'crp') {
               if (num >= 10) { status = 'High'; cls = 'status-danger'; }
-              else if (num > 3) { status = 'Elevated'; cls = 'status-warn'; }
+              else if (num >= 5) { status = 'Elevated'; cls = 'status-warn'; }
               else { status = 'Normal'; cls = 'status-normal'; }
             } else if (key === 'creatinine') {
               if (num > 1.3) { status = 'High'; cls = 'status-danger'; }
@@ -4186,7 +4256,6 @@
             [
               ['claudeAlertsSection',  'claudeAlertsList'],
               ['claudeDrugSection',    'claudeDrugTable'],
-              ['claudeMicroSection',   'claudeMicroTable'],
               ['claudeMonitorSection', 'claudeMonitorTable']
             ].forEach(([sectionId, listId]) => {
               const section = document.getElementById(sectionId);
@@ -4199,8 +4268,8 @@
             // Ensure all dynamically-populated report sections that bind() showed are still visible
             // (html2canvas clones the DOM — sections hidden by overflow or display:none will be missing)
             const pdfVisibleSections = [
-              'safetyAlertsBlock', 'drugSection', 'clinicalHoldOrdersSection',
-              'mdtReviewSection', 'refeedingSection', 'v3OutcomeModule',
+              'clinicalHoldOrdersSection',
+              'mdtReviewSection',
               'clinicalProtocolsContainer', 'mandatoryInvestigationsContainer',
               'progressSection', 'specsHistory'
             ];
@@ -4268,6 +4337,11 @@
                 dlBtn.innerHTML = originalBtnHtml;
               }
               if (autoClose) {
+                // Notify parent iframe controller that PDF is ready (dashboard direct-download flow)
+                try {
+                  const pid = window.patient && window.patient.id;
+                  window.parent.postMessage({ type: 'pdfReady', patientId: pid }, '*');
+                } catch(e) {}
                 setTimeout(() => { try { window.close(); } catch (e) { } }, 500);
               }
             }
@@ -4295,7 +4369,7 @@
             if (btnDownload) btnDownload.disabled = true;
 
             // Show placeholders in AI sections
-            const sections = ['claudeAlertsSection', 'claudeDrugSection', 'claudeMicroSection', 'claudeMonitorSection'];
+            const sections = ['claudeAlertsSection', 'claudeDrugSection', 'claudeMonitorSection'];
             const loadingDiv = '<div style="padding:16px; text-align:center; color:#64748b; font-style:italic;">✨ Claude is analyzing clinical data... please wait.</div>';
             const loadingRow = '<tr><td colspan="5" style="padding:20px; text-align:center; color:#64748b; font-style:italic;">✨ Claude is analyzing clinical data... please wait.</td></tr>';
             sections.forEach(s => {
@@ -4371,14 +4445,14 @@
               if (typeof updatePlan === 'function') {
                 updatePlan(cp);
                 console.log("Claude insights persisted to plan via updatePlan:", cp.id);
+                // Retry once after 8s in case of transient network failure
+                setTimeout(() => { if (cp.claudeInsights) updatePlan(cp); }, 8000);
               }
             }
 
             // 0. Validation Score
-            const vsEl = document.getElementById('aiValidationScore');
+            const vsEl = null; // aiValidationScore display removed
             if (vsEl && data.validationScore !== undefined) {
-                vsEl.innerText = `${data.validationScore}/10`;
-                vsEl.style.color = data.validationScore >= 8.5 ? '#16a34a' : (data.validationScore >= 6.5 ? '#d97706' : '#dc2626');
             }
 
             // 1. Rationale → goes to "Why This Plan" collapsible section (NOT mixed into engine rationale)
@@ -4394,13 +4468,6 @@
               if (claudeRationaleSection) claudeRationaleSection.style.display = 'block';
             }
 
-            // 2. Instructions (Prepend with cleanup — patient instructions stay in their section)
-            const piEl = document.getElementById('patientInstructions');
-            if (piEl && data.instructions && data.instructions.length > 0) {
-              piEl.querySelectorAll('.ai-insight').forEach(el => el.remove());
-              const aiHtml = data.instructions.map(t => `<li class="ai-insight" style="color:#6d28d9; font-weight:600; margin-bottom:4px;">✨ ${t}</li>`).join('');
-              piEl.innerHTML = aiHtml + piEl.innerHTML;
-            }
 
             // --- AUTO-SAVE AI CORRECTIONS to server for Rule Engine Manager ---
             if (!skipPersistence && data.correctedPrescription && data.correctedPrescription.isOverpowered) {
@@ -4473,7 +4540,7 @@
                     };
 
                     // Recompute macro breakdown for the recipe
-                    const d = recomputeFromDaily(overrides.dailyCalories, overrides.dailyProtein);
+                    const d = recomputeFromDaily(overrides.dailyCalories, overrides.dailyProtein, engineOutput.totalDailyCalories);
                     overrides.perServingCalories = d.perServingCalories;
                     overrides.perServingProtein = d.perServingProtein;
                     overrides.servingsPerDay = d.servingsPerDay;
@@ -4558,10 +4625,8 @@
               const alerts = Array.isArray(data.clinicalAlerts) ? data.clinicalAlerts : [];
               if (alerts.length > 0) {
                 alertsList.innerHTML = alerts.map(a => { const s=lv[a.level]||lv.LOW; return `<div style="background:${s.bg};border:1px solid ${s.border};color:${s.text};padding:9px 12px;border-radius:6px;margin-bottom:7px;font-size:11px;font-weight:600;display:flex;align-items:flex-start;gap:8px;"><span style="font-size:1.1em;flex-shrink:0;">${s.icon}</span><span><b>${a.type}:</b> ${a.message}</span></div>`; }).join('');
-              } else {
-                alertsList.innerHTML = '<div style="color:#16a34a;font-size:11px;padding:8px 4px;">✅ No additional clinical safety alerts — plan meets all audited criteria.</div>';
               }
-              alertsSec.style.display = 'block';
+              if (alerts.length > 0) alertsSec.style.display = 'block';
 
               // --- Populate Action Required banner with HIGH-priority items only ---
               const actionReqEl = document.getElementById('aiActionRequired');
@@ -4574,34 +4639,9 @@
                     <span style="min-width:20px;font-weight:900;">${actionItems.length + 1}.</span>
                     <span>🚨 <b>${a.type}:</b> ${a.message}</span></div>`);
                 });
-                // HIGH-risk drug interactions
-                (data.drugInteractions || []).filter(d => d.risk === 'HIGH').forEach(d => {
-                  actionItems.push(`<div style="display:flex;align-items:flex-start;gap:8px;padding:7px 0;border-bottom:1px solid #fecaca;font-size:11px;font-weight:700;color:#991b1b;">
-                    <span style="min-width:20px;font-weight:900;">${actionItems.length + 1}.</span>
-                    <span>💊 <b>${d.drug} — HIGH RISK:</b> ${d.advice}</span></div>`);
-                });
-                // EXCLUDED micronutrients (contraindicated)
-                (data.micronutrientOrders || []).filter(m => m.status === 'EXCLUDED').forEach(m => {
-                  actionItems.push(`<div style="display:flex;align-items:flex-start;gap:8px;padding:7px 0;border-bottom:1px solid #fecaca;font-size:11px;font-weight:700;color:#991b1b;">
-                    <span style="min-width:20px;font-weight:900;">${actionItems.length + 1}.</span>
-                    <span>⛔ <b>Remove ${m.nutrient}:</b> ${m.rationale}</span></div>`);
-                });
-                // AI prescription correction note (if overpower applied)
-                if (data.correctedPrescription && data.correctedPrescription.isOverpowered) {
-                  actionItems.push(`<div style="display:flex;align-items:flex-start;gap:8px;padding:7px 0;font-size:11px;font-weight:700;color:#7c3aed;">
-                    <span style="min-width:20px;font-weight:900;">${actionItems.length + 1}.</span>
-                    <span>⚖️ <b>Plan corrected by AI Auditor:</b> ${data.correctedPrescription.reasoning}</span></div>`);
-                }
                 if (actionItems.length > 0) {
                   actionListEl.innerHTML = actionItems.join('');
                   actionReqEl.style.display = 'block';
-                } else {
-                  // No high-priority items — show a clean pass banner
-                  actionListEl.innerHTML = '<div style="color:#16a34a;font-size:11px;font-weight:600;">✅ No high-priority actions — plan is clinically validated. Review details below and approve.</div>';
-                  actionReqEl.style.display = 'block';
-                  actionReqEl.querySelector('div').style.background = '#f0fdf4';
-                  actionReqEl.querySelector('div').style.borderColor = '#22c55e';
-                  actionReqEl.querySelector('div > div').style.color = '#166534';
                 }
               }
 
@@ -4643,15 +4683,15 @@
             const microSec = document.getElementById('claudeMicroSection');
             const microTbl = document.getElementById('claudeMicroTable');
             if (microSec && microTbl) {
-              const rows = data.micronutrientOrders && data.micronutrientOrders.length > 0
-                ? data.micronutrientOrders.map(m => {
-                    const sc = { SUPPLEMENT:'#0284c7', DEFICIENT:'#dc2626', MONITOR:'#d97706', CAPPED:'#9333ea', EXCLUDED:'#ef4444', HOLD:'#b45309', STANDARD:'#64748b', 'CARDIAC Rx':'#0e2247', 'GLYCEMIC Rx':'#b45309' };
+              const visibleMicro = (data.micronutrientOrders || []).filter(m => m.status !== 'EXCLUDED');
+              const rows = visibleMicro.length > 0
+                ? visibleMicro.map(m => {
+                    const sc = { SUPPLEMENT:'#0284c7', DEFICIENT:'#dc2626', MONITOR:'#d97706', CAPPED:'#9333ea', HOLD:'#b45309', STANDARD:'#64748b', 'CARDIAC Rx':'#0e2247', 'GLYCEMIC Rx':'#b45309' };
                     const col = sc[m.status]||'#64748b';
                     return `<tr><td style="padding:7px 8px;border:1px solid #e2e8f0;font-weight:700;color:#0e2247;">${m.nutrient}</td><td style="padding:7px 8px;border:1px solid #e2e8f0;color:#475569;">${m.labValue||'—'}</td><td style="padding:7px 8px;border:1px solid #e2e8f0;font-weight:600;">${m.dose}</td><td style="padding:7px 8px;border:1px solid #e2e8f0;font-size:10.5px;color:#334155;">${m.rationale}</td><td style="padding:7px 8px;border:1px solid #e2e8f0;text-align:center;"><span style="background:${col}22;color:${col};font-size:9px;font-weight:800;padding:2px 7px;border-radius:999px;text-transform:uppercase;white-space:nowrap;">${m.status}</span></td></tr>`;
                   }).join('')
                 : `<tr><td colspan="5" style="padding:15px;text-align:center;color:#64748b;font-style:italic;">No therapeutic micronutrient interventions required beyond standard protocols.</td></tr>`;
-              microTbl.innerHTML = rows;
-              microSec.style.display = 'block';
+              // (claudeMicroSection table hidden — AI orders applied directly to engine table below)
 
               // --- AI AUTHORITATIVE: Apply Claude micro orders to engine micro table cells ---
               const nutrientIdMap = {
@@ -4679,9 +4719,11 @@
                 const el = document.getElementById(elId);
                 if (!el) return;
                 if (m.status === 'EXCLUDED') {
-                  el.innerHTML = '<span style="color:#dc2626;font-weight:800;">&#9940; EXCLUDED (AI Audit) — ' + (m.dose || 'Contraindicated') + '</span>';
-                  const row = el.closest('tr');
-                  if (row) row.style.display = 'table-row';
+                  // Overwrite engine value — AI audit confirmed contraindication
+                  el.innerHTML = '<span style="background:#fef2f2;border:1px solid #fca5a5;color:#991b1b;font-size:10px;font-weight:800;padding:2px 8px;border-radius:4px;display:inline-block;">NOT PRESCRIBED</span>';
+                  const reasonEl = el.closest('tr') && el.closest('tr').cells[2];
+                  if (reasonEl) reasonEl.style.color = '#991b1b';
+                  return;
                 } else if (m.status === 'DEFICIENT') {
                   el.innerHTML = '<span style="color:#dc2626;font-weight:700;">&#128308; ' + m.dose + '</span>';
                 } else if (m.status === 'CAPPED') {
@@ -4720,10 +4762,14 @@
              }
           }
           setTimeout(cleanupOldVersions, 3000);
-          // Expose chat functions globally from inside _initPatientProfile scope
+          // Expose functions globally from inside _initPatientProfile scope
           window.sendChatMessage = sendChatMessage;
           window.enableFollowUpMode = enableFollowUpMode;
           window.triggerFileUpload = triggerFileUpload;
+          window.savePatientEditsAndAudit = savePatientEditsAndAudit;
+          window.approveFromReport = approveFromReport;
+          window.generateClaudeInsight = generateClaudeInsight;
+          window.downloadNutritionPDF = downloadNutritionPDF;
           setTimeout(() => window.toggleChat(), 800);
           } // end _initPatientProfile
         </script>

@@ -252,19 +252,17 @@ app.get('/api/nutrition-plans', authenticateToken, async (req, res) => {
     const result = await pool.query(
       'SELECT * FROM nutrition_plans ORDER BY generated_at DESC'
     );
-    const plans = result.rows.map(r => r.full_data || {
-      id: r.id,
-      patientId: r.patient_id,
-      version: r.version,
-      generatedAt: r.generated_at,
-      generatedBy: r.generated_by,
-      inputsSnapshot: r.inputs_snapshot,
-      engineOutput: r.engine_output,
-      overrides: r.overrides,
-      finalPlan: r.final_plan,
-      rationale: r.rationale,
-      overrideNotes: r.override_notes,
-      claudeInsights: r.claude_insights
+    const plans = result.rows.map(r => {
+      const plan = r.full_data || {
+        id: r.id, patientId: r.patient_id, version: r.version,
+        generatedAt: r.generated_at, generatedBy: r.generated_by,
+        inputsSnapshot: r.inputs_snapshot, engineOutput: r.engine_output,
+        overrides: r.overrides, finalPlan: r.final_plan,
+        rationale: r.rationale, overrideNotes: r.override_notes
+      };
+      // claude_insights column is authoritative — always overwrite full_data's value
+      if (r.claude_insights) plan.claudeInsights = r.claude_insights;
+      return plan;
     });
     res.json(plans);
   } catch (err) {
@@ -279,13 +277,16 @@ app.get('/api/nutrition-plans/patient/:patientId', authenticateToken, async (req
       'SELECT * FROM nutrition_plans WHERE patient_id = $1 ORDER BY version DESC',
       [req.params.patientId]
     );
-    const plans = result.rows.map(r => r.full_data || {
-      id: r.id, patientId: r.patient_id, version: r.version,
-      generatedAt: r.generated_at, generatedBy: r.generated_by,
-      inputsSnapshot: r.inputs_snapshot, engineOutput: r.engine_output,
-      overrides: r.overrides, finalPlan: r.final_plan,
-      rationale: r.rationale, overrideNotes: r.override_notes,
-      claudeInsights: r.claude_insights
+    const plans = result.rows.map(r => {
+      const plan = r.full_data || {
+        id: r.id, patientId: r.patient_id, version: r.version,
+        generatedAt: r.generated_at, generatedBy: r.generated_by,
+        inputsSnapshot: r.inputs_snapshot, engineOutput: r.engine_output,
+        overrides: r.overrides, finalPlan: r.final_plan,
+        rationale: r.rationale, overrideNotes: r.override_notes
+      };
+      if (r.claude_insights) plan.claudeInsights = r.claude_insights;
+      return plan;
     });
     res.json(plans);
   } catch (err) {
@@ -300,7 +301,8 @@ app.post('/api/nutrition-plans', authenticateToken, async (req, res) => {
     await pool.query(
       `INSERT INTO nutrition_plans (id, patient_id, version, inputs_snapshot, engine_output, overrides, final_plan, rationale, override_notes, generated_by, claude_insights, full_data)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
-       ON CONFLICT (id) DO UPDATE SET full_data = EXCLUDED.full_data, final_plan = EXCLUDED.final_plan, overrides = EXCLUDED.overrides, override_notes = EXCLUDED.override_notes`,
+       ON CONFLICT (id) DO UPDATE SET full_data = EXCLUDED.full_data, final_plan = EXCLUDED.final_plan, overrides = EXCLUDED.overrides, override_notes = EXCLUDED.override_notes,
+         claude_insights = COALESCE(EXCLUDED.claude_insights, nutrition_plans.claude_insights)`,
       [
         pl.id, pl.patientId || pl.patient_id, pl.version,
         pl.inputsSnapshot ? JSON.stringify(pl.inputsSnapshot) : null,
@@ -327,7 +329,9 @@ app.put('/api/nutrition-plans/:id', authenticateToken, async (req, res) => {
   try {
     await pool.query(
       `UPDATE nutrition_plans SET
-        overrides=$1, final_plan=$2, override_notes=$3, claude_insights=$4, full_data=$5
+        overrides=$1, final_plan=$2, override_notes=$3,
+        claude_insights = COALESCE($4::jsonb, claude_insights),
+        full_data=$5
        WHERE id=$6`,
       [
         pl.overrides ? JSON.stringify(pl.overrides) : null,
@@ -701,20 +705,17 @@ app.post('/api/claude-report', async (req, res) => {
   try {
     const system = `You are the Onvilox Clinical AI Auditor — Oncology RD/PhD level. You receive a patient profile and a rules-engine-generated nutrition plan. Your job is to:
 1. Validate every clinical parameter against the rules below
-2. Generate a full safety alert list — do NOT omit any that apply
-3. Correct the prescription if it is clinically wrong
-4. Produce a complete drug-nutrient interaction table for every drug in the regimen
-5. Produce a complete micronutrient orders table for every relevant nutrient
-6. Produce a full monitoring schedule
-7. Produce patient-facing dietary instructions
-8. Score the plan honestly
+2. Correct the prescription if it is clinically wrong
+3. Produce a complete drug-nutrient interaction table for every drug in the regimen
+4. Produce a complete micronutrient orders table for every relevant nutrient
+5. Produce a full monitoring schedule
+6. Score the plan honestly
 
 CLINICAL VALIDATION RULES — apply every rule to every patient:
 
 ENTERAL ESCALATION:
-- If reducedFoodIntake > 40 (meaning actual oral intake < 60% of requirements), generate a HIGH clinicalAlert with type "EN_ESCALATION_MANDATORY".
-- State that nasogastric or nasoduodenal tube feeding must be initiated immediately per ESPEN guidelines.
-- If intake is 40–60% (borderline), generate MODERATE alert for intensive ONS escalation.
+- If reducedFoodIntake >= 50 (meaning actual oral intake < 50% of requirements), generate a HIGH clinicalAlert with type "EN_ESCALATION_MANDATORY".
+- State that nasogastric or nasoduodenal tube feeding must be initiated immediately.
 
 PROTEIN SAFETY:
 - The renal protein cap of 0.8 g/kg applies ONLY when creatinine > 1.3 mg/dL (KDIGO guideline). If creatinine ≤ 1.3, this cap must NOT be applied.
@@ -811,13 +812,10 @@ OVERPOWER CORRECTION:
 - For case (c): correctedPrescription.dailyCalories = input totalDailyCalories (unchanged), correctedPrescription.dailyProtein = input totalDailyProtein (unchanged). Compute correctedPrescription.dailyFat = floor(totalDailyCalories × 0.30 / 9) and correctedPrescription.dailyCarbs = floor((totalDailyCalories - (dailyProtein × 4) - (correctedDailyFat × 9)) / 4). Reasoning must state: "NAFLD fat ceiling 30% violated — fat [X]g ([X]%) corrected to [Y]g (30%); excess redistributed to carbohydrates [Z]g."
 - Always provide a clinical reasoning string explaining the correction.
 
-CRITICAL — CLINICAL ALERTS COMPLETENESS:
-Every safety violation you identify — whether mentioned in rationale, logicRefinements, or instructions — MUST also appear as a structured entry in the clinicalAlerts array with the correct type and level. An empty or incomplete clinicalAlerts array while safety issues exist is a critical reporting failure. Do NOT summarise issues only in rationale and leave clinicalAlerts empty or partial.
-
 BRAND NAMES — STRICT RULE:
-NEVER mention any commercial product name, brand name, or trade name (e.g. Prosure, Ensure, Fresubin, Peptamen, Nepro, Glucerna, Abbott, Nestle, Fresenius, Danone, or any other manufacturer brand). Use only generic clinical/nutrient descriptions (e.g. "high-protein ONS formula", "omega-3 enriched enteral supplement", "immunonutrition formula with EPA/DHA"). This rule applies to every field in the output including rationale, instructions, clinicalAlerts, micronutrientOrders, and dietaryGuidance.
+NEVER mention any commercial product name, brand name, or trade name (e.g. Prosure, Ensure, Fresubin, Peptamen, Nepro, Glucerna, Abbott, Nestle, Fresenius, Danone, or any other manufacturer brand). Use only generic clinical/nutrient descriptions (e.g. "high-protein ONS formula", "omega-3 enriched enteral supplement", "immunonutrition formula with EPA/DHA"). This rule applies to every field in the output including rationale, micronutrientOrders, and drugInteractions.
 
-NUMERICAL CONSISTENCY — CRITICAL RULE — APPLIES TO ALL FIELDS (rationale, instructions, clinicalAlerts, drugInteractions, everything):
+NUMERICAL CONSISTENCY — CRITICAL RULE — APPLIES TO ALL FIELDS (rationale, drugInteractions, everything):
 The plan object contains the authoritative calculated values. You MUST use these exact numbers everywhere. NEVER recalculate protein, calories, or any macro independently.
 - plan.totalDailyProtein = the total protein target (diet + formula). Use this number when telling the patient their daily protein goal. NEVER apply g/kg × patient weight yourself.
 - plan.dailyProtein = the formula/supplement protein only (what the prescription provides).
@@ -826,14 +824,12 @@ The plan object contains the authoritative calculated values. You MUST use these
 - plan.dailyCalories = formula calorie contribution only.
 - plan.calcWeight = the weight used for calculation (IBW or actual). NEVER use patient.weight for any calculation.
 - plan.kcalPerKg and plan.proteinPerKg = the rates the engine applied.
-If you disagree with a value (e.g. protein seems low for sarcopenia), set isOverpowered:true and provide correctedPrescription — do NOT silently use a different number in instructions while leaving the plan unchanged. Every number in instructions, rationale, and alerts must match either plan values or correctedPrescription values. A patient instruction saying "consume 136g protein" while plan.totalDailyProtein=95g is a critical inconsistency and must never occur.
+If you disagree with a value (e.g. protein seems low for sarcopenia), set isOverpowered:true and provide correctedPrescription — do NOT silently use a different number in rationale while leaving the plan unchanged. Every number in rationale must match either plan values or correctedPrescription values.
 
 OUTPUT FORMAT — return ONLY valid JSON, no markdown, no text outside the JSON object. CRITICAL: never embed literal newline or tab characters inside JSON string values — use \\n and \\t escape sequences if line breaks are needed in text, or omit them entirely. All string values must be valid single-line JSON strings.
 {
   "validationScore": number,
   "rationale": ["string 1", "string 2", "string 3", "string 4", "string 5"],
-  "instructions": ["patient instruction 1", "patient instruction 2", "patient instruction 3", "patient instruction 4", "patient instruction 5", "patient instruction 6"],
-  "clinicalAlerts": [{"type": "string", "level": "HIGH|MODERATE|LOW", "message": "string"}],
   "correctedPrescription": {"isOverpowered": false, "dailyCalories": number, "dailyProtein": number, "dailyCarbs": number, "dailyFat": number, "reasoning": "string"},
   "logicRefinements": ["string 1", "string 2"],
   "drugInteractions": [{"drug": "string", "interaction": "string", "advice": "string", "risk": "HIGH|MODERATE|LOW"}],
@@ -922,8 +918,6 @@ OUTPUT FORMAT — return ONLY valid JSON, no markdown, no text outside the JSON 
       data = {
         validationScore: grabNum('validationScore'),
         rationale: grabArr('rationale'),
-        instructions: grabArr('instructions'),
-        clinicalAlerts: grabArr('clinicalAlerts'),
         correctedPrescription: { isOverpowered: false, dailyCalories: null, dailyProtein: null, reasoning: 'Response truncated — re-run audit.' },
         logicRefinements: grabArr('logicRefinements'),
         drugInteractions: grabArr('drugInteractions'),
@@ -991,9 +985,8 @@ OUTPUT FORMAT — return ONLY valid JSON, no markdown, no text outside the JSON 
       )
     `);
 
-    // Seed engine_formulas if empty
-    const fCount = await pool.query('SELECT COUNT(*) FROM engine_formulas');
-    if (parseInt(fCount.rows[0].count) === 0) {
+    // Seed engine_formulas — always runs, ON CONFLICT (id) DO NOTHING skips existing rows
+    {
       const formulas = [
         // ── Calorie Targets ───────────────────────────────────────────────────
         { id:'kcal_stable',               category:'calories',     name:'kcal_stable',               description:'Calorie target — Stable, no cachexia or significant risk',                                     value:'25',   unit:'kcal/kg',      source:'ESPEN Oncology 2021' },
@@ -1054,25 +1047,135 @@ OUTPUT FORMAT — return ONLY valid JSON, no markdown, no text outside the JSON 
         { id:'alt_liver_threshold',       category:'safety_labs',  name:'alt_liver_threshold',       description:'ALT above this value signals liver compromise (+2 risk score)',                                  value:'50',   unit:'IU/L',         source:'Clinical' },
         { id:'ast_liver_threshold',       category:'safety_labs',  name:'ast_liver_threshold',       description:'AST above this value signals liver compromise (+2 risk score)',                                  value:'50',   unit:'IU/L',         source:'Clinical' },
         { id:'bilirubin_liver_threshold', category:'safety_labs',  name:'bilirubin_liver_threshold', description:'Bilirubin above this value signals liver compromise (+2 risk score)',                            value:'1.2',  unit:'mg/dL',        source:'Clinical' },
-        // ── Refeeding Syndrome (NICE CG32) ────────────────────────────────────
-        { id:'rf_high_bmi',               category:'refeeding',    name:'rf_high_bmi',               description:'BMI below this value is a NICE CG32 high-risk refeeding criterion',                             value:'16',   unit:'kg/m²',        source:'NICE CG32' },
-        { id:'rf_high_weight_loss',       category:'refeeding',    name:'rf_high_weight_loss',       description:'Weight loss above this value is a NICE CG32 high-risk refeeding criterion',                     value:'15',   unit:'%',            source:'NICE CG32' },
-        { id:'rf_high_potassium',         category:'refeeding',    name:'rf_high_potassium',         description:'Potassium below this value is a NICE CG32 high-risk refeeding criterion',                       value:'3.5',  unit:'mmol/L',       source:'NICE CG32' },
-        { id:'rf_high_phosphate',         category:'refeeding',    name:'rf_high_phosphate',         description:'Phosphate below this value is a NICE CG32 high-risk refeeding criterion',                       value:'0.8',  unit:'mmol/L',       source:'NICE CG32' },
-        { id:'rf_high_magnesium',         category:'refeeding',    name:'rf_high_magnesium',         description:'Magnesium below this value is a NICE CG32 high-risk refeeding criterion',                       value:'0.75', unit:'mmol/L',       source:'NICE CG32' },
-        { id:'rf_high_start_kcal',        category:'refeeding',    name:'rf_high_start_kcal',        description:'Starting calorie dose for HIGH refeeding risk patients (Days 1–3)',                             value:'5',    unit:'kcal/kg',      source:'NICE CG32' },
-        { id:'rf_at_risk_start_kcal',     category:'refeeding',    name:'rf_at_risk_start_kcal',     description:'Starting calorie dose for AT RISK refeeding patients (Days 1–2)',                               value:'10',   unit:'kcal/kg',      source:'NICE CG32' },
-        { id:'rf_at_risk_criteria_min',   category:'refeeding',    name:'rf_at_risk_criteria_min',   description:'Minimum number of at-risk criteria (of 4) required to classify as refeeding at-risk',           value:'2',    unit:'criteria',     source:'NICE CG32' },
         // ── Macro Distribution ────────────────────────────────────────────────
         { id:'carb_ratio_standard',       category:'macros',       name:'carb_ratio_standard',       description:'Carbohydrate share of non-protein calories — standard patients',                                 value:'0.45', unit:'fraction',     source:'Clinical' },
         { id:'carb_ratio_diabetic',       category:'macros',       name:'carb_ratio_diabetic',       description:'Carbohydrate share of non-protein calories — diabetic or inflamed (CRP >5)',                    value:'0.35', unit:'fraction',     source:'Clinical' },
         // ── Intake / Escalation ───────────────────────────────────────────────
-        { id:'intake_critical',           category:'escalation',   name:'intake_critical',           description:'Oral intake at or below this value triggers immediate enteral tube escalation danger alert',     value:'30',   unit:'% oral intake', source:'ESPEN' },
-        { id:'intake_mandatory_en',       category:'escalation',   name:'intake_mandatory_en',       description:'Oral intake at or below this value makes enteral nutrition mandatory',                           value:'50',   unit:'% oral intake', source:'ESPEN' },
-        { id:'intake_full_replacement',   category:'escalation',   name:'intake_full_replacement',   description:'Oral intake at or below this value triggers full calorie/protein prescription (no deficit gap)', value:'60',   unit:'% oral intake', source:'ESPEN' },
+        { id:'intake_mandatory_en',       category:'escalation',   name:'intake_mandatory_en',       description:'Oral intake below this value triggers enteral tube escalation and full calorie/protein replacement prescription',  value:'50',   unit:'% oral intake', source:'ESPEN' },
         // ── Fluid Targets ─────────────────────────────────────────────────────
         { id:'fluid_min_per_kg',          category:'fluid',        name:'fluid_min_per_kg',          description:'Minimum daily fluid target',                                                                     value:'30',   unit:'ml/kg',        source:'ESPEN' },
         { id:'fluid_max_per_kg',          category:'fluid',        name:'fluid_max_per_kg',          description:'Maximum daily fluid target',                                                                     value:'35',   unit:'ml/kg',        source:'ESPEN' },
+
+        // ── FSSAI/ICMR-NIN 2020 RDA — Gender pairs (same value for both) ───────
+        { id:'micro_folate_maintenance_male',   category:'micronutrients', name:'micro_folate_maintenance_male',   description:'Folate maintenance — FSSAI/ICMR-NIN 2020 RDA for male',   value:'400', unit:'mcg/day', source:'FSSAI/ICMR-NIN 2020' },
+        { id:'micro_folate_maintenance_female', category:'micronutrients', name:'micro_folate_maintenance_female', description:'Folate maintenance — FSSAI/ICMR-NIN 2020 RDA for female', value:'400', unit:'mcg/day', source:'FSSAI/ICMR-NIN 2020' },
+        { id:'micro_vite_dose_male',            category:'micronutrients', name:'micro_vite_dose_male',            description:'Vitamin E maintenance — FSSAI/ICMR-NIN 2020 RDA for male',   value:'15',  unit:'mg/day',  source:'FSSAI/ICMR-NIN 2020' },
+        { id:'micro_vite_dose_female',          category:'micronutrients', name:'micro_vite_dose_female',          description:'Vitamin E maintenance — FSSAI/ICMR-NIN 2020 RDA for female', value:'12',  unit:'mg/day',  source:'FSSAI/ICMR-NIN 2020' },
+        { id:'micro_vitb12_maintenance_male',   category:'micronutrients', name:'micro_vitb12_maintenance_male',   description:'Vitamin B12 maintenance — FSSAI/ICMR-NIN 2020 RDA for male',   value:'500', unit:'mcg/day', source:'FSSAI/ICMR-NIN 2020' },
+        { id:'micro_vitb12_maintenance_female', category:'micronutrients', name:'micro_vitb12_maintenance_female', description:'Vitamin B12 maintenance — FSSAI/ICMR-NIN 2020 RDA for female', value:'500', unit:'mcg/day', source:'FSSAI/ICMR-NIN 2020' },
+
+        // ── FSSAI/ICMR-NIN 2020 RDA — Gender-specific pairs ──────────────────
+        { id:'micro_zinc_maintenance_male',   category:'micronutrients', name:'micro_zinc_maintenance_male',   description:'Zinc maintenance — FSSAI/ICMR-NIN 2020 RDA for male',                                        value:'12',   unit:'mg/day',        source:'FSSAI/ICMR-NIN 2020' },
+        { id:'micro_zinc_maintenance_female', category:'micronutrients', name:'micro_zinc_maintenance_female', description:'Zinc maintenance — FSSAI/ICMR-NIN 2020 RDA for female',                                      value:'10',   unit:'mg/day',        source:'FSSAI/ICMR-NIN 2020' },
+        { id:'micro_magnesium_maintenance_male',  category:'micronutrients', name:'micro_magnesium_maintenance_male',  description:'Magnesium maintenance — FSSAI/ICMR-NIN 2020 RDA for male',                           value:'340',  unit:'mg/day',        source:'FSSAI/ICMR-NIN 2020' },
+        { id:'micro_magnesium_maintenance_female',category:'micronutrients', name:'micro_magnesium_maintenance_female',description:'Magnesium maintenance — FSSAI/ICMR-NIN 2020 RDA for female',                         value:'310',  unit:'mg/day',        source:'FSSAI/ICMR-NIN 2020' },
+        { id:'micro_iron_rda_male',           category:'micronutrients', name:'micro_iron_rda_male',           description:'Iron RDA for male — FSSAI/ICMR-NIN 2020',                                                    value:'17',   unit:'mg/day',        source:'FSSAI/ICMR-NIN 2020' },
+        { id:'micro_iron_rda_female',         category:'micronutrients', name:'micro_iron_rda_female',         description:'Iron RDA for female — FSSAI/ICMR-NIN 2020',                                                  value:'21',   unit:'mg/day',        source:'FSSAI/ICMR-NIN 2020' },
+
+        // ── Clinical Protocols — Folate ───────────────────────────────────────
+        { id:'micro_folate_protocol',         category:'clinical_protocols', name:'micro_folate_protocol',         description:'Folate mandatory dose for antifolate regimens (Pemetrexed/Methotrexate)',                  value:'5',    unit:'mg/day',        source:'ESPEN / NCCN' },
+        { id:'micro_folate_correction',       category:'clinical_protocols', name:'micro_folate_correction',       description:'Folate correction dose for lab-confirmed deficiency or anaemia',                          value:'5',    unit:'mg/day',        source:'Clinical' },
+        { id:'micro_folate_lab_threshold',    category:'clinical_protocols', name:'micro_folate_lab_threshold',    description:'Serum folate below this value triggers deficiency correction',                            value:'3',    unit:'ng/mL',         source:'Clinical' },
+
+        // ── Clinical Protocols — Omega-3 / EPA ───────────────────────────────
+        { id:'micro_omega3_standard',         category:'clinical_protocols', name:'micro_omega3_standard',         description:'Omega-3 standard oncology dose (no high-risk indication)',                                value:'2',    unit:'g/day',         source:'ESPEN Oncology 2021' },
+        { id:'micro_omega3_high',             category:'clinical_protocols', name:'micro_omega3_high',             description:'Omega-3 high dose (cachexia, CRP >5, pancreatic/biliary cancer)',                        value:'3',    unit:'g/day',         source:'ESPEN Oncology 2021' },
+        { id:'micro_epa_low',                 category:'clinical_protocols', name:'micro_epa_low',                 description:'EPA dose for cachexia / tumor burden (moderate indication)',                              value:'2.2',  unit:'g EPA/day',     source:'ESPEN Oncology 2021' },
+        { id:'micro_epa_high',                category:'clinical_protocols', name:'micro_epa_high',                description:'EPA dose for advanced metastatic / pancreatic / biliary cancer',                         value:'3.0',  unit:'g EPA/day',     source:'ESPEN Oncology 2021' },
+
+        // ── Clinical Protocols — Leucine / Glutamine / BCAA ──────────────────
+        { id:'micro_leucine_standard',        category:'clinical_protocols', name:'micro_leucine_standard',        description:'Leucine standard dose for muscle protein synthesis support',                              value:'3',    unit:'g/day',         source:'ESPEN / Leucine review' },
+        { id:'micro_leucine_high',            category:'clinical_protocols', name:'micro_leucine_high',            description:'Leucine high dose — sarcopenia, high tumor burden, or ECOG ≥ 2',                        value:'5',    unit:'g/day',         source:'ESPEN / Leucine review' },
+        { id:'micro_glutamine_daily',         category:'clinical_protocols', name:'micro_glutamine_daily',         description:'Glutamine total daily dose — mucosal protection',                                        value:'16',   unit:'g/day',         source:'ESPEN Oncology 2021' },
+        { id:'micro_bcaa_hepatic',            category:'clinical_protocols', name:'micro_bcaa_hepatic',            description:'BCAA dose for hepatic protection (elevated ALT/AST/bilirubin)',                          value:'20',   unit:'g/day',         source:'ESPEN Liver 2019' },
+        { id:'micro_bcaa_sarcopenia',         category:'clinical_protocols', name:'micro_bcaa_sarcopenia',         description:'BCAA dose for sarcopenia muscle preservation',                                           value:'10',   unit:'g/day',         source:'ESPEN Oncology 2021' },
+
+        // ── Clinical Protocols — Iron ─────────────────────────────────────────
+        { id:'micro_iron_correction',         category:'clinical_protocols', name:'micro_iron_correction',         description:'Elemental iron correction dose for anaemia (Hb < threshold)',                             value:'100',  unit:'mg/day',        source:'WHO / Clinical' },
+
+        // ── Clinical Protocols — Selenium ─────────────────────────────────────
+        { id:'micro_selenium_physio',         category:'clinical_protocols', name:'micro_selenium_physio',         description:'Selenium physiological dose — FSSAI/ICMR-NIN 2020 RDA (correction or maintenance)',       value:'55',   unit:'mcg/day',       source:'FSSAI/ICMR-NIN 2020' },
+        { id:'micro_selenium_pharma_max',     category:'clinical_protocols', name:'micro_selenium_pharma_max',     description:'Selenium maximum pharmacological dose (requires oncologist approval)',                     value:'200',  unit:'mcg/day',       source:'Clinical' },
+
+        // ── Clinical Protocols — Chromium / ALA ──────────────────────────────
+        { id:'micro_chromium_diabetic',       category:'clinical_protocols', name:'micro_chromium_diabetic',       description:'Chromium dose for diabetic glycemic protocol — ICMR-NIN UL is 200 mcg/day',              value:'200',  unit:'mcg/day',       source:'ICMR-NIN UL 2020' },
+        { id:'micro_ala_low',                 category:'clinical_protocols', name:'micro_ala_low',                 description:'Alpha-lipoic acid dose for peripheral neuropathy (taxane protocol)',                     value:'300',  unit:'mg/day',        source:'Clinical' },
+        { id:'micro_ala_high',                category:'clinical_protocols', name:'micro_ala_high',                description:'Alpha-lipoic acid dose for diabetic glycaemic neuropathy support',                       value:'600',  unit:'mg/day',        source:'Clinical' },
+
+        // ── Clinical Protocols — Vitamin B12 ─────────────────────────────────
+        { id:'micro_vitb12_protocol',         category:'clinical_protocols', name:'micro_vitb12_protocol',         description:'Vitamin B12 mandatory dose for Pemetrexed/antifolate protocol',                          value:'1000', unit:'mcg/day',       source:'ESPEN / NCCN' },
+        { id:'micro_vitb12_deficiency',       category:'clinical_protocols', name:'micro_vitb12_deficiency',       description:'Vitamin B12 correction dose for confirmed deficiency (serum B12 < 200 pg/mL)',           value:'1000', unit:'mcg/day',       source:'Clinical' },
+        { id:'micro_vitb12_insufficiency',    category:'clinical_protocols', name:'micro_vitb12_insufficiency',    description:'Vitamin B12 correction dose for insufficiency (serum B12 200–400 pg/mL)',                value:'500',  unit:'mcg/day',       source:'Clinical' },
+        { id:'micro_vitb12_deficiency_threshold',  category:'clinical_protocols', name:'micro_vitb12_deficiency_threshold',  description:'Serum B12 below this value = deficiency',                                    value:'200',  unit:'pg/mL',         source:'Clinical' },
+        { id:'micro_vitb12_insufficiency_threshold',category:'clinical_protocols',name:'micro_vitb12_insufficiency_threshold',description:'Serum B12 below this value = insufficiency',                                value:'400',  unit:'pg/mL',         source:'Clinical' },
+
+        // ── FSSAI/ICMR-NIN 2020 RDA Reference — Vitamin D ────────────────────
+        { id:'micro_vitd_rda_male',               category:'micronutrients', name:'micro_vitd_rda_male',               description:'Vitamin D RDA for male — FSSAI/ICMR-NIN 2020',                                                               value:'600',  unit:'IU/day',   source:'FSSAI/ICMR-NIN 2020' },
+        { id:'micro_vitd_rda_female',             category:'micronutrients', name:'micro_vitd_rda_female',             description:'Vitamin D RDA for female — FSSAI/ICMR-NIN 2020',                                                             value:'600',  unit:'IU/day',   source:'FSSAI/ICMR-NIN 2020' },
+
+        // ── FSSAI/ICMR-NIN 2020 RDA Reference — Vitamin C ────────────────────
+        { id:'micro_vitc_rda',                    category:'micronutrients', name:'micro_vitc_rda',                    description:'Vitamin C RDA — FSSAI/ICMR-NIN 2020 (same for male and female)',                                            value:'40',   unit:'mg/day',   source:'FSSAI/ICMR-NIN 2020' },
+
+        // ── FSSAI/ICMR-NIN 2020 RDA Reference — Calcium ─────────────────────
+        { id:'micro_calcium_rda_male',            category:'micronutrients', name:'micro_calcium_rda_male',            description:'Calcium RDA for male — FSSAI/ICMR-NIN 2020',                                                                 value:'600',  unit:'mg/day',   source:'FSSAI/ICMR-NIN 2020' },
+        { id:'micro_calcium_rda_female',          category:'micronutrients', name:'micro_calcium_rda_female',          description:'Calcium RDA for female — FSSAI/ICMR-NIN 2020',                                                               value:'600',  unit:'mg/day',   source:'FSSAI/ICMR-NIN 2020' },
+
+        // ── FSSAI/ICMR-NIN 2020 RDA Reference — Thiamine (B1) ───────────────
+        { id:'micro_thiamine_rda_male',           category:'micronutrients', name:'micro_thiamine_rda_male',           description:'Thiamine (B1) RDA for male — FSSAI/ICMR-NIN 2020',                                                           value:'1.4',  unit:'mg/day',   source:'FSSAI/ICMR-NIN 2020' },
+        { id:'micro_thiamine_rda_female',         category:'micronutrients', name:'micro_thiamine_rda_female',         description:'Thiamine (B1) RDA for female — FSSAI/ICMR-NIN 2020',                                                         value:'1.1',  unit:'mg/day',   source:'FSSAI/ICMR-NIN 2020' },
+
+        // ── FSSAI/ICMR-NIN 2020 RDA Reference — Riboflavin (B2) ─────────────
+        { id:'micro_riboflavin_rda_male',         category:'micronutrients', name:'micro_riboflavin_rda_male',         description:'Riboflavin (B2) RDA for male — FSSAI/ICMR-NIN 2020',                                                         value:'1.9',  unit:'mg/day',   source:'FSSAI/ICMR-NIN 2020' },
+        { id:'micro_riboflavin_rda_female',       category:'micronutrients', name:'micro_riboflavin_rda_female',       description:'Riboflavin (B2) RDA for female — FSSAI/ICMR-NIN 2020',                                                       value:'1.5',  unit:'mg/day',   source:'FSSAI/ICMR-NIN 2020' },
+
+        // ── FSSAI/ICMR-NIN 2020 RDA Reference — Niacin (B3) ─────────────────
+        { id:'micro_niacin_rda_male',             category:'micronutrients', name:'micro_niacin_rda_male',             description:'Niacin (B3) RDA for male — FSSAI/ICMR-NIN 2020',                                                             value:'16',   unit:'mg NE/day',source:'FSSAI/ICMR-NIN 2020' },
+        { id:'micro_niacin_rda_female',           category:'micronutrients', name:'micro_niacin_rda_female',           description:'Niacin (B3) RDA for female — FSSAI/ICMR-NIN 2020',                                                           value:'12',   unit:'mg NE/day',source:'FSSAI/ICMR-NIN 2020' },
+
+        // ── FSSAI/ICMR-NIN 2020 RDA Reference — Vitamin B6 ──────────────────
+        { id:'micro_vitb6_rda_male',              category:'micronutrients', name:'micro_vitb6_rda_male',              description:'Vitamin B6 RDA for male — FSSAI/ICMR-NIN 2020',                                                              value:'1.6',  unit:'mg/day',   source:'FSSAI/ICMR-NIN 2020' },
+        { id:'micro_vitb6_rda_female',            category:'micronutrients', name:'micro_vitb6_rda_female',            description:'Vitamin B6 RDA for female — FSSAI/ICMR-NIN 2020',                                                            value:'1.6',  unit:'mg/day',   source:'FSSAI/ICMR-NIN 2020' },
+
+        // ── FSSAI/ICMR-NIN 2020 RDA Reference — Iodine ──────────────────────
+        { id:'micro_iodine_rda_male',             category:'micronutrients', name:'micro_iodine_rda_male',             description:'Iodine RDA for male — FSSAI/ICMR-NIN 2020',                                                                  value:'150',  unit:'mcg/day',  source:'FSSAI/ICMR-NIN 2020' },
+        { id:'micro_iodine_rda_female',           category:'micronutrients', name:'micro_iodine_rda_female',           description:'Iodine RDA for female — FSSAI/ICMR-NIN 2020',                                                                value:'150',  unit:'mcg/day',  source:'FSSAI/ICMR-NIN 2020' },
+
+        // ── FSSAI/ICMR-NIN 2020 RDA Reference — Dietary Fiber ───────────────
+        { id:'micro_fiber_rda_male',              category:'micronutrients', name:'micro_fiber_rda_male',              description:'Dietary fiber adequate intake for male — FSSAI/ICMR-NIN 2020',                                               value:'30',   unit:'g/day',    source:'FSSAI/ICMR-NIN 2020' },
+        { id:'micro_fiber_rda_female',            category:'micronutrients', name:'micro_fiber_rda_female',            description:'Dietary fiber adequate intake for female — FSSAI/ICMR-NIN 2020',                                             value:'25',   unit:'g/day',    source:'FSSAI/ICMR-NIN 2020' },
+
+        // ── FSSAI/ICMR-NIN 2020 RDA Reference — Vitamin K ───────────────────
+        { id:'micro_vitk_rda_male',               category:'micronutrients', name:'micro_vitk_rda_male',               description:'Vitamin K RDA for male — FSSAI/ICMR-NIN 2020',                                                               value:'55',   unit:'mcg/day',  source:'FSSAI/ICMR-NIN 2020' },
+        { id:'micro_vitk_rda_female',             category:'micronutrients', name:'micro_vitk_rda_female',             description:'Vitamin K RDA for female — FSSAI/ICMR-NIN 2020',                                                             value:'55',   unit:'mcg/day',  source:'FSSAI/ICMR-NIN 2020' },
+
+        // ── FSSAI/ICMR-NIN 2020 AI Reference — Sodium ───────────────────────
+        { id:'micro_sodium_ai_male',              category:'micronutrients', name:'micro_sodium_ai_male',              description:'Sodium adequate intake (AI) for male — FSSAI/WHO 2020 upper limit',                                          value:'2000', unit:'mg/day',   source:'FSSAI/WHO 2020' },
+        { id:'micro_sodium_ai_female',            category:'micronutrients', name:'micro_sodium_ai_female',            description:'Sodium adequate intake (AI) for female — FSSAI/WHO 2020 upper limit',                                        value:'2000', unit:'mg/day',   source:'FSSAI/WHO 2020' },
+
+        // ── FSSAI/ICMR-NIN 2020 AI Reference — Potassium ────────────────────
+        { id:'micro_potassium_ai_male',             category:'micronutrients', name:'micro_potassium_ai_male',             description:'Potassium adequate intake (AI) for male — FSSAI/ICMR-NIN 2020',                    value:'3500', unit:'mg/day',   source:'FSSAI/ICMR-NIN 2020' },
+        { id:'micro_potassium_ai_female',           category:'micronutrients', name:'micro_potassium_ai_female',           description:'Potassium adequate intake (AI) for female — FSSAI/ICMR-NIN 2020',                  value:'3500', unit:'mg/day',   source:'FSSAI/ICMR-NIN 2020' },
+
+        // ── FSSAI/ICMR-NIN 2020 RDA Reference — Pantothenic Acid (B5) ────────
+        { id:'micro_pantothenic_rda_male',          category:'micronutrients', name:'micro_pantothenic_rda_male',          description:'Pantothenic acid (B5) AI for male — FSSAI/ICMR-NIN 2020',                         value:'5',    unit:'mg/day',   source:'FSSAI/ICMR-NIN 2020' },
+        { id:'micro_pantothenic_rda_female',        category:'micronutrients', name:'micro_pantothenic_rda_female',        description:'Pantothenic acid (B5) AI for female — FSSAI/ICMR-NIN 2020',                       value:'5',    unit:'mg/day',   source:'FSSAI/ICMR-NIN 2020' },
+
+        // ── FSSAI/ICMR-NIN 2020 RDA Reference — Phosphorus ──────────────────
+        { id:'micro_phosphorus_rda_male',           category:'micronutrients', name:'micro_phosphorus_rda_male',           description:'Phosphorus RDA for male — FSSAI/ICMR-NIN 2020',                                   value:'600',  unit:'mg/day',   source:'FSSAI/ICMR-NIN 2020' },
+        { id:'micro_phosphorus_rda_female',         category:'micronutrients', name:'micro_phosphorus_rda_female',         description:'Phosphorus RDA for female — FSSAI/ICMR-NIN 2020',                                 value:'600',  unit:'mg/day',   source:'FSSAI/ICMR-NIN 2020' },
+
+        // ── FSSAI/ICMR-NIN 2020 RDA Reference — Copper ───────────────────────
+        { id:'micro_copper_rda_male',               category:'micronutrients', name:'micro_copper_rda_male',               description:'Copper RDA for male — FSSAI/ICMR-NIN 2020',                                       value:'900',  unit:'mcg/day',  source:'FSSAI/ICMR-NIN 2020' },
+        { id:'micro_copper_rda_female',             category:'micronutrients', name:'micro_copper_rda_female',             description:'Copper RDA for female — FSSAI/ICMR-NIN 2020',                                     value:'900',  unit:'mcg/day',  source:'FSSAI/ICMR-NIN 2020' },
+
+        // ── FSSAI/ICMR-NIN 2020 AI Reference — Chloride ──────────────────────
+        { id:'micro_chloride_ai_male',              category:'micronutrients', name:'micro_chloride_ai_male',              description:'Chloride AI for male — FSSAI/WHO 2020 (follows sodium chloride intake)',           value:'2300', unit:'mg/day',   source:'FSSAI/WHO 2020' },
+        { id:'micro_chloride_ai_female',            category:'micronutrients', name:'micro_chloride_ai_female',            description:'Chloride AI for female — FSSAI/WHO 2020 (follows sodium chloride intake)',         value:'2300', unit:'mg/day',   source:'FSSAI/WHO 2020' },
+
+        // ── FSSAI/ICMR-NIN 2020 RDA Reference — Molybdenum ──────────────────
+        { id:'micro_molybdenum_rda_male',           category:'micronutrients', name:'micro_molybdenum_rda_male',           description:'Molybdenum RDA for male — FSSAI/ICMR-NIN 2020',                                   value:'45',   unit:'mcg/day',  source:'FSSAI/ICMR-NIN 2020' },
+        { id:'micro_molybdenum_rda_female',         category:'micronutrients', name:'micro_molybdenum_rda_female',         description:'Molybdenum RDA for female — FSSAI/ICMR-NIN 2020',                                 value:'45',   unit:'mcg/day',  source:'FSSAI/ICMR-NIN 2020' },
+
         // ── Serving Frequency ─────────────────────────────────────────────────
         { id:'servings_base',             category:'servings',     name:'servings_base',             description:'Standard servings per day (baseline)',                                                           value:'3',    unit:'servings',     source:'Clinical' },
         { id:'servings_high_threshold',   category:'servings',     name:'servings_high_threshold',   description:'Daily calorie level above which servings increase to 4 (to reduce per-serving volume)',         value:'1800', unit:'kcal',         source:'Clinical' },
@@ -1088,8 +1191,44 @@ OUTPUT FORMAT — return ONLY valid JSON, no markdown, no text outside the JSON 
         );
       }
       console.log(`Engine formulas seeded: ${formulas.length} constants.`);
+
+      // ── One-time migrations: remove deprecated / orphaned parameters ────────
+      await pool.query(`DELETE FROM engine_formulas WHERE id IN (
+        'micro_zinc_maintenance','micro_magnesium_maintenance',
+        'micro_zinc_correction_min','micro_zinc_correction_max',
+        'micro_omega3_high_min','micro_omega3_high_max',
+        'micro_calcium_myeloma_min','micro_calcium_myeloma_max',
+        'micro_vitb12_maintenance_low','micro_vitb12_maintenance_high',
+        'micro_selenium_physio_min','micro_selenium_physio_max',
+        'micro_folate_maintenance','micro_vite_dose','micro_vitb12_maintenance',
+        'micro_vitd_deficiency_dose','micro_vitd_insufficient_dose','micro_vitd_maintenance','micro_vitd_renal_cap',
+        'micro_vitc_high','micro_vitc_standard','micro_vitc_chemo_cap',
+        'micro_zinc_correction','micro_zinc_lab_threshold',
+        'micro_magnesium_correction',
+        'micro_calcium_myeloma','micro_calcium_bone_mets','micro_calcium_steroid_high','micro_calcium_steroid'
+      ) OR category = 'refeeding'`);
+
+      // Move clinical/correction params out of micronutrients → clinical_protocols
+      await pool.query(`UPDATE engine_formulas SET category = 'clinical_protocols' WHERE id IN (
+        'micro_vitd_deficiency_dose','micro_vitd_insufficient_dose','micro_vitd_maintenance','micro_vitd_renal_cap',
+        'micro_vitc_high','micro_vitc_standard','micro_vitc_chemo_cap',
+        'micro_zinc_correction','micro_zinc_lab_threshold',
+        'micro_folate_protocol','micro_folate_correction','micro_folate_lab_threshold',
+        'micro_magnesium_correction',
+        'micro_omega3_standard','micro_omega3_high','micro_epa_low','micro_epa_high',
+        'micro_leucine_standard','micro_leucine_high','micro_glutamine_daily',
+        'micro_bcaa_hepatic','micro_bcaa_sarcopenia',
+        'micro_iron_correction',
+        'micro_selenium_physio','micro_selenium_pharma_max',
+        'micro_chromium_diabetic','micro_ala_low','micro_ala_high',
+        'micro_vitb12_protocol','micro_vitb12_deficiency','micro_vitb12_insufficiency',
+        'micro_vitb12_deficiency_threshold','micro_vitb12_insufficiency_threshold',
+        'micro_calcium_myeloma','micro_calcium_bone_mets','micro_calcium_steroid_high','micro_calcium_steroid'
+      )`);
+
     }
     console.log('Rule Engine tables ready.');
+
   } catch (e) {
     console.error('Rule Engine table init error:', e.message);
   }

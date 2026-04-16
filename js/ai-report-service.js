@@ -100,24 +100,46 @@ const aiReportService = {
         const apiBase = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : '';
         const payload = this.preparePayload(patient, plan);
 
-        // Step 1: Submit job, get jobId immediately
-        const submitRes = await fetch(`${apiBase}/api/claude-report`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json; charset=utf-8' },
-            body: JSON.stringify(payload)
-        });
-        if (!submitRes.ok) {
-            const errData = await submitRes.json();
-            throw new Error(errData.error || 'AI request failed');
-        }
-        const { jobId } = await submitRes.json();
-        if (!jobId) throw new Error('No jobId returned');
+        const submitJob = async () => {
+            const submitRes = await fetch(`${apiBase}/api/claude-report`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json; charset=utf-8' },
+                body: JSON.stringify(payload)
+            });
+            if (!submitRes.ok) {
+                const errData = await submitRes.json().catch(() => ({}));
+                throw new Error(errData.error || 'AI request failed');
+            }
+            const { jobId } = await submitRes.json();
+            if (!jobId) throw new Error('No jobId returned');
+            return jobId;
+        };
 
-        // Step 2: Poll until done (max 3 minutes, every 4 seconds)
-        const maxAttempts = 45;
+        let jobId = await submitJob();
+        let resubmitted = false;
+
+        // Poll until done — max 6 minutes, every 5 seconds
+        const maxAttempts = 72;
         for (let i = 0; i < maxAttempts; i++) {
-            await new Promise(r => setTimeout(r, 4000));
-            const pollRes = await fetch(`${apiBase}/api/claude-report/status/${jobId}`);
+            await new Promise(r => setTimeout(r, 5000));
+            let pollRes;
+            try {
+                pollRes = await fetch(`${apiBase}/api/claude-report/status/${jobId}`);
+            } catch(e) {
+                continue; // network blip — retry
+            }
+            if (pollRes.status === 502 || pollRes.status === 503) {
+                // Server restarting — wait a bit longer and retry
+                await new Promise(r => setTimeout(r, 6000));
+                continue;
+            }
+            if (pollRes.status === 404 && !resubmitted) {
+                // Job lost (server restarted) — resubmit once
+                console.warn('AI job lost — resubmitting...');
+                jobId = await submitJob();
+                resubmitted = true;
+                continue;
+            }
             if (!pollRes.ok) continue;
             const job = await pollRes.json();
             if (job.status === 'done') {
@@ -126,6 +148,6 @@ const aiReportService = {
             }
             if (job.status === 'error') throw new Error(job.error || 'AI job failed');
         }
-        throw new Error('AI report timed out after 3 minutes');
+        throw new Error('AI report timed out after 6 minutes — please try again.');
     }
 };
