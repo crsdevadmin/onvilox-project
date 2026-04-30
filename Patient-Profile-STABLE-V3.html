@@ -940,7 +940,7 @@
 
           <div style="margin-top:12px; border:1px solid #dde8f5; border-radius:5px; background:#f7faff; padding:12px;">
             <div style="font-size:10px; font-weight:800; text-transform:uppercase; color:#94a3b8; margin-bottom:8px;">
-              Daily Batch Formulation (Full Day — Divide into <span id="recipeServingsLabel">4</span> Equal Servings)</div>
+              <span id="recipeHeaderLabel">Daily Batch Formulation (Full Day — Divide into <span id="recipeServingsLabel">4</span> Equal Servings)</span></div>
             <table class="rt" style="font-size:11.5px; background:white; border:1px solid #dde8f5;">
               <thead style="display:none;">
                 <tr>
@@ -3168,9 +3168,12 @@
 
 
             // Hero block shows FORMULA/ONS product values (deficit to manufacture)
-            // recipeKcal is now daily batch total — no multiplication needed
             const heroServings = fp.servingsPerDay || 4;
-            const heroKcal = (fp.recipe && fp.recipe.recipeKcal) ? fp.recipe.recipeKcal : onsKcal;
+            // isDailyBatch = true → recipeKcal is daily total. Old plans (no flag) → recipeKcal is per-serving, multiply.
+            const isDailyBatch = fp.recipe && fp.recipe.isDailyBatch === true;
+            const heroKcal = (fp.recipe && fp.recipe.recipeKcal)
+              ? (isDailyBatch ? fp.recipe.recipeKcal : fp.recipe.recipeKcal * heroServings)
+              : onsKcal;
             // Hero protein = formula only (same basis as calories — deficit only).
             // Full target breakdown shown in the subtitle line below.
             const heroProtein = onsPro;
@@ -3185,9 +3188,9 @@
               ? `${heroKcal} kcal / ${breakProteinText} — Formula: ${heroKcal} kcal`
               : `${heroKcal} kcal / ${breakProteinText}`;
             setVal('totalDailyTarget', breakKcalText);
-            // Per-serving = daily batch ÷ servings
-            const dailyBatchKcal = (fp.recipe && fp.recipe.recipeKcal) ? fp.recipe.recipeKcal : onsKcal;
-            const perServingKcal = Math.round(dailyBatchKcal / heroServings);
+            // Per-serving = daily batch ÷ servings (or old per-serving value directly)
+            const dailyBatchKcal = heroKcal;
+            const perServingKcal = isDailyBatch ? Math.round(dailyBatchKcal / heroServings) : (fp.recipe && fp.recipe.recipeKcal ? fp.recipe.recipeKcal : Math.round(onsKcal / heroServings));
             const perServingWheyPro = fp.recipe && fp.recipe.wheyProtein != null ? Math.round(fp.recipe.wheyProtein / heroServings) : fp.perServingProtein;
             setVal('perServingCalories', perServingKcal + ' kcal');
             setVal('perServingProtein', perServingWheyPro + ' g');
@@ -3575,11 +3578,14 @@
               document.getElementById('bcaaRow').style.display = 'none';
             }
 
-            // Production specs show per-serving values (daily batch ÷ servings)
-            const recipeKcalDaily = (fp.recipe && fp.recipe.recipeKcal) ? fp.recipe.recipeKcal : onsKcal;
+            // Production specs show per-serving values
             const recipeServings = fp.recipe && fp.recipe.servingsPerDay ? fp.recipe.servingsPerDay : (fp.servingsPerDay || heroServings);
-            const recipeKcalPerServing = Math.round(recipeKcalDaily / recipeServings);
-            const recipeWheyProPerServing = fp.recipe && fp.recipe.wheyProtein != null ? Math.round(fp.recipe.wheyProtein / recipeServings) : fp.perServingProtein;
+            const recipeKcalPerServing = isDailyBatch
+              ? Math.round(heroKcal / recipeServings)
+              : (fp.recipe && fp.recipe.recipeKcal ? fp.recipe.recipeKcal : Math.round(onsKcal / recipeServings));
+            const recipeWheyProPerServing = fp.recipe && fp.recipe.wheyProtein != null
+              ? (isDailyBatch ? Math.round(fp.recipe.wheyProtein / recipeServings) : fp.recipe.wheyProtein)
+              : fp.perServingProtein;
             setVal('mCalories', recipeKcalPerServing + ' kcal');
             setVal('mProtein', recipeWheyProPerServing + ' g');
             setVal('mCarbs', bindPerServingCarbs + ' g');
@@ -3626,9 +3632,14 @@
       `;
                 rb.appendChild(tr);
               });
-              // Update servings label in recipe header
+              // Update servings label in recipe header (only meaningful for daily batch plans)
               const srv = r.servingsPerDay || (fp.servingsPerDay || 4);
+              const recipeIsDailyBatch = r.isDailyBatch === true;
               ['recipeServingsLabel','recipeServingsLabel2'].forEach(id => { const el = document.getElementById(id); if(el) el.textContent = srv; });
+              const recipeHeaderEl = document.getElementById('recipeHeaderLabel');
+              if (recipeHeaderEl) recipeHeaderEl.innerHTML = recipeIsDailyBatch
+                ? `Daily Batch Formulation (Full Day — Divide into <span id="recipeServingsLabel">${srv}</span> Equal Servings)`
+                : `Store Formulation (Per Serving Recipe)`;
               // Totals row — daily batch totals
               const tTotalP = Math.round(totalProtein * 10) / 10;
               const tTotalC = Math.round(totalCarbs * 10) / 10;
@@ -3778,7 +3789,7 @@
 
             const baseCal = fp.baseEnergy || Math.round(calcWt * kcalPerKg);
             // Recipe-actual kcal = what gets manufactured; used everywhere for consistency
-            const recipeActualKcal = (fp.recipe && fp.recipe.recipeKcal) ? fp.recipe.recipeKcal : fp.dailyCalories;
+            const recipeActualKcal = heroKcal; // already resolved (daily batch or per-serving × servings)
             trace.push(`<b>Base Energy Required:</b> ${kcalPerKg} kcal/kg/day → ${calcWt} kg × ${kcalPerKg} = <b>${baseCal} kcal/day</b>.`);
 
             const reducedIntake = patient.reducedFoodIntake || 0;

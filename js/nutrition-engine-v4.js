@@ -900,7 +900,7 @@ function generateNutritionPlan(patient, engineConfig) {
       carb: { id: selectedCarb.id, name: selectedCarb.name, grams: cGrams, rationale: selectedCarb.healingRationale },
       fat: { id: selectedFat.id, name: selectedFat.name, grams: fGrams, rationale: "Metabolic energy without glycemic load" },
       omega: (oGrams > 0) ? { id: 'omega3_powder', name: 'Omega-3 Powder', grams: oGrams, rationale: "Anti-inflammatory / EPA support." } : null,
-      recipeKcal, recipeProtein, wheyProtein, servingsPerDay,
+      recipeKcal, recipeProtein, wheyProtein, servingsPerDay, isDailyBatch: true,
       bcaa: (bcaaDailyGrams > 0) ? { id: 'bcaa_powder', name: 'BCAA (2:1:1 Mix)', grams: bcaaDailyGrams, rationale: "Hepatic Protection dose." } : null,
       glutamine: (pGrams > 0 && glutamineGrams > 0) ? { id: 'glutamine', name: 'L-Glutamine powder', grams: glutamineGrams, rationale: "Mucosal protection." } : null
     };
