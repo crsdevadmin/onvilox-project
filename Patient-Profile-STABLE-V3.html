@@ -3235,7 +3235,9 @@
             setVal('macroTablePerServingProtein', bindPerServingProtein + ' g');
             // Show breakdown footnote only when patient has partial oral intake
             if (dietPro > 0) {
-              setVal('proteinBreakdownNote', `Diet ~${dietPro}g + Formula ${onsPro}g = ${totalPro}g total. Per serving = formula ${onsPro}g ÷ ${bindServings} servings.`);
+              setVal('proteinBreakdownNote', isDailyBatch
+                ? `Diet ~${dietPro}g + Formula ${onsPro}g = ${totalPro}g total. Per serving = daily batch formula ${onsPro}g ÷ ${bindServings}.`
+                : `Diet ~${dietPro}g + Formula ${onsPro}g = ${totalPro}g total. Per serving = formula ${onsPro}g ÷ ${bindServings} servings.`);
               document.getElementById('proteinBreakdownRow').style.display = 'table-row';
             } else {
               document.getElementById('proteinBreakdownRow').style.display = 'none';
@@ -3744,7 +3746,9 @@
             setVal('riskNote', fp.cachexia ? 'Weight loss / albumin / BMI pattern suggests need for calorie-dense, high-protein support.' : 'Support plan built to maintain intake during treatment.');
             setVal('riskMonitor', 'Reassess intake tolerance, body weight trend, GI symptoms and key labs at follow-up.');
 
-            setVal('servingHeader', `Per Serving (${fp.servingsPerDay || 2}x Daily)`);
+            setVal('servingHeader', isDailyBatch
+              ? `Per Serving (daily batch ÷ ${fp.servingsPerDay || 2})`
+              : `Per Serving (${fp.servingsPerDay || 2}x Daily)`);
             setVal('servingsPerDay', (fp.servingsPerDay || 2) + ' servings/day');
             setVal('servingsPerDay2', (fp.servingsPerDay || 2) + ' servings/day');
             setVal('servingCalories', recipeKcalPerServing + ' kcal');
