@@ -860,8 +860,9 @@ function generateNutritionPlan(patient, engineConfig) {
     const selectedFat = getIng('mct_powder');
     const selectedOmega = getIng('omega3_powder');
 
-    // Daily omega-3 — fixed clinical dose
-    const oGrams = (crp > 5 || cachexia || (cancer && cancer.includes('pancreatic'))) ? 5.2 : 2.8; // daily batch (1.3g or 0.7g × servings)
+    // Daily omega-3 — scales with servings so each serving gets consistent dose
+    const oGramsPerServing = (crp > 5 || cachexia || (cancer && cancer.includes('pancreatic'))) ? 1.3 : 0.7;
+    const oGrams = Math.round(oGramsPerServing * servingsPerDay * 10) / 10;
 
     // Therapeutic add-ons — daily batch totals (compounding unit makes one daily box)
     const glutamineGrams = (patient.giIssues || (sideEffects && sideEffects.includes('Mucositis')) || (regimen && regimen.includes('folfirinox')) || hasIBD) ? 16 : 0; // 16g/day fixed
