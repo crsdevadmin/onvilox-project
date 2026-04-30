@@ -66,8 +66,14 @@ app.post('/api/auth/login', async (req, res) => {
 app.get('/api/patients', authenticateToken, async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM patients ORDER BY created_at DESC');
-    // Return full_data if available (complete client-side object), otherwise the DB row
-    const patients = result.rows.map(r => r.full_data || r);
+    const patients = result.rows.map(r => {
+      const p = r.full_data || {};
+      if (r.feeding_method != null) p.feedingMethod = r.feeding_method;
+      if (r.reduced_food_intake != null) p.reducedFoodIntake = r.reduced_food_intake;
+      if (r.weight != null) p.weight = r.weight;
+      if (r.status != null) p.status = r.status;
+      return p;
+    });
     res.json(patients);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -143,7 +149,18 @@ app.get('/api/patients/:id', authenticateToken, async (req, res) => {
     const result = await pool.query('SELECT * FROM patients WHERE id = $1', [req.params.id]);
     if (!result.rows[0]) return res.status(404).json({ error: 'Not found' });
     const row = result.rows[0];
-    res.json(row.full_data || row);
+    // Merge dedicated DB columns into full_data so stale blobs never hide updated fields
+    const patientData = row.full_data || {};
+    if (row.feeding_method != null) patientData.feedingMethod = row.feeding_method;
+    if (row.reduced_food_intake != null) patientData.reducedFoodIntake = row.reduced_food_intake;
+    if (row.weight != null) patientData.weight = row.weight;
+    if (row.usual_weight != null) patientData.usualWeight = row.usual_weight;
+    if (row.albumin != null) patientData.albumin = row.albumin;
+    if (row.crp != null) patientData.crp = row.crp;
+    if (row.creatinine != null) patientData.creatinine = row.creatinine;
+    if (row.blood_sugar != null) patientData.bloodSugar = row.blood_sugar;
+    if (row.status != null) patientData.status = row.status;
+    res.json(patientData);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -730,11 +747,13 @@ ANTIFOLATE TOXICITY:
 - Folate repletion must be initiated before the next chemotherapy cycle. Specify the repletion dose (5 mg/day folic acid), the timing of the follow-up serum folate test (Day 7 after commencing supplementation), and the cycle-day checkpoint (serum folate must be confirmed ≥ 5 ng/mL before Cycle N+1 Day 1).
 - Include folate supplementation in micronutrientOrders with status DEFICIENT and dose "5 mg/day folic acid — recheck serum folate Day 7; confirm ≥5 ng/mL before next cycle."
 
-VITAMIN D:
-- vitD < 20 ng/mL = deficient. Prescribe 4000 IU/day repletion — NOT 2000 IU/day which is a maintenance dose only.
-- vitD < 12 ng/mL = severe deficiency. Prescribe 50,000 IU/week for 8 weeks then recheck.
-- vitD 20–30 ng/mL = insufficient. Prescribe 2000 IU/day maintenance.
-- Always note the distinction between repletion and maintenance in micronutrientOrders.
+MICRONUTRIENT RDA VALIDATION — CRITICAL RULE:
+All micronutrient doses displayed in the plan are based exclusively on FSSAI/ICMR-NIN 2020 RDA values. You must NOT prescribe clinical correction doses (e.g. 4000 IU VitD, 2000 IU VitD, 500 mg VitC) in micronutrientOrders — these are not permitted for product approval.
+The FSSAI/ICMR-NIN 2020 RDA values are (gender-specific where applicable — use the patient's gender):
+  VitD: 600 IU/day | VitC: Male 80 mg / Female 65 mg | Zinc: Male 12 mg / Female 10 mg | Magnesium: Male 340 mg / Female 310 mg | Calcium: 600 mg | Folate maintenance: 400 mcg | VitB12 maintenance: 500 mcg | VitE: Male 15 mg / Female 12 mg | Thiamine: Male 1.4 mg / Female 1.1 mg | Riboflavin: Male 1.9 mg / Female 1.5 mg | Niacin: Male 16 mg NE / Female 12 mg NE | VitB6: 1.6 mg | Iodine: 150 mcg | VitK: 55 mcg | Sodium: 2000 mg | Potassium: 3500 mg | Fiber: Male 30 g / Female 25 g | Iron: Male 17 mg / Female 21 mg
+If the engine's output for any nutrient does NOT match the correct RDA above (i.e. the engine has a bug), set status "RDA_CORRECTION" in micronutrientOrders with dose set to the exact RDA value from the table above, and rationale explaining the correction.
+If the engine's output already matches the RDA, do NOT include that nutrient in micronutrientOrders with RDA_CORRECTION — leave it unchanged.
+VITAMIN D: Only flag RDA_CORRECTION if the engine shows a value other than 600 IU/day. Do not prescribe clinical correction doses under any circumstances.
 
 ANAEMIA & IRON:
 - Hemoglobin < 12 g/dL: generate MODERATE alert for anaemia.
@@ -833,7 +852,7 @@ OUTPUT FORMAT — return ONLY valid JSON, no markdown, no text outside the JSON 
   "correctedPrescription": {"isOverpowered": false, "dailyCalories": number, "dailyProtein": number, "dailyCarbs": number, "dailyFat": number, "reasoning": "string"},
   "logicRefinements": ["string 1", "string 2"],
   "drugInteractions": [{"drug": "string", "interaction": "string", "advice": "string", "risk": "HIGH|MODERATE|LOW"}],
-  "micronutrientOrders": [{"nutrient": "string", "labValue": "string", "dose": "string", "rationale": "string", "status": "SUPPLEMENT|DEFICIENT|MONITOR|CAPPED|EXCLUDED|HOLD|STANDARD"}],
+  "micronutrientOrders": [{"nutrient": "string", "labValue": "string", "dose": "string", "rationale": "string", "status": "RDA_CORRECTION|EXCLUDED|HOLD|MONITOR|STANDARD"}],
   "monitoringSchedule": [{"frequency": "string", "parameters": "string", "threshold": "string", "responsible": "string"}]
 }`;
 
@@ -1094,11 +1113,13 @@ OUTPUT FORMAT — return ONLY valid JSON, no markdown, no text outside the JSON 
         { id:'micro_iron_correction',         category:'clinical_protocols', name:'micro_iron_correction',         description:'Elemental iron correction dose for anaemia (Hb < threshold)',                             value:'100',  unit:'mg/day',        source:'WHO / Clinical' },
 
         // ── Clinical Protocols — Selenium ─────────────────────────────────────
-        { id:'micro_selenium_physio',         category:'clinical_protocols', name:'micro_selenium_physio',         description:'Selenium physiological dose — FSSAI/ICMR-NIN 2020 RDA (correction or maintenance)',       value:'55',   unit:'mcg/day',       source:'FSSAI/ICMR-NIN 2020' },
+        { id:'micro_selenium_rda_male',       category:'micronutrients',     name:'micro_selenium_rda_male',       description:'Selenium RDA for male — ICMR-NIN 2020',                                                       value:'40',   unit:'mcg/day',       source:'ICMR-NIN 2020' },
+        { id:'micro_selenium_rda_female',     category:'micronutrients',     name:'micro_selenium_rda_female',     description:'Selenium RDA for female — ICMR-NIN 2020',                                                     value:'40',   unit:'mcg/day',       source:'ICMR-NIN 2020' },
         { id:'micro_selenium_pharma_max',     category:'clinical_protocols', name:'micro_selenium_pharma_max',     description:'Selenium maximum pharmacological dose (requires oncologist approval)',                     value:'200',  unit:'mcg/day',       source:'Clinical' },
 
         // ── Clinical Protocols — Chromium / ALA ──────────────────────────────
-        { id:'micro_chromium_diabetic',       category:'clinical_protocols', name:'micro_chromium_diabetic',       description:'Chromium dose for diabetic glycemic protocol — ICMR-NIN UL is 200 mcg/day',              value:'200',  unit:'mcg/day',       source:'ICMR-NIN UL 2020' },
+        { id:'micro_chromium_rda_male',       category:'micronutrients',     name:'micro_chromium_rda_male',       description:'Chromium RDA for male — ICMR-NIN 2020',                                               value:'33',   unit:'mcg/day',       source:'ICMR-NIN 2020' },
+        { id:'micro_chromium_rda_female',     category:'micronutrients',     name:'micro_chromium_rda_female',     description:'Chromium RDA for female — ICMR-NIN 2020',                                             value:'25',   unit:'mcg/day',       source:'ICMR-NIN 2020' },
         { id:'micro_ala_low',                 category:'clinical_protocols', name:'micro_ala_low',                 description:'Alpha-lipoic acid dose for peripheral neuropathy (taxane protocol)',                     value:'300',  unit:'mg/day',        source:'Clinical' },
         { id:'micro_ala_high',                category:'clinical_protocols', name:'micro_ala_high',                description:'Alpha-lipoic acid dose for diabetic glycaemic neuropathy support',                       value:'600',  unit:'mg/day',        source:'Clinical' },
 
@@ -1110,11 +1131,14 @@ OUTPUT FORMAT — return ONLY valid JSON, no markdown, no text outside the JSON 
         { id:'micro_vitb12_insufficiency_threshold',category:'clinical_protocols',name:'micro_vitb12_insufficiency_threshold',description:'Serum B12 below this value = insufficiency',                                value:'400',  unit:'pg/mL',         source:'Clinical' },
 
         // ── FSSAI/ICMR-NIN 2020 RDA Reference — Vitamin D ────────────────────
+        { id:'micro_vita_rda_male',               category:'micronutrients', name:'micro_vita_rda_male',               description:'Vitamin A RDA for male — ICMR-NIN 2020',                                                                     value:'900',  unit:'mcg RAE/day', source:'ICMR-NIN 2020' },
+        { id:'micro_vita_rda_female',             category:'micronutrients', name:'micro_vita_rda_female',             description:'Vitamin A RDA for female — ICMR-NIN 2020',                                                                   value:'700',  unit:'mcg RAE/day', source:'ICMR-NIN 2020' },
         { id:'micro_vitd_rda_male',               category:'micronutrients', name:'micro_vitd_rda_male',               description:'Vitamin D RDA for male — FSSAI/ICMR-NIN 2020',                                                               value:'600',  unit:'IU/day',   source:'FSSAI/ICMR-NIN 2020' },
         { id:'micro_vitd_rda_female',             category:'micronutrients', name:'micro_vitd_rda_female',             description:'Vitamin D RDA for female — FSSAI/ICMR-NIN 2020',                                                             value:'600',  unit:'IU/day',   source:'FSSAI/ICMR-NIN 2020' },
 
         // ── FSSAI/ICMR-NIN 2020 RDA Reference — Vitamin C ────────────────────
-        { id:'micro_vitc_rda',                    category:'micronutrients', name:'micro_vitc_rda',                    description:'Vitamin C RDA — FSSAI/ICMR-NIN 2020 (same for male and female)',                                            value:'40',   unit:'mg/day',   source:'FSSAI/ICMR-NIN 2020' },
+        { id:'micro_vitc_rda_male',   category:'micronutrients', name:'micro_vitc_rda_male',   description:'Vitamin C RDA for male — ICMR-NIN',   value:'80', unit:'mg/day', source:'ICMR-NIN' },
+        { id:'micro_vitc_rda_female', category:'micronutrients', name:'micro_vitc_rda_female', description:'Vitamin C RDA for female — ICMR-NIN', value:'65', unit:'mg/day', source:'ICMR-NIN' },
 
         // ── FSSAI/ICMR-NIN 2020 RDA Reference — Calcium ─────────────────────
         { id:'micro_calcium_rda_male',            category:'micronutrients', name:'micro_calcium_rda_male',            description:'Calcium RDA for male — FSSAI/ICMR-NIN 2020',                                                                 value:'600',  unit:'mg/day',   source:'FSSAI/ICMR-NIN 2020' },
@@ -1194,6 +1218,9 @@ OUTPUT FORMAT — return ONLY valid JSON, no markdown, no text outside the JSON 
 
       // ── One-time migrations: remove deprecated / orphaned parameters ────────
       await pool.query(`DELETE FROM engine_formulas WHERE id IN (
+        'micro_vitc_rda',
+        'micro_vitb12_deficiency','micro_vitb12_deficiency_threshold',
+        'micro_vitb12_insufficiency','micro_vitb12_insufficiency_threshold',
         'micro_zinc_maintenance','micro_magnesium_maintenance',
         'micro_zinc_correction_min','micro_zinc_correction_max',
         'micro_omega3_high_min','micro_omega3_high_max',
@@ -1219,7 +1246,7 @@ OUTPUT FORMAT — return ONLY valid JSON, no markdown, no text outside the JSON 
         'micro_leucine_standard','micro_leucine_high','micro_glutamine_daily',
         'micro_bcaa_hepatic','micro_bcaa_sarcopenia',
         'micro_iron_correction',
-        'micro_selenium_physio','micro_selenium_pharma_max',
+        'micro_selenium_physio','micro_chromium_diabetic',
         'micro_chromium_diabetic','micro_ala_low','micro_ala_high',
         'micro_vitb12_protocol','micro_vitb12_deficiency','micro_vitb12_insufficiency',
         'micro_vitb12_deficiency_threshold','micro_vitb12_insufficiency_threshold',

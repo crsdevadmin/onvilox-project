@@ -859,7 +859,7 @@
                   <tr>
                     <th>Macro Distribution</th>
                     <th>Daily Total</th>
-                    <th id="servingHeader">Per Serving</th>
+                    <th id="servingHeader">Per Formula Serving</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -867,6 +867,11 @@
                     <td>Protein</td>
                     <td id="macroTableDailyProtein" class="vbig"></td>
                     <td id="macroTablePerServingProtein"></td>
+                  </tr>
+                  <tr id="proteinBreakdownRow" style="display:none;">
+                    <td colspan="3" style="font-size:10px; color:#64748b; padding-top:0; padding-bottom:6px;">
+                      <span id="proteinBreakdownNote"></span>
+                    </td>
                   </tr>
                   <tr>
                     <td>Carbohydrates</td>
@@ -935,7 +940,7 @@
 
           <div style="margin-top:12px; border:1px solid #dde8f5; border-radius:5px; background:#f7faff; padding:12px;">
             <div style="font-size:10px; font-weight:800; text-transform:uppercase; color:#94a3b8; margin-bottom:8px;">
-              Store Formulation (Per Serving Recipe)</div>
+              Daily Batch Formulation (Full Day — Divide into <span id="recipeServingsLabel">4</span> Equal Servings)</div>
             <table class="rt" style="font-size:11.5px; background:white; border:1px solid #dde8f5;">
               <thead style="display:none;">
                 <tr>
@@ -947,8 +952,7 @@
                 <!-- Dynamic Recipe -->
               </tbody>
             </table>
-            <div style="font-size:9.5px; color:#64748b; margin-top:8px;">* Batch scaling: Multiply grams by servings
-              required for production run.</div>
+            <div style="font-size:9.5px; color:#64748b; margin-top:8px;">* All quantities are for one daily batch. Divide equally into <span id="recipeServingsLabel2"></span> servings per day.</div>
           </div>
 
           <!-- SPECIFICATION HISTORY (NEW) -->
@@ -1092,6 +1096,11 @@
                 <td id="iodine_reason" style="font-size:10.5px;color:#475569;"></td>
               </tr>
               <tr>
+                <td>Vitamin A</td>
+                <td id="vitA"></td>
+                <td id="vitA_reason" style="font-size:10.5px;color:#475569;"></td>
+              </tr>
+              <tr>
                 <td>Vitamin K</td>
                 <td id="vitK"></td>
                 <td id="vitK_reason" style="font-size:10.5px;color:#475569;"></td>
@@ -1111,7 +1120,7 @@
                 <td id="fiber"></td>
                 <td id="fiber_reason" style="font-size:10.5px;color:#475569;"></td>
               </tr>
-              <tr id="chromiumRow" style="display:none;">
+              <tr id="chromiumRow">
                 <td>Chromium</td>
                 <td id="chromium"></td>
                 <td id="chromium_reason" style="font-size:10.5px;color:#475569;"></td>
@@ -1582,15 +1591,9 @@
                     <div class="validation-msg" id="epFeeding_msg"></div>
                   </div>
                   <div class="form-group">
-                    <label>Oral Intake Level</label>
-                    <select id="epFoodIntake">
-                      <option value="0">≥ 50% — Adequate oral intake (no escalation)</option>
-                      <option value="60">~40% oral intake — Escalation required</option>
-                      <option value="70">~30% oral intake — Escalation required</option>
-                      <option value="80">~20% oral intake — Escalation required</option>
-                      <option value="90">~10% oral intake — Escalation required</option>
-                      <option value="100">Nil by Mouth — Full enteral replacement</option>
-                    </select>
+                    <label>Oral Intake (% of normal)</label>
+                    <input type="number" id="epFoodIntake" min="0" max="100" step="1" placeholder="e.g. 60 means patient eats 60% of normal">
+                    <div class="range-hint">Enter actual % intake (0 = nil by mouth, 100 = full intake)</div>
                   </div>
                   <div class="form-group">
                     <label class="required">GI Issues (Hydrolyzed?)</label>
@@ -1901,9 +1904,7 @@
             const epFI = document.getElementById('epFoodIntake');
             if (epFI) {
               const deficit = res.deficitPercent || 0;
-              const opts = [0, 60, 70, 80, 90, 100];
-              const snapped = opts.reduce((prev, curr) => Math.abs(curr - deficit) < Math.abs(prev - deficit) ? curr : prev);
-              epFI.value = snapped;
+              epFI.value = Math.max(0, 100 - deficit);
               epFI.classList.add('ai-filled');
               setTimeout(() => epFI.classList.remove('ai-filled'), 2000);
             }
@@ -2292,6 +2293,8 @@
                   setTimeout(() => el.classList.remove('ai-filled'), 3000);
                   if (typeof updateLabStatus === 'function') updateLabStatus(id, val);
                   if (id === 'epHeight' || id === 'epWeight') updateBSAAuto();
+                  // epFoodIntake now shows actual intake % — convert from stored deficit %
+                  if (id === 'epFoodIntake') el.value = Math.max(0, 100 - parseFloat(val || 0));
                   count++;
                 }
               }
@@ -2613,7 +2616,8 @@
             patient.height = parseFloat(document.getElementById('epHeight').value);
             patient.albumin = parseFloat(document.getElementById('epAlbumin').value);
             patient.usualWeight = parseFloat(document.getElementById('epUW').value || 0);
-            patient.reducedFoodIntake = parseFloat(document.getElementById('epFoodIntake')?.value || 0);
+            // epFoodIntake stores actual intake % (e.g. 60 = patient eats 60%). Engine needs deficit %.
+            patient.reducedFoodIntake = Math.max(0, 100 - parseFloat(document.getElementById('epFoodIntake')?.value || 100));
             patient.weightLossPercent = (() => {
               const uw = patient.usualWeight;
               const cw = patient.weight;
@@ -3049,10 +3053,8 @@
             (function() {
               const epFI2 = document.getElementById('epFoodIntake');
               if (!epFI2) return;
-              const deficit = parseFloat(patient.reducedFoodIntake || 0);
-              const opts = [0, 60, 70, 80, 90, 100];
-              const snapped = opts.reduce((prev, curr) => Math.abs(curr - deficit) < Math.abs(prev - deficit) ? curr : prev);
-              epFI2.value = snapped;
+              // Display actual intake % (convert from stored deficit %)
+              epFI2.value = Math.max(0, 100 - parseFloat(patient.reducedFoodIntake || 0));
             })();
             const epCrp = document.getElementById('epCRP'); if (epCrp) epCrp.value = patient.crp || 0;
             const epMuac = document.getElementById('epMUAC'); if (epMuac) epMuac.value = patient.muac || 0;
@@ -3166,24 +3168,29 @@
 
 
             // Hero block shows FORMULA/ONS product values (deficit to manufacture)
-            // Use recipe-actual kcal × servings so daily total always equals per-serving × servings
+            // recipeKcal is now daily batch total — no multiplication needed
             const heroServings = fp.servingsPerDay || 4;
-            const heroKcal = (fp.recipe && fp.recipe.recipeKcal) ? fp.recipe.recipeKcal * heroServings : onsKcal;
-            const heroProtein = (fp.recipe && fp.recipe.recipeProtein) ? fp.recipe.recipeProtein * heroServings : onsPro;
+            const heroKcal = (fp.recipe && fp.recipe.recipeKcal) ? fp.recipe.recipeKcal : onsKcal;
+            // Hero protein = formula only (same basis as calories — deficit only).
+            // Full target breakdown shown in the subtitle line below.
+            const heroProtein = onsPro;
             setVal('dailyCalories', heroKcal + ' kcal');
             setVal('dailyProtein', heroProtein + ' g');
 
-            // Rebuild breakdown text using recipe-actual values so it matches the hero
+            // Rebuild breakdown text — shows full target with diet + formula split
             const breakProteinText = dietPro > 0
-              ? `${heroProtein}g Total (Diet: ${dietPro}g + Formula: ${onsPro}g)`
+              ? `${heroProtein}g Formula (Diet ~${dietPro}g + Formula ${onsPro}g = ${totalPro}g Total Target)`
               : `${heroProtein}g (Full Replacement Formula)`;
             const breakKcalText = dietPro > 0
               ? `${heroKcal} kcal / ${breakProteinText} — Formula: ${heroKcal} kcal`
               : `${heroKcal} kcal / ${breakProteinText}`;
             setVal('totalDailyTarget', breakKcalText);
-            // Per-serving values are based on recipe actual (what the patient administers per feed)
-            setVal('perServingCalories', (fp.recipe && fp.recipe.recipeKcal ? fp.recipe.recipeKcal : fp.perServingCalories) + ' kcal');
-            setVal('perServingProtein', (fp.recipe && fp.recipe.recipeProtein ? fp.recipe.recipeProtein : fp.perServingProtein) + ' g');
+            // Per-serving = daily batch ÷ servings
+            const dailyBatchKcal = (fp.recipe && fp.recipe.recipeKcal) ? fp.recipe.recipeKcal : onsKcal;
+            const perServingKcal = Math.round(dailyBatchKcal / heroServings);
+            const perServingWheyPro = fp.recipe && fp.recipe.wheyProtein != null ? Math.round(fp.recipe.wheyProtein / heroServings) : fp.perServingProtein;
+            setVal('perServingCalories', perServingKcal + ' kcal');
+            setVal('perServingProtein', perServingWheyPro + ' g');
 
             // Fix macro ratio — computed after NAFLD ceiling is applied below, so use fp values here
             // (bindDailyCarbs/bindDailyFat are declared in the block below; ratio uses fp directly but
@@ -3219,9 +3226,17 @@
 
             const bindPerServingCarbs = Math.round((bindDailyCarbs / bindServings) * 10) / 10;
             const bindPerServingFat = Math.round((bindDailyFat / bindServings) * 10) / 10;
-            const bindPerServingProtein = Math.round((fp.dailyProtein / bindServings) * 10) / 10;
-            setVal('macroTableDailyProtein', (fp.dailyProtein || 0) + ' g');
+            // Macro table: daily total = full target (diet + formula); per serving = formula only ÷ servings
+            const bindPerServingProtein = Math.round((onsPro / bindServings) * 10) / 10;
+            setVal('macroTableDailyProtein', totalPro + ' g');
             setVal('macroTablePerServingProtein', bindPerServingProtein + ' g');
+            // Show breakdown footnote only when patient has partial oral intake
+            if (dietPro > 0) {
+              setVal('proteinBreakdownNote', `Diet ~${dietPro}g + Formula ${onsPro}g = ${totalPro}g total. Per serving = formula ${onsPro}g ÷ ${bindServings} servings.`);
+              document.getElementById('proteinBreakdownRow').style.display = 'table-row';
+            } else {
+              document.getElementById('proteinBreakdownRow').style.display = 'none';
+            }
             setVal('dailyCarbs', bindDailyCarbs + ' g');
             setVal('perServingCarbs', bindPerServingCarbs + ' g');
             setVal('dailyFat', (typeof bindDailyFat === 'number' ? bindDailyFat.toFixed(1) : bindDailyFat) + ' g');
@@ -3287,17 +3302,13 @@
             setVal('niacin',    fp.micronutrients.niacin    || '—');
             setVal('vitB6',     fp.micronutrients.vitB6     || '—');
             setVal('iodine',    fp.micronutrients.iodine    || '—');
+            setVal('vitA',      fp.micronutrients.vitA      || '—');
             setVal('vitK',      fp.micronutrients.vitK      || '—');
             setVal('sodium',    fp.micronutrients.sodium    || '—');
             setVal('potassium', fp.micronutrients.potassium || '—');
             setVal('fiber',     fp.micronutrients.fiber     || '—');
 
-            if (fp.micronutrients.chromium) {
-              setVal('chromium', fp.micronutrients.chromium);
-              document.getElementById('chromiumRow').style.display = 'table-row';
-            } else {
-              document.getElementById('chromiumRow').style.display = 'none';
-            }
+            setVal('chromium', fp.micronutrients.chromium || '—');
 
             if (fp.micronutrients.ala) {
               setVal('ala', fp.micronutrients.ala);
@@ -3564,10 +3575,13 @@
               document.getElementById('bcaaRow').style.display = 'none';
             }
 
-            const recipeKcal = (fp.recipe && fp.recipe.recipeKcal) ? fp.recipe.recipeKcal : fp.perServingCalories;
-            const recipeProtein = (fp.recipe && fp.recipe.recipeProtein) ? fp.recipe.recipeProtein : fp.perServingProtein;
-            setVal('mCalories', recipeKcal + ' kcal');
-            setVal('mProtein', recipeProtein + ' g');
+            // Production specs show per-serving values (daily batch ÷ servings)
+            const recipeKcalDaily = (fp.recipe && fp.recipe.recipeKcal) ? fp.recipe.recipeKcal : onsKcal;
+            const recipeServings = fp.recipe && fp.recipe.servingsPerDay ? fp.recipe.servingsPerDay : (fp.servingsPerDay || heroServings);
+            const recipeKcalPerServing = Math.round(recipeKcalDaily / recipeServings);
+            const recipeWheyProPerServing = fp.recipe && fp.recipe.wheyProtein != null ? Math.round(fp.recipe.wheyProtein / recipeServings) : fp.perServingProtein;
+            setVal('mCalories', recipeKcalPerServing + ' kcal');
+            setVal('mProtein', recipeWheyProPerServing + ' g');
             setVal('mCarbs', bindPerServingCarbs + ' g');
             setVal('mFat', bindPerServingFat + ' g');
 
@@ -3582,13 +3596,17 @@
               const r = fp.recipe;
               // Look up macro contributions from IngredientLibrary for transparency
               const getLib = id => (typeof IngredientLibrary !== 'undefined' ? IngredientLibrary.find(i => i.id === id) : null) || {};
+              let totalPowderGrams = 0, totalProtein = 0, totalCarbs = 0, totalFat = 0;
               [r.protein, r.carb, r.fat, r.omega, r.bcaa, r.glutamine].forEach(ing => {
                 if (!ing || !ing.grams) return;
                 const lib = getLib(ing.id);
                 const carbContrib = lib.cPerGram > 0 ? Math.round(ing.grams * lib.cPerGram * 10) / 10 : 0;
                 const fatContrib  = lib.fPerGram > 0 ? Math.round(ing.grams * lib.fPerGram * 10) / 10 : 0;
                 const protContrib = lib.pPerGram > 0 ? Math.round(ing.grams * lib.pPerGram * 10) / 10 : 0;
-                // Build macro breakdown sub-line (only show non-zero contributions that are not the primary macro)
+                totalPowderGrams += ing.grams;
+                totalProtein += protContrib;
+                totalCarbs   += carbContrib;
+                totalFat     += fatContrib;
                 const macroHints = [];
                 if (protContrib > 0) macroHints.push(`${protContrib}g protein`);
                 if (carbContrib > 0) macroHints.push(`${carbContrib}g carbs`);
@@ -3608,6 +3626,23 @@
       `;
                 rb.appendChild(tr);
               });
+              // Update servings label in recipe header
+              const srv = r.servingsPerDay || (fp.servingsPerDay || 4);
+              ['recipeServingsLabel','recipeServingsLabel2'].forEach(id => { const el = document.getElementById(id); if(el) el.textContent = srv; });
+              // Totals row — daily batch totals
+              const tTotalP = Math.round(totalProtein * 10) / 10;
+              const tTotalC = Math.round(totalCarbs * 10) / 10;
+              const tTotalF = Math.round(totalFat * 10) / 10;
+              const totalsRow = document.createElement('tr');
+              totalsRow.innerHTML = `
+        <td style="padding:8px 13px; background:#f8fafc; border-top:2px solid #e2e8f0;">
+          <div style="font-weight:800; color:#0e2247; font-size:10.5px;">Daily Batch Totals</div>
+          <div style="font-size:9.5px; color:#475569; margin-top:2px;">Powder: <b>${Math.round(totalPowderGrams * 10)/10} g</b> &nbsp;|&nbsp; Protein: <b>${tTotalP}g</b> &nbsp;|&nbsp; Carbs: <b>${tTotalC}g</b> &nbsp;|&nbsp; Fat: <b>${tTotalF}g</b></div>
+          <div style="font-size:8.5px; color:#94a3b8; margin-top:1px;">Note: Powder weight ≠ macro grams. Each ingredient delivers different protein/carb/fat fractions. Divide into ${srv} equal servings.</div>
+        </td>
+        <td style="background:#f8fafc; border-top:2px solid #e2e8f0;"></td>
+      `;
+              rb.appendChild(totalsRow);
             }
 
             // Instructions & Alerts Binding
@@ -3701,8 +3736,8 @@
             setVal('servingHeader', `Per Serving (${fp.servingsPerDay || 2}x Daily)`);
             setVal('servingsPerDay', (fp.servingsPerDay || 2) + ' servings/day');
             setVal('servingsPerDay2', (fp.servingsPerDay || 2) + ' servings/day');
-            setVal('servingCalories', recipeKcal + ' kcal');
-            setVal('servingProtein', recipeProtein + ' g');
+            setVal('servingCalories', recipeKcalPerServing + ' kcal');
+            setVal('servingProtein', recipeWheyProPerServing + ' g');
             setVal('servingTolerance', (fp.servingsPerDay || 2) >= 4 ? 'Smaller, more frequent feeds selected to improve tolerance during treatment.' : 'Moderate serving volume selected based on current intake pattern.');
             setVal('servingReview', 'If nausea, bloating or poor intake persists, consider smaller feeds, slower escalation and clinician review.');
 
@@ -3742,21 +3777,32 @@
             }
 
             const baseCal = fp.baseEnergy || Math.round(calcWt * kcalPerKg);
-            trace.push(`<b>Base Energy Required:</b> ${kcalPerKg} kcal/kg/day → ${calcWt} kg (calc weight) × ${kcalPerKg} = <b>${baseCal} kcal/day</b>.`);
+            // Recipe-actual kcal = what gets manufactured; used everywhere for consistency
+            const recipeActualKcal = (fp.recipe && fp.recipe.recipeKcal) ? fp.recipe.recipeKcal : fp.dailyCalories;
+            trace.push(`<b>Base Energy Required:</b> ${kcalPerKg} kcal/kg/day → ${calcWt} kg × ${kcalPerKg} = <b>${baseCal} kcal/day</b>.`);
 
             const reducedIntake = patient.reducedFoodIntake || 0;
             const actualIntakePct2 = 100 - reducedIntake;
-            if (reducedIntake > 0) {
-              const isEnteral = (patient.feedingMethod || '').includes('Enteral');
-              // Full replacement also triggered when oral intake < 50% (ESPEN escalation threshold)
-              const isFullReplacementMode = isEnteral || (actualIntakePct2 < 50);
-              if (isFullReplacementMode) {
-                const reason = isEnteral ? 'Enteral route' : `Oral intake ${actualIntakePct2}% < 50% escalation threshold`;
-                trace.push(`<b>Feeding Rule (Full Replacement):</b> ${reason} — formula fulfills 100% of daily target → <b>${fp.dailyCalories} kcal/day</b>.`);
+            const prescribedRouteLC = (fp.prescribedRoute || '').toLowerCase();
+            const isEnteralRoute = prescribedRouteLC.includes('enteral') || prescribedRouteLC.includes('parenteral');
+            const isCombination = prescribedRouteLC.includes('combination');
+            if (isEnteralRoute && !isCombination) {
+              trace.push(`<b>Feeding Rule (Full Replacement):</b> ${fp.prescribedRoute} — formula prescribed: <b>${recipeActualKcal} kcal/day</b>.`);
+            } else {
+              const dietKcal = Math.round(baseCal * (actualIntakePct2 / 100));
+              if (reducedIntake > 0) {
+                const deficitKcal = Math.round(baseCal * (reducedIntake / 100));
+                const onsFloor = fp.onsFloorKcal || 0;
+                const floorNote = (onsFloor > 0 && onsFloor > deficitKcal)
+                  ? ` (ONS minimum floor ${onsFloor} kcal applied — exceeds calculated deficit of ${deficitKcal} kcal)`
+                  : '';
+                const roundingDiff = deficitKcal - recipeActualKcal;
+                const roundingNote = (roundingDiff > 0 && roundingDiff <= Math.round(deficitKcal * 0.1))
+                  ? ` (${roundingDiff} kcal variance due to ingredient weight rounding — within ESPEN ±10% tolerance)`
+                  : '';
+                trace.push(`<b>Intake Split:</b> Patient eating ${actualIntakePct2}% orally (est. ${dietKcal} kcal/day from diet). ${reducedIntake}% calorie deficit = <b>${deficitKcal} kcal/day</b>. Product prescribed: <b>${recipeActualKcal} kcal/day</b>${roundingNote}${floorNote}.`);
               } else {
-                const dietKcal = Math.round(baseCal * (actualIntakePct2 / 100));
-                const formulaKcal = fp.dailyCalories;
-                trace.push(`<b>Intake Split:</b> Patient eating ${actualIntakePct2}% orally → Diet estimated <b>${dietKcal} kcal/day</b>. Formula bridges the ${reducedIntake}% deficit → <b>${formulaKcal} kcal/day</b>. Total delivery: ${dietKcal + formulaKcal} kcal/day (target ${baseCal} kcal/day).`);
+                trace.push(`<b>Intake:</b> Patient eating 100% orally (est. ${dietKcal} kcal/day from diet). Formula: <b>${recipeActualKcal} kcal/day</b> ONS minimum supplement (active chemotherapy protocol).`);
               }
             }
 
@@ -3765,8 +3811,9 @@
             const dietProt = fp.estimatedDietaryProtein || 0;
             const formProt = fp.dailyProtein || 0;
             const totalProt = fp.totalDailyProtein || (dietProt + formProt);
+            const actualTotal = dietProt + formProt;
             const protSplitStr = dietProt > 0
-              ? ` — Diet ~${dietProt}g + Formula ${formProt}g = Total ${totalProt}g/day (Target: ${baseProt}g)`
+              ? ` — Diet ~${dietProt}g + Formula ${formProt}g = Total ${actualTotal}g/day (Target: ${baseProt}g)`
               : ` — Formula: ${formProt}g/day`;
             trace.push(`<b>Protein rule applied:</b> ${proteinPerKg} g/kg/day${protNote} → ${calcWt} kg × ${proteinPerKg} = ${baseProt} g/day.${protSplitStr}`);
             trace.push(`<b>Serving pattern:</b> daily target ÷ ${fp.servingsPerDay || 2} servings/day for better tolerance.`);
@@ -4693,21 +4740,46 @@
                 : `<tr><td colspan="5" style="padding:15px;text-align:center;color:#64748b;font-style:italic;">No therapeutic micronutrient interventions required beyond standard protocols.</td></tr>`;
               // (claudeMicroSection table hidden — AI orders applied directly to engine table below)
 
-              // --- AI AUTHORITATIVE: Apply Claude micro orders to engine micro table cells ---
+              // AI may only apply RDA_CORRECTION (engine bug fix to correct RDA) or EXCLUDED/HOLD (safety).
+              // RDA_CORRECTION is validated against hardcoded RDA values — AI cannot inject non-RDA doses.
+              const gender = (patient.gender || '').toLowerCase();
+              const isFemale = gender === 'female' || gender === 'f';
+              const FSSAI_RDA = {
+                vitD:      ['600 IU', '600 iu'],
+                vitC:      [isFemale ? '65 mg' : '80 mg', isFemale ? '65mg' : '80mg'],
+                zinc:      [isFemale ? '10 mg' : '12 mg', isFemale ? '10mg' : '12mg'],
+                magnesium: [isFemale ? '310 mg' : '340 mg', isFemale ? '310mg' : '340mg'],
+                calcium:   ['600 mg', '600mg'],
+                folate:    ['400 mcg', '400mcg'],
+                vitB12:    ['500 mcg', '500mcg'],
+                vitE:      [isFemale ? '12 mg' : '15 mg', isFemale ? '12mg' : '15mg'],
+                thiamine:  [isFemale ? '1.1 mg' : '1.4 mg'],
+                riboflavin:[isFemale ? '1.5 mg' : '1.9 mg'],
+                niacin:    [isFemale ? '12 mg' : '16 mg'],
+                vitB6:     ['1.6 mg'],
+                iodine:    ['150 mcg'],
+                vitA:      [isFemale ? '700 mcg' : '900 mcg'],
+                vitK:      ['55 mcg'],
+                sodium:    ['2000 mg'],
+                potassium: ['3500 mg'],
+                fiber:     [isFemale ? '25 g' : '30 g'],
+                iron:      [isFemale ? '21 mg' : '17 mg']
+              };
               const nutrientIdMap = {
                 'vitamin c': 'vitC', 'ascorbic acid': 'vitC',
-                'alpha lipoic acid': 'ala', 'lipoic acid': 'ala',
-                'glutamine': 'glutamine',
-                'bcaa': 'bcaa', 'branched-chain': 'bcaa',
                 'vitamin d': 'vitD', 'vit d': 'vitD',
-                'zinc': 'zinc',
-                'omega-3': 'omega3', 'omega3': 'omega3', 'dha': 'omega3',
-                'epa': 'epa',
-                'leucine': 'leucine',
-                'hmb': 'hmb',
+                'zinc': 'zinc', 'magnesium': 'magnesium', 'calcium': 'calcium',
+                'folate': 'folate', 'vitamin b12': 'vitB12', 'vit b12': 'vitB12',
+                'vitamin e': 'vitE', 'vit e': 'vitE',
+                'thiamine': 'thiamine', 'riboflavin': 'riboflavin',
+                'niacin': 'niacin', 'vitamin b6': 'vitB6', 'vit b6': 'vitB6',
+                'iodine': 'iodine', 'vitamin k': 'vitK', 'vit k': 'vitK',
+                'sodium': 'sodium', 'potassium': 'potassium', 'fiber': 'fiber',
                 'iron': 'iron',
-                'selenium': 'selenium',
-                'magnesium': 'magnesium'
+                'alpha lipoic acid': 'ala', 'lipoic acid': 'ala',
+                'glutamine': 'glutamine', 'bcaa': 'bcaa', 'branched-chain': 'bcaa',
+                'omega-3': 'omega3', 'omega3': 'omega3', 'dha': 'omega3',
+                'epa': 'epa', 'leucine': 'leucine', 'hmb': 'hmb', 'selenium': 'selenium'
               };
               (data.micronutrientOrders || []).forEach(function(m) {
                 const key = (m.nutrient || '').toLowerCase();
@@ -4718,23 +4790,26 @@
                 if (!elId) return;
                 const el = document.getElementById(elId);
                 if (!el) return;
-                if (m.status === 'EXCLUDED') {
-                  // Overwrite engine value — AI audit confirmed contraindication
+                if (m.status === 'RDA_CORRECTION') {
+                  // Only apply if the dose matches the known FSSAI RDA for this nutrient
+                  const allowed = FSSAI_RDA[elId] || [];
+                  const doseLC = (m.dose || '').toLowerCase();
+                  const isValidRDA = allowed.some(r => doseLC.startsWith(r.toLowerCase()));
+                  if (isValidRDA) {
+                    el.textContent = m.dose + ' (FSSAI/ICMR-NIN 2020 RDA)';
+                  }
+                  // If dose doesn't match RDA — reject silently. Engine value stays.
+                } else if (m.status === 'EXCLUDED') {
                   el.innerHTML = '<span style="background:#fef2f2;border:1px solid #fca5a5;color:#991b1b;font-size:10px;font-weight:800;padding:2px 8px;border-radius:4px;display:inline-block;">NOT PRESCRIBED</span>';
                   const reasonEl = el.closest('tr') && el.closest('tr').cells[2];
                   if (reasonEl) reasonEl.style.color = '#991b1b';
-                  return;
-                } else if (m.status === 'DEFICIENT') {
-                  el.innerHTML = '<span style="color:#dc2626;font-weight:700;">&#128308; ' + m.dose + '</span>';
-                } else if (m.status === 'CAPPED') {
-                  el.innerHTML = '<span style="color:#9333ea;font-weight:700;">&#128998; ' + m.dose + ' (Capped)</span>';
                 } else if (m.status === 'HOLD') {
-                  el.innerHTML = '<span style="background:#fef3c7;border:1px solid #f59e0b;color:#92400e;font-size:10px;font-weight:800;padding:3px 8px;border-radius:4px;display:inline-block;">&#9208; CLINICAL HOLD — ' + m.dose + '</span>';
+                  const existing = el.innerHTML;
+                  el.innerHTML = '<span style="background:#fef3c7;border:1px solid #f59e0b;color:#92400e;font-size:10px;font-weight:800;padding:3px 8px;border-radius:4px;display:inline-block;">&#9208; CLINICAL HOLD</span><br><span style="font-size:10.5px;color:#475569;">' + existing + '</span>';
                   const row = el.closest('tr');
                   if (row) row.style.display = 'table-row';
-                } else if (m.dose && m.dose !== '—') {
-                  el.innerHTML = '<span style="color:#0284c7;font-weight:600;">&#10024; ' + m.dose + '</span>';
                 }
+                // All other statuses — engine RDA value stands unchanged.
               });
             }
 

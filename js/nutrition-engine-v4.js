@@ -25,6 +25,7 @@ function generateNutritionPlan(patient, engineConfig) {
   const zinc = parseFloat(patient.zinc || 0);
   const prealbumin = parseFloat(patient.prealbumin || 0);
   const wbc = parseFloat(patient.wbc || 0);
+  const wbcAbsolute = wbc * 1000; // WBC stored in ×10³/µL, thresholds are in /µL
   const anc = parseFloat(patient.anc || 0);
   const platelet = parseFloat(patient.platelet || 0);
   const age = parseInt(patient.age || 0);
@@ -145,8 +146,8 @@ function generateNutritionPlan(patient, engineConfig) {
   let safetyAlerts = [];
 
   // Neutropenia detection — ANC is definitive; WBC used as fallback
-  const hasNeutropenia = (anc > 0 ? anc < 1500 : (wbc > 0 && wbc < fv('wbc_neutropenia', 3500)));
-  const hasSevereNeutropenia = (anc > 0 ? anc < 500 : (wbc > 0 && wbc < fv('wbc_severe_neutropenia', 2000)));
+  const hasNeutropenia = (anc > 0 ? anc < 1500 : (wbc > 0 && wbcAbsolute < fv('wbc_neutropenia', 3500)));
+  const hasSevereNeutropenia = (anc > 0 ? anc < 500 : (wbc > 0 && wbcAbsolute < fv('wbc_severe_neutropenia', 2000)));
   const hasThrombocytopenia = platelet > 0 && platelet < 100;
   // Steroid-induced hyperglycaemia triple trigger
   const hasTripleTrigger = chemFlags.steroid && isDiabetic && bloodSugar >= 180;
@@ -301,15 +302,17 @@ function generateNutritionPlan(patient, engineConfig) {
   const baseDailyProtein = Math.round(calcWeight * proteinPerKg);
 
   // --- DEFICIT LOGIC ---
-  // Full replacement only when enteral or oral intake < 50% (ESPEN escalation threshold).
-  // Renal restriction is protein-only — calories still calculated as deficit only.
-  const isFullReplacement = (patient.feedingMethod || '').toLowerCase().includes('enteral') || (actualIntake < fv('intake_mandatory_en', 50));
+  // Full replacement for pure enteral or pure parenteral (no oral component).
+  // Combination (Oral+Enteral or Enteral+Parenteral) still uses deficit logic based on intake.
+  const feedingMethodLC = (patient.feedingMethod || '').toLowerCase();
+  const isPureEnteral = feedingMethodLC.includes('enteral') && !feedingMethodLC.includes('combination') && !feedingMethodLC.includes('oral');
+  const isPureTPN = feedingMethodLC.includes('parenteral') && !feedingMethodLC.includes('combination') && !feedingMethodLC.includes('enteral');
+  const isFullReplacement = isPureEnteral || isPureTPN;
   
-  // ONS floor: cancer patients on active chemo always get a minimum supplement
-  // even with 100% oral intake — catabolism demands supplementation regardless of reported intake.
-  // Floor = 10 kcal/kg (oncology minimum ONS threshold per ESPEN 2021).
-  const onsFloorKcal = activeChemo ? Math.round(calcWeight * fv('ons_floor_kcal', 10)) : 0;
-  const onsFloorProtein = activeChemo ? Math.round(calcWeight * fv('ons_floor_protein', 0.3)) : 0;
+  // No ONS floor — prescribe only when there is an actual deficit.
+  // 100% oral intake = no product prescribed.
+  const onsFloorKcal = 0;
+  const onsFloorProtein = 0;
 
   const rawDailyCalories = isFullReplacement ? baseDailyCalories : Math.round(baseDailyCalories * (reducedFoodIntake / 100));
   const rawDailyProtein = isFullReplacement ? baseDailyProtein : Math.round(baseDailyProtein * (reducedFoodIntake / 100));
@@ -388,7 +391,7 @@ function generateNutritionPlan(patient, engineConfig) {
 
   const micronutrients = {
     vitD: `${fv(gender === 'female' ? 'micro_vitd_rda_female' : 'micro_vitd_rda_male', 600)} IU/day (FSSAI/ICMR-NIN 2020 RDA)`,
-    vitC: `${fv('micro_vitc_rda', 40)} mg/day (FSSAI/ICMR-NIN 2020 RDA)`,
+    vitC: `${fv(gender === 'female' ? 'micro_vitc_rda_female' : 'micro_vitc_rda_male', gender === 'female' ? 65 : 80)} mg/day (ICMR-NIN RDA)`,
     zinc: `${fv(gender === 'female' ? 'micro_zinc_maintenance_female' : 'micro_zinc_maintenance_male', gender === 'female' ? 10 : 12)} mg/day (FSSAI/ICMR-NIN 2020 RDA)`,
     omega3: (crp > 5 || cachexia || cancer.includes('pancreatic') || cancer.includes('biliary') || cancer.includes('cholangiocarcinoma'))
       ? `${fv('micro_omega3_high', 3)} g/day`
@@ -427,7 +430,7 @@ function generateNutritionPlan(patient, engineConfig) {
       // Adequate baseline → FSSAI RDA maintenance
       return `${fv(gender === 'female' ? 'micro_folate_maintenance_female' : 'micro_folate_maintenance_male', 400)} mcg/day (Maintenance — FSSAI RDA)`;
     })(),
-    chromium: isDiabetic ? `${fv('micro_chromium_diabetic', 200)} mcg/day (Glycemic monitoring protocol active — ICMR-NIN UL)` : null,
+    chromium: `${fv(gender === 'female' ? 'micro_chromium_rda_female' : 'micro_chromium_rda_male', gender === 'female' ? 25 : 33)} mcg/day (ICMR-NIN 2020 RDA)`,
     ala: (() => {
       if (chemFlags.bortezomib || chemFlags.ac || chemFlags.rchop || regimen.includes('cisplatin') || regimen.includes('platin')) return null;
       if (hasPelvicRadiation) return null;
@@ -453,10 +456,10 @@ function generateNutritionPlan(patient, engineConfig) {
 
     vitE: (() => {
       const viteRda = fv(gender === 'female' ? 'micro_vite_dose_female' : 'micro_vite_dose_male', gender === 'female' ? 12 : 15);
-      if (chemFlags.ac || chemFlags.rchop || regimen.includes('cisplatin') || regimen.includes('platin')) return `HIGH-DOSE RESTRICTED (>400 IU/day) — Vitamin E antioxidant activity may reduce platinum/anthracycline cytotoxicity. Physiological dose ONLY: ${viteRda} mg/day (RDA). Do not exceed without oncologist approval.`;
-      if (hasPelvicRadiation) return `HIGH-DOSE RESTRICTED during active radiation (>400 IU/day). Physiological dose: ${viteRda} mg/day permitted. Reassess at radiation completion.`;
-      if (activeChemo) return `Physiological dose: ${viteRda} mg/day (RDA). High-dose supplementation (>400 IU/day) requires oncologist approval during active chemotherapy.`;
-      return `Standard: ${viteRda} mg/day (RDA). High-dose supplementation discuss with oncologist.`;
+      if (chemFlags.ac || chemFlags.rchop || regimen.includes('cisplatin') || regimen.includes('platin')) return `${viteRda} mg/day (ICMR-NIN RDA) — High-dose (>400 IU/day) RESTRICTED during platinum/anthracycline chemotherapy.`;
+      if (hasPelvicRadiation) return `${viteRda} mg/day (ICMR-NIN RDA) — High-dose (>400 IU/day) restricted during active radiation.`;
+      if (activeChemo) return `${viteRda} mg/day (ICMR-NIN RDA) — High-dose (>400 IU/day) requires oncologist approval during active chemotherapy.`;
+      return `${viteRda} mg/day (ICMR-NIN RDA)`;
     })(),
 
     nac: (() => {
@@ -475,9 +478,11 @@ function generateNutritionPlan(patient, engineConfig) {
     // ── Group 2: Conditional Use ──────────────────────────────────────────────
 
     selenium: (() => {
-      if (chemFlags.ac || chemFlags.rchop || regimen.includes('cisplatin') || regimen.includes('platin')) return `Pharmacological selenium (>${fv('micro_selenium_pharma_max', 200)} mcg/day) RESTRICTED during platinum/anthracycline chemotherapy. Physiological correction (${fv('micro_selenium_physio', 55)} mcg/day) PERMITTED if deficiency confirmed (plasma selenium <70 mcg/L). Check selenium levels before supplementing.`;
-      if (activeChemo) return `Physiological dose (${fv('micro_selenium_physio', 55)} mcg/day) acceptable if deficiency confirmed. Pharmacological dosing (>${fv('micro_selenium_pharma_max', 200)} mcg/day) requires oncologist approval during active treatment.`;
-      return `Standard: ${fv('micro_selenium_physio', 55)} mcg/day (FSSAI RDA). Check plasma selenium if deficiency suspected. Avoid high-dose supplementation without confirmed deficiency.`;
+      const rdaDose = fv(gender === 'female' ? 'micro_selenium_rda_female' : 'micro_selenium_rda_male', 40);
+      const pharmaMax = fv('micro_selenium_pharma_max', 200);
+      if (chemFlags.ac || chemFlags.rchop || regimen.includes('cisplatin') || regimen.includes('platin')) return `${rdaDose} mcg/day (ICMR-NIN 2020 RDA) — Pharmacological doses (>${pharmaMax} mcg/day) RESTRICTED during platinum/anthracycline chemotherapy.`;
+      if (activeChemo) return `${rdaDose} mcg/day (ICMR-NIN 2020 RDA) — Pharmacological doses (>${pharmaMax} mcg/day) require oncologist approval during active treatment.`;
+      return `${rdaDose} mcg/day (ICMR-NIN 2020 RDA)`;
     })(),
 
     curcumin: (() => {
@@ -496,11 +501,8 @@ function generateNutritionPlan(patient, engineConfig) {
 
     // ── Vitamin B12 (standalone — Group 3 Essential) ─────────────────────────
     vitB12: (() => {
-      const b12Val = parseFloat(patient.vitB12 || 0);
-      if (regimen.includes('pemetrexed') || regimen.includes('methotrexate')) return '1000 mcg/day MANDATORY — Pemetrexed/antifolate protocol. Must begin at least 7 days before first dose and continue throughout treatment to prevent haematological and GI toxicity.';
-      if (b12Val > 0 && b12Val < 200) return '1000 mcg/day (Deficiency correction — sublingual or IM preferred for absorption; recheck at 8 weeks)';
-      if (b12Val > 0 && b12Val < 400) return '500 mcg/day (Insufficiency correction — monitor every 3 months)';
-      return `${fv(gender === 'female' ? 'micro_vitb12_maintenance_female' : 'micro_vitb12_maintenance_male', 500)} mcg/day (Maintenance — FSSAI RDA)`;
+      if (regimen.includes('pemetrexed') || regimen.includes('methotrexate')) return `${fv('micro_vitb12_protocol', 1000)} mcg/day MANDATORY — Pemetrexed/antifolate protocol. Must begin at least 7 days before first dose and continue throughout treatment to prevent haematological and GI toxicity.`;
+      return `${fv(gender === 'female' ? 'micro_vitb12_maintenance_female' : 'micro_vitb12_maintenance_male', 500)} mcg/day (Maintenance — FSSAI/ICMR-NIN 2020 RDA)`;
     })(),
 
     // ── B Vitamins — Individual RDA Maintenance ───────────────────────────────
@@ -511,6 +513,7 @@ function generateNutritionPlan(patient, engineConfig) {
     iodine: `${fv(gender === 'female' ? 'micro_iodine_rda_female' : 'micro_iodine_rda_male', 150)} mcg/day (Maintenance — FSSAI RDA; covered by iodised salt in most diets)`,
 
     // ── Vitamin K ─────────────────────────────────────────────────────────────
+    vitA: `${fv(gender === 'female' ? 'micro_vita_rda_female' : 'micro_vita_rda_male', gender === 'female' ? 700 : 900)} mcg RAE/day (ICMR-NIN 2020 RDA)`,
     vitK: `${fv(gender === 'female' ? 'micro_vitk_rda_female' : 'micro_vitk_rda_male', 55)} mcg/day (Maintenance — FSSAI RDA; maintain CONSISTENT daily intake if on anticoagulant therapy — fluctuations alter INR)`,
 
     // ── Electrolytes & Fiber ──────────────────────────────────────────────────
@@ -560,9 +563,9 @@ function generateNutritionPlan(patient, engineConfig) {
 
   // Neutropenia safety
   if (hasSevereNeutropenia) {
-    safetyStatus.neutropenia = { level: 'danger', message: `SEVERE NEUTROPENIA (WBC ${wbc}/µL): Raw foods, unpasteurised products, and live cultures CONTRAINDICATED. Formula must be commercially sterile. PROBIOTICS STRICTLY CONTRAINDICATED. Immediate G-CSF eligibility assessment by oncology. Fever ≥38°C = emergency protocol — do not defer.` };
+    safetyStatus.neutropenia = { level: 'danger', message: `SEVERE NEUTROPENIA (WBC ${wbc} ×10³/µL): Raw foods, unpasteurised products, and live cultures CONTRAINDICATED. Formula must be commercially sterile. PROBIOTICS STRICTLY CONTRAINDICATED. Immediate G-CSF eligibility assessment by oncology. Fever ≥38°C = emergency protocol — do not defer.` };
   } else if (hasNeutropenia) {
-    safetyStatus.neutropenia = { level: 'warning', message: `NEUTROPENIA RISK (WBC ${wbc}/µL): Strict food safety protocol — no raw foods or live cultures. Formula must be commercially sterile. PROBIOTICS CONTRAINDICATED. G-CSF eligibility review recommended. Monitor temperature daily.` };
+    safetyStatus.neutropenia = { level: 'warning', message: `NEUTROPENIA RISK (WBC ${wbc} ×10³/µL): Strict food safety protocol — no raw foods or live cultures. Formula must be commercially sterile. PROBIOTICS CONTRAINDICATED. G-CSF eligibility review recommended. Monitor temperature daily.` };
   }
 
   // Steroid-induced hyperglycaemia
@@ -826,7 +829,7 @@ function generateNutritionPlan(patient, engineConfig) {
   }
   if (hasIBD) rationale.push(`<b>GI Strategy (IBD):</b> Low-residue focus and hydrolyzed protein used.`);
   if (cancer.includes('pancreatic')) rationale.push(`<b>PERT Focus:</b> Enzymes strongly recommended to address EPI.`);
-  const currentIsEnteral = (patient.feedingMethod || '').toLowerCase().includes('enteral');
+  const currentIsEnteral = feedingMethodLC.includes('enteral') || feedingMethodLC.includes('parenteral');
   if (actualIntake <= 50 && !currentIsEnteral) {
     rationale.push(`<b>Escalation Strategy:</b> Critical intake deficit (${actualIntake}%) detected; clinical transition to Enteral Feeding (Liquid format) strongly recommended to meet targets.`);
   }
@@ -857,41 +860,49 @@ function generateNutritionPlan(patient, engineConfig) {
     const selectedFat = getIng('mct_powder');
     const selectedOmega = getIng('omega3_powder');
 
-    const oGrams = (crp > 5 || cachexia || (cancer && cancer.includes('pancreatic'))) ? 1.3 : 0.7;
+    // Daily omega-3 — fixed clinical dose
+    const oGrams = (crp > 5 || cachexia || (cancer && cancer.includes('pancreatic'))) ? 5.2 : 2.8; // daily batch (1.3g or 0.7g × servings)
 
-    // Step 1: protein grams
-    const pGrams = Math.round(macroProtein / (selectedProtein.pPerGram || 1));
+    // Therapeutic add-ons — daily batch totals (compounding unit makes one daily box)
+    const glutamineGrams = (patient.giIssues || (sideEffects && sideEffects.includes('Mucositis')) || (regimen && regimen.includes('folfirinox')) || hasIBD) ? 16 : 0; // 16g/day fixed
+    const glutamineProtein = glutamineGrams;
+    const bcaaDailyGrams = (patient.alt > 50 || patient.ast > 50 || patient.bilirubin > 1.2) ? 20 : 0; // 20g/day fixed
+    const bcaaProtein = bcaaDailyGrams;
+
+    // All ingredient grams calculated from DAILY totals — round once, no per-serving compounding error
+    // Step 1: whey protein — sized to deliver daily formula protein target
+    const pGrams = Math.round(dailyProtein / (selectedProtein.pPerGram || 1));
     const carbsFromProtein = pGrams * (selectedProtein.cPerGram || 0);
     const fatFromProtein = pGrams * (selectedProtein.fPerGram || 0);
 
-    // Step 2: fat grams (MCT) — must be calculated before carbs because MCT has a carb fraction
-    const neededFat = Math.max(0, macroFat - fatFromProtein);
+    // Step 2: fat grams (MCT daily)
+    const neededFat = Math.max(0, dailyFat - fatFromProtein);
     const fGrams = Math.round(neededFat / (selectedFat.fPerGram || 1));
     const carbsFromFat = fGrams * (selectedFat.cPerGram || 0);
     const carbsFromOmega = oGrams * (selectedOmega.cPerGram || 0);
 
-    // Step 3: carb grams — subtract carbs already contributed by protein, MCT, and omega-3
-    const neededCarbs = Math.max(0, macroCarbs - carbsFromProtein - carbsFromFat - carbsFromOmega);
+    // Step 3: carb grams (daily)
+    const neededCarbs = Math.max(0, dailyCarbs - carbsFromProtein - carbsFromFat - carbsFromOmega);
     const cGrams = Math.round(neededCarbs / (selectedCarb.cPerGram || 1));
 
-    // Step 4: compute actual recipe kcal from ingredient grams (ground truth for display)
+    // Step 4: daily batch kcal — ground truth, rounded once from daily grams
     const recipeKcal = Math.round(
       pGrams * selectedProtein.kcalPerGram +
       cGrams * selectedCarb.kcalPerGram +
       fGrams * selectedFat.kcalPerGram +
       oGrams * selectedOmega.kcalPerGram
     );
-    // Actual protein delivered by recipe
-    const recipeProtein = Math.round(pGrams * selectedProtein.pPerGram);
+    const wheyProtein = Math.round(pGrams * selectedProtein.pPerGram);
+    const recipeProtein = wheyProtein + glutamineProtein + bcaaProtein;
 
     return {
-      protein: { id: selectedProtein.id, name: selectedProtein.name, grams: pGrams, deliveredProtein: recipeProtein, rationale: selectedProtein.healingRationale },
+      protein: { id: selectedProtein.id, name: selectedProtein.name, grams: pGrams, deliveredProtein: wheyProtein, rationale: selectedProtein.healingRationale },
       carb: { id: selectedCarb.id, name: selectedCarb.name, grams: cGrams, rationale: selectedCarb.healingRationale },
       fat: { id: selectedFat.id, name: selectedFat.name, grams: fGrams, rationale: "Metabolic energy without glycemic load" },
       omega: (oGrams > 0) ? { id: 'omega3_powder', name: 'Omega-3 Powder', grams: oGrams, rationale: "Anti-inflammatory / EPA support." } : null,
-      recipeKcal, recipeProtein,
-      bcaa: (patient.alt > 50 || patient.ast > 50 || patient.bilirubin > 1.2) ? { id: 'bcaa_powder', name: 'BCAA (2:1:1 Mix)', grams: 20, rationale: "Hepatic Protection dose." } : null,
-      glutamine: (pGrams > 0 && (patient.giIssues || (sideEffects && sideEffects.includes('Mucositis')) || (regimen && regimen.includes('folfirinox')) || hasIBD)) ? { id: 'glutamine', name: 'L-Glutamine powder', grams: Math.round(16 / servingsPerDay), dailyGrams: 16, rationale: "Mucosal protection. (16 g/day total split across " + servingsPerDay + " servings)" } : null
+      recipeKcal, recipeProtein, wheyProtein, servingsPerDay,
+      bcaa: (bcaaDailyGrams > 0) ? { id: 'bcaa_powder', name: 'BCAA (2:1:1 Mix)', grams: bcaaDailyGrams, rationale: "Hepatic Protection dose." } : null,
+      glutamine: (pGrams > 0 && glutamineGrams > 0) ? { id: 'glutamine', name: 'L-Glutamine powder', grams: glutamineGrams, rationale: "Mucosal protection." } : null
     };
   }
 
@@ -918,7 +929,7 @@ function generateNutritionPlan(patient, engineConfig) {
     patientInstructions.push("GI Management: Sip slowly, use probiotics, and avoid lactose if diarrhea persists.");
   }
   if (actualIntake <= 50) {
-    patientInstructions.push("URGENT: Oral intake is insufficient (<50%). Transition to Enteral Tube Feeding recommended.");
+    patientInstructions.push("CLINICAL NOTE: Oral intake is insufficient (<50%). Consider escalation to Oral Nutrition Supplements or enteral support — discuss with medical team.");
     patientInstructions.push("Do not attempt to 'sip' large volumes if nausea or early satiety is present.");
     patientInstructions.push("Consult medical team for immediate nutrition escalation protocol.");
   } else {
@@ -1143,7 +1154,7 @@ function generateNutritionPlan(patient, engineConfig) {
     feasibilityScore, mandatoryInvestigations,
     servingsPerDay, totalDailyCalories, totalDailyProtein,
     estimatedDietaryProtein, totalProteinDelivery,
-    onsCalories, prescribedProtein,
+    onsCalories, onsFloorKcal, prescribedProtein,
     dailyCalories, dailyProtein, perServingCalories, perServingProtein,
     proteinType, dailyCarbs, dailyFat, macroProtein, macroCarbs, macroFat,
     micronutrients, rationale, nutritionRisk, nutritionRiskScore: riskScore,
@@ -1158,11 +1169,13 @@ function generateNutritionPlan(patient, engineConfig) {
     mustTotal, mustRisk, mustBMIScore, mustWLScore, mustAcuteScore,
     prescribedRoute: (() => {
       const selected = (patient.feedingMethod || '').toLowerCase();
+      if (selected.includes('enteral') && selected.includes('parenteral')) return "Combination Feeding (Enteral + Parenteral)";
+      if (selected.includes('oral') && selected.includes('enteral')) return "Combination Feeding (Oral + Enteral)";
+      if (selected.includes('parenteral')) return "Parenteral Nutrition (TPN)";
       if (selected.includes('enteral')) return "Enteral Tube Feeding";
       if (selected.includes('ons') || selected.includes('oral nutrition')) return "Oral Nutrition Supplements";
       if (selected.includes('oral')) return "Oral Feeding";
-      // No selection — engine decides based on intake
-      if (actualIntake < fv('intake_mandatory_en', 50)) return "Enteral Tube Feeding";
+      // No selection — engine decides based on intake. Never auto-select Enteral (clinical decision).
       if (actualIntake <= 75) return "Oral Nutrition Supplements";
       return "Oral Feeding";
     })(),
