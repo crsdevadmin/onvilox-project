@@ -3816,6 +3816,7 @@
                 if (roundingDiff > 0 && roundingDiff <= Math.round(deficitKcal * 0.1)) {
                   const pct = Math.round((roundingDiff / deficitKcal) * 100 * 10) / 10;
                   roundingNote = ` <span style="color:#64748b;font-size:9.5px;">(${roundingDiff} kcal gap = ${pct}% — within ESPEN ±10% tolerance. Note: ingredient composition variance — real-world powders use kcal densities that differ slightly from standard 4/4/9 macro assumptions, e.g. MCT powder = 7.7 kcal/g not 9 kcal/g. This gap cannot be eliminated by rounding adjustments.)</span>`;
+                }
                 trace.push(`<b>Intake Split:</b> Patient eating ${actualIntakePct2}% orally (est. ${dietKcal} kcal/day from diet). ${reducedIntake}% calorie deficit = <b>${deficitKcal} kcal/day</b>. Product prescribed: <b>${recipeActualKcal} kcal/day</b>${roundingNote}${floorNote}.`);
               } else {
                 trace.push(`<b>Intake:</b> Patient eating 100% orally (est. ${dietKcal} kcal/day from diet). Formula: <b>${recipeActualKcal} kcal/day</b> ONS minimum supplement (active chemotherapy protocol).`);
