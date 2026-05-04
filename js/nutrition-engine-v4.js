@@ -8,7 +8,9 @@ function generateNutritionPlan(patient, engineConfig) {
   };
 
   const weight = parseFloat(patient.weight || 0);
-  const height = parseFloat(patient.height || 0);
+  // Auto-correct height: if entered in metres (e.g. 1.62) convert to cm (162)
+  const heightRaw = parseFloat(patient.height || 0);
+  const height = (heightRaw > 0 && heightRaw < 3) ? Math.round(heightRaw * 100) : heightRaw;
   const albumin = parseFloat(patient.albumin || 0);
   const weightLossPercent = parseFloat(patient.weightLossPercent || 0);
   const reducedFoodIntake = parseFloat(patient.reducedFoodIntake || 0);

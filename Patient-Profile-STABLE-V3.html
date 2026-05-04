@@ -1357,8 +1357,8 @@
             <div class="validation-msg" id="epWeight_msg"></div>
           </div>
           <div class="form-group">
-            <label class="required">Height (cm)</label>
-            <input id="epHeight" type="number" min="30" max="250" step="0.1" oninput="updateBSAAuto()">
+            <label class="required">Height (cm) <span style="font-weight:400;color:#94a3b8;font-size:10px;">— enter in centimetres e.g. 162, not 1.62</span></label>
+            <input id="epHeight" type="number" min="30" max="250" step="0.1" oninput="updateBSAAuto(); if(this.value>0&&this.value<3){this.style.borderColor='#f59e0b'; document.getElementById('epHeight_msg').textContent='Did you mean '+(this.value*100)+'cm? Height must be in centimetres.';}else{this.style.borderColor=''; document.getElementById('epHeight_msg').textContent='';}">
             <div class="validation-msg" id="epHeight_msg"></div>
           </div>
           <div class="form-group">
@@ -2790,7 +2790,8 @@
           }
 
           function computeBMI() {
-            const h = parseFloat(patient.height) / 100;
+            const hRaw = parseFloat(patient.height);
+            const h = (hRaw > 0 && hRaw < 3) ? hRaw : hRaw / 100; // auto-correct metres → cm
             return round1(parseFloat(patient.weight) / (h * h));
           }
 
