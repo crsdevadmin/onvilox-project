@@ -2694,7 +2694,7 @@
 
             // Sync Oncology labels explicitly before bind
             setVal('pCancer_header', patient.cancer);
-            setVal('pRegimen_header', patient.regimen);
+            setVal('pRegimen_header', normalizeRegimen(patient.regimen));
 
             bind(newPlan);
             alert('Patient details updated and plan recalculated.');
@@ -2785,8 +2785,8 @@
                setVal('pCancer_card', c);
             }
             if (r) {
-               setVal('pRegimen_header', r);
-               setVal('pRegimen_card', r);
+               setVal('pRegimen_header', normalizeRegimen(r));
+               setVal('pRegimen_card', normalizeRegimen(r));
             }
           }
 
@@ -3038,7 +3038,7 @@
             setVal('pStage', patient.cancerStage || '-');
             setVal('pECOG', patient.ecogStatus || '0');
             setVal('pCancer_card', patient.cancer);
-            setVal('pRegimen_card', patient.regimen);
+            setVal('pRegimen_card', normalizeRegimen(patient.regimen));
             setVal('pFeeding_header', fp.prescribedRoute);
             setVal('pMetastasis', patient.metastasisSites || 'None reported');
             setVal('pTreatments', (Array.isArray(patient.treatmentTypes) && patient.treatmentTypes.length) ? patient.treatmentTypes.join(', ') : 'None Reported');
@@ -3107,7 +3107,7 @@
             if (ibwDisp) ibwDisp.textContent = `IBW: ${ibwKg} kg`;
             setVal('pWL', (patient.weightLossPercent ?? '-') + ' %');
             setVal('pCancer_header', patient.cancer);
-            setVal('pRegimen_header', patient.regimen);
+            setVal('pRegimen_header', normalizeRegimen(patient.regimen));
             setVal('pFeeding', fp.prescribedRoute);
             setHTML('pAlbumin', labBadge(patient.albumin, 'g/dL', {lo:3.5, hi:5.5, critLo:2.8}));
             setHTML('pCRP_val', labBadge(patient.crp, 'mg/L', {lo:0.1, hi:5, critHi:10}));

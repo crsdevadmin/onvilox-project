@@ -1,7 +1,22 @@
 /**
- * Onvilox AI Report Service
- * Shared logic for Claude 3.5 Sonnet Clinical Reporting
+ * AI Report Service — shared logic for Claude clinical reporting
  */
+
+// Normalise common regimen misspellings and shorthand to canonical clinical names.
+// Used for both display and the AI payload so Claude receives correct drug names.
+function normalizeRegimen(regimen) {
+    if (!regimen) return regimen;
+    return regimen
+        .replace(/\bcepatin\b/gi, 'Cisplatin')
+        .replace(/\bcarbopaltin\b/gi, 'Carboplatin')
+        .replace(/\bpaclitaxol\b/gi, 'Paclitaxel')
+        .replace(/\bdocetaxol\b/gi, 'Docetaxel')
+        .replace(/\bgemcis\b/gi, 'Gemcitabine + Cisplatin')
+        .replace(/\bgem-cis\b/gi, 'Gemcitabine + Cisplatin')
+        .replace(/\bpembro\b/gi, 'Pembrolizumab')
+        .replace(/\bnivo\b/gi, 'Nivolumab')
+        .replace(/\batez\b/gi, 'Atezolizumab');
+}
 
 const aiReportService = {
     /**
@@ -40,7 +55,7 @@ const aiReportService = {
                 weight: patient.weight,
                 weightLossPercent: patient.weightLossPercent || 0,
                 cancer: patient.cancer, cancerStage: patient.cancerStage,
-                regimen: patient.regimen,
+                regimen: normalizeRegimen(patient.regimen),
                 feedingMethod: patient.feedingMethod,
                 reducedFoodIntake: patient.reducedFoodIntake || 0,
                 albumin: patient.albumin,

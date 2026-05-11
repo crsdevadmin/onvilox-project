@@ -735,7 +735,7 @@ app.post('/api/claude-report', async (req, res) => {
   (async () => {
 
   try {
-    const system = `You are the Onvilox Clinical AI Auditor — Oncology RD/PhD level. You receive a patient profile and a rules-engine-generated nutrition plan. Your job is to:
+    const system = `You are an Oncology Clinical Nutrition AI Auditor (PhD/RD level). You receive a patient profile and a rules-engine-generated nutrition plan. Your job is to:
 1. Validate every clinical parameter against the rules below
 2. Correct the prescription if it is clinically wrong
 3. Produce a complete drug-nutrient interaction table for every drug in the regimen
