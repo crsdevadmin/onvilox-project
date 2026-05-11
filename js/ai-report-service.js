@@ -37,33 +37,28 @@ const aiReportService = {
         return {
             patient: compactLabs({
                 age: patient.age, sex: patient.sex,
-                weight: patient.weight, height: patient.height,
-                usualWeight: patient.usualWeight,
+                weight: patient.weight,
                 weightLossPercent: patient.weightLossPercent || 0,
                 cancer: patient.cancer, cancerStage: patient.cancerStage,
-                regimen: patient.regimen, ecogStatus: patient.ecogStatus,
+                regimen: patient.regimen,
                 feedingMethod: patient.feedingMethod,
                 reducedFoodIntake: patient.reducedFoodIntake || 0,
-                albumin: patient.albumin, prealbumin: patient.prealbumin,
+                albumin: patient.albumin,
                 crp: patient.crp, hemoglobin: patient.hemoglobin,
                 bloodSugar: patient.bloodSugar, hba1c: patient.hba1c,
                 folate: patient.folate,
-                sodium: patient.sodium, potassium: patient.potassium,
+                potassium: patient.potassium,
                 magnesium: patient.magnesium, creatinine: patient.creatinine,
                 alt: patient.alt, ast: patient.ast, bilirubin: patient.bilirubin,
                 vitD: patient.vitD, tsh: patient.tsh, zinc: patient.zinc,
-                smi: patient.smi, handGrip: patient.handGrip,
                 comorbidities: patient.comorbidities || [],
                 sideEffects: patient.sideEffects || [],
-                genomicMarkers: patient.genomicMarkers || [],
                 tumorBurden: patient.tumorBurden,
-                sarcopeniaStatus: patient.sarcopeniaStatus,
-                vegetarian: patient.vegetarian,
-                culturalPreferences: patient.culturalPreferences
-            }, ['age','sex','weight','height','usualWeight','weightLossPercent','cancer','cancerStage','regimen','ecogStatus','feedingMethod','reducedFoodIntake','albumin','prealbumin','crp','hemoglobin','bloodSugar','hba1c','folate','sodium','potassium','magnesium','creatinine','alt','ast','bilirubin','vitD','tsh','zinc','smi','handGrip','tumorBurden','sarcopeniaStatus','vegetarian','culturalPreferences','comorbidities','sideEffects','genomicMarkers']),
+                treatmentTypes: patient.treatmentTypes || []
+            }, ['age','sex','weight','weightLossPercent','cancer','cancerStage','regimen','feedingMethod','reducedFoodIntake','albumin','crp','hemoglobin','bloodSugar','hba1c','folate','potassium','magnesium','creatinine','alt','ast','bilirubin','vitD','tsh','zinc','tumorBurden','comorbidities','sideEffects','treatmentTypes']),
             plan: {
-                bmi: bmi,
-                // totalDailyCalories = full 24h target; onsCalories = formula contribution only
+                // calcWeight = IBW or actual weight the engine used — required for all rule validations
+                calcWeight: fp.calcWeight || fp.ibw || parseFloat(patient.weight || 0),
                 totalDailyCalories: fp.totalDailyCalories || fp.baseEnergy || fp.dailyCalories,
                 onsCalories: fp.onsCalories || fp.dailyCalories,
                 totalDailyProtein: fp.totalDailyProtein || fp.dailyProtein,
@@ -73,21 +68,11 @@ const aiReportService = {
                 dailyProtein: fp.dailyProtein, proteinPerKg: fp.proteinPerKg,
                 servingsPerDay: fp.servingsPerDay,
                 perServingCalories: fp.perServingCalories,
-                perServingProtein: fp.perServingProtein,
                 dailyCarbs: fp.dailyCarbs, dailyFat: fp.dailyFat,
-                // Per-serving grams (explicit units to prevent % misinterpretation)
-                perServingCarbsG: fp.dailyCarbs && fp.servingsPerDay ? Math.round(fp.dailyCarbs / fp.servingsPerDay * 10) / 10 : null,
-                perServingFatG: fp.dailyFat && fp.servingsPerDay ? Math.round(fp.dailyFat / fp.servingsPerDay * 10) / 10 : null,
-                // Macro percentages of total daily formula calories (computed, unambiguous)
-                fatPct: fp.dailyFat && fp.dailyCalories ? Math.round(fp.dailyFat * 9 / fp.dailyCalories * 100) : null,
-                carbsPct: fp.dailyCarbs && fp.dailyCalories ? Math.round(fp.dailyCarbs * 4 / fp.dailyCalories * 100) : null,
-                prescribedRoute: fp.prescribedRoute,
                 cachexia: fp.cachexia, sarcopenia: fp.sarcopenia,
-                proteinType: fp.proteinType,
                 safetyFlags: alertsSlim,
                 drugInteractions: (fp.interactions || []).map(i => ({ drug: i.drug, effect: i.effect })),
                 micronutrientsActive: microSlim,
-                feasibilityScore: fp.feasibilityScore,
                 mandatoryInvestigations: fp.mandatoryInvestigations || []
             }
         };
