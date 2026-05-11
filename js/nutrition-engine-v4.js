@@ -152,8 +152,10 @@ function generateNutritionPlan(patient, engineConfig) {
   let safetyAlerts = [];
 
   // Neutropenia detection — ANC is definitive; WBC used as fallback
-  const hasNeutropenia = (anc > 0 ? anc < 1500 : (wbc > 0 && wbcAbsolute < fv('wbc_neutropenia', 3500)));
-  const hasSevereNeutropenia = (anc > 0 ? anc < 500 : (wbc > 0 && wbcAbsolute < fv('wbc_severe_neutropenia', 2000)));
+  // WBC is in ×10³/µL — compare directly against ×10³ thresholds (3.5 and 2.0)
+  // Clinical constants per ESMO/WHO — not DB-configurable to prevent unit confusion
+  const hasNeutropenia = (anc > 0 ? anc < 1500 : (wbc > 0 && wbc < 3.5));
+  const hasSevereNeutropenia = (anc > 0 ? anc < 500 : (wbc > 0 && wbc < 2.0));
   const hasThrombocytopenia = platelet > 0 && platelet < 100;
   // Steroid-induced hyperglycaemia triple trigger
   const hasTripleTrigger = chemFlags.steroid && isDiabetic && bloodSugar >= 180;
