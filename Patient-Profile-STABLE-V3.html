@@ -4,6 +4,7 @@
 <head>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta charset="UTF-8">
+  <link rel="icon" href="data:,">
   <title>Patient Nutrition Plan - Gquence</title>
   <link rel="stylesheet" href="/css/app.css?v=2.0">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" crossorigin="anonymous"
@@ -3127,13 +3128,16 @@
             setVal('pCultural', patient.culturalPreferences || 'Standard');
             setVal('pHxNotes', patient.notes || 'None');
 
-            // Bind Safety Alerts (V5) - Prioritized
+            // Bind Safety Alerts — always re-run engine for alerts so stale stored data never shows
             const safetyBlock = document.getElementById('safetyAlertsBlock');
             const safetyList = document.getElementById('safetyAlertsList');
-            if (fp.safetyAlerts && fp.safetyAlerts.length > 0) {
+            const _liveAlerts = (typeof generateNutritionPlan === 'function' && window.patient)
+              ? (generateNutritionPlan(window.patient).safetyAlerts || fp.safetyAlerts || [])
+              : (fp.safetyAlerts || []);
+            if (_liveAlerts.length > 0) {
               safetyBlock.style.display = 'block';
               // Sort: danger > warning > info
-              const sortedAlerts = [...fp.safetyAlerts].sort((a, b) => {
+              const sortedAlerts = [..._liveAlerts].sort((a, b) => {
                 const order = { danger: 0, warning: 1, info: 2 };
                 return (order[a.level] || 99) - (order[b.level] || 99);
               });
