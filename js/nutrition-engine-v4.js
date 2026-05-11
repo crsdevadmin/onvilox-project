@@ -26,9 +26,12 @@ function generateNutritionPlan(patient, engineConfig) {
   const vitD = parseFloat(patient.vitD || 0);
   const zinc = parseFloat(patient.zinc || 0);
   const prealbumin = parseFloat(patient.prealbumin || 0);
-  const wbc = parseFloat(patient.wbc || 0);
-  const wbcAbsolute = wbc * 1000; // WBC stored in ×10³/µL, thresholds are in /µL
-  const anc = parseFloat(patient.anc || 0);
+  // Auto-normalise WBC and ANC to ×10³/µL regardless of how the value was entered.
+  // Values > 100 are in cells/µL (e.g. 6500 → 6.5); values ≤ 100 are already ×10³/µL (e.g. 6.5).
+  const _wbcRaw = parseFloat(patient.wbc || 0);
+  const wbc = _wbcRaw > 100 ? _wbcRaw / 1000 : _wbcRaw;
+  const _ancRaw = parseFloat(patient.anc || 0);
+  const anc = _ancRaw > 100 ? _ancRaw / 1000 : _ancRaw;
   const platelet = parseFloat(patient.platelet || 0);
   const age = parseInt(patient.age || 0);
   const ecog = parseInt(patient.ecogStatus || 0);
@@ -152,10 +155,10 @@ function generateNutritionPlan(patient, engineConfig) {
   let safetyAlerts = [];
 
   // Neutropenia detection — ANC is definitive; WBC used as fallback
-  // WBC is in ×10³/µL — compare directly against ×10³ thresholds (3.5 and 2.0)
-  // Clinical constants per ESMO/WHO — not DB-configurable to prevent unit confusion
-  const hasNeutropenia = (anc > 0 ? anc < 1500 : (wbc > 0 && wbc < 3.5));
-  const hasSevereNeutropenia = (anc > 0 ? anc < 500 : (wbc > 0 && wbc < 2.0));
+  // WBC and ANC are normalised to ×10³/µL above — thresholds below are in ×10³/µL
+  // (1.5 ×10³ = 1500/µL neutropenia threshold; 0.5 ×10³ = 500/µL severe threshold)
+  const hasNeutropenia = (anc > 0 ? anc < 1.5 : (wbc > 0 && wbc < 3.5));
+  const hasSevereNeutropenia = (anc > 0 ? anc < 0.5 : (wbc > 0 && wbc < 2.0));
   const hasThrombocytopenia = platelet > 0 && platelet < 100;
   // Steroid-induced hyperglycaemia triple trigger
   const hasTripleTrigger = chemFlags.steroid && isDiabetic && bloodSugar >= 180;
