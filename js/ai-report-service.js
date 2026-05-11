@@ -75,6 +75,8 @@ const aiReportService = {
                 // calcWeight = IBW or actual weight the engine used — required for all rule validations
                 calcWeight: fp.calcWeight || fp.ibw || parseFloat(patient.weight || 0),
                 totalDailyCalories: fp.totalDailyCalories || fp.baseEnergy || fp.dailyCalories,
+                // dailyCalories = formula contribution only (same value as onsCalories; both names used in system prompt rules)
+                dailyCalories: fp.dailyCalories || fp.onsCalories,
                 onsCalories: fp.onsCalories || fp.dailyCalories,
                 totalDailyProtein: fp.totalDailyProtein || fp.dailyProtein,
                 prescribedProtein: fp.prescribedProtein,

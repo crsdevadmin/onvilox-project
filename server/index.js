@@ -826,7 +826,7 @@ DRUG INTERACTIONS:
 ARITHMETIC VERIFICATION:
 - Verify: onsCalories ÷ servingsPerDay ≈ perServingCalories (±5 kcal tolerance). Flag discrepancy in logicRefinements.
 - Verify: (totalDailyProtein × 4) + (dailyCarbs × 4) + (dailyFat × 9) ≤ totalDailyCalories × 1.05. Flag if macros significantly exceed total calories.
-- Verify: prescribedProtein ÷ weight = proteinPerKg matches stated proteinPerKg (±0.1 tolerance).
+- Verify: prescribedProtein ÷ plan.calcWeight = proteinPerKg matches stated plan.proteinPerKg (±0.1 tolerance). Use plan.calcWeight — NEVER patient.weight — for this check.
 
 SCORING (max 9.8):
 - Start at 9.8. This ceiling represents a clinically complete, arithmetically correct plan with all mandatory labs present and no safety violations.
