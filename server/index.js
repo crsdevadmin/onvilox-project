@@ -365,6 +365,21 @@ app.put('/api/nutrition-plans/:id', authenticateToken, async (req, res) => {
   }
 });
 
+// Nutrition Plans: Save only claude_insights (lightweight — avoids sending full plan payload)
+app.patch('/api/nutrition-plans/:id/insights', authenticateToken, async (req, res) => {
+  const { insights } = req.body;
+  if (!insights) return res.status(400).json({ error: 'insights required' });
+  try {
+    await pool.query(
+      `UPDATE nutrition_plans SET claude_insights = $1 WHERE id = $2`,
+      [JSON.stringify(insights), req.params.id]
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Users: Get All (admin)
 app.get('/api/users', authenticateToken, async (req, res) => {
   try {

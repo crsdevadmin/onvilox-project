@@ -1211,7 +1211,7 @@
         <div id="aiActionRequired" style="display:none;"><div id="aiActionList"></div></div>
 
         <!-- AI NOT GENERATED BANNER — shown when no insights are saved -->
-        <div id="aiNotGeneratedBanner" style="display:none; margin-top:16px; background:#fefce8; border:1.5px dashed #ca8a04; border-radius:8px; padding:12px 16px; display:flex; align-items:center; justify-content:space-between; gap:12px;">
+        <div id="aiNotGeneratedBanner" style="display:none; margin-top:16px; background:#fefce8; border:1.5px dashed #ca8a04; border-radius:8px; padding:12px 16px; align-items:center; justify-content:space-between; gap:12px;">
           <div style="display:flex; align-items:center; gap:10px;">
             <span style="font-size:18px;">⚠️</span>
             <div>
@@ -4429,6 +4429,12 @@
               return;
             }
 
+            // Guard: if insights are already loaded in memory, render them — never re-call the API
+            if (window.currentVersionedPlan.claudeInsights) {
+              renderClaudeInsight(window.currentVersionedPlan.claudeInsights, true);
+              return;
+            }
+
             if (btn) {
               btn.disabled = true;
               btn.innerHTML = '⏳ Consulting Claude AI...';
@@ -4511,11 +4517,23 @@
             const cp = window.currentVersionedPlan;
             if (!skipPersistence && cp && cp.id) {
               cp.claudeInsights = data;
+              // Lightweight save — only sends insights (no full plan payload), more reliable
+              const _apiBase2 = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : '';
+              const _u2 = (typeof auth !== 'undefined') ? auth.getCurrentUser() : null;
+              const _saveInsights = () => fetch(`${_apiBase2}/api/nutrition-plans/${cp.id}/insights`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json', 'Authorization': _u2 && _u2.token ? 'Bearer ' + _u2.token : '' },
+                body: JSON.stringify({ insights: data })
+              }).then(r => {
+                if (r.ok) console.log('[Insights] Saved to server (PATCH):', cp.id);
+                else console.warn('[Insights] PATCH save failed:', r.status);
+              }).catch(e => console.warn('[Insights] PATCH save error:', e.message));
+              _saveInsights();
+              // Retry once after 10s in case of transient failure
+              setTimeout(_saveInsights, 10000);
+              // Also update full plan record (overrides, recipe, etc.)
               if (typeof updatePlan === 'function') {
                 updatePlan(cp);
-                console.log("Claude insights persisted to plan via updatePlan:", cp.id);
-                // Retry once after 8s in case of transient network failure
-                setTimeout(() => { if (cp.claudeInsights) updatePlan(cp); }, 8000);
               }
             }
 
