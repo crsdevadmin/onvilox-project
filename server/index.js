@@ -1216,6 +1216,10 @@ OUTPUT FORMAT — return ONLY valid JSON, no markdown, no text outside the JSON 
       }
       console.log(`Engine formulas seeded: ${formulas.length} constants.`);
 
+      // ── Force-correct WBC thresholds to /µL units (fix for ON CONFLICT DO NOTHING leaving stale values) ──
+      await pool.query(`UPDATE engine_formulas SET value = '3500', unit = '/µL' WHERE id = 'wbc_neutropenia'`);
+      await pool.query(`UPDATE engine_formulas SET value = '2000', unit = '/µL' WHERE id = 'wbc_severe_neutropenia'`);
+
       // ── One-time migrations: remove deprecated / orphaned parameters ────────
       await pool.query(`DELETE FROM engine_formulas WHERE id IN (
         'micro_vitc_rda',

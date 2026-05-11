@@ -101,8 +101,12 @@ function generateNutritionPlan(patient, engineConfig) {
   var hasAppetiteLoss = sideEffects.some(s => s.includes('appetite') || s.includes('satiety'));
   var hasMucositis = sideEffects.some(s => s.includes('mucositis') || s.includes('mouth sore') || regimen.includes('5-fu') || regimen.includes('folfirinox'));
   
+  // Normalise common platinum abbreviations/typos so all downstream checks work
+  const hasCisplatin = regimen.includes('cisplatin') || regimen.includes('cepatin') || regimen.includes('gem-cis') || regimen.includes('gemcis');
+  const hasPlatinum = regimen.includes('platin') || regimen.includes('cepatin') || regimen.includes('folfox') || regimen.includes('folfirinox');
+
   var chemFlags = {
-    platin: regimen.includes('platin') || regimen.includes('folfox') || regimen.includes('folfirinox'),
+    platin: hasPlatinum,
     oxaliplatin: regimen.includes('oxaliplatin') || regimen.includes('folfox') || regimen.includes('folfirinox'),
     bortezomib: (regimen.includes('bortezomib') || regimen.includes('velcade') || regimen.includes('vrd') || regimen.includes('vcd')) || cancer.includes('myeloma'),
     pembrolizumab: regimen.includes('pembrolizumab') || regimen.includes('keytruda'),
@@ -121,7 +125,7 @@ function generateNutritionPlan(patient, engineConfig) {
   };
 
   var drugs = [];
-  if (regimen.includes('cisplatin')) drugs.push("Cisplatin");
+  if (hasCisplatin) drugs.push("Cisplatin");
   if (chemFlags.bortezomib) drugs.push("Bortezomib");
   if (regimen.includes('lenalidomide') || regimen.includes('revlimid')) drugs.push("Lenalidomide");
   if (chemFlags.pembrolizumab) drugs.push("Pembrolizumab");
@@ -342,7 +346,7 @@ function generateNutritionPlan(patient, engineConfig) {
   
   // --- STEP 5: MICRONUTRIENTS & DRUG INTERACTIONS ---
   const interactions = [];
-  if (regimen.includes('cisplatin')) {
+  if (hasCisplatin) {
     interactions.push({ drug: "Cisplatin", effect: "Renal Magnesium Wasting + Nephrotoxicity", advice: "Mandatory Magnesium protocol; weekly creatinine monitoring. Escalation trigger: Creatinine >1.5 mg/dL = hold Cisplatin." });
     if (isDiabetic) {
       interactions.push({ drug: "Cisplatin + ALA (Diabetic Patient)", effect: "ALA Excluded — Antioxidant Interference", advice: "ALA is contraindicated during Cisplatin cycles. Platinum cytotoxicity relies partly on oxidative stress; ALA antioxidant activity may attenuate efficacy. For peripheral neuropathy management on Cisplatin: use High-potency B-Complex only. Resume ALA consideration after Cisplatin completion with oncology sign-off." });
@@ -434,12 +438,12 @@ function generateNutritionPlan(patient, engineConfig) {
     })(),
     chromium: `${fv(gender === 'female' ? 'micro_chromium_rda_female' : 'micro_chromium_rda_male', gender === 'female' ? 25 : 33)} mcg/day (ICMR-NIN 2020 RDA)`,
     ala: (() => {
-      if (chemFlags.bortezomib || chemFlags.ac || chemFlags.rchop || regimen.includes('cisplatin') || regimen.includes('platin')) return null;
+      if (chemFlags.bortezomib || chemFlags.ac || chemFlags.rchop || hasPlatinum) return null;
       if (hasPelvicRadiation) return null;
       const hasNeuropathy = sideEffects.some(s => (s || '').toLowerCase().includes('neuropathy'));
       const isTaxane = chemFlags.taxane || regimen.includes('paclitaxel') || regimen.includes('docetaxel');
       if (!isDiabetic && isTaxane && hasNeuropathy) return `${fv('micro_ala_low', 300)} mg/day — peripheral neuropathy prevention (taxane phase only; suspend if regimen changes to anthracycline)`;
-      if (isDiabetic) return `${fv('micro_ala_high', 600)} mg/day — glycaemic neuropathy support (taxane-phase safe)`;
+      if (isDiabetic && isTaxane) return `${fv('micro_ala_high', 600)} mg/day — glycaemic neuropathy support (taxane phase; suspend if regimen changes)`;
       return null;
     })(),
     microbiome: hasNeutropenia ? 'Soluble Fiber ONLY — PROBIOTICS STRICTLY CONTRAINDICATED (active neutropenia/WBC <3500)' : ((regimen.includes('folfirinox') || hasIBD) ? 'Soluble Fiber + Probiotic' : null),
@@ -450,7 +454,7 @@ function generateNutritionPlan(patient, engineConfig) {
 
     glutathione: (() => {
       if (chemFlags.ac || chemFlags.rchop) return 'CONTRAINDICATED during anthracycline cycles — high-dose glutathione reduces Doxorubicin ROS-dependent cytotoxicity. Dietary sources (cruciferous vegetables) permitted. Reassess after treatment completion.';
-      if (regimen.includes('cisplatin') || regimen.includes('platin')) return 'RESTRICTED during platinum-based chemotherapy — antioxidant activity may attenuate cisplatin efficacy. Pharmacological dosing contraindicated. Resume consideration post-treatment with oncologist sign-off.';
+      if (hasPlatinum) return 'RESTRICTED during platinum-based chemotherapy — antioxidant activity may attenuate cisplatin efficacy. Pharmacological dosing contraindicated. Resume consideration post-treatment with oncologist sign-off.';
       if (hasPelvicRadiation) return 'RESTRICTED during active radiation — antioxidant supplementation may reduce radiation cytotoxicity. Dietary glutathione sources acceptable. Review after radiation completion.';
       if (activeChemo) return 'CAUTION during active chemotherapy — high-dose glutathione supplementation not recommended without oncologist approval. Physiological dietary sources acceptable.';
       return 'May be considered post-treatment for recovery support with oncologist review.';
@@ -458,14 +462,14 @@ function generateNutritionPlan(patient, engineConfig) {
 
     vitE: (() => {
       const viteRda = fv(gender === 'female' ? 'micro_vite_dose_female' : 'micro_vite_dose_male', gender === 'female' ? 12 : 15);
-      if (chemFlags.ac || chemFlags.rchop || regimen.includes('cisplatin') || regimen.includes('platin')) return `${viteRda} mg/day (ICMR-NIN RDA) — High-dose (>400 IU/day) RESTRICTED during platinum/anthracycline chemotherapy.`;
+      if (chemFlags.ac || chemFlags.rchop || hasPlatinum) return `${viteRda} mg/day (ICMR-NIN RDA) — High-dose (>400 IU/day) RESTRICTED during platinum/anthracycline chemotherapy.`;
       if (hasPelvicRadiation) return `${viteRda} mg/day (ICMR-NIN RDA) — High-dose (>400 IU/day) restricted during active radiation.`;
       if (activeChemo) return `${viteRda} mg/day (ICMR-NIN RDA) — High-dose (>400 IU/day) requires oncologist approval during active chemotherapy.`;
       return `${viteRda} mg/day (ICMR-NIN RDA)`;
     })(),
 
     nac: (() => {
-      if (chemFlags.ac || chemFlags.rchop || regimen.includes('cisplatin') || regimen.includes('platin')) return 'CONTRAINDICATED during platinum/anthracycline chemotherapy — NAC is a potent glutathione precursor; antioxidant activity may reduce ROS-dependent cytotoxicity. Resume consideration only after chemotherapy completion with oncologist sign-off.';
+      if (chemFlags.ac || chemFlags.rchop || hasPlatinum) return 'CONTRAINDICATED during platinum/anthracycline chemotherapy — NAC is a potent glutathione precursor; antioxidant activity may reduce ROS-dependent cytotoxicity. Resume consideration only after chemotherapy completion with oncologist sign-off.';
       if (hasPelvicRadiation) return 'RESTRICTED during active radiation — NAC antioxidant activity may reduce radiation efficacy. Review at radiation completion.';
       if (activeChemo) return 'RESTRICTED during active chemotherapy — NAC antioxidant mechanism not recommended without oncologist approval. Not for concurrent use with most cytotoxic regimens.';
       return 'May be considered post-treatment with oncologist approval.';
@@ -482,7 +486,7 @@ function generateNutritionPlan(patient, engineConfig) {
     selenium: (() => {
       const rdaDose = fv(gender === 'female' ? 'micro_selenium_rda_female' : 'micro_selenium_rda_male', 40);
       const pharmaMax = fv('micro_selenium_pharma_max', 200);
-      if (chemFlags.ac || chemFlags.rchop || regimen.includes('cisplatin') || regimen.includes('platin')) return `${rdaDose} mcg/day (ICMR-NIN 2020 RDA) — Pharmacological doses (>${pharmaMax} mcg/day) RESTRICTED during platinum/anthracycline chemotherapy.`;
+      if (chemFlags.ac || chemFlags.rchop || hasPlatinum) return `${rdaDose} mcg/day (ICMR-NIN 2020 RDA) — Pharmacological doses (>${pharmaMax} mcg/day) RESTRICTED during platinum/anthracycline chemotherapy.`;
       if (activeChemo) return `${rdaDose} mcg/day (ICMR-NIN 2020 RDA) — Pharmacological doses (>${pharmaMax} mcg/day) require oncologist approval during active treatment.`;
       return `${rdaDose} mcg/day (ICMR-NIN 2020 RDA)`;
     })(),
@@ -522,7 +526,7 @@ function generateNutritionPlan(patient, engineConfig) {
     sodium: hasRenalIssue
       ? `Restrict to ≤1500 mg/day (Renal impairment — sodium restriction required per KDIGO/ESPEN)`
       : `≤${fv(gender === 'female' ? 'micro_sodium_ai_female' : 'micro_sodium_ai_male', 2000)} mg/day (AI upper limit — FSSAI/WHO; restrict further if hypertension, cardiac disease, or ascites present)`,
-    potassium: regimen.includes('cisplatin')
+    potassium: hasCisplatin
       ? `Target ${fv(gender === 'female' ? 'micro_potassium_ai_female' : 'micro_potassium_ai_male', 3500)} mg/day dietary intake — MONITOR serum potassium closely (cisplatin-induced hypokalemia risk; IV supplementation may be required if loop diuretics co-prescribed)`
       : `${fv(gender === 'female' ? 'micro_potassium_ai_female' : 'micro_potassium_ai_male', 3500)} mg/day (AI — FSSAI/ICMR-NIN; dietary sources preferred: banana, coconut water, legumes, leafy greens)`,
     fiber: hasNeutropenia
@@ -579,7 +583,7 @@ function generateNutritionPlan(patient, engineConfig) {
 
   if (creatinine > 1.3) {
     safetyStatus.renal = { level: 'danger', message: `CRITICAL RENAL ALERT: Creatinine ${creatinine} is elevated. Protein strictly restricted to 0.8g/kg.` };
-  } else if (creatinine >= 1.2 && regimen.includes('cisplatin')) {
+  } else if (creatinine >= 1.2 && hasCisplatin) {
     safetyStatus.renal = { level: 'warning', message: `RENAL BORDERLINE (Cisplatin): Creatinine ${creatinine} mg/dL — at/near upper safety threshold on a nephrotoxic platinum agent. Weekly creatinine monitoring mandatory each cycle. Escalation trigger: Creatinine >1.5 mg/dL = hold Cisplatin and escalate to nephrology. Do not dose-reduce protein without confirmed GFR decline.` };
   } else if (creatinine < 0.6) {
     safetyStatus.renal = { level: 'warning', message: 'LOW CREATININE ALERT: Potential muscle wasting; verify SMI/Grip.' };
@@ -1167,7 +1171,7 @@ function generateNutritionPlan(patient, engineConfig) {
     dietaryPlan,
     enteralProtocol, electrolyteStrategy, reassessmentProtocol,
     hasRenalIssue,
-    hasHighRiskRegimen: (chemFlags.bortezomib || regimen.includes('cisplatin') || regimen.includes('platin') || regimen.includes('lenalidomide')),
+    hasHighRiskRegimen: (chemFlags.bortezomib || hasCisplatin || hasPlatinum || regimen.includes('lenalidomide')),
     weightBasis, ibw, calcWeight,
     mustTotal, mustRisk, mustBMIScore, mustWLScore, mustAcuteScore,
     prescribedRoute: (() => {
