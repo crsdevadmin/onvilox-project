@@ -85,6 +85,7 @@ const aiReportService = {
                 perServingCalories: fp.perServingCalories,
                 dailyCarbs: fp.dailyCarbs, dailyFat: fp.dailyFat,
                 cachexia: fp.cachexia, sarcopenia: fp.sarcopenia,
+                proteinType: fp.proteinType,
                 safetyFlags: alertsSlim,
                 drugInteractions: (fp.interactions || []).map(i => ({ drug: i.drug, effect: i.effect })),
                 micronutrientsActive: microSlim,
