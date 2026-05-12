@@ -3234,9 +3234,10 @@
 
             const bindPerServingCarbs = Math.round((bindDailyCarbs / bindServings) * 10) / 10;
             const bindPerServingFat = Math.round((bindDailyFat / bindServings) * 10) / 10;
-            // Macro table: daily total = full target (diet + formula); per serving = formula only ÷ servings
+            // Macro table: all three rows use formula-only basis so daily × servings = per-serving.
+            // The diet+formula combined total is shown in the breakdown footnote below.
             const bindPerServingProtein = Math.round((onsPro / bindServings) * 10) / 10;
-            setVal('macroTableDailyProtein', totalPro + ' g');
+            setVal('macroTableDailyProtein', onsPro + ' g');
             setVal('macroTablePerServingProtein', bindPerServingProtein + ' g');
             // Show breakdown footnote only when patient has partial oral intake
             if (dietPro > 0) {
