@@ -122,13 +122,13 @@
 
   <div class="form-group">
     <label class="required">Age</label>
-    <input type="number" id="age" onkeyup="validateField(this,'Age'); updateCompletenessScore()" min="1" max="120" required>
+    <input type="number" id="age" onkeyup="validateField(this,'Age'); updateCompletenessScore(); updateBodyCompAuto()" min="1" max="120" required>
     <div class="validation-msg" id="age_msg"></div>
   </div>
 
   <div class="form-group">
     <label class="required">Sex</label>
-    <select id="sex" onchange="validateField(this,'Sex'); updateCompletenessScore()" required>
+    <select id="sex" onchange="validateField(this,'Sex'); updateCompletenessScore(); updateBodyCompAuto()" required>
       <option value="">Select</option>
       <option>Male</option>
       <option>Female</option>
@@ -413,8 +413,8 @@
         </select>
       </div>
       <div class="form-group">
-        <label>LBM (kg)</label>
-        <input type="number" id="leanBodyMass" step="0.1" placeholder="e.g. 45.0">
+        <label>LBM (kg) — Auto</label>
+        <input type="number" id="leanBodyMass" step="0.1" readonly style="background:var(--bg-2); color:#94a3b8;">
       </div>
       <div class="form-group">
         <label>SMI (cm²/m²)</label>
@@ -442,8 +442,8 @@
         </select>
       </div>
       <div class="form-group">
-        <label>Body Fat (%)</label>
-        <input type="number" id="fatPercent" step="0.1" placeholder="e.g. 25">
+        <label>Body Fat (%) — Auto</label>
+        <input type="number" id="fatPercent" step="0.1" readonly style="background:var(--bg-2); color:#94a3b8;">
       </div>
       <div class="form-group" style="grid-column: 1 / -1;">
         <label>BSA (m²) - Auto</label>
@@ -881,6 +881,28 @@ function updateBSAAuto() {
     bsaEl.value = '';
   }
   updateCompletenessScore();
+  updateBodyCompAuto();
+}
+
+function updateBodyCompAuto() {
+  const h = parseFloat(document.getElementById('height').value);
+  const w = parseFloat(document.getElementById('weight').value);
+  const age = parseInt(document.getElementById('age').value || 0);
+  const isMale = (document.getElementById('sex').value || '').toLowerCase() === 'male';
+  const bfEl = document.getElementById('fatPercent');
+  const lbmEl = document.getElementById('leanBodyMass');
+  if (h > 0 && w > 0 && age > 0) {
+    const bmi = w / ((h / 100) * (h / 100));
+    // 1998 Deurenberg: Male (1.20×BMI)+(0.23×Age)−16.2 | Female (1.20×BMI)+(0.23×Age)−5.4
+    const bf = Math.round((isMale ? (1.20 * bmi) + (0.23 * age) - 16.2 : (1.20 * bmi) + (0.23 * age) - 5.4) * 10) / 10;
+    // Boer LBM: Male (0.407×W)+(0.267×H)−19.2 | Female (0.252×W)+(0.473×H)−48.3
+    const lbm = Math.round((isMale ? (0.407 * w) + (0.267 * h) - 19.2 : (0.252 * w) + (0.473 * h) - 48.3) * 10) / 10;
+    bfEl.value = bf > 0 ? bf : '';
+    lbmEl.value = lbm > 0 ? lbm : '';
+  } else {
+    bfEl.value = '';
+    lbmEl.value = '';
+  }
 }
 
 // --- CHATBOT & AI LOGIC ---
@@ -1213,6 +1235,7 @@ function applyExtractionData(data) {
 
   if (data.giIssues !== undefined) setVal('giIssues', String(data.giIssues));
   if (data.height || data.weight) updateBSAAuto();
+  updateBodyCompAuto();
   updateCompletenessScore();
 }
 
