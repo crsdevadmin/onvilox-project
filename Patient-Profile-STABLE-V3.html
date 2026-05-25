@@ -3011,8 +3011,8 @@
             const _bfAge = parseInt(patient.age || 0);
             const _bfEstimated = (!patient.fatPercent && _bfBmi && _bfAge)
                 ? Math.round((isMale
-                    ? (1.29 * _bfBmi) + (0.20 * _bfAge) - 19.4
-                    : (1.29 * _bfBmi) + (0.20 * _bfAge) - 8.0) * 10) / 10
+                    ? (1.20 * _bfBmi) + (0.23 * _bfAge) - 16.2
+                    : (1.20 * _bfBmi) + (0.23 * _bfAge) - 5.4) * 10) / 10
                 : null;
             const _bfValue = patient.fatPercent || _bfEstimated;
             const _bfEl = document.getElementById('pFat');
