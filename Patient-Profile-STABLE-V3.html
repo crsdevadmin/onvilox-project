@@ -2707,7 +2707,7 @@
             }
           }
 
-          function acknowledgeAlert(alertKey, idx) {
+          window.acknowledgeAlert = function acknowledgeAlert(alertKey, idx) {
             const justification = prompt(
               'MEDICAL OVERRIDE — Clinical Justification Required\n\n' +
               'You are acknowledging a Critical Safety Alert. Document your clinical reasoning:\n\n' +
