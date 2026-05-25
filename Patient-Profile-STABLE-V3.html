@@ -2707,6 +2707,22 @@
             }
           }
 
+          function acknowledgeAlert(alertKey, idx) {
+            const justification = prompt(
+              'MEDICAL OVERRIDE — Clinical Justification Required\n\n' +
+              'You are acknowledging a Critical Safety Alert. Document your clinical reasoning:\n\n' +
+              'Example: "Endocrinology aware. Diabetic formula prescribed. Blood glucose monitoring in place."'
+            );
+            if (!justification || justification.trim().length < 10) {
+              alert('Acknowledgement cancelled. A minimum 10-character justification is required.');
+              return;
+            }
+            if (!window._acknowledgedAlerts) window._acknowledgedAlerts = {};
+            const me = window._currentUser || {};
+            window._acknowledgedAlerts[alertKey] = `${me.name || me.username || 'Doctor'}: ${justification.trim()}`;
+            if (window._renderSafetyAlerts) window._renderSafetyAlerts();
+          }
+
           async function approveFromReport() {
             if (!canEditOrApprove() || me.role === 'ASSISTANT') {
               alert('Only the assigned doctor can approve this patient.');
@@ -2721,8 +2737,16 @@
             const eng = generateNutritionPlan(patient);
             const dangerAlerts = (eng.safetyAlerts || []).filter(a => a.level === 'danger');
             if (dangerAlerts.length > 0) {
-              alert(`APPROVAL DENIED: There are unresolved ${dangerAlerts.length} Critical Safety Alerts (🚨). These must be resolved in the patient profile or via a documented medical override before production.`);
-              return;
+              const acks = window._acknowledgedAlerts || {};
+              const unacknowledged = dangerAlerts.filter(a => !acks[a.message.substring(0, 40)]);
+              if (unacknowledged.length > 0) {
+                alert(`APPROVAL DENIED: ${unacknowledged.length} Critical Safety Alert(s) require acknowledgement.\n\nScroll up to the Safety Alerts section and click "Acknowledge & Override" on each 🚨 alert before approving.`);
+                return;
+              }
+              // All acknowledged — append justifications to plan override notes
+              const justifications = dangerAlerts.map(a => acks[a.message.substring(0, 40)]).join(' | ');
+              const cp = window.currentVersionedPlan;
+              if (cp) cp.overrideNotes = (cp.overrideNotes ? cp.overrideNotes + '; ' : '') + `[DANGER OVERRIDE: ${justifications}]`;
             }
 
             const storeId = mappingService.getStoreForDoctor(me.id);
@@ -3150,28 +3174,46 @@
             const _liveAlerts = (typeof generateNutritionPlan === 'function' && window.patient)
               ? (generateNutritionPlan(window.patient).safetyAlerts || fp.safetyAlerts || [])
               : (fp.safetyAlerts || []);
-            if (_liveAlerts.length > 0) {
-              safetyBlock.style.display = 'block';
-              // Sort: danger > warning > info
-              const sortedAlerts = [..._liveAlerts].sort((a, b) => {
-                const order = { danger: 0, warning: 1, info: 2 };
-                return (order[a.level] || 99) - (order[b.level] || 99);
-              });
-              safetyList.innerHTML = sortedAlerts.map(a => {
-                const colors = {
-                  danger: { bg: '#fee2e2', border: '#ef4444', text: '#991b1b', icon: '🚨' },
-                  warning: { bg: '#fff7ed', border: '#f97316', text: '#9a3412', icon: '⚠️' },
-                  info: { bg: '#eff6ff', border: '#3b82f6', text: '#1e40af', icon: 'ℹ️' }
-                };
-                const c = colors[a.level] || colors.info;
-                return `
-        <div style="background:${c.bg}; border:1px solid ${c.border}; color:${c.text}; padding:10px; border-radius:6px; margin-bottom:8px; font-weight:600; display:flex; align-items:center;">
-          <span style="margin-right:8px; font-size:1.2em;">${c.icon}</span>
-          <span>${a.message}</span>
-        </div>`;
-              }).join('');
-            } else {
-              safetyBlock.style.display = 'none';
+            window._renderSafetyAlerts = function() {
+              const liveAlerts2 = (typeof generateNutritionPlan === 'function' && window.patient)
+                ? (generateNutritionPlan(window.patient).safetyAlerts || [])
+                : [];
+              renderSafetyAlertsList(liveAlerts2);
+            };
+            renderSafetyAlertsList(_liveAlerts);
+            function renderSafetyAlertsList(alerts) {
+              if (!window._acknowledgedAlerts) window._acknowledgedAlerts = {};
+              if (alerts.length > 0) {
+                safetyBlock.style.display = 'block';
+                const sortedAlerts = [...alerts].sort((a, b) => {
+                  const order = { danger: 0, warning: 1, info: 2 };
+                  return (order[a.level] || 99) - (order[b.level] || 99);
+                });
+                safetyList.innerHTML = sortedAlerts.map((a, idx) => {
+                  const colors = {
+                    danger: { bg: '#fee2e2', border: '#ef4444', text: '#991b1b', icon: '🚨' },
+                    warning: { bg: '#fff7ed', border: '#f97316', text: '#9a3412', icon: '⚠️' },
+                    info: { bg: '#eff6ff', border: '#3b82f6', text: '#1e40af', icon: 'ℹ️' }
+                  };
+                  const c = colors[a.level] || colors.info;
+                  const alertKey = a.message.substring(0, 40);
+                  const ack = window._acknowledgedAlerts[alertKey];
+                  const ackBtn = a.level === 'danger' ? (ack
+                    ? `<div style="margin-top:8px;background:#f0fdf4;border:1px solid #86efac;color:#15803d;font-size:11px;font-weight:700;padding:4px 10px;border-radius:4px;display:inline-block;">✓ Acknowledged — ${ack}</div>`
+                    : `<div style="margin-top:8px;"><button onclick="acknowledgeAlert('${alertKey.replace(/'/g,"\\'")}', ${idx})" style="background:#991b1b;color:#fff;border:none;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">Acknowledge &amp; Override</button></div>`)
+                    : '';
+                  return `
+          <div style="background:${c.bg}; border:1px solid ${c.border}; color:${c.text}; padding:10px; border-radius:6px; margin-bottom:8px; font-weight:600;">
+            <div style="display:flex; align-items:center;">
+              <span style="margin-right:8px; font-size:1.2em;">${c.icon}</span>
+              <span>${a.message}</span>
+            </div>
+            ${ackBtn}
+          </div>`;
+                }).join('');
+              } else {
+                safetyBlock.style.display = 'none';
+              }
             }
 
 
