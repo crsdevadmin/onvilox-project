@@ -3003,7 +3003,23 @@
             const isMale = sex === 'male';
             setHTML('pSMI', labBadge(patient.smi, 'cm²/m²', isMale ? {lo:7.26, hi:30} : {lo:5.45, hi:30}));
             setHTML('pHandGrip', labBadge(patient.handGrip, 'kg', isMale ? {lo:27, hi:60, critLo:20} : {lo:16, hi:40, critLo:10}));
-            setHTML('pFat', labBadge(patient.fatPercent, '%', isMale ? {lo:10, hi:25} : {lo:20, hi:35}));
+            // 1998 Deurenberg formula: estimate BF% from BMI + Age when clinician hasn't entered a measured value
+            const _bfBmi = fp.bmi != null ? fp.bmi : (() => {
+                const h = parseFloat(patient.height) / 100;
+                return h > 0 ? Math.round(parseFloat(patient.weight) / (h * h) * 10) / 10 : null;
+            })();
+            const _bfAge = parseInt(patient.age || 0);
+            const _bfEstimated = (!patient.fatPercent && _bfBmi && _bfAge)
+                ? Math.round((isMale
+                    ? (1.29 * _bfBmi) + (0.20 * _bfAge) - 19.4
+                    : (1.29 * _bfBmi) + (0.20 * _bfAge) - 8.0) * 10) / 10
+                : null;
+            const _bfValue = patient.fatPercent || _bfEstimated;
+            const _bfEl = document.getElementById('pFat');
+            if (_bfEl) {
+                _bfEl.innerHTML = labBadge(_bfValue, '%', isMale ? {lo:10, hi:25} : {lo:20, hi:35});
+                if (_bfEstimated) _bfEl.innerHTML += ' <span style="font-size:9px;color:#94a3b8;">(est.)</span>';
+            }
             setVal('pActivity', patient.activityLevel || '-');
             setVal('pVegetarian', (patient.vegetarian ? 'Vegetarian' : 'Non-Vegetarian'));
             setVal('pBSA', (patient.bsa ? patient.bsa + ' m²' : '-'));
