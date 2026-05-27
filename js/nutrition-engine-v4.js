@@ -594,12 +594,10 @@ function generateNutritionPlan(patient, engineConfig) {
     safetyStatus.renal = { level: 'warning', message: 'LOW CREATININE ALERT: Potential muscle wasting; verify SMI/Grip.' };
   }
 
-  if (bloodSugar > 180 || (isDiabetic && bloodSugar > 140)) {
-    safetyStatus.metabolic = { level: 'danger', message: `HYPERGLYCEMIA ALERT: Blood Sugar ${bloodSugar}. Diabetic protocol active.` };
-    if (!patient.hba1c || patient.hba1c === 0) {
-      safetyStatus.metabolic.level = 'danger';
-      safetyStatus.metabolic.message += " [CRITICAL] HbA1c missing; glycemic control depth unknown. Immediate Hba1c screening required.";
-    }
+  if (bloodSugar > 180) {
+    safetyStatus.metabolic = { level: 'danger', message: `HYPERGLYCEMIA ALERT: Blood Sugar ${bloodSugar} mg/dL — symptomatic hyperglycemia threshold exceeded. Diabetic formula active. Endocrinology review recommended.` };
+  } else if (isDiabetic && bloodSugar > 140) {
+    safetyStatus.metabolic = { level: 'warning', message: `GLYCAEMIA MONITORING: Blood Sugar ${bloodSugar} mg/dL in known diabetic patient. Diabetic formula protocol active. Monitor pre/post-meal glucose. HbA1c ${patient.hba1c || '?'}%.` };
   }
 
   // ECOG vs Activity Contradiction

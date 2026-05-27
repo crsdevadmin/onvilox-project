@@ -2733,20 +2733,13 @@
               return;
             }
 
-            // Final Safety Check before Approval
+            // Safety alert awareness check — informational only, does not block approval
             const eng = generateNutritionPlan(patient);
             const dangerAlerts = (eng.safetyAlerts || []).filter(a => a.level === 'danger');
             if (dangerAlerts.length > 0) {
-              const acks = window._acknowledgedAlerts || {};
-              const unacknowledged = dangerAlerts.filter(a => !acks[a.message.substring(0, 40)]);
-              if (unacknowledged.length > 0) {
-                alert(`APPROVAL DENIED: ${unacknowledged.length} Critical Safety Alert(s) require acknowledgement.\n\nScroll up to the Safety Alerts section and click "Acknowledge & Override" on each 🚨 alert before approving.`);
-                return;
-              }
-              // All acknowledged — append justifications to plan override notes
-              const justifications = dangerAlerts.map(a => acks[a.message.substring(0, 40)]).join(' | ');
-              const cp = window.currentVersionedPlan;
-              if (cp) cp.overrideNotes = (cp.overrideNotes ? cp.overrideNotes + '; ' : '') + `[DANGER OVERRIDE: ${justifications}]`;
+              const alertSummary = dangerAlerts.map(a => '🚨 ' + a.message).join('\n\n');
+              const confirmed = confirm(`SAFETY ALERT NOTICE\n\nThe following critical alert(s) are active for this patient:\n\n${alertSummary}\n\nThese alerts are recorded in the patient plan. Click OK to proceed with approval, or Cancel to review.`);
+              if (!confirmed) return;
             }
 
             const storeId = mappingService.getStoreForDoctor(me.id);
