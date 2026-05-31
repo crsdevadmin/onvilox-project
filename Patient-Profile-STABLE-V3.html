@@ -1189,6 +1189,201 @@
             </tbody>
           </table>
         </div>
+        <!-- PATIENT PROGRESS MONITORING -->
+        <div id="monitoringSection" class="rs" style="margin-top:20px; display:none;">
+          <div class="rs-title" style="display:flex; align-items:center; justify-content:space-between;">
+            <span>Patient Progress Monitoring</span>
+            <div style="display:flex; gap:8px;">
+              <button onclick="showMonitorTab('daily')" id="monTabDaily" style="background:#0e2247;color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:11px;font-weight:700;cursor:pointer;">Daily Endpoints</button>
+              <button onclick="showMonitorTab('weekly')" id="monTabWeekly" style="background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0;border-radius:6px;padding:6px 14px;font-size:11px;font-weight:700;cursor:pointer;">Weekly Endpoints</button>
+            </div>
+          </div>
+
+          <!-- DAILY TAB -->
+          <div id="monPanelDaily">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin:12px 0 8px;">
+              <div style="font-size:11px; color:#64748b; font-weight:600;">Primary Endpoints — log daily during radiation therapy</div>
+              <button onclick="toggleMonitorForm('daily')" style="background:#10b981;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">+ Log Today</button>
+            </div>
+            <!-- Daily entry form -->
+            <div id="monFormDaily" style="display:none; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:14px; margin-bottom:12px;">
+              <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-bottom:10px;">
+                <div>
+                  <label style="font-size:11px;font-weight:700;color:#374151;display:block;margin-bottom:3px;">Weight (kg)</label>
+                  <input type="number" id="monD_weight" step="0.1" style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:5px;font-size:12px;">
+                </div>
+                <div>
+                  <label style="font-size:11px;font-weight:700;color:#374151;display:block;margin-bottom:3px;">Oral Intake (%)</label>
+                  <input type="number" id="monD_oralIntake" min="0" max="100" style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:5px;font-size:12px;">
+                </div>
+                <div>
+                  <label style="font-size:11px;font-weight:700;color:#374151;display:block;margin-bottom:3px;">Radiation Session Completed</label>
+                  <select id="monD_radiation" style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:5px;font-size:12px;">
+                    <option value="">— Select —</option>
+                    <option value="Yes">Yes — Completed</option>
+                    <option value="No">No — Interrupted</option>
+                    <option value="NA">Not Applicable</option>
+                  </select>
+                </div>
+                <div>
+                  <label style="font-size:11px;font-weight:700;color:#374151;display:block;margin-bottom:3px;">Nutrition Compliance</label>
+                  <select id="monD_compliance" style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:5px;font-size:12px;">
+                    <option value="">— Select —</option>
+                    <option value="Full">Full — all servings taken</option>
+                    <option value="Partial">Partial — some servings missed</option>
+                    <option value="Poor">Poor — most servings missed</option>
+                  </select>
+                </div>
+              </div>
+              <div style="margin-bottom:10px;">
+                <label style="font-size:11px;font-weight:700;color:#374151;display:block;margin-bottom:3px;">Notes</label>
+                <input type="text" id="monD_notes" placeholder="Any observations..." style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:5px;font-size:12px;box-sizing:border-box;">
+              </div>
+              <div style="display:flex;gap:8px;">
+                <button onclick="saveMonitorLog('daily')" style="background:#0e2247;color:#fff;border:none;border-radius:6px;padding:6px 16px;font-size:12px;font-weight:700;cursor:pointer;">Save Entry</button>
+                <button onclick="toggleMonitorForm('daily')" style="background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0;border-radius:6px;padding:6px 12px;font-size:12px;cursor:pointer;">Cancel</button>
+              </div>
+            </div>
+            <!-- Daily history table -->
+            <div style="overflow-x:auto;">
+              <table style="width:100%;border-collapse:collapse;font-size:11px;">
+                <thead>
+                  <tr style="background:#f1f5f9;">
+                    <th style="padding:7px 8px;text-align:left;border:1px solid #e2e8f0;font-weight:700;color:#374151;">Date</th>
+                    <th style="padding:7px 8px;text-align:center;border:1px solid #e2e8f0;font-weight:700;">Weight</th>
+                    <th style="padding:7px 8px;text-align:center;border:1px solid #e2e8f0;font-weight:700;">Δ Weight</th>
+                    <th style="padding:7px 8px;text-align:center;border:1px solid #e2e8f0;font-weight:700;">Oral Intake</th>
+                    <th style="padding:7px 8px;text-align:center;border:1px solid #e2e8f0;font-weight:700;">Δ Intake</th>
+                    <th style="padding:7px 8px;text-align:center;border:1px solid #e2e8f0;font-weight:700;">Radiation</th>
+                    <th style="padding:7px 8px;text-align:center;border:1px solid #e2e8f0;font-weight:700;">Compliance</th>
+                    <th style="padding:7px 8px;text-align:left;border:1px solid #e2e8f0;font-weight:700;">Notes</th>
+                  </tr>
+                </thead>
+                <tbody id="monTableDaily">
+                  <tr><td colspan="8" style="padding:12px;text-align:center;color:#94a3b8;font-style:italic;">No daily entries yet.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- WEEKLY TAB -->
+          <div id="monPanelWeekly" style="display:none;">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin:12px 0 8px;">
+              <div style="font-size:11px; color:#64748b; font-weight:600;">Secondary Endpoints — log weekly</div>
+              <button onclick="toggleMonitorForm('weekly')" style="background:#7c3aed;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">+ Log This Week</button>
+            </div>
+            <!-- Weekly entry form -->
+            <div id="monFormWeekly" style="display:none; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:14px; margin-bottom:12px;">
+              <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-bottom:10px;">
+                <div>
+                  <label style="font-size:11px;font-weight:700;color:#374151;display:block;margin-bottom:3px;">Mucositis Grade (CTCAE 0–4)</label>
+                  <select id="monW_mucositis" style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:5px;font-size:12px;">
+                    <option value="">— Select —</option>
+                    <option value="0">Grade 0 — None</option>
+                    <option value="1">Grade 1 — Mild</option>
+                    <option value="2">Grade 2 — Moderate</option>
+                    <option value="3">Grade 3 — Severe</option>
+                    <option value="4">Grade 4 — Life-threatening</option>
+                  </select>
+                </div>
+                <div>
+                  <label style="font-size:11px;font-weight:700;color:#374151;display:block;margin-bottom:3px;">Feeding Escalation</label>
+                  <select id="monW_feeding" style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:5px;font-size:12px;">
+                    <option value="">— Select —</option>
+                    <option value="Oral">Oral — no change</option>
+                    <option value="ONS">ONS supplement added</option>
+                    <option value="NGT">NGT initiated</option>
+                    <option value="TPN">TPN initiated</option>
+                  </select>
+                </div>
+                <div>
+                  <label style="font-size:11px;font-weight:700;color:#374151;display:block;margin-bottom:3px;">ECOG Performance Status</label>
+                  <select id="monW_ecog" style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:5px;font-size:12px;">
+                    <option value="">— Select —</option>
+                    <option value="0">0 — Fully active</option>
+                    <option value="1">1 — Restricted but ambulatory</option>
+                    <option value="2">2 — Self-care, not working</option>
+                    <option value="3">3 — Limited self-care</option>
+                    <option value="4">4 — Disabled</option>
+                  </select>
+                </div>
+                <div>
+                  <label style="font-size:11px;font-weight:700;color:#374151;display:block;margin-bottom:3px;">Hospital Stay (days this week)</label>
+                  <input type="number" id="monW_hospitalDays" min="0" max="7" style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:5px;font-size:12px;">
+                </div>
+                <div>
+                  <label style="font-size:11px;font-weight:700;color:#374151;display:block;margin-bottom:3px;">Hand Grip Strength (kg)</label>
+                  <input type="number" id="monW_handGrip" step="0.1" style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:5px;font-size:12px;">
+                </div>
+                <div>
+                  <label style="font-size:11px;font-weight:700;color:#374151;display:block;margin-bottom:3px;">Albumin (g/dL)</label>
+                  <input type="number" id="monW_albumin" step="0.1" style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:5px;font-size:12px;">
+                </div>
+                <div>
+                  <label style="font-size:11px;font-weight:700;color:#374151;display:block;margin-bottom:3px;">CRP (mg/L)</label>
+                  <input type="number" id="monW_crp" step="0.1" style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:5px;font-size:12px;">
+                </div>
+                <div>
+                  <label style="font-size:11px;font-weight:700;color:#374151;display:block;margin-bottom:3px;">Patient Tolerance</label>
+                  <select id="monW_tolerance" style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:5px;font-size:12px;">
+                    <option value="">— Select —</option>
+                    <option value="Good">Good</option>
+                    <option value="Fair">Fair</option>
+                    <option value="Poor">Poor</option>
+                  </select>
+                </div>
+                <div>
+                  <label style="font-size:11px;font-weight:700;color:#374151;display:block;margin-bottom:3px;">Dietitian Acceptance</label>
+                  <select id="monW_dietitian" style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:5px;font-size:12px;">
+                    <option value="">— Select —</option>
+                    <option value="Yes">Yes</option>
+                    <option value="No">No</option>
+                  </select>
+                </div>
+                <div>
+                  <label style="font-size:11px;font-weight:700;color:#374151;display:block;margin-bottom:3px;">Physician Acceptance</label>
+                  <select id="monW_physician" style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:5px;font-size:12px;">
+                    <option value="">— Select —</option>
+                    <option value="Yes">Yes</option>
+                    <option value="No">No</option>
+                  </select>
+                </div>
+              </div>
+              <div style="margin-bottom:10px;">
+                <label style="font-size:11px;font-weight:700;color:#374151;display:block;margin-bottom:3px;">Notes</label>
+                <input type="text" id="monW_notes" placeholder="Clinical observations..." style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:5px;font-size:12px;box-sizing:border-box;">
+              </div>
+              <div style="display:flex;gap:8px;">
+                <button onclick="saveMonitorLog('weekly')" style="background:#7c3aed;color:#fff;border:none;border-radius:6px;padding:6px 16px;font-size:12px;font-weight:700;cursor:pointer;">Save Entry</button>
+                <button onclick="toggleMonitorForm('weekly')" style="background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0;border-radius:6px;padding:6px 12px;font-size:12px;cursor:pointer;">Cancel</button>
+              </div>
+            </div>
+            <!-- Weekly history table -->
+            <div style="overflow-x:auto;">
+              <table style="width:100%;border-collapse:collapse;font-size:11px;">
+                <thead>
+                  <tr style="background:#f5f3ff;">
+                    <th style="padding:7px 8px;text-align:left;border:1px solid #e2e8f0;font-weight:700;color:#374151;">Week of</th>
+                    <th style="padding:7px 8px;text-align:center;border:1px solid #e2e8f0;font-weight:700;">Mucositis</th>
+                    <th style="padding:7px 8px;text-align:center;border:1px solid #e2e8f0;font-weight:700;">Feeding</th>
+                    <th style="padding:7px 8px;text-align:center;border:1px solid #e2e8f0;font-weight:700;">ECOG</th>
+                    <th style="padding:7px 8px;text-align:center;border:1px solid #e2e8f0;font-weight:700;">Grip (kg)</th>
+                    <th style="padding:7px 8px;text-align:center;border:1px solid #e2e8f0;font-weight:700;">Albumin</th>
+                    <th style="padding:7px 8px;text-align:center;border:1px solid #e2e8f0;font-weight:700;">CRP</th>
+                    <th style="padding:7px 8px;text-align:center;border:1px solid #e2e8f0;font-weight:700;">Tolerance</th>
+                    <th style="padding:7px 8px;text-align:center;border:1px solid #e2e8f0;font-weight:700;">Dietitian</th>
+                    <th style="padding:7px 8px;text-align:center;border:1px solid #e2e8f0;font-weight:700;">Physician</th>
+                    <th style="padding:7px 8px;text-align:left;border:1px solid #e2e8f0;font-weight:700;">Notes</th>
+                  </tr>
+                </thead>
+                <tbody id="monTableWeekly">
+                  <tr><td colspan="11" style="padding:12px;text-align:center;color:#94a3b8;font-style:italic;">No weekly entries yet.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
         <!-- REFEEDING SYNDROME PROTOCOL (shown only when risk detected) -->
 
         <div class="rs" style="margin-top:16px;">
@@ -1950,6 +2145,7 @@
               return;
             }
             _initPatientProfile(patient);
+            loadMonitoringLogs();
           });
 
           function _initPatientProfile(patient) {
@@ -2706,6 +2902,177 @@
                await generateClaudeInsight();
             }
           }
+
+          // ── PATIENT MONITORING ──────────────────────────────────────────────
+          let _monLogs = [];
+
+          async function loadMonitoringLogs() {
+            const p = window.patient;
+            if (!p || !p.id) return;
+            const u = window._currentUser || {};
+            const token = u.token ? 'Bearer ' + u.token : '';
+            const apiBase = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : '';
+            try {
+              const res = await fetch(`${apiBase}/api/patients/${p.id}/monitoring`, { headers: { Authorization: token } });
+              if (!res.ok) return;
+              _monLogs = await res.json();
+              renderMonitorTables();
+              document.getElementById('monitoringSection').style.display = 'block';
+            } catch(e) { console.warn('Monitoring load failed:', e); }
+          }
+
+          function showMonitorTab(tab) {
+            document.getElementById('monPanelDaily').style.display = tab === 'daily' ? 'block' : 'none';
+            document.getElementById('monPanelWeekly').style.display = tab === 'weekly' ? 'block' : 'none';
+            document.getElementById('monTabDaily').style.background = tab === 'daily' ? '#0e2247' : '#f1f5f9';
+            document.getElementById('monTabDaily').style.color = tab === 'daily' ? '#fff' : '#64748b';
+            document.getElementById('monTabWeekly').style.background = tab === 'weekly' ? '#7c3aed' : '#f1f5f9';
+            document.getElementById('monTabWeekly').style.color = tab === 'weekly' ? '#fff' : '#64748b';
+          }
+
+          function toggleMonitorForm(type) {
+            const el = document.getElementById('monForm' + (type === 'daily' ? 'Daily' : 'Weekly'));
+            el.style.display = el.style.display === 'none' ? 'block' : 'none';
+          }
+
+          async function saveMonitorLog(type) {
+            const p = window.patient;
+            if (!p || !p.id) return;
+            const u = window._currentUser || {};
+            const token = u.token ? 'Bearer ' + u.token : '';
+            const apiBase = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : '';
+            let data = {};
+            if (type === 'daily') {
+              data = {
+                weight: parseFloat(document.getElementById('monD_weight').value) || null,
+                oralIntake: parseInt(document.getElementById('monD_oralIntake').value) || null,
+                radiation: document.getElementById('monD_radiation').value || null,
+                compliance: document.getElementById('monD_compliance').value || null,
+                notes: document.getElementById('monD_notes').value || ''
+              };
+            } else {
+              data = {
+                mucositis: document.getElementById('monW_mucositis').value || null,
+                feeding: document.getElementById('monW_feeding').value || null,
+                ecog: document.getElementById('monW_ecog').value || null,
+                hospitalDays: parseInt(document.getElementById('monW_hospitalDays').value) || null,
+                handGrip: parseFloat(document.getElementById('monW_handGrip').value) || null,
+                albumin: parseFloat(document.getElementById('monW_albumin').value) || null,
+                crp: parseFloat(document.getElementById('monW_crp').value) || null,
+                tolerance: document.getElementById('monW_tolerance').value || null,
+                dietitian: document.getElementById('monW_dietitian').value || null,
+                physician: document.getElementById('monW_physician').value || null,
+                notes: document.getElementById('monW_notes').value || ''
+              };
+            }
+            try {
+              const res = await fetch(`${apiBase}/api/patients/${p.id}/monitoring`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: token },
+                body: JSON.stringify({ type, data })
+              });
+              if (!res.ok) throw new Error('Save failed');
+              const saved = await res.json();
+              _monLogs.unshift(saved);
+              renderMonitorTables();
+              toggleMonitorForm(type);
+              // Clear form fields
+              const prefix = type === 'daily' ? 'monD_' : 'monW_';
+              ['weight','oralIntake','radiation','compliance','notes','mucositis','feeding','ecog','hospitalDays','handGrip','albumin','crp','tolerance','dietitian','physician'].forEach(f => {
+                const el = document.getElementById(prefix + f);
+                if (el) el.value = '';
+              });
+            } catch(e) { alert('Failed to save entry. Please try again.'); }
+          }
+
+          function _delta(curr, prev, higherIsBetter) {
+            if (curr == null || prev == null) return '';
+            const diff = curr - prev;
+            if (Math.abs(diff) < 0.05) return '<span style="color:#64748b;">→</span>';
+            const up = diff > 0;
+            const good = higherIsBetter ? up : !up;
+            const color = good ? '#16a34a' : '#dc2626';
+            const arrow = up ? '↑' : '↓';
+            return `<span style="color:${color};font-weight:700;">${arrow}${Math.abs(diff).toFixed(1)}</span>`;
+          }
+
+          function _mucositisBadge(g) {
+            if (g == null || g === '') return '—';
+            const colors = ['#f0fdf4','#fef9c3','#fef3c7','#fee2e2','#fce7f3'];
+            const texts = ['#15803d','#854d0e','#92400e','#991b1b','#9d174d'];
+            return `<span style="background:${colors[g]||'#f1f5f9'};color:${texts[g]||'#374151'};padding:2px 7px;border-radius:4px;font-weight:700;font-size:10px;">Grade ${g}</span>`;
+          }
+
+          function _complianceBadge(v) {
+            if (!v) return '—';
+            const c = {Full:'#16a34a',Partial:'#d97706',Poor:'#dc2626'}[v] || '#64748b';
+            return `<span style="color:${c};font-weight:700;">${v}</span>`;
+          }
+
+          function _toleranceBadge(v) {
+            if (!v) return '—';
+            const c = {Good:'#16a34a',Fair:'#d97706',Poor:'#dc2626'}[v] || '#64748b';
+            return `<span style="color:${c};font-weight:700;">${v}</span>`;
+          }
+
+          function _yesNo(v) {
+            if (!v) return '—';
+            return v === 'Yes' ? '<span style="color:#16a34a;font-weight:700;">✓</span>' : '<span style="color:#dc2626;font-weight:700;">✗</span>';
+          }
+
+          function renderMonitorTables() {
+            const daily = _monLogs.filter(l => l.type === 'daily').map(l => ({ ...l, data: typeof l.data === 'string' ? JSON.parse(l.data) : l.data }));
+            const weekly = _monLogs.filter(l => l.type === 'weekly').map(l => ({ ...l, data: typeof l.data === 'string' ? JSON.parse(l.data) : l.data }));
+
+            // Daily table
+            const dtBody = document.getElementById('monTableDaily');
+            if (daily.length === 0) {
+              dtBody.innerHTML = '<tr><td colspan="8" style="padding:12px;text-align:center;color:#94a3b8;font-style:italic;">No daily entries yet.</td></tr>';
+            } else {
+              dtBody.innerHTML = daily.map((row, i) => {
+                const d = row.data;
+                const prev = daily[i + 1] ? daily[i + 1].data : null;
+                const date = new Date(row.recorded_at).toLocaleDateString('en-IN', { day:'2-digit', month:'short' });
+                const radBadge = d.radiation === 'Yes' ? '<span style="color:#16a34a;font-weight:700;">✓</span>' : d.radiation === 'No' ? '<span style="color:#dc2626;font-weight:700;">✗</span>' : (d.radiation || '—');
+                return `<tr style="background:${i===0?'#f0fdf4':'#fff'}">
+                  <td style="padding:6px 8px;border:1px solid #e2e8f0;font-weight:600;">${date}${i===0?' <span style="background:#dcfce7;color:#15803d;font-size:9px;padding:1px 5px;border-radius:3px;font-weight:700;">NEW</span>':''}</td>
+                  <td style="padding:6px 8px;border:1px solid #e2e8f0;text-align:center;">${d.weight != null ? d.weight + ' kg' : '—'}</td>
+                  <td style="padding:6px 8px;border:1px solid #e2e8f0;text-align:center;">${_delta(d.weight, prev?.weight, false)}</td>
+                  <td style="padding:6px 8px;border:1px solid #e2e8f0;text-align:center;">${d.oralIntake != null ? d.oralIntake + '%' : '—'}</td>
+                  <td style="padding:6px 8px;border:1px solid #e2e8f0;text-align:center;">${_delta(d.oralIntake, prev?.oralIntake, true)}</td>
+                  <td style="padding:6px 8px;border:1px solid #e2e8f0;text-align:center;">${radBadge}</td>
+                  <td style="padding:6px 8px;border:1px solid #e2e8f0;text-align:center;">${_complianceBadge(d.compliance)}</td>
+                  <td style="padding:6px 8px;border:1px solid #e2e8f0;color:#64748b;">${d.notes || '—'}</td>
+                </tr>`;
+              }).join('');
+            }
+
+            // Weekly table
+            const wtBody = document.getElementById('monTableWeekly');
+            if (weekly.length === 0) {
+              wtBody.innerHTML = '<tr><td colspan="11" style="padding:12px;text-align:center;color:#94a3b8;font-style:italic;">No weekly entries yet.</td></tr>';
+            } else {
+              wtBody.innerHTML = weekly.map((row, i) => {
+                const d = row.data;
+                const prev = weekly[i + 1] ? weekly[i + 1].data : null;
+                const date = new Date(row.recorded_at).toLocaleDateString('en-IN', { day:'2-digit', month:'short' });
+                return `<tr style="background:${i===0?'#faf5ff':'#fff'}">
+                  <td style="padding:6px 8px;border:1px solid #e2e8f0;font-weight:600;">${date}${i===0?' <span style="background:#ede9fe;color:#6d28d9;font-size:9px;padding:1px 5px;border-radius:3px;font-weight:700;">NEW</span>':''}</td>
+                  <td style="padding:6px 8px;border:1px solid #e2e8f0;text-align:center;">${_mucositisBadge(d.mucositis)}</td>
+                  <td style="padding:6px 8px;border:1px solid #e2e8f0;text-align:center;">${d.feeding || '—'}</td>
+                  <td style="padding:6px 8px;border:1px solid #e2e8f0;text-align:center;">${d.ecog != null ? 'ECOG ' + d.ecog : '—'}</td>
+                  <td style="padding:6px 8px;border:1px solid #e2e8f0;text-align:center;">${d.handGrip != null ? d.handGrip + ' kg' : '—'}${_delta(d.handGrip, prev?.handGrip, true)}</td>
+                  <td style="padding:6px 8px;border:1px solid #e2e8f0;text-align:center;">${d.albumin != null ? d.albumin + ' g/dL' : '—'}${_delta(d.albumin, prev?.albumin, true)}</td>
+                  <td style="padding:6px 8px;border:1px solid #e2e8f0;text-align:center;">${d.crp != null ? d.crp + ' mg/L' : '—'}${_delta(d.crp, prev?.crp, false)}</td>
+                  <td style="padding:6px 8px;border:1px solid #e2e8f0;text-align:center;">${_toleranceBadge(d.tolerance)}</td>
+                  <td style="padding:6px 8px;border:1px solid #e2e8f0;text-align:center;">${_yesNo(d.dietitian)}</td>
+                  <td style="padding:6px 8px;border:1px solid #e2e8f0;text-align:center;">${_yesNo(d.physician)}</td>
+                  <td style="padding:6px 8px;border:1px solid #e2e8f0;color:#64748b;">${d.notes || '—'}</td>
+                </tr>`;
+              }).join('');
+            }
+          }
+          // ── END MONITORING ──────────────────────────────────────────────────
 
           window.acknowledgeAlert = function acknowledgeAlert(alertKey, idx) {
             const justification = prompt(

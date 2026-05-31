@@ -380,6 +380,29 @@ app.patch('/api/nutrition-plans/:id/insights', authenticateToken, async (req, re
   }
 });
 
+// Patient Monitoring Logs
+app.post('/api/patients/:id/monitoring', authenticateToken, async (req, res) => {
+  const { type, data } = req.body;
+  if (!type || !data) return res.status(400).json({ error: 'type and data required' });
+  try {
+    const result = await pool.query(
+      `INSERT INTO monitoring_logs (patient_id, type, recorded_by, data) VALUES ($1, $2, $3, $4) RETURNING *`,
+      [req.params.id, type, req.user.id, JSON.stringify(data)]
+    );
+    res.json(result.rows[0]);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/patients/:id/monitoring', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT * FROM monitoring_logs WHERE patient_id = $1 ORDER BY recorded_at DESC LIMIT 90`,
+      [req.params.id]
+    );
+    res.json(result.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // Users: Get All (admin)
 app.get('/api/users', authenticateToken, async (req, res) => {
   try {
@@ -973,6 +996,21 @@ OUTPUT FORMAT — return ONLY valid JSON, no markdown, no text outside the JSON 
 // ── RULE ENGINE MANAGER ──────────────────────────────────────────────────────
 
 // Create tables on startup if they don't exist
+(async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS monitoring_logs (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER NOT NULL,
+        type VARCHAR(10) NOT NULL,
+        recorded_at TIMESTAMP DEFAULT NOW(),
+        recorded_by INTEGER,
+        data JSONB NOT NULL
+      )
+    `);
+  } catch(e) { console.error('monitoring_logs migration:', e.message); }
+})();
+
 (async () => {
   try {
     await pool.query(`
