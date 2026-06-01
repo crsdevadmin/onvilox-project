@@ -14,8 +14,8 @@
     try {
       localStorage.setItem(key(name), JSON.stringify(value));
     } catch (e) {
-      console.error("Storage Error (iOS/Mobile):", e);
-      alert("❌ STORAGE FAILURE: Could not save data. If you are on iOS, ensure you are NOT in Private Mode and are serving the site via HTTP/HTTPS, not 'file://'.");
+      // localStorage quota exceeded or blocked — non-critical since data is persisted server-side
+      console.warn("localStorage write skipped (quota/blocked):", name, e.name);
     }
   }
   function uid(prefix='id'){
@@ -29,8 +29,7 @@
     localStorage.removeItem(testKey);
     console.log("Onvilox Storage: HEALTHY (iOS Compatibility Verified)");
   } catch (e) {
-    console.error("Storage Critical Failure:", e);
-    alert("CRITICAL: Your iOS browser is blocking local storage. This usually happens in 'Private Browsing' mode or if your iPhone storage is nearly full. Patient data CANNOT be saved until you switch to a standard tab.");
+    console.warn("localStorage unavailable — running server-only mode:", e.name);
   }
 
   global.db = {
