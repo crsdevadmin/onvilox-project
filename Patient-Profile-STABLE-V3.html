@@ -2907,20 +2907,21 @@
 
           async function loadMonitoringLogs() {
             const p = window.patient;
+            // Always show the section — it renders empty tables if no data
+            document.getElementById('monitoringSection').style.display = 'block';
             if (!p || !p.id) return;
             const u = window._currentUser || {};
             const token = u.token ? 'Bearer ' + u.token : '';
             const apiBase = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : '';
             try {
               const res = await fetch(`${apiBase}/api/patients/${p.id}/monitoring`, { headers: { Authorization: token } });
-              if (!res.ok) return;
+              if (!res.ok) { console.warn('Monitoring API returned', res.status); return; }
               _monLogs = await res.json();
               renderMonitorTables();
-              document.getElementById('monitoringSection').style.display = 'block';
             } catch(e) { console.warn('Monitoring load failed:', e); }
           }
 
-          function showMonitorTab(tab) {
+          window.showMonitorTab = function showMonitorTab(tab) {
             document.getElementById('monPanelDaily').style.display = tab === 'daily' ? 'block' : 'none';
             document.getElementById('monPanelWeekly').style.display = tab === 'weekly' ? 'block' : 'none';
             document.getElementById('monTabDaily').style.background = tab === 'daily' ? '#0e2247' : '#f1f5f9';
@@ -2929,12 +2930,12 @@
             document.getElementById('monTabWeekly').style.color = tab === 'weekly' ? '#fff' : '#64748b';
           }
 
-          function toggleMonitorForm(type) {
+          window.toggleMonitorForm = function toggleMonitorForm(type) {
             const el = document.getElementById('monForm' + (type === 'daily' ? 'Daily' : 'Weekly'));
             el.style.display = el.style.display === 'none' ? 'block' : 'none';
           }
 
-          async function saveMonitorLog(type) {
+          window.saveMonitorLog = async function saveMonitorLog(type) {
             const p = window.patient;
             if (!p || !p.id) return;
             const u = window._currentUser || {};
