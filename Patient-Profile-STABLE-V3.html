@@ -5225,9 +5225,9 @@ function toggleMonitorForm(type) {
 
 async function saveMonitorLog(type) {
   var p = window.patient;
-  if (!p || !p.id) return alert('Patient not loaded yet.');
-  var u = window._currentUser || {};
-  var token = u.token ? 'Bearer ' + u.token : '';
+  if (!p || !p.id || String(p.id).startsWith('pat_')) return alert('Monitoring is only available for patients saved to the server. Please re-create this patient.');
+  var u = (typeof auth !== 'undefined') ? auth.getCurrentUser() : {};
+  var token = u && u.token ? 'Bearer ' + u.token : '';
   var apiBase = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : '';
   var data = {};
   if (type === 'daily') {
@@ -5273,13 +5273,13 @@ async function saveMonitorLog(type) {
 
 async function loadMonitoringLogs() {
   var p = window.patient;
-  if (!p || !p.id) return;
-  var u = window._currentUser || {};
-  var token = u.token ? 'Bearer ' + u.token : '';
+  if (!p || !p.id || String(p.id).startsWith('pat_')) return; // localStorage patient — no server record
+  var u = (typeof auth !== 'undefined') ? auth.getCurrentUser() : {};
+  var token = u && u.token ? 'Bearer ' + u.token : '';
   var apiBase = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : '';
   try {
     var res = await fetch(apiBase + '/api/patients/' + p.id + '/monitoring', { headers: { Authorization: token } });
-    if (!res.ok) return;
+    if (!res.ok) { console.warn('Monitoring API returned', res.status); return; }
     _monLogs = await res.json();
     renderMonitorTables();
   } catch(e) { console.warn('Monitoring load failed:', e); }
