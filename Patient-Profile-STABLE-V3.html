@@ -2145,7 +2145,6 @@
               return;
             }
             _initPatientProfile(patient);
-            loadMonitoringLogs();
           });
 
           function _initPatientProfile(patient) {
@@ -3073,6 +3072,7 @@
             }
           }
           // ── END MONITORING ──────────────────────────────────────────────────
+          loadMonitoringLogs();
 
           window.acknowledgeAlert = function acknowledgeAlert(alertKey, idx) {
             const justification = prompt(
