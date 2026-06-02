@@ -1453,28 +1453,7 @@
           </div>
         </div>
 
-        <!-- ══════════════════════════════════════════════════════════════ -->
-        <!-- SECTION 5: MONITORING SCHEDULE — collapsible -->
-        <!-- ══════════════════════════════════════════════════════════════ -->
-        <div id="claudeMonitorSection" style="display:none; margin-top:16px;">
-          <div class="rs-title" style="font-size:9.5px; margin-bottom:0; cursor:pointer; user-select:none; display:flex; justify-content:space-between; align-items:center;"
-               onclick="(function(){ var b=document.getElementById('claudeMonitorBody'); var t=document.getElementById('claudeMonitorToggle'); if(b.style.display==='none'){b.style.display='block';t.textContent='▲';}else{b.style.display='none';t.textContent='▼';} })()">
-            <span>📅 Monitoring & Reassessment Schedule (AI)</span><span id="claudeMonitorToggle" style="font-size:10px;">▲</span>
-          </div>
-          <div id="claudeMonitorBody" style="margin-top:8px;">
-            <table style="width:100%; border-collapse:collapse; font-size:10.5px;">
-              <thead>
-                <tr style="background:#f1f5f9;">
-                  <th style="padding:6px 8px; text-align:left; border:1px solid #e2e8f0; font-weight:700;">Frequency</th>
-                  <th style="padding:6px 8px; text-align:left; border:1px solid #e2e8f0; font-weight:700;">Parameters</th>
-                  <th style="padding:6px 8px; text-align:left; border:1px solid #e2e8f0; font-weight:700;">Action Threshold</th>
-                  <th style="padding:6px 8px; text-align:left; border:1px solid #e2e8f0; font-weight:700;">Responsible</th>
-                </tr>
-              </thead>
-              <tbody id="claudeMonitorTable"></tbody>
-            </table>
-          </div>
-        </div>
+        <!-- claudeMonitorSection removed -->
 
         <!-- ══════════════════════════════════════════════════════════════ -->
         <!-- SECTION 6: WHY THIS PLAN — clinical rationale, collapsed by default -->
@@ -4692,7 +4671,7 @@
             if (btnDownload) btnDownload.disabled = true;
 
             // Show placeholders in AI sections
-            const sections = ['claudeAlertsSection', 'claudeDrugSection', 'claudeMonitorSection'];
+            const sections = ['claudeAlertsSection', 'claudeDrugSection'];
             const loadingDiv = '<div style="padding:16px; text-align:center; color:#64748b; font-style:italic;">✨ Claude is analyzing clinical data... please wait.</div>';
             const loadingRow = '<tr><td colspan="5" style="padding:20px; text-align:center; color:#64748b; font-style:italic;">✨ Claude is analyzing clinical data... please wait.</td></tr>';
             sections.forEach(s => {
@@ -5101,17 +5080,6 @@
               });
             }
 
-            const monSec = document.getElementById('claudeMonitorSection');
-            const monTbl = document.getElementById('claudeMonitorTable');
-            if (monSec && monTbl) {
-              const rows = data.monitoringSchedule && data.monitoringSchedule.length > 0
-                ? data.monitoringSchedule.map(m => `<tr><td style="padding:7px 8px;border:1px solid #e2e8f0;font-weight:700;color:#0e2247;">${m.frequency}</td><td style="padding:7px 8px;border:1px solid #e2e8f0;">${m.parameters}</td><td style="padding:7px 8px;border:1px solid #e2e8f0;color:#dc2626;font-weight:600;">${m.threshold}</td><td style="padding:7px 8px;border:1px solid #e2e8f0;color:#475569;">${m.responsible}</td></tr>`).join('')
-                : `<tr><td colspan="4" style="padding:15px;text-align:center;color:#64748b;font-style:italic;">Standard weekly clinical monitoring and weight reassessment plan applies.</td></tr>`;
-              monTbl.innerHTML = rows;
-              monSec.style.display = 'block';
-              const printMonTbl = document.getElementById('printMonitorTable');
-              if (printMonTbl) printMonTbl.innerHTML = rows;
-            }
           }
 
           function cleanupOldVersions() {
