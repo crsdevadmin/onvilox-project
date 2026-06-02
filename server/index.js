@@ -21,25 +21,6 @@ const corsOptions = {
 };
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
-
-// VAPID public key for clients
-app.get('/api/push/vapid-public-key', (req, res) => res.json({ key: VAPID_PUBLIC }));
-
-// Save push subscription
-app.post('/api/push/subscribe', authenticateToken, (req, res) => {
-  const { subscription } = req.body;
-  if (!subscription) return res.status(400).json({ error: 'subscription required' });
-  _pushSubs[req.user.id] = subscription;
-  res.json({ ok: true });
-});
-
-// Send push to all store managers of a given storeId
-async function notifyStore(storeId, title, body, url) {
-  const payload = JSON.stringify({ title, body, url });
-  for (const [userId, sub] of Object.entries(_pushSubs)) {
-    try { await webpush.sendNotification(sub, payload); } catch(e) { delete _pushSubs[userId]; }
-  }
-}
 app.use(express.json({ limit: '2mb' }));
 
 // Serve frontend static files (HTML, JS, CSS) from the project root
@@ -65,6 +46,21 @@ const authenticateToken = (req, res, next) => {
 };
 
 // --- ROUTES ---
+
+// Push notification helpers
+app.get('/api/push/vapid-public-key', (req, res) => res.json({ key: VAPID_PUBLIC }));
+app.post('/api/push/subscribe', authenticateToken, (req, res) => {
+  const { subscription } = req.body;
+  if (!subscription) return res.status(400).json({ error: 'subscription required' });
+  _pushSubs[req.user.id] = subscription;
+  res.json({ ok: true });
+});
+async function notifyStore(storeId, title, body, url) {
+  const payload = JSON.stringify({ title, body, url });
+  for (const [userId, sub] of Object.entries(_pushSubs)) {
+    try { await webpush.sendNotification(sub, payload); } catch(e) { delete _pushSubs[userId]; }
+  }
+}
 
 // Health Check
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
