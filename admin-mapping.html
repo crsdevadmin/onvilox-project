@@ -39,6 +39,20 @@
   </div>
 
   <div class="card">
+    <h2>Store Manager → Store Mapping</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Store Manager</th>
+          <th>Mapped Store</th>
+          <th>Change</th>
+        </tr>
+      </thead>
+      <tbody id="smStoreTable"></tbody>
+    </table>
+  </div>
+
+  <div class="card">
     <h2>Assistant → Doctor Mapping</h2>
     <table>
       <thead>
@@ -157,7 +171,56 @@ function updateAssistantDoctor(assistantId){
   renderAssistantDoctor();
 }
 
+function renderStoreManagerStore(){
+  const managers = userService.getUsersByRole('STORE');
+  const stores = storeService.getStores();
+  const tbody = document.getElementById('smStoreTable');
+  tbody.innerHTML='';
+  if (managers.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="3" style="color:#94a3b8;font-style:italic;padding:10px;">No store manager accounts found.</td></tr>';
+    return;
+  }
+  managers.forEach(m => {
+    const storeName = (stores.find(s => s.id === m.storeId) || {}).name || '-';
+    const options = ['<option value="">Select Store</option>']
+      .concat(stores.map(s => `<option value="${s.id}" ${s.id===m.storeId?'selected':''}>${s.name}</option>`))
+      .join('');
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${m.name} (${m.username || m.email})</td>
+      <td>${storeName}</td>
+      <td>
+        <select id="sm_${m.id}">${options}</select>
+        <button class="btn-warning" style="margin-left:10px;" onclick="updateStoreManagerStore('${m.id}')">Save</button>
+      </td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+async function updateStoreManagerStore(userId){
+  const sel = document.getElementById('sm_' + userId);
+  const storeId = sel.value;
+  const u = (typeof auth !== 'undefined') ? auth.getCurrentUser() : null;
+  const apiBase = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : '';
+  try {
+    const res = await fetch(`${apiBase}/api/users/${userId}/store`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Authorization': u && u.token ? 'Bearer ' + u.token : '' },
+      body: JSON.stringify({ storeId: storeId || null })
+    });
+    if (!res.ok) throw new Error('Server error');
+    const users = getUsers();
+    const sm = users.find(x => x.id === userId);
+    if (sm) { sm.storeId = storeId || null; saveUsers(users); }
+    renderStoreManagerStore();
+    alert('Store mapping saved successfully.');
+  } catch(e) {
+    alert('Failed to save mapping: ' + e.message);
+  }
+}
+
 renderDoctorStore();
+renderStoreManagerStore();
 renderAssistantDoctor();
 </script>
 
