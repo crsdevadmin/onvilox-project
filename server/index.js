@@ -3,18 +3,43 @@ const { Pool } = require('pg');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const webpush = require('web-push');
 require('dotenv').config();
+
+const VAPID_PUBLIC  = 'BP2E-Ogveb92wrIjjciORv_jDJO82jut8m3QSJM_UrwJbVDJCFZdDzSuQZvahxpu_0gw7B-E_bJktm7VKd-qTEo';
+const VAPID_PRIVATE = 'of-_1IjWZ415k3XDDwbpbgtNDpm0d-Hcxkz1eCNfbk0';
+webpush.setVapidDetails('mailto:admin@gquence.com', VAPID_PUBLIC, VAPID_PRIVATE);
+const _pushSubs = {}; // userId → subscription (in-memory; survives restarts via DB below)
 
 const path = require('path');
 
 const app = express();
 const corsOptions = {
   origin: '*',
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Claude-Context']
 };
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
+
+// VAPID public key for clients
+app.get('/api/push/vapid-public-key', (req, res) => res.json({ key: VAPID_PUBLIC }));
+
+// Save push subscription
+app.post('/api/push/subscribe', authenticateToken, (req, res) => {
+  const { subscription } = req.body;
+  if (!subscription) return res.status(400).json({ error: 'subscription required' });
+  _pushSubs[req.user.id] = subscription;
+  res.json({ ok: true });
+});
+
+// Send push to all store managers of a given storeId
+async function notifyStore(storeId, title, body, url) {
+  const payload = JSON.stringify({ title, body, url });
+  for (const [userId, sub] of Object.entries(_pushSubs)) {
+    try { await webpush.sendNotification(sub, payload); } catch(e) { delete _pushSubs[userId]; }
+  }
+}
 app.use(express.json({ limit: '2mb' }));
 
 // Serve frontend static files (HTML, JS, CSS) from the project root
@@ -217,6 +242,14 @@ app.put('/api/patients/:id', authenticateToken, async (req, res) => {
         req.params.id
       ]
     );
+    // Push notification when patient is approved
+    if ((p.status === 'APPROVED') && p.storeId) {
+      notifyStore(p.storeId,
+        '✅ New Patient Approved',
+        `${p.name || 'A patient'} has been approved and is ready for production.`,
+        '/store'
+      ).catch(() => {});
+    }
     res.json(p);
   } catch (err) {
     console.error('Patient update error:', err.message);

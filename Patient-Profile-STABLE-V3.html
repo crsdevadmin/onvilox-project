@@ -2130,6 +2130,19 @@
 
           const printMode = params.get('print') === '1';
           const reviewMode = params.get('review') === '1';
+          const storeMode = params.get('store') === '1' || (me && me.role === 'STORE');
+          if (storeMode) {
+            const storeStyle = document.createElement('style');
+            storeStyle.textContent = `
+              #editPatientSection, .rpt-actions-bar, .ai-chat-launcher,
+              #safetyAlertsBlock, #clinicalProtocolsContainer,
+              #calcTrace, #clinicalRationale, #monitoringSection,
+              #claudeAlertsSection, #claudeDrugSection,
+              .rs-title + .rg, #progressSection,
+              [id^="claude"]:not(#reportDoc) { display:none !important; }
+            `;
+            document.head.appendChild(storeStyle);
+          }
 
           // Only the assigned doctor (or their assistant) can edit/approve
           function canEditOrApprove() {

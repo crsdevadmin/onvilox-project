@@ -4,6 +4,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Store Dashboard - Gquence</title>
   <link rel="stylesheet" href="/css/app.css">
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#0e2247">
 </head>
 <body>
 
@@ -137,8 +139,9 @@ function render(){
       <td>${p.uhic}</td>
       <td>${p.cancer}</td>
       <td><span class="status ${statusClass(j.status)}">${j.status}</span></td>
-      <td>
-        <button class="btn-warning" onclick="toggleDetails('${j.id}'); event.stopPropagation();">Details</button>
+      <td style="display:flex;gap:8px;align-items:center;">
+        <a href="/patients/profile?id=${p.id}&store=1" class="btn-primary" style="padding:6px 12px;font-size:12px;border-radius:6px;" onclick="event.stopPropagation();">View Plan</a>
+        <button class="btn-warning" onclick="toggleDetails('${j.id}'); event.stopPropagation();">Status</button>
       </td>
     `;
     tbody.appendChild(main);
@@ -277,5 +280,6 @@ function openQrLink(){
 </script>
 
 <script src="/js/theme.js"></script>
+<script src="/js/pwa.js"></script>
 </body>
 </html>
