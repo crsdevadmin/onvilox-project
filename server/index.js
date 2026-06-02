@@ -3,13 +3,19 @@ const { Pool } = require('pg');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const webpush = require('web-push');
 require('dotenv').config();
 
 const VAPID_PUBLIC  = 'BP2E-Ogveb92wrIjjciORv_jDJO82jut8m3QSJM_UrwJbVDJCFZdDzSuQZvahxpu_0gw7B-E_bJktm7VKd-qTEo';
 const VAPID_PRIVATE = 'of-_1IjWZ415k3XDDwbpbgtNDpm0d-Hcxkz1eCNfbk0';
-webpush.setVapidDetails('mailto:admin@gquence.com', VAPID_PUBLIC, VAPID_PRIVATE);
-const _pushSubs = {}; // userId → subscription (in-memory; survives restarts via DB below)
+const _pushSubs = {};
+let webpush = null;
+try {
+  webpush = require('web-push');
+  webpush.setVapidDetails('mailto:admin@gquence.com', VAPID_PUBLIC, VAPID_PRIVATE);
+  console.log('web-push loaded OK');
+} catch(e) {
+  console.warn('web-push unavailable — push notifications disabled:', e.message);
+}
 
 const path = require('path');
 
@@ -56,6 +62,7 @@ app.post('/api/push/subscribe', authenticateToken, (req, res) => {
   res.json({ ok: true });
 });
 async function notifyStore(storeId, title, body, url) {
+  if (!webpush) return;
   const payload = JSON.stringify({ title, body, url });
   for (const [userId, sub] of Object.entries(_pushSubs)) {
     try { await webpush.sendNotification(sub, payload); } catch(e) { delete _pushSubs[userId]; }
