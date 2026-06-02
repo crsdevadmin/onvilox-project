@@ -32,6 +32,7 @@
           role: data.user.role,
           name: data.user.name,
           hospital_name: data.user.hospital_name,
+          storeId: data.user.storeId || null,
           username: username,
           token: data.token
         });
