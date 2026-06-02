@@ -91,6 +91,9 @@
     if ((role === 'DOCTOR' || role === 'STORE') && !storeId) {
       return { ok: false, error: 'Store mapping is required for this role' };
     }
+    if (role === 'COORDINATOR' && !storeId) {
+      return { ok: false, error: 'Store mapping is required for Coordinator' };
+    }
 
     if (role === 'STORE') {
       const existingMgr = getUsersByRole('STORE').find(u => (u.storeId || u.store_id) === storeId);

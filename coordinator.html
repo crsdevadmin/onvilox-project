@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Coordinator - Gquence</title>
+  <link rel="stylesheet" href="/css/app.css">
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#0e2247">
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">Gquence Coordinator</div>
+  <div class="nav">
+    <a href="/coordinator">Dashboard</a>
+    <a href="#" onclick="auth.logout()">Logout</a>
+    <button id="themeToggleBtn" onclick="toggleTheme()" class="btn-secondary btn-sm" style="margin-left:20px;border-radius:30px;padding:6px 14px;cursor:pointer;">🌙 Dark</button>
+  </div>
+</div>
+
+<div class="container page">
+  <div class="card">
+    <h2>Delivery Queue</h2>
+    <p style="color:#64748b;font-size:13px;margin-bottom:16px;">Dispatched orders ready to be marked as delivered.</p>
+    <table>
+      <thead>
+        <tr>
+          <th>Patient</th>
+          <th>UHIC</th>
+          <th>Cancer</th>
+          <th>Store</th>
+          <th>Status</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody id="jobTable"></tbody>
+    </table>
+  </div>
+</div>
+
+<script src="/js/config.js"></script>
+<script src="/js/storage.js"></script>
+<script src="/js/seed.js"></script>
+<script src="/js/auth.js"></script>
+<script src="/js/users.js"></script>
+<script src="/js/stores.js"></script>
+<script src="/js/patient-store.js?v=3.2"></script>
+<script src="/js/manufacturing.js"></script>
+
+<script>
+auth.requireRole(['COORDINATOR']);
+const me = auth.getCurrentUser();
+
+function statusClass(s){ return (s||'').toLowerCase(); }
+
+async function markDelivered(jobId) {
+  if (!confirm('Mark this order as DELIVERED?')) return;
+  const apiBase = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : '';
+  try {
+    const res = await fetch(`${apiBase}/api/manufacturing-jobs/${jobId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + me.token },
+      body: JSON.stringify({ status: 'DELIVERED' })
+    });
+    if (!res.ok) throw new Error('Failed');
+    render();
+  } catch(e) { alert('Failed to update: ' + e.message); }
+}
+
+function render() {
+  const tbody = document.getElementById('jobTable');
+  tbody.innerHTML = '';
+
+  initStore().then(() => {
+    const allJobs = manufacturingService.getJobs();
+    const dispatched = allJobs.filter(j => j.status === 'DISPATCHED');
+
+    if (dispatched.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" style="padding:16px;text-align:center;color:#94a3b8;font-style:italic;">No dispatched orders pending delivery.</td></tr>';
+      return;
+    }
+
+    dispatched.sort((a,b) => (b.updatedAt||'').localeCompare(a.updatedAt||''));
+    dispatched.forEach(j => {
+      const p = getPatientById(j.patientId);
+      if (!p) return;
+      const store = (typeof storeService !== 'undefined') ? storeService.getStoreById(j.storeId) : null;
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td style="font-weight:700;">${p.name}</td>
+        <td>${p.uhic || '-'}</td>
+        <td>${p.cancer || '-'}</td>
+        <td>${store ? store.name : (j.storeId || '-')}</td>
+        <td><span class="status dispatched">DISPATCHED</span></td>
+        <td>
+          <button class="btn-primary" style="padding:6px 14px;font-size:12px;" onclick="markDelivered('${j.id}')">
+            ✓ Mark Delivered
+          </button>
+        </td>`;
+      tbody.appendChild(tr);
+    });
+  });
+}
+
+render();
+</script>
+
+<script src="/js/theme.js"></script>
+<script src="/js/pwa.js"></script>
+</body>
+</html>

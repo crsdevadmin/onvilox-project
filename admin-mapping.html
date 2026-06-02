@@ -39,7 +39,7 @@
   </div>
 
   <div class="card">
-    <h2>Store Manager → Store Mapping</h2>
+    <h2>Store Manager / Coordinator → Store Mapping</h2>
     <table>
       <thead>
         <tr>
@@ -172,7 +172,7 @@ function updateAssistantDoctor(assistantId){
 }
 
 function renderStoreManagerStore(){
-  const managers = userService.getUsersByRole('STORE');
+  const managers = [...userService.getUsersByRole('STORE'), ...userService.getUsersByRole('COORDINATOR')];
   const stores = storeService.getStores();
   const tbody = document.getElementById('smStoreTable');
   tbody.innerHTML='';

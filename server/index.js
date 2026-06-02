@@ -1550,6 +1550,7 @@ const cleanRoutes = {
   '/admin/tracking':   'admin-tracking.html',
   '/admin/reports':    'admin-reports.html',
   '/admin/rules':      'admin-rules.html',
+  '/coordinator':      'coordinator.html',
 };
 Object.entries(cleanRoutes).forEach(([route, file]) => {
   app.get(route, (req, res) => res.sendFile(path.join(__dirname, '..', file)));
