@@ -208,7 +208,7 @@ function openPdf(patientId){
   window.open(url, '_blank', 'noopener');
 }
 
-initStore().then(() => render());
+// render() called from polling init below
 
 let __qrCurrentLink = '';
 
@@ -276,6 +276,61 @@ function openQrLink(){
   if(!__qrCurrentLink) return;
   window.open(__qrCurrentLink, '_blank', 'noopener');
 }
+
+// ── NOTIFICATION POLLING ──────────────────────────────────────────────────
+let _knownJobIds = new Set();
+let _notifPermission = false;
+
+function _initNotifications() {
+  if (!('Notification' in window)) return;
+  if (Notification.permission === 'granted') {
+    _notifPermission = true;
+  } else if (Notification.permission !== 'denied') {
+    Notification.requestPermission().then(p => { _notifPermission = (p === 'granted'); });
+  }
+}
+
+function _pollJobs() {
+  const apiBase = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : '';
+  fetch(apiBase + '/api/manufacturing-jobs', { headers: { Authorization: 'Bearer ' + me.token } })
+    .then(r => r.ok ? r.json() : [])
+    .then(jobs => {
+      if (!me.storeId) return;
+      const myJobs = jobs.filter(j => j.store_id === me.storeId || j.storeId === me.storeId);
+      myJobs.forEach(j => {
+        if (!_knownJobIds.has(j.id)) {
+          if (_knownJobIds.size > 0) {
+            // New job appeared — notify
+            const p = getPatientById(j.patient_id || j.patientId);
+            const name = p ? p.name : 'A patient';
+            _showNotification('New Patient Approved', `${name} is ready for production.`);
+            render();
+          }
+          _knownJobIds.add(j.id);
+        }
+      });
+    }).catch(() => {});
+}
+
+function _showNotification(title, body) {
+  if (_notifPermission) {
+    try { new Notification(title, { body, icon: '/favicon.ico' }); } catch(e) {}
+  }
+  // Always show in-page toast
+  const toast = document.createElement('div');
+  toast.style.cssText = 'position:fixed;top:70px;right:20px;background:#0e2247;color:#fff;padding:14px 20px;border-radius:8px;z-index:9999;font-size:14px;font-weight:600;box-shadow:0 4px 20px rgba(0,0,0,0.3);max-width:320px;';
+  toast.innerHTML = `<div style="font-weight:700;margin-bottom:4px;">🔔 ${title}</div><div style="font-size:12px;opacity:0.85;">${body}</div>`;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 6000);
+}
+
+// Start polling after page loads
+initStore().then(() => {
+  render();
+  _initNotifications();
+  _pollJobs(); // seed known job IDs (no notification on first load)
+  setInterval(_pollJobs, 30000); // check every 30 seconds
+});
 
 </script>
 
