@@ -873,7 +873,7 @@
         <div id="clinicalProtocolsContainer" class="rs" style="display:none; margin-top:20px;"></div>
 
         <!-- NUTRITION RX -->
-        <div class="rs">
+        <div class="rs" id="sectionPrescription">
           <div class="rs-title" id="pPrescriptionTitle">Prescription Target</div>
 
           <!-- CACHEXIA ALERT -->
@@ -949,7 +949,7 @@
         </div>
 
         <!-- FEEDING PATTERN -->
-        <div class="rs">
+        <div class="rs" id="sectionServings">
           <div class="rs-title">Servings & Administration</div>
           <div class="rg">
             <div class="rf">
@@ -976,7 +976,7 @@
         </div>
 
         <!-- MANUFACTURING -->
-        <div class="rs">
+        <div class="rs" id="sectionProduction">
           <div class="rs-title">Production Specifications</div>
           <div class="rg rg4">
             <div class="rf">
@@ -2192,12 +2192,21 @@
           if (storeMode) {
             const storeStyle = document.createElement('style');
             storeStyle.textContent = `
+              /* Hide all .rs sections by default in store mode */
+              #reportDoc .rs { display:none !important; }
+              /* Show only the 3 production-relevant sections */
+              #sectionPrescription,
+              #sectionServings,
+              #sectionProduction { display:block !important; }
+              /* Hide global UI elements not needed by store */
               #editPatientSection, .rpt-actions-bar, .ai-chat-launcher,
               #safetyAlertsBlock, #clinicalProtocolsContainer,
               #calcTrace, #clinicalRationale, #monitoringSection,
-              #claudeAlertsSection, #claudeDrugSection,
-              .rs-title + .rg, #progressSection,
-              [id^="claude"]:not(#reportDoc) { display:none !important; }
+              #progressSection,
+              [id^="claude"] { display:none !important; }
+              /* Mobile-friendly recipe table */
+              #sectionProduction table { font-size:11px; }
+              #sectionProduction td, #sectionProduction th { padding:6px 8px !important; }
             `;
             document.head.appendChild(storeStyle);
           }
