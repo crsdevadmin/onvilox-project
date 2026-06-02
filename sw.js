@@ -21,10 +21,14 @@ self.addEventListener('push', e => {
 // Notification click — open the relevant page
 self.addEventListener('notificationclick', e => {
   e.notification.close();
-  const url = e.notification.data || '/';
-  e.waitUntil(clients.matchAll({ type: 'window' }).then(list => {
+  const data = e.notification.data;
+  const url = (data && data.url) ? data.url : '/store';
+  e.waitUntil(clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
     for (const client of list) {
-      if (client.url.includes(url) && 'focus' in client) return client.focus();
+      if ('focus' in client) {
+        client.navigate(url);
+        return client.focus();
+      }
     }
     if (clients.openWindow) return clients.openWindow(url);
   }));

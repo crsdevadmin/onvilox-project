@@ -88,7 +88,7 @@ app.post('/api/push/test', authenticateToken, async (req, res) => {
   try {
     await webpush.sendNotification(sub, JSON.stringify({
       title: '✅ Gquence Test Notification',
-      body: 'Push notifications are working correctly!',
+      body: 'Push notifications are working correctly! Tap to open store.',
       url: '/store'
     }));
     res.json({ ok: true, message: 'Test notification sent' });
@@ -275,8 +275,8 @@ app.put('/api/patients/:id', authenticateToken, async (req, res) => {
     if ((p.status === 'APPROVED') && p.storeId) {
       notifyStore(p.storeId,
         '✅ New Patient Approved',
-        `${p.name || 'A patient'} has been approved and is ready for production.`,
-        '/store'
+        `${p.name || 'A patient'} is ready for production. Tap to view plan.`,
+        `/patients/profile?id=${req.params.id}&store=1`
       ).catch(() => {});
     }
     res.json(p);
