@@ -55,10 +55,18 @@ const authenticateToken = (req, res, next) => {
 
 // Push notification helpers
 app.get('/api/push/vapid-public-key', (req, res) => res.json({ key: VAPID_PUBLIC }));
-app.post('/api/push/subscribe', authenticateToken, (req, res) => {
+app.post('/api/push/subscribe', authenticateToken, async (req, res) => {
   const { subscription } = req.body;
   if (!subscription) return res.status(400).json({ error: 'subscription required' });
   _pushSubs[req.user.id] = subscription;
+  try {
+    await pool.query(
+      `INSERT INTO push_subscriptions (user_id, subscription, updated_at)
+       VALUES ($1, $2, NOW())
+       ON CONFLICT (user_id) DO UPDATE SET subscription=$2, updated_at=NOW()`,
+      [req.user.id, JSON.stringify(subscription)]
+    );
+  } catch(e) { console.warn('push sub save:', e.message); }
   res.json({ ok: true });
 });
 async function notifyStore(storeId, title, body, url) {
@@ -1032,6 +1040,22 @@ OUTPUT FORMAT — return ONLY valid JSON, no markdown, no text outside the JSON 
 });
 
 // ── RULE ENGINE MANAGER ──────────────────────────────────────────────────────
+
+// Push subscription table + load existing subs into memory
+(async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS push_subscriptions (
+        user_id TEXT PRIMARY KEY,
+        subscription JSONB NOT NULL,
+        updated_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    const rows = await pool.query('SELECT user_id, subscription FROM push_subscriptions');
+    rows.rows.forEach(r => { _pushSubs[r.user_id] = r.subscription; });
+    console.log(`Push: loaded ${rows.rows.length} subscription(s)`);
+  } catch(e) { console.warn('push_subscriptions init:', e.message); }
+})();
 
 // Create tables on startup if they don't exist
 (async () => {

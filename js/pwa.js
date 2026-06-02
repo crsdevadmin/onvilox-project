@@ -5,9 +5,23 @@
   const VAPID_KEY = 'BP2E-Ogveb92wrIjjciORv_jDJO82jut8m3QSJM_UrwJbVDJCFZdDzSuQZvahxpu_0gw7B-E_bJktm7VKd-qTEo';
 
   // Register service worker
-  navigator.serviceWorker.register('/sw.js').then(reg => {
+  navigator.serviceWorker.register('/sw.js', { scope: '/' }).then(reg => {
     window._swReg = reg;
-    _subscribePush(reg);
+    // Wait for SW to be active before subscribing
+    if (reg.active) {
+      _subscribePush(reg);
+    } else {
+      (reg.installing || reg.waiting).addEventListener('statechange', function() {
+        if (this.state === 'activated') _subscribePush(reg);
+      });
+      reg.addEventListener('updatefound', () => {
+        reg.installing.addEventListener('statechange', function() {
+          if (this.state === 'activated') _subscribePush(reg);
+        });
+      });
+      // Also try after short delay as fallback
+      setTimeout(() => _subscribePush(reg), 2000);
+    }
   }).catch(e => console.warn('SW registration failed:', e));
 
   // PWA install prompt

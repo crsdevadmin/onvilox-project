@@ -9,10 +9,11 @@ self.addEventListener('push', e => {
   const title = data.title || 'Gquence';
   const options = {
     body: data.body || 'New update',
-    icon: '/icons/icon-192.png',
-    badge: '/icons/icon-192.png',
-    data: data.url || '/',
-    vibrate: [200, 100, 200]
+    icon: '/icons/icon.svg',
+    badge: '/icons/icon.svg',
+    data: { url: data.url || '/store' },
+    vibrate: [200, 100, 200],
+    requireInteraction: true
   };
   e.waitUntil(self.registration.showNotification(title, options));
 });
