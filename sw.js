@@ -22,14 +22,14 @@ self.addEventListener('push', e => {
 self.addEventListener('notificationclick', e => {
   e.notification.close();
   const data = e.notification.data;
-  const url = (data && data.url) ? data.url : '/store';
-  e.waitUntil(clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
-    for (const client of list) {
-      if ('focus' in client) {
-        client.navigate(url);
-        return client.focus();
+  const path = (data && data.url) ? data.url : '/store';
+  const fullUrl = new URL(path, self.location.origin).href;
+  e.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
+      for (const client of list) {
+        if (client.url === fullUrl && 'focus' in client) return client.focus();
       }
-    }
-    if (clients.openWindow) return clients.openWindow(url);
-  }));
+      return clients.openWindow(fullUrl);
+    })
+  );
 });
