@@ -20,6 +20,11 @@
 
 <div class="container page">
 
+  <div class="card" style="padding:12px 20px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
+    <div style="font-size:13px; color:#64748b;" id="notifStatus">🔔 Notifications: checking...</div>
+    <button onclick="testPushNotification()" style="background:#0e2247;color:#fff;border:none;border-radius:6px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;">Send Test Notification</button>
+  </div>
+
   <div class="card">
     <h2>Production Queue</h2>
 
@@ -324,10 +329,49 @@ function _showNotification(title, body) {
   setTimeout(() => toast.remove(), 6000);
 }
 
+async function testPushNotification() {
+  const apiBase = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : '';
+  try {
+    const res = await fetch(apiBase + '/api/push/test', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + me.token }
+    });
+    const data = await res.json();
+    if (res.ok) {
+      alert('✅ Test notification sent! You should receive it on your device within a few seconds.');
+    } else {
+      alert('❌ Failed: ' + data.error + '\n\nMake sure you have allowed notifications and the store dashboard has been open at least once.');
+    }
+  } catch(e) {
+    alert('❌ Error: ' + e.message);
+  }
+}
+
+function _updateNotifStatus() {
+  const el = document.getElementById('notifStatus');
+  if (!el) return;
+  if (!('Notification' in window)) {
+    el.textContent = '🔕 Notifications not supported on this browser';
+    el.style.color = '#dc2626';
+  } else if (Notification.permission === 'granted') {
+    el.textContent = '🔔 Notifications: Enabled';
+    el.style.color = '#16a34a';
+  } else if (Notification.permission === 'denied') {
+    el.textContent = '🔕 Notifications: Blocked — go to browser settings to enable';
+    el.style.color = '#dc2626';
+  } else {
+    el.textContent = '🔔 Notifications: Not yet enabled — tap to allow';
+    el.style.color = '#d97706';
+    el.style.cursor = 'pointer';
+    el.onclick = () => Notification.requestPermission().then(() => _updateNotifStatus());
+  }
+}
+
 // Start polling after page loads
 initStore().then(() => {
   render();
   _initNotifications();
+  _updateNotifStatus();
   _pollJobs(); // seed known job IDs (no notification on first load)
   setInterval(_pollJobs, 30000); // check every 30 seconds
 });

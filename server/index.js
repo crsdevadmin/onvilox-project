@@ -80,6 +80,24 @@ async function notifyStore(storeId, title, body, url) {
 // Health Check
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
+// Test push — send a test notification to the calling user
+app.post('/api/push/test', authenticateToken, async (req, res) => {
+  const sub = _pushSubs[req.user.id];
+  if (!sub) return res.status(404).json({ error: 'No subscription found for this user. Make sure notifications are enabled and you have visited the store dashboard.' });
+  if (!webpush) return res.status(503).json({ error: 'web-push not loaded on server' });
+  try {
+    await webpush.sendNotification(sub, JSON.stringify({
+      title: '✅ Gquence Test Notification',
+      body: 'Push notifications are working correctly!',
+      url: '/store'
+    }));
+    res.json({ ok: true, message: 'Test notification sent' });
+  } catch(e) {
+    delete _pushSubs[req.user.id];
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Auth: Login
 app.post('/api/auth/login', async (req, res) => {
   const { email, password } = req.body;
