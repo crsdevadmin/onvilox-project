@@ -93,15 +93,26 @@ function renderDoctorStore(){
   });
 }
 
-function updateDoctorStore(doctorId){
+async function updateDoctorStore(doctorId){
   const sel = document.getElementById('ds_' + doctorId);
   const storeId = sel.value;
-  const users = getUsers();
-  const d = users.find(u => u.id === doctorId);
-  if(d){
-    d.storeId = storeId || null;
-    saveUsers(users);
+  const u = (typeof auth !== 'undefined') ? auth.getCurrentUser() : null;
+  const apiBase = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : '';
+  try {
+    const res = await fetch(`${apiBase}/api/users/${doctorId}/store`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Authorization': u && u.token ? 'Bearer ' + u.token : '' },
+      body: JSON.stringify({ storeId: storeId || null })
+    });
+    if (!res.ok) throw new Error('Server error');
+    // Also update local cache
+    const users = getUsers();
+    const d = users.find(u => u.id === doctorId);
+    if (d) { d.storeId = storeId || null; saveUsers(users); }
     renderDoctorStore();
+    alert('Store mapping saved successfully.');
+  } catch(e) {
+    alert('Failed to save mapping: ' + e.message);
   }
 }
 

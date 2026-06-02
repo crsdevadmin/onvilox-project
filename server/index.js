@@ -56,7 +56,7 @@ app.post('/api/auth/login', async (req, res) => {
     if (!validPassword) return res.status(400).json({ error: 'Invalid password' });
 
     const token = jwt.sign({ id: user.id, role: user.role }, process.env.JWT_SECRET);
-    res.json({ token, user: { id: user.id, name: user.name, role: user.role, hospital_name: user.hospital_name } });
+    res.json({ token, user: { id: user.id, name: user.name, role: user.role, hospital_name: user.hospital_name, storeId: user.store_id || null } });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -442,6 +442,15 @@ app.delete('/api/users/:id', authenticateToken, async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+});
+
+// Users: Assign store
+app.patch('/api/users/:id/store', authenticateToken, async (req, res) => {
+  const { storeId } = req.body;
+  try {
+    await pool.query('UPDATE users SET store_id = $1 WHERE id = $2', [storeId || null, req.params.id]);
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // Users: Reset Password

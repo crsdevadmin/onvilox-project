@@ -93,7 +93,7 @@ function render(){
   tbody.innerHTML='';
 
   if(!me.storeId){
-    tbody.innerHTML = '<tr><td colspan="6">Store is not mapped to a store. Admin must map Store → Store.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" style="padding:20px;color:#dc2626;font-weight:600;">This account is not assigned to a store. Please ask the Admin to go to Admin → Mappings and assign a store to your account.</td></tr>';
     return;
   }
 
