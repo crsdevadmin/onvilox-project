@@ -81,7 +81,6 @@ function statusClass(s){
   return (s||'APPROVED').toLowerCase();
 }
 
-
 function toggleDetails(jobId){
   const el = document.getElementById('details_' + jobId);
   if(!el) return;
@@ -93,7 +92,26 @@ function render(){
   tbody.innerHTML='';
 
   if(!me.storeId){
-    tbody.innerHTML = '<tr><td colspan="6" style="padding:20px;color:#dc2626;font-weight:600;">This account is not assigned to a store. Please ask the Admin to go to Admin → Mappings and assign a store to your account.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" style="padding:20px;color:#94a3b8;font-style:italic;">Loading store assignment...</td></tr>';
+    // Fetch storeId from server in case session is stale
+    const apiBase = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : '';
+    fetch(apiBase + '/api/users', { headers: { Authorization: 'Bearer ' + me.token } })
+      .then(r => r.json())
+      .then(users => {
+        const serverUser = users.find(u => u.id === me.id);
+        if (serverUser && serverUser.storeId) {
+          me.storeId = serverUser.storeId;
+          // Update session cache so next reload doesn't need to re-fetch
+          const session = Object.assign({}, me);
+          db.setTable('session', session);
+          render();
+        } else {
+          tbody.innerHTML = '<tr><td colspan="6" style="padding:20px;color:#dc2626;font-weight:600;">This account is not assigned to a store. Please ask the Admin to go to Admin → Mappings and assign a store to your account.</td></tr>';
+        }
+      })
+      .catch(() => {
+        tbody.innerHTML = '<tr><td colspan="6" style="padding:20px;color:#dc2626;font-weight:600;">This account is not assigned to a store. Please ask the Admin to go to Admin → Mappings and assign a store to your account.</td></tr>';
+      });
     return;
   }
 
