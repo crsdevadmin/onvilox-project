@@ -772,8 +772,7 @@ app.post('/api/claude-report', async (req, res) => {
 2. Correct the prescription if it is clinically wrong
 3. Produce a complete drug-nutrient interaction table for every drug in the regimen
 4. Produce a complete micronutrient orders table for every relevant nutrient
-5. Produce a full monitoring schedule
-6. Score the plan honestly
+5. Score the plan honestly
 
 CLINICAL VALIDATION RULES — apply every rule to every patient:
 
@@ -807,12 +806,10 @@ ANAEMIA & IRON:
 - If iron studies (ferritin, serum iron, TIBC) are absent from the lab panel: generate HIGH alert type "IRON_PANEL_MANDATORY" and flag iron panel as a mandatory investigation.
 - If oral intake < 60%: recommend IV iron over oral supplementation due to impaired GI absorption.
 - In micronutrientOrders, set iron status to "HOLD" and dose to "ON CLINICAL HOLD — Pending iron panel (ferritin, serum iron, TIBC, transferrin saturation) before empirical dosing."
-- Include iron assessment in monitoringSchedule.
 
 LIVER FUNCTION:
 - ALT > 40 U/L or AST > 40 U/L: generate MODERATE alert requiring fortnightly LFT monitoring.
 - If patient has liver metastases or is on a hepatotoxic regimen (platinum agents, taxanes, anthracyclines): add hepatology escalation threshold of 3× ULN.
-- Include LFTs in monitoringSchedule with escalation trigger.
 
 GLUTAMINE CAUTION:
 - If glutamine is prescribed AND tumor burden is High or Bulky: add a LOW informational note in micronutrientOrders with status "MONITOR" noting that glutamine use in high-burden settings should be reviewed at the next oncology MDT.
@@ -822,13 +819,11 @@ STEROID-INDUCED HYPERGLYCAEMIA & MACRO REDISTRIBUTION:
 - If HbA1c is 5.7–6.4% OR fasting blood sugar is 100–125 mg/dL (pre-diabetic range) AND the regimen includes dexamethasone or steroid-containing chemotherapy: generate MODERATE alert.
 - Recommend blood glucose monitoring before and 2 hours after each dexamethasone dose.
 - If HbA1c ≥ 6.5% (diabetic range) OR blood sugar > 140 mg/dL OR patient comorbidities include Fatty Liver Disease (NAFLD/MAFLD/NASH/steatohepatitis): the macro distribution MUST be corrected. Set isOverpowered: true. Fat must not exceed 30% of totalDailyCalories: set dailyFat = totalDailyCalories × 0.30 / 9, then set dailyCarbs = (totalDailyCalories − dailyProtein×4 − dailyFat×9) / 4. Distribute carbs across 5–6 small meals for glycaemic control. Provide the corrected gram values for dailyCarbs and dailyFat in correctedPrescription.
-- Include glycaemic monitoring in monitoringSchedule.
 
 IMMUNOTHERAPY MONITORING:
 - If regimen includes Pembrolizumab, Nivolumab, Atezolizumab, or Durvalumab: TSH monitoring every treatment cycle is MANDATORY.
 - If TSH is absent from the lab panel: generate HIGH alert type "IMMUNOTHERAPY_TSH_MISSING" — this is a patient safety requirement.
 - If TSH is absent AND patient sideEffects include fatigue, tiredness, or weakness: add an additional note in the alert that current fatigue symptoms must be assessed as a possible immune-related adverse event (irAE — immune thyroiditis) while TSH is pending. Do not attribute fatigue solely to chemotherapy until thyroid function is confirmed.
-- Include thyroid function in monitoringSchedule with per-cycle frequency and TSH thresholds (<0.5 or >4.5 mIU/L → endocrinology referral).
 
 ANTIOXIDANT SAFETY:
 - If regimen includes Bortezomib, AC (Doxorubicin + Cyclophosphamide), Oxaliplatin, or Cisplatin: Vitamin C > 500 mg/day and Alpha-Lipoic Acid are CONTRAINDICATED during those specific cycles as they may reduce chemotherapy efficacy via ROS-dependent cytotoxic mechanisms.
@@ -899,8 +894,7 @@ OUTPUT FORMAT — return ONLY valid JSON, no markdown, no text outside the JSON 
   "correctedPrescription": {"isOverpowered": false, "dailyCalories": number, "dailyProtein": number, "dailyCarbs": number, "dailyFat": number, "reasoning": "string"},
   "logicRefinements": ["string 1", "string 2"],
   "drugInteractions": [{"drug": "string", "interaction": "string", "advice": "string", "risk": "HIGH|MODERATE|LOW"}],
-  "micronutrientOrders": [{"nutrient": "string", "labValue": "string", "dose": "string", "rationale": "string", "status": "RDA_CORRECTION|EXCLUDED|HOLD|MONITOR|STANDARD"}],
-  "monitoringSchedule": [{"frequency": "string", "parameters": "string", "threshold": "string", "responsible": "string"}]
+  "micronutrientOrders": [{"nutrient": "string", "labValue": "string", "dose": "string", "rationale": "string", "status": "RDA_CORRECTION|EXCLUDED|HOLD|MONITOR|STANDARD"}]
 }`;
 
     const msg = await anthropic.messages.create({
@@ -988,8 +982,7 @@ OUTPUT FORMAT — return ONLY valid JSON, no markdown, no text outside the JSON 
         correctedPrescription: { isOverpowered: false, dailyCalories: null, dailyProtein: null, reasoning: 'Response truncated — re-run audit.' },
         logicRefinements: grabArr('logicRefinements'),
         drugInteractions: grabArr('drugInteractions'),
-        micronutrientOrders: grabArr('micronutrientOrders'),
-        monitoringSchedule: grabArr('monitoringSchedule')
+        micronutrientOrders: grabArr('micronutrientOrders')
       };
     }
     __aiJobs[jobId] = { status: 'done', data };
