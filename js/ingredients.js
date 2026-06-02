@@ -63,7 +63,7 @@ const IngredientLibrary = [
     id: 'mct_powder',
     name: 'MCT Powder (70%)',
     category: 'FAT',
-    kcalPerGram: 6.5,
+    kcalPerGram: 7.0,
     pPerGram: 0,
     fPerGram: 0.7,
     cPerGram: 0.3,
