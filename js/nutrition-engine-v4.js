@@ -727,7 +727,10 @@ function generateNutritionPlan(patient, engineConfig) {
   const proteinCalories = dailyProtein * 4;
   const remainingCalories = Math.max(0, dailyCalories - proteinCalories);
   
-  const carbRatio = (crp > 5 || isDiabetic) ? fv('carb_ratio_diabetic', 0.35) : fv('carb_ratio_standard', 0.45);
+  // ESPEN Oncology 2021: carbohydrates are the primary energy substrate.
+  // Carbs should exceed fat. Standard 55% / diabetic/high-CRP 55% (glycaemic
+  // control achieved via Palatinose slow-release carb, not by reducing carbs).
+  const carbRatio = (crp > 5 || isDiabetic) ? fv('carb_ratio_diabetic', 0.55) : fv('carb_ratio_standard', 0.55);
   let dailyCarbs = Math.floor((remainingCalories * carbRatio) / 4);
   const carbCalories = dailyCarbs * 4;
 
