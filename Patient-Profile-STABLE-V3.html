@@ -716,7 +716,7 @@
         <!-- PATIENT SUMMARY (Micro Grid) -->
         <div class="rs">
           <div class="rs-title">Patient Profile</div>
-          <div class="rmg" style="grid-template-columns: repeat(3, 1fr);">
+          <div class="rmg" style="grid-template-columns: repeat(4, 1fr); margin-bottom:6px;">
             <div class="rmi">
               <div class="rmi-n">Name</div>
               <div class="rmi-v" id="pName"></div>
@@ -726,16 +726,18 @@
               <div class="rmi-v"><span id="pAge"></span> / <span id="pSex"></span></div>
             </div>
             <div class="rmi">
-              <div class="rmi-n">Protocol / Regimen</div>
-              <div class="rmi-v"><span id="pCancer_header"></span> / <span id="pRegimen_header"></span></div>
-            </div>
-            <div class="rmi">
               <div class="rmi-n">Weight / Height</div>
               <div class="rmi-v"><span id="pWeight"></span> / <span id="pHeight"></span></div>
             </div>
             <div class="rmi">
               <div class="rmi-n">BMI (Current)</div>
               <div class="rmi-v" id="pBMI_top"></div>
+            </div>
+          </div>
+          <div class="rmg" style="grid-template-columns: 1fr;">
+            <div class="rmi">
+              <div class="rmi-n">Protocol / Regimen</div>
+              <div class="rmi-v"><span id="pCancer_header"></span> / <span id="pRegimen_header"></span></div>
             </div>
           </div>
         </div>
