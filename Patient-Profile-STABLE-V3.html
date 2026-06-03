@@ -1758,7 +1758,7 @@
                     <label class="required">Hemoglobin (g/dL) <span id="epHemoglobin_status"
                         class="status-badge"></span></label>
                     <input id="epHemoglobin" type="number" step="0.1"
-                      oninput="validateNumber('epHemoglobin','Hemoglobin',2,25); updateLabStatus('epHemoglobin', this.value)">
+                      oninput="validateOptionalNumber('epHemoglobin','Hemoglobin',2,25); updateLabStatus('epHemoglobin', this.value)">
                     <div class="range-hint">Normal: 12 - 16 g/dL</div>
                     <div class="validation-msg" id="epHemoglobin_msg"></div>
                   </div>
@@ -2391,6 +2391,14 @@
             if (v < min || v > max) return setMsg(id, false, `${label} must be between ${min} and ${max}`);
             return setMsg(id, true, '');
           }
+          function validateOptionalNumber(id, label, min, max) {
+            const raw = document.getElementById(id).value;
+            if (!raw || raw.trim() === '') return setMsg(id, true, ''); // optional — blank is OK
+            const v = parseFloat(raw);
+            if (Number.isNaN(v)) return setMsg(id, false, `${label}: enter a valid number or leave blank`);
+            if (v < min || v > max) return setMsg(id, false, `${label} must be between ${min} and ${max}`);
+            return setMsg(id, true, '');
+          }
           function validateSelect(id, label) {
             const v = document.getElementById(id).value;
             if (!v) return setMsg(id, false, label + ' is required');
@@ -2898,8 +2906,8 @@
               validateNumber('epAlbumin', 'Serum Albumin', 1, 6) &
               validateNumber('epCRP', 'CRP', 0, 500) &
               validateNumber('epCreatinine', 'Creatinine', 0.1, 20) &
-              validateNumber('epBloodSugar', 'Blood Sugar', 20, 1000) &
-              validateNumber('epHemoglobin', 'Hemoglobin', 2, 25) &
+              validateOptionalNumber('epBloodSugar', 'Blood Sugar', 20, 1000) &
+              validateOptionalNumber('epHemoglobin', 'Hemoglobin', 2, 25) &
               validateSelect('epFeeding', 'Feeding Method') &
               validateSelect('epCancer', 'Cancer Type') &
               validateSelect('epRegimen', 'Chemo Regimen');
