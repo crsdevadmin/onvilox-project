@@ -531,28 +531,73 @@
     }
 
     @media print {
-      body {
-        background: #fff !important;
-      }
+      body { background: #fff !important; }
 
-      .topbar,
-      .rpt-actions-bar,
-      .rpt-panel,
-      .no-print {
-        display: none !important;
-      }
+      .topbar, .rpt-actions-bar, .rpt-panel, .no-print { display: none !important; }
 
-      #reportDoc {
-        box-shadow: none;
-        border: none;
-        margin: 0;
-        max-width: none;
-      }
+      #reportDoc { box-shadow: none; border: none; margin: 0; max-width: none; }
 
-      .rs, .rg, .rt, .ai-panel, .rtrace {
-        page-break-inside: avoid !important;
-        break-inside: avoid !important;
-      }
+      /* ── COMPACT PRINT: reduce report from 8-9 pages to ~4-5 pages ── */
+
+      /* Letterhead & hospital bar */
+      .rlt { padding: 12px 20px 10px !important; }
+      .rlt-brand-name { font-size: 18px !important; }
+      .rlt-doc-title { font-size: 10px !important; }
+      .rlt-doc-sub, .rlt-doc-id { font-size: 9px !important; }
+      .rhb { padding: 5px 20px !important; }
+      .rhb-name { font-size: 12px !important; }
+      .rhb-right { font-size: 10px !important; }
+
+      /* Sections */
+      .rs { padding: 0 20px !important; margin-top: 10px !important; }
+      .rs:last-of-type { padding-bottom: 14px !important; }
+      .rs-title { font-size: 8px !important; padding-bottom: 3px !important; margin-bottom: 7px !important; }
+      .rs-title::before { height: 10px !important; }
+
+      /* Field grid — 4 columns in print for compactness */
+      .rg { grid-template-columns: repeat(4, 1fr) !important; gap: 4px !important; }
+      .rg2 { grid-template-columns: repeat(3, 1fr) !important; gap: 4px !important; }
+      .rg4 { grid-template-columns: repeat(5, 1fr) !important; gap: 4px !important; }
+
+      /* Field cards */
+      .rf { padding: 5px 8px !important; border-radius: 3px !important; }
+      .rf-lbl { font-size: 7.5px !important; margin-bottom: 1px !important; }
+      .rf-val { font-size: 11px !important; }
+      .rf-val.big { font-size: 14px !important; }
+      .vbig { font-size: 12px !important; }
+
+      /* Tables */
+      .rt { font-size: 9.5px !important; }
+      .rt thead th { padding: 5px 8px !important; font-size: 8.5px !important; }
+      .rt tbody td { padding: 4px 8px !important; font-size: 9.5px !important; }
+      table { font-size: 9.5px !important; }
+      td, th { padding: 4px 7px !important; }
+
+      /* Micronutrient table — 2-column layout to halve vertical space */
+      #micronutrientSection .rt tbody { display: grid; grid-template-columns: 1fr 1fr; }
+      #micronutrientSection .rt thead { display: none; }
+      #micronutrientSection .rt tbody tr { break-inside: avoid; }
+
+      /* AI sections */
+      [id^="claude"] { font-size: 9.5px !important; }
+      [id^="claude"] td, [id^="claude"] th { padding: 4px 7px !important; }
+
+      /* Recipe / ingredient table */
+      #recipeBody td { padding: 4px 8px !important; font-size: 9.5px !important; }
+      .recipe-row-item { font-size: 9px !important; }
+
+      /* Calculation trace */
+      #calcTrace { font-size: 9px !important; line-height: 1.4 !important; }
+      #calcTrace div { margin-bottom: 2px !important; }
+
+      /* Clinical rationale */
+      .rrat li { font-size: 9px !important; margin-bottom: 2px !important; }
+
+      /* Monitoring section — hide in print (it's interactive only) */
+      #monitoringSection { display: none !important; }
+
+      /* Page break control */
+      .rs, .rg, .ai-panel, .rtrace { page-break-inside: avoid !important; break-inside: avoid !important; }
     }
 
     .ai-panel {
