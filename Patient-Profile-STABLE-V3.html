@@ -716,26 +716,31 @@
         <!-- PATIENT SUMMARY (Micro Grid) -->
         <div class="rs">
           <div class="rs-title">Patient Profile</div>
-          <div class="rmg" style="grid-template-columns: repeat(4, 1fr); margin-bottom:6px;">
-            <div class="rmi">
-              <div class="rmi-n">Name</div>
-              <div class="rmi-v" id="pName"></div>
+          <div style="display:grid; grid-template-columns: 1fr 1fr 2fr; gap:6px;">
+            <!-- Column 1: Name + Age/Sex -->
+            <div style="display:flex; flex-direction:column; gap:6px;">
+              <div class="rmi">
+                <div class="rmi-n">Name</div>
+                <div class="rmi-v" id="pName"></div>
+              </div>
+              <div class="rmi">
+                <div class="rmi-n">Age / Sex</div>
+                <div class="rmi-v"><span id="pAge"></span> / <span id="pSex"></span></div>
+              </div>
             </div>
-            <div class="rmi">
-              <div class="rmi-n">Age / Sex</div>
-              <div class="rmi-v"><span id="pAge"></span> / <span id="pSex"></span></div>
+            <!-- Column 2: Weight/Height + BMI -->
+            <div style="display:flex; flex-direction:column; gap:6px;">
+              <div class="rmi">
+                <div class="rmi-n">Weight / Height</div>
+                <div class="rmi-v"><span id="pWeight"></span> / <span id="pHeight"></span></div>
+              </div>
+              <div class="rmi">
+                <div class="rmi-n">BMI (Current)</div>
+                <div class="rmi-v" id="pBMI_top"></div>
+              </div>
             </div>
-            <div class="rmi">
-              <div class="rmi-n">Weight / Height</div>
-              <div class="rmi-v"><span id="pWeight"></span> / <span id="pHeight"></span></div>
-            </div>
-            <div class="rmi">
-              <div class="rmi-n">BMI (Current)</div>
-              <div class="rmi-v" id="pBMI_top"></div>
-            </div>
-          </div>
-          <div class="rmg" style="grid-template-columns: 1fr;">
-            <div class="rmi">
+            <!-- Column 3: Protocol/Regimen (spans full height) -->
+            <div class="rmi" style="height:100%;">
               <div class="rmi-n">Protocol / Regimen</div>
               <div class="rmi-v"><span id="pCancer_header"></span> / <span id="pRegimen_header"></span></div>
             </div>
