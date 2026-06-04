@@ -742,7 +742,7 @@
             <!-- Column 3: Protocol/Regimen (spans full height) -->
             <div class="rmi" style="height:100%;">
               <div class="rmi-n">Protocol / Regimen</div>
-              <div class="rmi-v"><span id="pCancer_header"></span> / <span id="pRegimen_header"></span></div>
+              <div class="rmi-v" id="pProtocolLine"><span id="pCancer_header"></span><span id="pRegimenSlash"> / </span><span id="pRegimen_header"></span></div>
             </div>
           </div>
         </div>
@@ -3008,7 +3008,7 @@
 
             // Sync Oncology labels explicitly before bind
             setVal('pCancer_header', patient.cancer);
-            setVal('pRegimen_header', (function(r){ return (r && r.toLowerCase() !== 'unknown') ? r : '-'; })(normalizeRegimen(patient.regimen)));
+            (function(){ var r = normalizeRegimen(patient.regimen); var clean = (r && r.toLowerCase() !== 'unknown') ? r : ''; setVal('pRegimen_header', clean || ''); var slash = document.getElementById('pRegimenSlash'); if (slash) slash.style.display = clean ? '' : 'none'; })();
 
             bind(newPlan);
             alert('Patient details updated and plan recalculated.');
@@ -3117,7 +3117,7 @@
                setVal('pCancer_card', c);
             }
             if (r) {
-               setVal('pRegimen_header', (function(x){ return (x && x.toLowerCase() !== 'unknown') ? x : '-'; })(normalizeRegimen(r)));
+               (function(){ var nr = normalizeRegimen(r); var clean = (nr && nr.toLowerCase() !== 'unknown') ? nr : ''; setVal('pRegimen_header', clean); var slash = document.getElementById('pRegimenSlash'); if (slash) slash.style.display = clean ? '' : 'none'; })();
                setVal('pRegimen_card', normalizeRegimen(r));
             }
           }
@@ -3455,7 +3455,7 @@
             if (ibwDisp) ibwDisp.textContent = `IBW: ${ibwKg} kg`;
             setVal('pWL', (patient.weightLossPercent ?? '-') + ' %');
             setVal('pCancer_header', patient.cancer);
-            setVal('pRegimen_header', (function(r){ return (r && r.toLowerCase() !== 'unknown') ? r : '-'; })(normalizeRegimen(patient.regimen)));
+            (function(){ var r = normalizeRegimen(patient.regimen); var clean = (r && r.toLowerCase() !== 'unknown') ? r : ''; setVal('pRegimen_header', clean || ''); var slash = document.getElementById('pRegimenSlash'); if (slash) slash.style.display = clean ? '' : 'none'; })();
             setVal('pFeeding', fp.prescribedRoute);
             setHTML('pAlbumin', labBadge(patient.albumin, 'g/dL', {lo:3.5, hi:5.5, critLo:2.8}));
             setHTML('pCRP_val', labBadge(patient.crp, 'mg/L', {lo:0.1, hi:5, critHi:10}));
