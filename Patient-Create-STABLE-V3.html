@@ -320,7 +320,7 @@
       </div>
       <div class="form-group" style="grid-column:1 / -1;">
         <label class="required">Chemo Regimen</label>
-        <input type="text" id="regimenInput" placeholder="Search regimen..." autocomplete="new-password" name="off" spellcheck="false" required onfocus="openRegimenDropdown()" onkeyup="filterRegimenList()" onblur="setTimeout(()=>validateField(this,'Chemo Regimen'), 200)">
+        <input type="text" id="regimenInput" placeholder="Search regimen..." autocomplete="new-password" name="off" spellcheck="false" required onfocus="openRegimenDropdown()" onkeyup="filterRegimenList()" onblur="setTimeout(validateRegimen, 200)">
         <div class="dropdown-list" id="regimenDropdown"></div>
         <div class="validation-msg" id="regimenInput_msg"></div>
       </div>
@@ -625,6 +625,14 @@ function submitPatient(){
   const missingFields = [];
   let firstInvalidEl = null;
   for (let f of fields) {
+    if (f.id === 'regimenInput') {
+      if (!validateRegimen()) {
+        if (!firstInvalidEl) firstInvalidEl = document.getElementById('regimenInput');
+        missingFields.push(f.name);
+        isValid = false;
+      }
+      continue;
+    }
     const el = document.getElementById(f.id);
     if (!validateField(el, f.name)) {
       if (!firstInvalidEl) firstInvalidEl = el;

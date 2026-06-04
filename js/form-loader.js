@@ -114,7 +114,39 @@ function selectRegimen(regimen) {
   const input = document.getElementById("regimenInput");
   input.value = regimen;
   document.getElementById("regimenDropdown").style.display = "none";
-  validateField(input, "Chemo Regimen");
+  validateRegimen();
+}
+
+function validateRegimen() {
+  const input = document.getElementById("regimenInput");
+  const msgBox = document.getElementById("regimenInput_msg");
+  if (!input) return true;
+  const val = (input.value || '').trim();
+  const placeholders = ['unknown', 'n/a', 'na', 'none', 'not specified', 'not stated', '-'];
+
+  if (!val || placeholders.includes(val.toLowerCase())) {
+    input.classList.add("field-invalid"); input.classList.remove("field-valid");
+    if (msgBox) { msgBox.className = "validation-msg validation-error"; msgBox.innerText = "Chemo Regimen is required"; }
+    return false;
+  }
+
+  // Check if the value exists in the approved regimen list for the selected cancer
+  const allRegimens = [];
+  if (typeof cancerRegimenMap !== 'undefined') {
+    Object.values(cancerRegimenMap).forEach(arr => { if (Array.isArray(arr)) allRegimens.push(...arr); });
+  }
+  const valLower = val.toLowerCase();
+  const approved = allRegimens.some(r => r.toLowerCase() === valLower || valLower.includes(r.toLowerCase()) || r.toLowerCase().includes(valLower));
+
+  if (!approved && allRegimens.length > 0) {
+    input.classList.add("field-invalid"); input.classList.remove("field-valid");
+    if (msgBox) { msgBox.className = "validation-msg validation-error"; msgBox.innerText = "Please select a regimen from the approved list"; }
+    return false;
+  }
+
+  input.classList.add("field-valid"); input.classList.remove("field-invalid");
+  if (msgBox) { msgBox.className = "validation-msg validation-success"; msgBox.innerText = "✓ Looks good"; }
+  return true;
 }
 
 // ---------- FEEDING ----------
