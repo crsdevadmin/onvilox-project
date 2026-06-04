@@ -320,7 +320,7 @@
       </div>
       <div class="form-group" style="grid-column:1 / -1;">
         <label class="required">Chemo Regimen</label>
-        <input type="text" id="regimenInput" placeholder="Search regimen..." autocomplete="new-password" name="off" spellcheck="false" onfocus="openRegimenDropdown()" onkeyup="filterRegimenList()" onblur="setTimeout(()=>validateField(this,'Chemo Regimen'), 200)">
+        <input type="text" id="regimenInput" placeholder="Search regimen..." autocomplete="new-password" name="off" spellcheck="false" required onfocus="openRegimenDropdown()" onkeyup="filterRegimenList()" onblur="setTimeout(()=>validateField(this,'Chemo Regimen'), 200)">
         <div class="dropdown-list" id="regimenDropdown"></div>
         <div class="validation-msg" id="regimenInput_msg"></div>
       </div>

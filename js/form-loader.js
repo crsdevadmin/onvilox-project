@@ -239,8 +239,12 @@ function validateField(field, fieldName) {
   const val = (typeof valRaw === "string") ? valRaw.trim() : valRaw;
   const isMandatory = field.getAttribute('required') !== null;
 
+  // Placeholder values that should not be accepted as real inputs
+  const _placeholders = ['unknown', 'n/a', 'na', 'none', 'not specified', 'not stated', '-'];
+  const isPlaceholder = isMandatory && val && _placeholders.includes(val.toLowerCase());
+
   // Required check
-  if (val === "" || val === null || val === undefined) {
+  if (val === "" || val === null || val === undefined || isPlaceholder) {
     if (isMandatory) {
       field.classList.add("field-invalid");
       field.classList.remove("field-valid");

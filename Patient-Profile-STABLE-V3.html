@@ -2400,8 +2400,9 @@
             return setMsg(id, true, '');
           }
           function validateSelect(id, label) {
-            const v = document.getElementById(id).value;
-            if (!v) return setMsg(id, false, label + ' is required');
+            const v = (document.getElementById(id).value || '').trim();
+            const invalid = ['', 'unknown', 'n/a', 'na', 'none', 'not specified', 'not stated', '-'];
+            if (!v || invalid.includes(v.toLowerCase())) return setMsg(id, false, label + ' is required — please select or enter a valid value');
             return setMsg(id, true, '');
           }
 
