@@ -2240,7 +2240,7 @@
 
           const printMode = params.get('print') === '1';
           const reviewMode = params.get('review') === '1';
-          const storeMode = params.get('store') === '1' || (me && me.role === 'STORE');
+          const storeMode = params.get('store') === '1';
           if (storeMode) {
             const storeStyle = document.createElement('style');
             storeStyle.textContent = `
