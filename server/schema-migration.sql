@@ -196,3 +196,7 @@ ALTER TABLE patients ADD COLUMN IF NOT EXISTS created_by_user_id VARCHAR(50);
 -- Migration: Add claude_insights to nutrition_plans
 ALTER TABLE nutrition_plans ADD COLUMN IF NOT EXISTS claude_insights JSONB;
 ALTER TABLE nutrition_plans ADD COLUMN IF NOT EXISTS full_data JSONB;
+
+-- Migration: Add store_id and phone to users
+ALTER TABLE users ADD COLUMN IF NOT EXISTS store_id VARCHAR(50);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(50);

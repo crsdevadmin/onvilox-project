@@ -88,11 +88,6 @@ function statusClass(s){
   return (s||'APPROVED').toLowerCase();
 }
 
-function toggleDetails(jobId){
-  const el = document.getElementById('details_' + jobId);
-  if(!el) return;
-  el.style.display = (el.style.display === 'none' || el.style.display === '') ? 'table-row' : 'none';
-}
 
 function render(){
   const tbody = document.getElementById('jobTable');
@@ -144,72 +139,30 @@ function render(){
       <td>${p.uhic}</td>
       <td>${p.cancer}</td>
       <td><span class="status ${statusClass(j.status)}">${j.status}</span></td>
-      <td style="display:flex;gap:8px;align-items:center;">
-        <a href="/patients/profile?id=${p.id}&store=1" class="btn-primary" style="padding:6px 12px;font-size:12px;border-radius:6px;" onclick="event.stopPropagation();">View Plan</a>
-        <button class="btn-warning" onclick="toggleDetails('${j.id}'); event.stopPropagation();">Status</button>
-      </td>
-    `;
-    tbody.appendChild(main);
-
-    const details = document.createElement('tr');
-    details.id = `details_${j.id}`;
-    details.style.display = 'none';
-    details.innerHTML = `
-      <td colspan="6">
-        <div class="card" style="margin:0; padding:18px;">
-          <div style="display:flex; flex-wrap:wrap; gap:18px; align-items:flex-start;">
-            <div style="flex:1; min-width:260px;">
-              <div style="font-weight:700; margin-bottom:8px;">Patient</div>
-              <div><b>Name:</b> ${p.name}</div>
-              <div><b>UHIC:</b> ${p.uhic}</div>
-              <div><b>Age/Sex:</b> ${p.age} / ${p.sex}</div>
-              <div><b>Weight/Height:</b> ${p.weight} kg / ${p.height} cm</div>
-              <div><b>Albumin:</b> ${p.albumin} g/dL</div>
-              <div><b>Weight loss %:</b> ${p.weightLossPercent ?? '-'}</div>
-              <div><b>Feeding:</b> ${p.feedingMethod}</div>
-            </div>
-
-            <div style="flex:1; min-width:260px;">
-              <div style="font-weight:700; margin-bottom:8px;">Nutrition (latest plan)</div>
-              ${planFinal ? `
-                <div><b>Calories/day:</b> ${planFinal.dailyCalories} kcal</div>
-                <div><b>Protein/day:</b> ${planFinal.dailyProtein} g</div>
-                <div><b>Per serving (2x):</b> ${planFinal.perServingCalories} kcal, ${planFinal.perServingProtein} g protein</div>
-                <div><b>Carbs/serving:</b> ${planFinal.macroCarbs} g</div>
-                <div><b>Fat/serving:</b> ${planFinal.macroFat} g</div>
-                <div><b>Protein type:</b> ${planFinal.proteinType}</div>
-                <div style="margin-top:8px; font-size:13px; color:#6b7280;">
-                  Plan v${plan.version} • ${plan.generatedBy}
-                </div>
-              ` : `
-                <div style="color:#6b7280;">No plan generated yet. Open report to generate.</div>
-              `}
-            </div>
+      <td>
+        <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-start;">
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <a href="/patients/profile?id=${p.id}&store=1" class="btn-primary" style="padding:6px 12px;font-size:12px;border-radius:6px;" onclick="event.stopPropagation();">View Plan</a>
+            <button class="btn-warning" onclick="event.stopPropagation(); openPdf('${p.id}')" style="padding:6px 12px;font-size:12px;border-radius:6px;">PDF</button>
           </div>
-
-          <div style="margin-top:14px; display:flex; flex-wrap:wrap; gap:10px;">
-            <button class="btn-primary" onclick="event.stopPropagation(); location.href='/store/job?job=${j.id}'" style="display:flex; align-items:center; gap:6px;" title="Update Production Status">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M11 2a3 3 0 0 1 2.995 2.824L14 5v6a3 3 0 0 1-2.824 2.995L11 14H5a3 3 0 0 1-2.995-2.824L2 11V5a3 3 0 0 1 2.824-2.995L5 2h6zm-1.5 6h-3a.5.5 0 0 0 0 1h3a.5.5 0 0 0 0-1zm.5-3h-4a.5.5 0 0 0 0 1h4a.5.5 0 0 0 0-1z"/></svg>
-              Production
-            </button>
-            <button class="btn-secondary" onclick="event.stopPropagation(); location.href='/patients/profile?id=${p.id}'" style="display:flex; align-items:center; gap:6px;" title="View Report">
-               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M8.636 3.5a.5.5 0 0 0-.5-.5H1.5A1.5 1.5 0 0 0 0 4.5v10A1.5 1.5 0 0 0 1.5 16h10a1.5 1.5 0 0 0 1.5-1.5V7.864a.5.5 0 0 0-1 0V14.5a.5.5 0 0 1-.5.5h-10a.5.5 0 0 1-.5-.5v-10a.5.5 0 0 1 .5-.5h6.636a.5.5 0 0 0 .5-.5z"/><path fill-rule="evenodd" d="M16 .5a.5.5 0 0 0-.5-.5h-5a.5.5 0 0 0 0 1h3.793L6.146 9.146a.5.5 0 1 0 .708.708L15 1.707V5.5a.5.5 0 0 0 1 0v-5z"/></svg>
-               Report
-            </button>
-            <button class="btn-warning" onclick="event.stopPropagation(); openPdf('${p.id}')" style="display:flex; align-items:center; gap:6px;" title="Download PDF">
-               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/><path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/></svg>
-               PDF
-            </button>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <button onclick="event.stopPropagation(); updateStatus('${j.id}', 'PROCESSING')" style="padding:5px 10px;font-size:11px;border-radius:5px;border:1px solid #f59e0b;background:#fffbeb;color:#92400e;font-weight:600;cursor:pointer;">Mark Processing</button>
+            <button onclick="event.stopPropagation(); updateStatus('${j.id}', 'DISPATCHED')" style="padding:5px 10px;font-size:11px;border-radius:5px;border:1px solid #16a34a;background:#f0fdf4;color:#15803d;font-weight:600;cursor:pointer;">Mark Dispatched</button>
           </div>
         </div>
       </td>
     `;
-    tbody.appendChild(details);
+    tbody.appendChild(main);
   });
 }
 
+async function updateStatus(jobId, status) {
+  await manufacturingService.updateJobStatus(jobId, status);
+  render();
+}
+
 function openPdf(patientId){
-  const url = `patient-profile.html?id=${encodeURIComponent(patientId)}&print=1`;
+  const url = `/patients/profile?id=${encodeURIComponent(patientId)}&print=1`;
   window.open(url, '_blank', 'noopener');
 }
 

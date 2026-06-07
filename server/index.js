@@ -1557,4 +1557,8 @@ Object.entries(cleanRoutes).forEach(([route, file]) => {
   app.get(route, (req, res) => res.sendFile(path.join(__dirname, '..', file)));
 });
 // Root → login page
-app.get('/', (req, res) => res.sendFile(p
+app.get('/', (req, res) => res.sendFile(path.join(__dirname, '..', 'index.html')));
+
+// Start Server
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
