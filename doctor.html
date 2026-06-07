@@ -304,20 +304,35 @@
             if (planId) {
               const apiBase = (typeof CONFIG !== 'undefined' ? CONFIG.API_BASE_URL : '');
               const token = auth.getCurrentUser().token || '';
+
+              const _patch = async () => {
+                const res = await fetch(`${apiBase}/api/nutrition-plans/${planId}/insights`, {
+                  method: 'PATCH',
+                  headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+                  body: JSON.stringify({ insights: data })
+                });
+                return res.ok ? res.json() : Promise.reject(new Error(`PATCH ${res.status}`));
+              };
+
               // Retry up to 3 times in case of transient server error
               for (let attempt = 1; attempt <= 3; attempt++) {
                 try {
-                  const res = await fetch(`${apiBase}/api/nutrition-plans/${planId}/insights`, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-                    body: JSON.stringify({ insights: data })
-                  });
-                  if (res.ok) break;
-                  console.warn(`PATCH insights attempt ${attempt} failed (${res.status})`);
+                  const result = await _patch();
+                  if (result.rowCount === 0) {
+                    // Plan exists in localStorage but NOT in DB — POST it first, then PATCH
+                    console.warn('Plan not in DB — saving plan first then re-patching insights');
+                    await fetch(`${apiBase}/api/nutrition-plans`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+                      body: JSON.stringify(freshPlan)
+                    });
+                    await _patch(); // Now PATCH with plan in DB
+                  }
+                  break;
                 } catch(e) {
                   console.warn(`PATCH insights attempt ${attempt} error:`, e.message);
+                  if (attempt < 3) await new Promise(r => setTimeout(r, 2000 * attempt));
                 }
-                if (attempt < 3) await new Promise(r => setTimeout(r, 2000 * attempt));
               }
               _clearLock(planId);
             }
@@ -499,63 +514,4 @@
       // Safety timeout: remove iframe after 45s regardless
       const timeout = setTimeout(cleanup, 45000);
 
-      window.addEventListener('message', function handler(e) {
-        if (e.data && e.data.type === 'pdfReady' && e.data.patientId === patientId) {
-          clearTimeout(timeout);
-          window.removeEventListener('message', handler);
-          setTimeout(cleanup, 1500); // slight delay so download can start
-        }
-      });
-
-      iframe.src = url;
-    }
-
-    async function quickApprove(patientId, btn) {
-      const patient = getPatientById(patientId);
-      if (!patient) return alert('Patient not found.');
-      if (patient.status !== 'CREATED') return alert('Patient is already approved or in production.');
-
-      if (btn) { btn.disabled = true; btn.textContent = 'Approving...'; }
-
-      // Get storeId
-      const storeId = mappingService.getStoreForDoctor(me.id);
-      if (!storeId) {
-        if (btn) { btn.disabled = false; btn.textContent = 'Approve'; }
-        return alert('Doctor is not mapped to a store. Admin must map doctor → store.');
-      }
-
-      // Approve
-      patient.status = 'APPROVED';
-      patient.approvedAt = new Date().toISOString();
-      patient.approvedBy = me.id;
-      patient.approvedByName = me.name || me.username || 'Doctor';
-      patient.storeId = storeId;
-
-      try {
-        await updatePatient(patient);
-        const existingJob = manufacturingService.getJobByPatient(patient.id);
-        if (!existingJob) {
-          manufacturingService.createJob({ patientId: patient.id, storeId, doctorId: me.id });
-        }
-        render();
-        alert(`✓ ${patient.name} approved and sent to production.`);
-      } catch(e) {
-        if (btn) { btn.disabled = false; btn.textContent = 'Approve'; }
-        alert('Approval failed: ' + e.message);
-      }
-    }
-
-    function confirmDelete(id, name) {
-      if (confirm(`CRITICAL ACTION: Are you sure you want to permanently delete the record for "${name}"? This will also remove all their nutrition plans and manufacturing history.`)) {
-        if (deletePatient(id)) {
-           render(); // Refresh the list
-        }
-      }
-    }
-  </script>
-
-  <script src="/js/theme.js"></script>
-  <script src="/js/pwa.js"></script>
-</body>
-
-</html>
+      window.addEve

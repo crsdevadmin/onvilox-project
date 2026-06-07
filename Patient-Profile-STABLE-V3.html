@@ -2246,10 +2246,10 @@
             storeStyle.textContent = `
               /* Hide all .rs sections by default in store mode */
               #reportDoc .rs { display:none !important; }
-              /* Show only the 3 production-relevant sections */
-              #sectionPrescription,
-              #sectionServings,
-              #sectionProduction { display:block !important; }
+              /* Show only the 3 production-relevant sections (higher specificity to win over the hide rule) */
+              #reportDoc #sectionPrescription,
+              #reportDoc #sectionServings,
+              #reportDoc #sectionProduction { display:block !important; }
               /* Hide global UI elements not needed by store */
               #editPatientSection, .rpt-actions-bar, .ai-chat-launcher,
               #safetyAlertsBlock, #clinicalProtocolsContainer,
@@ -3332,7 +3332,7 @@
             setHTML('pFolate', labBadge(patient.folate, 'ng/mL', {lo:3.1, hi:17.5, critLo:2.0}));
             setHTML('pZinc', labBadge(patient.zinc, 'μg/dL', {lo:60, hi:120, critLo:40}));
             setHTML('pMagnesium', labBadge(patient.magnesium, 'mg/dL', {lo:1.7, hi:2.2, critLo:1.5}));
-            setVal('pMicrobiome', fp.micronutrients.microbiome || '-');
+            setVal('pMicrobiome', (fp.micronutrients && fp.micronutrients.microbiome) || '-');
             const isMale = sex === 'male';
             setHTML('pSMI', labBadge(patient.smi, 'cm²/m²', isMale ? {lo:7.26, hi:30} : {lo:5.45, hi:30}));
             setHTML('pHandGrip', labBadge(patient.handGrip, 'kg', isMale ? {lo:27, hi:60, critLo:20} : {lo:16, hi:40, critLo:10}));

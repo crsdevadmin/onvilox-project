@@ -430,13 +430,14 @@ app.put('/api/nutrition-plans/:id', authenticateToken, async (req, res) => {
 // Nutrition Plans: Save only claude_insights (lightweight — avoids sending full plan payload)
 app.patch('/api/nutrition-plans/:id/insights', authenticateToken, async (req, res) => {
   const { insights } = req.body;
-  if (!insights) return res.status(400).json({ error: 'insights required' });
+  if (insights === undefined) return res.status(400).json({ error: 'insights required' });
   try {
-    await pool.query(
+    const result = await pool.query(
       `UPDATE nutrition_plans SET claude_insights = $1 WHERE id = $2`,
-      [JSON.stringify(insights), req.params.id]
+      [insights ? JSON.stringify(insights) : null, req.params.id]
     );
-    res.json({ ok: true });
+    // rowCount tells client whether the plan existed in DB (0 = plan missing, needs POST first)
+    res.json({ ok: true, rowCount: result.rowCount });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -483,12 +484,12 @@ app.get('/api/users', authenticateToken, async (req, res) => {
 
 // Users: Create (admin)
 app.post('/api/users', authenticateToken, async (req, res) => {
-  const { id, name, email, password, role, hospital_name } = req.body;
+  const { id, name, email, password, role, hospital_name, store_id, phone } = req.body;
   try {
     const hash = await bcrypt.hash(password, 10);
     const result = await pool.query(
-      'INSERT INTO users (id, name, email, password_hash, role, hospital_name) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id, name, email, role, hospital_name',
-      [id || `user_${Date.now()}`, name, email, hash, role, hospital_name]
+      'INSERT INTO users (id, name, email, password_hash, role, hospital_name, store_id, phone) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id, name, email, role, hospital_name, store_id, phone',
+      [id || `user_${Date.now()}`, name, email, hash, role, hospital_name, store_id || null, phone || null]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -1556,8 +1557,4 @@ Object.entries(cleanRoutes).forEach(([route, file]) => {
   app.get(route, (req, res) => res.sendFile(path.join(__dirname, '..', file)));
 });
 // Root → login page
-app.get('/', (req, res) => res.sendFile(path.join(__dirname, '..', 'index.html')));
-
-// Start Server
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.get('/', (req, res) => res.sendFile(p
