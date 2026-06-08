@@ -9,6 +9,9 @@
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#0e2247">
   <style>
+    .filter-tab { padding:7px 16px; font-size:12px; font-weight:700; border-radius:20px; border:1.5px solid #d1d5db; background:#fff; color:#64748b; cursor:pointer; transition:all .15s; }
+    .filter-tab:hover { border-color:#0e2247; color:#0e2247; }
+    .filter-tab.active { background:#0e2247; color:#fff; border-color:#0e2247; }
     @keyframes pulse {
       0% {
         opacity: 1;
@@ -54,17 +57,10 @@
             autocomplete="off">
         </div>
 
-        <div class="toolbar-field">
-          <label class="sr-only" for="statusFilter">Status</label>
-          <select id="statusFilter" class="input input-sm">
-            <option value="ALL">All Status</option>
-            <option value="CREATED">Created</option>
-            <option value="APPROVED">Approved</option>
-            <option value="PROCESSING">Processing</option>
-            <option value="READY">Ready</option>
-            <option value="DISPATCHED">Dispatched</option>
-            <option value="DELIVERED">Delivered</option>
-          </select>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          <button onclick="setDocFilter('ALL')"     id="dtab-ALL"     class="filter-tab active">All</button>
+          <button onclick="setDocFilter('PENDING')" id="dtab-PENDING" class="filter-tab">Not Approved</button>
+          <button onclick="setDocFilter('APPROVED')" id="dtab-APPROVED" class="filter-tab">Approved</button>
         </div>
 
         <a class="btn-primary btn-sm" href="/patients/create">+ Create Patient</a>
@@ -159,7 +155,6 @@
     let statusQuery = 'ALL';
 
     const searchBox = document.getElementById('searchBox');
-    const statusFilter = document.getElementById('statusFilter');
 
     if (searchBox) {
       searchBox.addEventListener('input', (e) => {
@@ -168,11 +163,13 @@
       });
     }
 
-    if (statusFilter) {
-      statusFilter.addEventListener('change', (e) => {
-        statusQuery = e.target.value || 'ALL';
-        render();
+    function setDocFilter(f) {
+      statusQuery = f;
+      ['ALL','PENDING','APPROVED'].forEach(k => {
+        const btn = document.getElementById('dtab-' + k);
+        if (btn) btn.classList.toggle('active', k === f);
       });
+      render();
     }
 
 
@@ -211,7 +208,9 @@
       // Apply filters for table view
       const filtered = patients.filter(p => {
         const status = p.status || 'CREATED';
-        if (statusQuery !== 'ALL' && status !== statusQuery) return false;
+        if (statusQuery === 'PENDING' && status !== 'CREATED') return false;
+        if (statusQuery === 'APPROVED' && status === 'CREATED') return false;
+        if (statusQuery !== 'ALL' && statusQuery !== 'PENDING' && statusQuery !== 'APPROVED' && status !== statusQuery) return false;
 
         if (searchQuery) {
           const name = (p.name || '').toLowerCase();

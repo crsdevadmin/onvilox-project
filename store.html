@@ -6,6 +6,12 @@
   <link rel="stylesheet" href="/css/app.css">
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#0e2247">
+  <style>
+    .filter-tab { padding:7px 16px; font-size:12px; font-weight:700; border-radius:20px; border:1.5px solid #d1d5db; background:#fff; color:#64748b; cursor:pointer; transition:all .15s; }
+    .filter-tab:hover:not(:disabled) { border-color:#0e2247; color:#0e2247; }
+    .filter-tab.active { background:#0e2247; color:#fff; border-color:#0e2247; }
+    .filter-tab:disabled { opacity:0.35; cursor:not-allowed; }
+  </style>
 </head>
 <body>
 
@@ -26,14 +32,23 @@
   </div>
 
   <div class="card">
-    <h2>Production Queue</h2>
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px;">
+      <h2 style="margin:0;">Production Queue</h2>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;" id="statusTabs">
+        <button onclick="setFilter('ALL')"       id="tab-ALL"        class="filter-tab active">All</button>
+        <button onclick="setFilter('APPROVED')"  id="tab-APPROVED"   class="filter-tab">Open</button>
+        <button onclick="setFilter('PROCESSING')" id="tab-PROCESSING" class="filter-tab">Processing</button>
+        <button onclick="setFilter('DISPATCHED')" id="tab-DISPATCHED" class="filter-tab" disabled>Dispatched</button>
+      </div>
+    </div>
 
     <table>
       <thead>
         <tr>
           <th>Doctor</th>
           <th>Patient</th>
-          <th>UHIC</th>
+          <th>Age / Gender</th>
+          <th>UHID</th>
           <th>Cancer</th>
           <th>Status</th>
           <th>Action</th>
@@ -78,6 +93,25 @@
 auth.requireRole(['STORE']);
 const me = auth.getCurrentUser();
 
+let _activeFilter = 'ALL';
+
+function setFilter(f) {
+  _activeFilter = f;
+  // Update tab styles
+  ['ALL','APPROVED','PROCESSING','DISPATCHED'].forEach(k => {
+    const btn = document.getElementById('tab-' + k);
+    if (!btn) return;
+    btn.classList.toggle('active', k === f);
+    btn.disabled = false;
+  });
+  // When Processing selected: enable Dispatched tab too (next step)
+  const dispTab = document.getElementById('tab-DISPATCHED');
+  if (f !== 'PROCESSING' && f !== 'ALL') {
+    dispTab.disabled = (f !== 'DISPATCHED');
+  }
+  render();
+}
+
 function getUserName(id){
   const users = userService.getUsers();
   const u = users.find(x => x.id === id);
@@ -88,14 +122,23 @@ function statusClass(s){
   return (s||'APPROVED').toLowerCase();
 }
 
+function statusActionBtn(j) {
+  const s = (j.status || 'APPROVED').toUpperCase();
+  if (s === 'APPROVED') {
+    return `<button onclick="event.stopPropagation(); updateStatus('${j.id}', 'PROCESSING')" style="padding:5px 10px;font-size:11px;border-radius:5px;border:1px solid #f59e0b;background:#fffbeb;color:#92400e;font-weight:600;cursor:pointer;">Mark Processing</button>`;
+  }
+  if (s === 'PROCESSING') {
+    return `<button onclick="event.stopPropagation(); updateStatus('${j.id}', 'DISPATCHED')" style="padding:5px 10px;font-size:11px;border-radius:5px;border:1px solid #16a34a;background:#f0fdf4;color:#15803d;font-weight:600;cursor:pointer;">Mark Dispatched</button>`;
+  }
+  return `<span style="font-size:11px;color:#16a34a;font-weight:700;">✓ Dispatched</span>`;
+}
 
 function render(){
   const tbody = document.getElementById('jobTable');
   tbody.innerHTML='';
 
   if(!me.storeId){
-    tbody.innerHTML = '<tr><td colspan="6" style="padding:20px;color:#94a3b8;font-style:italic;">Loading store assignment...</td></tr>';
-    // Fetch storeId from server in case session is stale
+    tbody.innerHTML = '<tr><td colspan="7" style="padding:20px;color:#94a3b8;font-style:italic;">Loading store assignment...</td></tr>';
     const apiBase = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : '';
     fetch(apiBase + '/api/users', { headers: { Authorization: 'Bearer ' + me.token } })
       .then(r => r.json())
@@ -103,40 +146,43 @@ function render(){
         const serverUser = users.find(u => u.id === me.id);
         if (serverUser && serverUser.storeId) {
           me.storeId = serverUser.storeId;
-          // Update session cache so next reload doesn't need to re-fetch
           const session = Object.assign({}, me);
           db.setTable('session', session);
           render();
         } else {
-          tbody.innerHTML = '<tr><td colspan="6" style="padding:20px;color:#dc2626;font-weight:600;">This account is not assigned to a store. Please ask the Admin to go to Admin → Mappings and assign a store to your account.</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="7" style="padding:20px;color:#dc2626;font-weight:600;">This account is not assigned to a store. Please ask the Admin to go to Admin → Mappings and assign a store to your account.</td></tr>';
         }
       })
       .catch(() => {
-        tbody.innerHTML = '<tr><td colspan="6" style="padding:20px;color:#dc2626;font-weight:600;">This account is not assigned to a store. Please ask the Admin to go to Admin → Mappings and assign a store to your account.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" style="padding:20px;color:#dc2626;font-weight:600;">This account is not assigned to a store. Please ask the Admin to go to Admin → Mappings and assign a store to your account.</td></tr>';
       });
     return;
   }
 
-  const jobs = manufacturingService.getJobsForStore(me.storeId);
+  let jobs = manufacturingService.getJobsForStore(me.storeId);
   jobs.sort((a,b)=> (b.updatedAt||'').localeCompare(a.updatedAt||''));
 
+  // Apply filter
+  if (_activeFilter !== 'ALL') {
+    jobs = jobs.filter(j => (j.status || 'APPROVED').toUpperCase() === _activeFilter);
+  }
+
   if(jobs.length === 0){
-    tbody.innerHTML = '<tr><td colspan="6">No jobs yet.</td></tr>';
+    tbody.innerHTML = `<tr><td colspan="7" style="padding:20px;color:#94a3b8;font-style:italic;">No ${_activeFilter === 'ALL' ? '' : _activeFilter.toLowerCase() + ' '}jobs.</td></tr>`;
     return;
   }
 
-    jobs.forEach(j => {
+  jobs.forEach(j => {
     const p = getPatientById(j.patientId);
     if(!p) return;
-    const plan = getLatestPlanForPatient(p.id);
-    const planFinal = plan ? plan.finalPlan : null;
 
     const main = document.createElement('tr');
     main.className = 'clickable-row';
     main.innerHTML = `
       <td>${getUserName(j.doctorId)}</td>
       <td><a href="javascript:void(0)" class="link" onclick="showQr('${p.id}'); event.stopPropagation();">${p.name}</a></td>
-      <td>${p.uhic}</td>
+      <td>${p.age ? p.age + ' yr' : '-'} / ${p.sex || '-'}</td>
+      <td>${p.uhic || '-'}</td>
       <td>${p.cancer}</td>
       <td><span class="status ${statusClass(j.status)}">${j.status}</span></td>
       <td>
@@ -146,8 +192,7 @@ function render(){
             <button class="btn-warning" onclick="event.stopPropagation(); openPdf('${p.id}')" style="padding:6px 12px;font-size:12px;border-radius:6px;">PDF</button>
           </div>
           <div style="display:flex;gap:6px;flex-wrap:wrap;">
-            <button onclick="event.stopPropagation(); updateStatus('${j.id}', 'PROCESSING')" style="padding:5px 10px;font-size:11px;border-radius:5px;border:1px solid #f59e0b;background:#fffbeb;color:#92400e;font-weight:600;cursor:pointer;">Mark Processing</button>
-            <button onclick="event.stopPropagation(); updateStatus('${j.id}', 'DISPATCHED')" style="padding:5px 10px;font-size:11px;border-radius:5px;border:1px solid #16a34a;background:#f0fdf4;color:#15803d;font-weight:600;cursor:pointer;">Mark Dispatched</button>
+            ${statusActionBtn(j)}
           </div>
         </div>
       </td>
