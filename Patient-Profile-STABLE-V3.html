@@ -2207,6 +2207,18 @@
           loadEngineConfig(); // Part 3: load formula constants + active rules from DB
 
           const me = auth.getCurrentUser();
+
+          // Hide AI elements immediately for STORE users (before initStore delay)
+          if (me && me.role === 'STORE') {
+            const aiHideStyle = document.createElement('style');
+            aiHideStyle.textContent = `
+              .ai-chat-launcher, #aiChatWindow, #aiNotGeneratedBanner,
+              #aiActionRequired, #v3OutcomeModule, #outcomePredictions,
+              .ai-insight, #aiRationaleList, #aiAuditList,
+              [id^="claude"] { display:none !important; }
+            `;
+            document.head.appendChild(aiHideStyle);
+          }
           const params = new URLSearchParams(window.location.search);
           const patientId = params.get('id');
 
@@ -2255,7 +2267,10 @@
               #safetyAlertsBlock, #clinicalProtocolsContainer,
               #calcTrace, #clinicalRationale, #monitoringSection,
               #progressSection,
-              [id^="claude"] { display:none !important; }
+              [id^="claude"],
+              #aiChatWindow, #aiNotGeneratedBanner, #aiActionRequired,
+              #v3OutcomeModule, #outcomePredictions, .ai-insight,
+              #aiRationaleList, #aiAuditList { display:none !important; }
               /* Mobile-friendly recipe table */
               #sectionProduction table { font-size:11px; }
               #sectionProduction td, #sectionProduction th { padding:6px 8px !important; }
@@ -4294,8 +4309,8 @@
                 window.currentVersionedPlan = ensurePlan();
                 bind(window.currentVersionedPlan);
                 
-                // LOAD or AUTO-GENERATE Claude AI insight
-                if (params.get('print') !== '1') {
+                // LOAD or AUTO-GENERATE Claude AI insight (not for store users)
+                if (params.get('print') !== '1' && !storeMode) {
                   const cp = window.currentVersionedPlan;
                   if (cp && cp.claudeInsights) {
                     // Case 1: Insights already saved — render from cache, no API call

@@ -1559,6 +1559,31 @@ Object.entries(cleanRoutes).forEach(([route, file]) => {
 // Root → login page
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, '..', 'index.html')));
 
+// Seed SUPER_ADMIN into DB on startup if not present
+async function seedSuperAdmin() {
+  try {
+    // Remove old admin@onvilox.com if it exists
+    await pool.query("DELETE FROM users WHERE email = $1 AND role = 'SUPER_ADMIN'", ['admin@onvilox.com']);
+
+    const existing = await pool.query("SELECT id FROM users WHERE email = $1", ['admin@gquence.in']);
+    if (existing.rows.length === 0) {
+      const hash = await bcrypt.hash('admin2026', 10);
+      await pool.query(
+        `INSERT INTO users (id, name, email, password_hash, role, created_at)
+         VALUES ($1, $2, $3, $4, $5, NOW())
+         ON CONFLICT (id) DO UPDATE SET email=$3, password_hash=$4`,
+        ['superadmin_001', 'System Admin', 'admin@gquence.in', hash, 'SUPER_ADMIN']
+      );
+      console.log('SUPER_ADMIN seeded: admin@gquence.in');
+    }
+  } catch(e) {
+    console.warn('seedSuperAdmin error:', e.message);
+  }
+}
+
 // Start Server
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(PORT, async () => {
+  console.log(`Server running on port ${PORT}`);
+  await seedSuperAdmin();
+});

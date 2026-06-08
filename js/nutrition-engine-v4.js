@@ -877,7 +877,7 @@ function generateNutritionPlan(patient, engineConfig) {
     const oGrams = Math.round(oGramsPerServing * servingsPerDay * 10) / 10;
 
     // Therapeutic add-ons — daily batch totals (compounding unit makes one daily box)
-    const glutamineGrams = (patient.giIssues || (sideEffects && sideEffects.includes('Mucositis')) || (regimen && regimen.includes('folfirinox')) || hasIBD) ? 16 : 0; // 16g/day fixed
+    const glutamineGrams = (patient.giIssues || hasMucositis || hasNausea || hasIBD || hasPelvicRadiation) ? 16 : 0; // 16g/day fixed
     const glutamineProtein = glutamineGrams;
     const bcaaDailyGrams = (patient.alt > 50 || patient.ast > 50 || patient.bilirubin > 1.2) ? 20 : 0; // 20g/day fixed
     const bcaaProtein = bcaaDailyGrams;
