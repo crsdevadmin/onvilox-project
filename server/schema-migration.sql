@@ -236,8 +236,14 @@ ALTER TABLE patients ADD COLUMN IF NOT EXISTS tox_xerostomia INTEGER DEFAULT 0;
 ALTER TABLE patients ADD COLUMN IF NOT EXISTS tox_nausea INTEGER DEFAULT 0;
 ALTER TABLE patients ADD COLUMN IF NOT EXISTS tox_diarrhea INTEGER DEFAULT 0;
 
--- Migration: FSSAI licence number on stores
+-- Migration: FSSAI licence number + address on stores
 ALTER TABLE stores ADD COLUMN IF NOT EXISTS fssai_number VARCHAR(20);
+ALTER TABLE stores ADD COLUMN IF NOT EXISTS address TEXT;
+
+-- Migration: label fields on manufacturing_jobs
+ALTER TABLE manufacturing_jobs ADD COLUMN IF NOT EXISTS batch_no TEXT;
+ALTER TABLE manufacturing_jobs ADD COLUMN IF NOT EXISTS mfg_date DATE;
+ALTER TABLE manufacturing_jobs ADD COLUMN IF NOT EXISTS exp_date DATE;
 
 -- Migration: manufacturing_jobs (store production queue / approval workflow)
 CREATE TABLE IF NOT EXISTS manufacturing_jobs (

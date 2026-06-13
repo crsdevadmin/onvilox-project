@@ -117,20 +117,37 @@ function selectRegimen(regimen) {
   validateRegimen();
 }
 
+// Radiation is "applicable" when a Radiation Status other than None is chosen.
+function isRTApplicable() {
+  const rs = document.getElementById("radiationStatus");
+  const v = rs ? (rs.value || '').trim() : '';
+  return !!v && v.toLowerCase() !== 'none';
+}
+
+// Chemo Regimen and Radiation are alternatives — a patient may have chemo only,
+// RT only, or both. So the regimen is required ONLY when no RT is specified.
+// When a regimen IS entered, it must be a recognized value.
 function validateRegimen() {
   const input = document.getElementById("regimenInput");
   const msgBox = document.getElementById("regimenInput_msg");
   if (!input) return true;
   const val = (input.value || '').trim();
   const placeholders = ['unknown', 'n/a', 'na', 'none', 'not specified', 'not stated', '-'];
+  const isEmpty = (!val || placeholders.includes(val.toLowerCase()));
 
-  if (!val || placeholders.includes(val.toLowerCase())) {
+  if (isEmpty) {
+    if (isRTApplicable()) {
+      // RT-only patient — chemo regimen legitimately blank
+      input.classList.remove("field-invalid", "field-valid");
+      if (msgBox) { msgBox.className = "validation-msg"; msgBox.innerText = "RT-only patient — chemo regimen not required."; }
+      return true;
+    }
     input.classList.add("field-invalid"); input.classList.remove("field-valid");
-    if (msgBox) { msgBox.className = "validation-msg validation-error"; msgBox.innerText = "Chemo Regimen is required"; }
+    if (msgBox) { msgBox.className = "validation-msg validation-error"; msgBox.innerText = "Enter a Chemo Regimen, or set a Radiation Status for an RT-only patient."; }
     return false;
   }
 
-  // Check if the value exists in the approved regimen list for the selected cancer
+  // A regimen was entered — it must exist in the approved list.
   const allRegimens = [];
   if (typeof cancerRegimenMap !== 'undefined') {
     Object.values(cancerRegimenMap).forEach(arr => { if (Array.isArray(arr)) allRegimens.push(...arr); });

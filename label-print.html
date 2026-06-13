@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Product Labels - Gquence</title>
+  <script src="/js/config.js"></script>
+  <link rel="stylesheet" href="/css/app.css">
+  <style>
+    /* Label sheet = 100mm wide x 75mm tall */
+    :root { --lw:100mm; --lh:75mm; }
+    body { background:#eef2f7; }
+    .controls { max-width: 820px; margin: 16px auto; }
+    .label-wrap { display:flex; flex-direction:column; align-items:center; gap:14px; padding-bottom:40px; }
+
+    .label {
+      width: var(--lw); height: var(--lh); box-sizing: border-box;
+      background:#fff; color:#0f172a; padding: 4mm 5mm; overflow:hidden;
+      font-family: Arial, Helvetica, sans-serif; position:relative;
+    }
+    @media screen {
+      .label { border:1px solid #cbd5e1; box-shadow:0 4px 16px rgba(0,0,0,.12); border-radius:4px; }
+      .label-cap { font-size:11px; color:#64748b; font-weight:700; text-transform:uppercase; letter-spacing:.05em; margin-bottom:4px; }
+    }
+    .label * { line-height: 1.18; }
+
+    /* ---- FRONT ---- */
+    .brand { font-size:9px; font-weight:800; letter-spacing:.12em; color:#0e2247; text-transform:uppercase; }
+    .pname { font-size:17px; font-weight:800; margin:1mm 0 0.5mm; }
+    .pmeta { font-size:10px; color:#334155; margin-bottom:1.5mm; }
+    .pmeta b { color:#0f172a; }
+    .tt-title { font-size:9px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:#0e2247; border-top:1px solid #e2e8f0; padding-top:1.5mm; margin-top:1mm; }
+    .tt-grid { display:grid; grid-template-columns:1fr 1fr; gap:1.5mm 4mm; margin-top:1.5mm; }
+    .tt-item .l { font-size:8.5px; color:#64748b; text-transform:uppercase; letter-spacing:.04em; }
+    .tt-item .v { font-size:14px; font-weight:800; color:#0f172a; }
+    .tt-item .u { font-size:9px; font-weight:600; color:#475569; }
+
+    /* ---- BACK ---- */
+    .back { display:flex; gap:4mm; height:100%; }
+    .back-left { flex:1; display:flex; flex-direction:column; }
+    .back-right { width:38mm; display:flex; flex-direction:column; justify-content:space-between; border-left:1px solid #e2e8f0; padding-left:3mm; }
+    .sec-h { font-size:8px; font-weight:800; letter-spacing:.05em; text-transform:uppercase; color:#0e2247; margin-bottom:1mm; }
+    .ps-grid { display:grid; grid-template-columns:1fr 1fr; gap:1mm 3mm; margin-bottom:2mm; }
+    .ps-item .l { font-size:7.5px; color:#64748b; text-transform:uppercase; }
+    .ps-item .v { font-size:11.5px; font-weight:800; }
+    .formula-list { font-size:9px; color:#1e293b; }
+    .formula-list span { display:inline-block; margin:0.4mm 0; }
+    .reg { font-size:8.5px; color:#0f172a; }
+    .reg .row { display:flex; justify-content:space-between; gap:2mm; margin-bottom:0.6mm; }
+    .reg .row .k { color:#64748b; }
+    .reg .row .vv { font-weight:800; text-align:right; }
+    .mfgby { font-size:8px; color:#0f172a; text-align:right; }
+    .mfgby .t { font-size:7.5px; color:#64748b; text-transform:uppercase; letter-spacing:.04em; }
+    .mfgby .n { font-weight:800; font-size:9px; }
+
+    @media print {
+      @page { size: 100mm 75mm; margin: 0; }
+      html, body { background:#fff; margin:0; padding:0; }
+      .no-print { display:none !important; }
+      .label-wrap { padding:0; gap:0; }
+      .label { border:none !important; box-shadow:none !important; border-radius:0; page-break-after: always; }
+      .label-cap { display:none !important; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="topbar no-print">
+  <div class="logo">Gquence Store</div>
+  <div class="nav">
+    <a href="/store">Dashboard</a>
+    <a href="#" onclick="auth.logout()">Logout</a>
+  </div>
+</div>
+
+<div class="container page no-print">
+  <div class="card controls">
+    <h2 style="margin-top:0;">Print Product Labels</h2>
+    <div id="ctrlInfo" style="color:#64748b;font-size:13px;margin-bottom:12px;">Loading…</div>
+    <div style="display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;">
+      <div class="form-group" style="margin:0;">
+        <label for="mfgDate">Manufacturing Date</label>
+        <input id="mfgDate" type="date">
+      </div>
+      <button class="btn-primary" id="genBtn" onclick="generateBatch()">Save Date &amp; Generate Batch</button>
+      <button class="btn-secondary" id="printBtn" onclick="window.print()" disabled>Print Labels</button>
+    </div>
+    <div id="batchInfo" style="margin-top:12px;font-size:13px;color:#0f172a;"></div>
+    <div id="errBox" style="margin-top:10px;color:#dc2626;font-weight:600;"></div>
+  </div>
+</div>
+
+<div class="label-wrap" id="labels" style="display:none;">
+  <!-- FRONT -->
+  <div>
+    <div class="label-cap no-print">Front label · 100 × 75 mm</div>
+    <div class="label" id="frontLabel">
+      <div class="brand">Gquence · Therapeutic Nutrition</div>
+      <div class="pname" id="fName">—</div>
+      <div class="pmeta" id="fMeta">—</div>
+      <div class="tt-title">Daily Therapeutic Target</div>
+      <div class="tt-grid">
+        <div class="tt-item"><div class="l">Energy</div><div class="v"><span id="fEnergy">—</span> <span class="u">kcal</span></div></div>
+        <div class="tt-item"><div class="l">Protein</div><div class="v"><span id="fProtein">—</span> <span class="u">g</span></div></div>
+        <div class="tt-item"><div class="l">Servings / Day</div><div class="v"><span id="fServings">—</span> <span class="u">servings/day</span></div></div>
+        <div class="tt-item"><div class="l">Route</div><div class="v" style="font-size:11px;" id="fRoute">—</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BACK -->
+  <div>
+    <div class="label-cap no-print">Back label · 100 × 75 mm</div>
+    <div class="label" id="backLabel">
+      <div class="back">
+        <div class="back-left">
+          <div class="sec-h">Per Serving — Energy &amp; Macros</div>
+          <div class="ps-grid">
+            <div class="ps-item"><div class="l">Energy</div><div class="v"><span id="bEnergy">—</span> kcal</div></div>
+            <div class="ps-item"><div class="l">Protein</div><div class="v"><span id="bProtein">—</span> g</div></div>
+            <div class="ps-item"><div class="l">Carbohydrate</div><div class="v"><span id="bCarb">—</span> g</div></div>
+            <div class="ps-item"><div class="l">Fat</div><div class="v"><span id="bFat">—</span> g</div></div>
+          </div>
+          <div class="sec-h">Daily Batch Formulation</div>
+          <div class="formula-list" id="bFormula">—</div>
+        </div>
+        <div class="back-right">
+          <div class="reg">
+            <div class="row"><span class="k">FSSAI No.</span><span class="vv" id="bFssai">—</span></div>
+            <div class="row"><span class="k">Batch No.</span><span class="vv" id="bBatch">—</span></div>
+            <div class="row"><span class="k">Mfg Date</span><span class="vv" id="bMfg">—</span></div>
+            <div class="row"><span class="k">Exp Date</span><span class="vv" id="bExp">—</span></div>
+          </div>
+          <div class="mfgby">
+            <div class="t">Manufactured by</div>
+            <div class="n" id="bStoreName">—</div>
+            <div id="bStoreAddr"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/js/storage.js"></script>
+<script src="/js/seed.js"></script>
+<script src="/js/auth.js"></script>
+<script src="/js/users.js"></script>
+<script src="/js/stores.js"></script>
+<script src="/js/patient-store.js?v=3.2"></script>
+<script src="/js/ingredients.js"></script>
+<script src="/js/nutrition-engine-v4.js"></script>
+<script src="/js/manufacturing.js?v=labels1"></script>
+
+<script>
+auth.requireRole(['STORE', 'STORE_APPROVER']);
+const me = auth.getCurrentUser();
+const jobId = new URLSearchParams(window.location.search).get('job');
+
+let _job = null, _patient = null, _store = null, _plan = null;
+
+function fmtDate(d){
+  if(!d) return '—';
+  const s = (typeof d === 'string') ? d.slice(0,10) : new Date(d).toISOString().slice(0,10);
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : s;
+}
+function num(v){ const n = Math.round(parseFloat(v)); return isNaN(n) ? '—' : n; }
+function num1(v){ const n = Math.round(parseFloat(v)*10)/10; return isNaN(n) ? '—' : n; }
+
+initStore().then(() => {
+  _job = manufacturingService.getJobs().find(j => j.id === jobId);
+  if(!_job){ showErr('Job not found. Open this page from the store dashboard.'); return; }
+  if(me.storeId && _job.storeId && _job.storeId !== me.storeId){ showErr('This job belongs to another store.'); return; }
+
+  _patient = getPatientById(_job.patientId);
+  if(!_patient){ showErr('Patient not found.'); return; }
+
+  _store = (storeService.getStoreById ? storeService.getStoreById(_job.storeId) : null)
+        || storeService.getStores().find(s => s.id === _job.storeId) || null;
+
+  // Compute the plan (same inputs as the store production view)
+  try {
+    _plan = generateNutritionPlan({
+      ..._patient,
+      weight: parseFloat(_patient.weight),
+      height: parseFloat(_patient.height),
+      albumin: parseFloat(_patient.albumin),
+      weightLossPercent: parseFloat(_patient.weightLossPercent || 0),
+      giIssues: !!_patient.giIssues
+    });
+  } catch(e){ showErr('Could not compute the nutrition plan: ' + e.message); return; }
+
+  document.getElementById('ctrlInfo').innerHTML =
+    `Patient: <b>${_patient.name || '-'}</b> · UHIC ${_patient.uhic || '-'} · Status ${_job.status}`;
+
+  // Default mfg date: existing or today
+  const today = new Date().toISOString().slice(0,10);
+  document.getElementById('mfgDate').value = (_job.mfgDate ? String(_job.mfgDate).slice(0,10) : today);
+
+  renderLabels();
+  if(_job.batchNo){
+    document.getElementById('printBtn').disabled = false;
+    showBatchInfo();
+  }
+});
+
+function planVal(k){ return _plan ? _plan[k] : null; }
+
+function renderLabels(){
+  document.getElementById('labels').style.display = 'flex';
+
+  // FRONT
+  document.getElementById('fName').textContent = _patient.name || '—';
+  const age = _patient.age ? _patient.age + ' yr' : '—';
+  document.getElementById('fMeta').innerHTML =
+    `<b>${age}</b> &nbsp;·&nbsp; <b>${_patient.sex || '—'}</b> &nbsp;·&nbsp; UHIC: <b>${_patient.uhic || '—'}</b>`;
+  document.getElementById('fEnergy').textContent = num(planVal('dailyCalories'));
+  document.getElementById('fProtein').textContent = num(planVal('dailyProtein'));
+  document.getElementById('fServings').textContent = planVal('servingsPerDay') || '—';
+  document.getElementById('fRoute').textContent = planVal('prescribedRoute') || 'Oral Feeding';
+
+  // BACK — per serving
+  document.getElementById('bEnergy').textContent = num(planVal('perServingCalories'));
+  document.getElementById('bProtein').textContent = num(planVal('perServingProtein'));
+  document.getElementById('bCarb').textContent = num1(planVal('macroCarbs'));
+  document.getElementById('bFat').textContent = num1(planVal('macroFat'));
+
+  // BACK — batch formulation (names only)
+  const r = _plan && _plan.recipe ? _plan.recipe : {};
+  const names = [r.protein, r.carb, r.fat, r.omega, r.bcaa, r.glutamine]
+    .filter(Boolean).map(x => x.name).filter(Boolean);
+  document.getElementById('bFormula').innerHTML = names.length
+    ? names.map(n => `<span>• ${n}</span>`).join('<br>')
+    : '<span style="color:#94a3b8;">—</span>';
+
+  // BACK — registration block
+  document.getElementById('bFssai').textContent = (_store && (_store.fssai_number || _store.fssai)) || '—';
+  document.getElementById('bBatch').textContent = _job.batchNo || '— (generate)';
+  document.getElementById('bMfg').textContent = fmtDate(_job.mfgDate);
+  document.getElementById('bExp').textContent = fmtDate(_job.expDate);
+
+  document.getElementById('bStoreName').textContent = (_store && _store.name) || '—';
+  const addr = (_store && (_store.address || _store.location)) || '';
+  document.getElementById('bStoreAddr').textContent = addr;
+}
+
+async function generateBatch(){
+  showErr('');
+  const mfg = document.getElementById('mfgDate').value;
+  if(!mfg){ showErr('Please enter the manufacturing date.'); return; }
+  const btn = document.getElementById('genBtn');
+  btn.disabled = true; btn.textContent = 'Generating…';
+  const res = await manufacturingService.assignBatch(jobId, mfg);
+  btn.disabled = false; btn.textContent = 'Save Date & Generate Batch';
+  if(!res.ok){ showErr(res.error || 'Failed to generate batch.'); return; }
+  _job.batchNo = res.batchNo; _job.mfgDate = res.mfgDate; _job.expDate = res.expDate;
+  renderLabels();
+  showBatchInfo();
+  document.getElementById('printBtn').disabled = false;
+}
+
+function showBatchInfo(){
+  document.getElementById('batchInfo').innerHTML =
+    `✅ Batch <b>${_job.batchNo}</b> · Mfg ${fmtDate(_job.mfgDate)} · Exp ${fmtDate(_job.expDate)} (18 months). You can now print.`;
+}
+
+function showErr(m){ document.getElementById('errBox').textContent = m || ''; }
+</script>
+
+<script src="/js/theme.js"></script>
+</body>
+</html>

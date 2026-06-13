@@ -36,7 +36,7 @@
     return getStores().find(s => s.id === id) || null;
   }
 
-  async function createStore({name, fssai, hospital, location}) {
+  async function createStore({name, fssai, hospital, location, address}) {
     const n = (name || '').trim();
     if (!n) return { ok: false, error: 'Store name is required' };
 
@@ -57,6 +57,7 @@
       id, name: n,
       fssai: f,
       fssai_number: f,
+      address: (address || '').trim(),
       hospital: (hospital || '').trim(),
       location: (location || '').trim(),
       createdAt: new Date().toISOString(),

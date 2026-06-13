@@ -563,10 +563,11 @@ app.get('/api/stores', authenticateToken, async (req, res) => {
 app.post('/api/stores', authenticateToken, async (req, res) => {
   const { id, name, hospital, location } = req.body;
   const fssai = req.body.fssai_number || req.body.fssai || null;
+  const address = req.body.address || null;
   try {
     const result = await pool.query(
-      'INSERT INTO stores (id, name, hospital, location, fssai_number) VALUES ($1,$2,$3,$4,$5) RETURNING *',
-      [id || `store_${Date.now()}`, name, hospital || '', location || '', fssai]
+      'INSERT INTO stores (id, name, hospital, location, fssai_number, address) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *',
+      [id || `store_${Date.now()}`, name, hospital || '', location || '', fssai, address]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -770,6 +771,50 @@ app.put('/api/manufacturing-jobs/:id', authenticateToken, async (req, res) => {
         }
       }
     } catch(e) { console.warn('job notify:', e.message); }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Manufacturing Jobs: Assign batch number + manufacturing/expiry dates (for labels).
+// Batch no is a per-store running sequence, assigned once and reused on reprints.
+// Exp date = mfg date + 18 months.
+app.post('/api/manufacturing-jobs/:id/batch', authenticateToken, async (req, res) => {
+  const role = req.user && req.user.role;
+  if (!['STORE', 'STORE_APPROVER', 'ADMIN', 'SUPER_ADMIN'].includes(role)) {
+    return res.status(403).json({ error: 'Not permitted' });
+  }
+  const { mfgDate } = req.body;
+  if (!mfgDate || !/^\d{4}-\d{2}-\d{2}$/.test(mfgDate)) {
+    return res.status(400).json({ error: 'A valid manufacturing date (YYYY-MM-DD) is required.' });
+  }
+  try {
+    const cur = await pool.query('SELECT store_id, batch_no FROM manufacturing_jobs WHERE id=$1', [req.params.id]);
+    if (!cur.rows.length) return res.status(404).json({ error: 'Job not found' });
+    const storeId = cur.rows[0].store_id;
+    let batchNo = cur.rows[0].batch_no;
+
+    // Assign a per-store sequential batch number on first print.
+    if (!batchNo) {
+      const cnt = await pool.query(
+        'SELECT COUNT(*)::int AS n FROM manufacturing_jobs WHERE store_id=$1 AND batch_no IS NOT NULL',
+        [storeId]
+      );
+      const seq = (cnt.rows[0].n || 0) + 1;
+      batchNo = 'B' + String(seq).padStart(5, '0');
+    }
+
+    // Exp date = mfg + 18 months
+    const d = new Date(mfgDate + 'T00:00:00Z');
+    const exp = new Date(d);
+    exp.setUTCMonth(exp.getUTCMonth() + 18);
+    const expDate = exp.toISOString().slice(0, 10);
+
+    const upd = await pool.query(
+      'UPDATE manufacturing_jobs SET batch_no=$1, mfg_date=$2, exp_date=$3, updated_at=NOW() WHERE id=$4 RETURNING *',
+      [batchNo, mfgDate, expDate, req.params.id]
+    );
+    res.json(upd.rows[0]);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -1267,11 +1312,12 @@ OUTPUT FORMAT — return ONLY valid JSON, no markdown, no text outside the JSON 
   } catch(e) { console.error('monitoring_logs migration:', e.message); }
 })();
 
-// Migration: add FSSAI licence number to stores
+// Migration: add FSSAI licence number + address to stores
 (async () => {
   try {
     await pool.query('ALTER TABLE stores ADD COLUMN IF NOT EXISTS fssai_number VARCHAR(20)');
-  } catch(e) { console.error('stores fssai_number migration:', e.message); }
+    await pool.query('ALTER TABLE stores ADD COLUMN IF NOT EXISTS address TEXT');
+  } catch(e) { console.error('stores fssai_number/address migration:', e.message); }
 })();
 
 // Migration: ensure manufacturing_jobs table exists (production queue / approvals)
@@ -1289,6 +1335,10 @@ OUTPUT FORMAT — return ONLY valid JSON, no markdown, no text outside the JSON 
         updated_at TIMESTAMPTZ DEFAULT NOW()
       )
     `);
+    // Label fields
+    await pool.query('ALTER TABLE manufacturing_jobs ADD COLUMN IF NOT EXISTS batch_no TEXT');
+    await pool.query('ALTER TABLE manufacturing_jobs ADD COLUMN IF NOT EXISTS mfg_date DATE');
+    await pool.query('ALTER TABLE manufacturing_jobs ADD COLUMN IF NOT EXISTS exp_date DATE');
     const bf = await reconcileJobs();
     if (bf.created) console.log('manufacturing_jobs backfill: created ' + bf.created + ' job(s) for approved patients.');
   } catch(e) { console.error('manufacturing_jobs migration:', e.message); }

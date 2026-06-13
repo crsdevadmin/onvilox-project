@@ -39,11 +39,33 @@
       doctorId: r.doctor_id || r.doctorId,
       status: r.status,
       history: r.history || [],
+      batchNo: r.batch_no || r.batchNo || null,
+      mfgDate: r.mfg_date || r.mfgDate || null,
+      expDate: r.exp_date || r.expDate || null,
       createdAt: r.created_at || r.createdAt,
       updatedAt: r.updated_at || r.updatedAt
     }));
     db.setTable('manufacturing_jobs', _cache.jobs);
     return _cache.jobs;
+  }
+
+  // Assign/refresh batch number + manufacturing & expiry dates for a job.
+  // Returns { ok, batchNo, mfgDate, expDate } or { ok:false, error }.
+  async function assignBatch(jobId, mfgDate) {
+    try {
+      const res = await fetch(_apiBase() + '/api/manufacturing-jobs/' + jobId + '/batch', {
+        method: 'POST', headers: _headers(), body: JSON.stringify({ mfgDate })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) return { ok: false, error: data.error || 'Server error assigning batch' };
+      // update local cache
+      const jobs = getJobs();
+      const job = jobs.find(j => j.id === jobId);
+      if (job) { job.batchNo = data.batch_no; job.mfgDate = data.mfg_date; job.expDate = data.exp_date; }
+      return { ok: true, batchNo: data.batch_no, mfgDate: data.mfg_date, expDate: data.exp_date };
+    } catch (e) {
+      return { ok: false, error: e.message };
+    }
   }
 
   function getJobs() {
@@ -153,5 +175,5 @@
     }
   };
 
-  global.manufacturingService = { initJobs, applyServerJobs, getJobs, createJob, updateJobStatus, getJobsForStore, getJobByPatient, WORKFLOW };
+  global.manufacturingService = { initJobs, applyServerJobs, getJobs, createJob, updateJobStatus, assignBatch, getJobsForStore, getJobByPatient, WORKFLOW };
 })(window);

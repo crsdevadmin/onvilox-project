@@ -42,6 +42,10 @@
         <label for="storeLocation">Location</label>
         <input id="storeLocation" type="text" placeholder="Chennai">
       </div>
+      <div class="form-group" style="grid-column:1 / -1;">
+        <label for="storeAddress">Address <span style="font-weight:400;color:#64748b;font-size:12px;">(printed on product labels as "Manufactured by")</span></label>
+        <textarea id="storeAddress" rows="2" placeholder="Full address incl. street, city, state, PIN"></textarea>
+      </div>
     </div>
 
     <div id="storeError" style="color:#ef4444;font-weight:600;margin-top:8px;"></div>
@@ -162,8 +166,9 @@ async function createStoreUI(){
   const name = document.getElementById('storeName').value;
   const fssai = document.getElementById('storeFssai').value;
   const location = document.getElementById('storeLocation').value;
+  const address = document.getElementById('storeAddress').value;
 
-  const res = await storeService.createStore({name, fssai, location});
+  const res = await storeService.createStore({name, fssai, location, address});
   if(!res.ok){
     document.getElementById('storeError').innerText = res.error;
     return;
@@ -182,6 +187,7 @@ async function createStoreUI(){
   document.getElementById('storeFssai_msg').innerText='';
   document.getElementById('storeFssai').classList.remove('field-valid','field-invalid');
   document.getElementById('storeLocation').value='';
+  document.getElementById('storeAddress').value='';
   renderStores();
 }
 

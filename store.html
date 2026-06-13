@@ -11,6 +11,67 @@
     .filter-tab:hover:not(:disabled) { border-color:#0e2247; color:#0e2247; }
     .filter-tab.active { background:#0e2247; color:#fff; border-color:#0e2247; }
     .filter-tab:disabled { opacity:0.35; cursor:not-allowed; }
+
+    /* ===== Label modal + 100x75mm labels ===== */
+    #labelOverlay { position:fixed; inset:0; background:rgba(15,23,42,.55); z-index:9998; display:none; align-items:flex-start; justify-content:center; overflow:auto; padding:24px 12px; }
+    #labelDialog { background:#f1f5f9; border-radius:10px; max-width:540px; width:100%; padding:18px; box-shadow:0 20px 60px rgba(0,0,0,.35); }
+    .lbl { width:100mm; height:75mm; box-sizing:border-box; background:#fff; color:#0f172a; padding:3.2mm 4mm; font-family:Arial,Helvetica,sans-serif; border:1px solid #cbd5e1; border-radius:4px; box-shadow:0 4px 14px rgba(0,0,0,.12); margin:10px auto; overflow:hidden; }
+    .lbl * { line-height:1.15; }
+    .lbl-cap { font-size:11px;color:#64748b;font-weight:700;text-transform:uppercase;letter-spacing:.05em;text-align:center;margin-top:6px; }
+    .lb-brand { font-size:8.5px;font-weight:800;letter-spacing:.12em;color:#0e2247;text-transform:uppercase; }
+    .lb-name { font-size:16px;font-weight:800;margin:0.6mm 0 0; }
+    .lb-meta { font-size:9.5px;color:#334155;margin-bottom:1mm; }
+    .lb-th { font-size:8px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:#0e2247;border-top:1px solid #e2e8f0;padding-top:1mm;margin-top:0.8mm; }
+    .lb-row { display:flex;gap:2mm;margin-top:1.2mm; }
+    .lb-cell { flex:1;background:#f8fafc;border:1px solid #eef2f7;border-radius:3px;padding:1mm 1.5mm;text-align:center; }
+    .lb-cell .l { font-size:7.5px;color:#64748b;text-transform:uppercase;letter-spacing:.03em; }
+    .lb-cell .v { font-size:15px;font-weight:800; }
+    .lb-cell .u { font-size:8px;font-weight:600;color:#475569; }
+    .lb-cell.route .v { font-size:10px; }
+    .lb-note { font-size:7.5px;color:#64748b;margin-top:auto;padding-top:1mm;border-top:1px dashed #e2e8f0; }
+    .lb-back { display:flex;gap:3mm;height:100%; }
+    .lb-left { flex:1;display:flex;flex-direction:column; }
+    .lb-right { width:36mm;display:flex;flex-direction:column;justify-content:flex-start;border-left:1px solid #e2e8f0;padding-left:2.5mm; }
+    .lb-reg .r { display:flex;justify-content:space-between;font-size:8px;margin-bottom:0.5mm; }
+    .lb-reg .r .k { color:#64748b; } .lb-reg .r .vv { font-weight:800;text-align:right; }
+    .lb-mfgby { text-align:right;font-size:8px;color:#0f172a;margin-top:2mm;padding-top:1.5mm;border-top:1px solid #e2e8f0; }
+    .lb-mfgby .t { font-size:7px;color:#64748b;text-transform:uppercase; }
+    .lb-mfgby .n { font-weight:800;font-size:8.5px; }
+    .lb-formula { font-size:9px;color:#1e293b;margin-top:0.8mm; line-height:1.35; }
+    .lb-left { padding-right:1mm; }
+
+    /* ---- Box label 100 x 150 mm ---- */
+    .lbl3 { width:100mm; height:150mm; box-sizing:border-box; background:#fff; color:#0f172a; padding:5mm; font-family:Arial,Helvetica,sans-serif; border:1px solid #cbd5e1; border-radius:4px; box-shadow:0 4px 14px rgba(0,0,0,.12); margin:10px auto; overflow:hidden; }
+    .lbl3 * { line-height:1.2; }
+    .b3-h { font-size:9px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:#0e2247;border-bottom:1px solid #e2e8f0;padding-bottom:1mm;margin:2.5mm 0 1.5mm; }
+    .b3-h:first-of-type { margin-top:1.5mm; }
+    .b3-tbl { width:100%;border-collapse:collapse;font-size:10px; }
+    .b3-tbl td { padding:0.9mm 1mm;border-bottom:1px solid #f1f5f9;vertical-align:top; }
+    .b3-tbl td.k { color:#64748b;width:42%; }
+    .b3-tbl td.v { font-weight:700;text-align:right; }
+    .b3-spec { width:100%;border-collapse:collapse;font-size:10px; }
+    .b3-spec th { font-size:8px;text-transform:uppercase;letter-spacing:.03em;color:#64748b;text-align:left;padding:1mm;border-bottom:1.5px solid #e2e8f0; }
+    .b3-spec th.r, .b3-spec td.r { text-align:right; }
+    .b3-spec td { padding:1mm;border-bottom:1px solid #f1f5f9; }
+    .b3-spec tfoot td { font-weight:800;border-top:1.5px solid #e2e8f0;border-bottom:none; }
+    .b3-foot { display:flex;justify-content:space-between;gap:3mm;margin-top:2.5mm;border-top:1px solid #e2e8f0;padding-top:2mm; }
+    .b3-foot .reg .r { display:flex;justify-content:space-between;font-size:8.5px;gap:3mm;margin-bottom:0.6mm; }
+    .b3-foot .reg .r .k { color:#64748b; } .b3-foot .reg .r .vv { font-weight:800; }
+    .b3-foot .mfgby { text-align:right;font-size:8px; } .b3-foot .mfgby .t { color:#64748b;text-transform:uppercase;font-size:7.5px; } .b3-foot .mfgby .n { font-weight:800;font-size:9px; }
+
+    @media print {
+      body > *:not(#labelOverlay) { display:none !important; }
+      #labelOverlay { position:static; display:block !important; background:#fff; padding:0; overflow:visible; }
+      #labelDialog { box-shadow:none; background:#fff; max-width:none; padding:0; }
+      .lbl-modal-chrome, .lbl-cap { display:none !important; }
+      @page small { size:100mm 75mm; margin:0; }
+      @page box   { size:100mm 150mm; margin:0; }
+      .lbl  { page:small; border:none; box-shadow:none; margin:0; page-break-after:always; border-radius:0; }
+      .lbl3 { page:box;   border:none; box-shadow:none; margin:0; page-break-after:always; border-radius:0; }
+      /* Print only the set the user chose */
+      body.print-small .lbl3 { display:none !important; }
+      body.print-box   .lbl  { display:none !important; }
+    }
   </style>
 </head>
 <body>
@@ -37,13 +98,8 @@
         <h2 style="margin:0;" id="queueTitle">Production Queue</h2>
         <span id="roleChip" style="font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#0e2247;background:#e2e8f0;border-radius:999px;padding:3px 10px;"></span>
       </div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;" id="statusTabs">
-        <button onclick="setFilter('ALL')"        id="tab-ALL"        class="filter-tab active">All</button>
-        <button onclick="setFilter('APPROVED')"   id="tab-APPROVED"   class="filter-tab">Open</button>
-        <button onclick="setFilter('PENDING')"    id="tab-PENDING"    class="filter-tab">Pending Approval</button>
-        <button onclick="setFilter('PROCESSING')" id="tab-PROCESSING" class="filter-tab">Processing</button>
-        <button onclick="setFilter('DISPATCHED')" id="tab-DISPATCHED" class="filter-tab">Dispatched</button>
-      </div>
+      <!-- tabs are built by role in buildTabs() -->
+      <div style="display:flex;gap:6px;flex-wrap:wrap;" id="statusTabs"></div>
     </div>
 
     <table>
@@ -64,6 +120,128 @@
 
 </div>
 
+
+<!-- Label Modal -->
+<div id="labelOverlay" onclick="if(event.target===this) closeLabelModal()">
+  <div id="labelDialog">
+    <div class="lbl-modal-chrome" style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px;">
+      <h3 style="margin:0;font-size:16px;" id="lblTitle">Product Labels</h3>
+      <button onclick="closeLabelModal()" style="border:none;background:#e2e8f0;border-radius:6px;width:30px;height:30px;cursor:pointer;font-size:18px;line-height:1;">×</button>
+    </div>
+    <div class="lbl-modal-chrome" id="lblErr" style="display:none;color:#dc2626;font-weight:600;margin-bottom:8px;"></div>
+    <div class="lbl-modal-chrome" style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:6px;">
+      <div style="display:flex;flex-direction:column;gap:3px;">
+        <label style="font-size:12px;font-weight:600;color:#334155;">Manufacturing Date</label>
+        <input id="lblMfgDate" type="date" style="padding:7px 10px;border:1px solid #cbd5e1;border-radius:6px;">
+      </div>
+      <button class="btn-primary" id="lblGenBtn" onclick="generateLabelBatch()" style="padding:8px 14px;border-radius:6px;">Save Date &amp; Generate Batch</button>
+      <button class="btn-secondary" id="lblPrintBtn" onclick="printLabelsSmall()" style="padding:8px 14px;border-radius:6px;" disabled>Print Pouch Labels (100×75)</button>
+      <button class="btn-secondary" id="lblPrintBoxBtn" onclick="printBoxLabel()" style="padding:8px 14px;border-radius:6px;" disabled>Print Box Label (100×150)</button>
+    </div>
+    <div class="lbl-modal-chrome" id="lblBatchInfo" style="font-size:12.5px;color:#0f172a;margin-bottom:6px;"></div>
+
+    <!-- FRONT -->
+    <div class="lbl-cap lbl-modal-chrome">Front · 100 × 75 mm</div>
+    <div class="lbl" id="lblFront">
+      <div class="lb-brand">Gquence · Personalized Oncology Nutrition</div>
+      <div class="lb-name" id="lf_name">—</div>
+      <div class="lb-meta" id="lf_meta">—</div>
+      <div class="lb-th">Daily Therapeutic Target</div>
+      <div class="lb-row">
+        <div class="lb-cell"><div class="l">Energy</div><div class="v"><span id="lf_energy">—</span></div><div class="u">kcal</div></div>
+        <div class="lb-cell"><div class="l">Protein</div><div class="v"><span id="lf_protein">—</span></div><div class="u">g</div></div>
+        <div class="lb-cell"><div class="l">Servings</div><div class="v"><span id="lf_serv">—</span></div><div class="u">per day</div></div>
+        <div class="lb-cell route"><div class="l">Route</div><div class="v" id="lf_route">—</div></div>
+      </div>
+    </div>
+
+    <!-- BACK -->
+    <div class="lbl-cap lbl-modal-chrome">Back · 100 × 75 mm</div>
+    <div class="lbl" id="lblBack">
+      <div class="lb-brand" style="margin-bottom:1mm;">Gquence · Personalized Oncology Nutrition</div>
+      <div class="lb-back">
+        <div class="lb-left">
+          <div class="lb-th" style="border-top:none;margin-top:0;padding-top:0;">Per Serving — Energy &amp; Macros</div>
+          <div class="lb-row">
+            <div class="lb-cell"><div class="l">Energy</div><div class="v"><span id="lb_energy">—</span></div><div class="u">kcal</div></div>
+            <div class="lb-cell"><div class="l">Protein</div><div class="v"><span id="lb_protein">—</span></div><div class="u">g</div></div>
+            <div class="lb-cell"><div class="l">Carb</div><div class="v"><span id="lb_carb">—</span></div><div class="u">g</div></div>
+            <div class="lb-cell"><div class="l">Fat</div><div class="v"><span id="lb_fat">—</span></div><div class="u">g</div></div>
+          </div>
+          <div class="lb-th">Daily Batch Formulation</div>
+          <div class="lb-formula" id="lb_formula">—</div>
+          <div class="lb-note">Store in a cool, dry place. Use under medical supervision. Not for parenteral use.</div>
+        </div>
+        <div class="lb-right">
+          <div class="lb-reg">
+            <div class="r"><span class="k">FSSAI</span><span class="vv" id="lb_fssai">—</span></div>
+            <div class="r"><span class="k">Batch</span><span class="vv" id="lb_batch">—</span></div>
+            <div class="r"><span class="k">Mfg</span><span class="vv" id="lb_mfg">—</span></div>
+            <div class="r"><span class="k">Exp</span><span class="vv" id="lb_exp">—</span></div>
+          </div>
+          <div class="lb-mfgby">
+            <div class="t">Manufactured by</div>
+            <div class="n" id="lb_storename">—</div>
+            <div id="lb_storeaddr"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- BOX LABEL 100 x 150 mm -->
+    <div class="lbl-cap lbl-modal-chrome">Box label · 100 × 150 mm</div>
+    <div class="lbl3" id="lblBox">
+      <div class="lb-brand">Gquence · Personalized Oncology Nutrition</div>
+      <div style="font-size:13px;font-weight:800;margin-top:1mm;" id="x_name">—</div>
+
+      <div class="b3-h">Patient Details</div>
+      <table class="b3-tbl">
+        <tr><td class="k">UHIC</td><td class="v" id="x_uhic">—</td></tr>
+        <tr><td class="k">Age / Sex</td><td class="v" id="x_agesex">—</td></tr>
+        <tr><td class="k">Cancer</td><td class="v" id="x_cancer">—</td></tr>
+        <tr><td class="k">Regimen</td><td class="v" id="x_regimen">—</td></tr>
+        <tr><td class="k">Feeding Route</td><td class="v" id="x_route">—</td></tr>
+        <tr><td class="k">Servings / Day</td><td class="v" id="x_serv">—</td></tr>
+      </table>
+
+      <div class="b3-h">Macro Distribution</div>
+      <table class="b3-spec">
+        <thead><tr><th>Nutrient</th><th class="r">Per Serving</th><th class="r">Daily Total</th></tr></thead>
+        <tbody>
+          <tr><td>Energy (kcal)</td><td class="r" id="x_ps_energy">—</td><td class="r" id="x_d_energy">—</td></tr>
+          <tr><td>Protein (g)</td><td class="r" id="x_ps_protein">—</td><td class="r" id="x_d_protein">—</td></tr>
+          <tr><td>Carbohydrate (g)</td><td class="r" id="x_ps_carb">—</td><td class="r" id="x_d_carb">—</td></tr>
+          <tr><td>Fat (g)</td><td class="r" id="x_ps_fat">—</td><td class="r" id="x_d_fat">—</td></tr>
+        </tbody>
+      </table>
+      <div style="font-size:9px;color:#475569;margin-top:1mm;">Protein source: <b id="x_ptype">—</b></div>
+
+      <div class="b3-h">Production Specifications (Daily Batch)</div>
+      <table class="b3-spec">
+        <thead><tr><th>Component</th><th class="r">Quantity</th></tr></thead>
+        <tbody id="x_spec"></tbody>
+        <tfoot>
+          <tr><td>Total batch energy</td><td class="r" id="x_batch_kcal">—</td></tr>
+          <tr><td>Total batch protein</td><td class="r" id="x_batch_protein">—</td></tr>
+        </tfoot>
+      </table>
+
+      <div class="b3-foot">
+        <div class="reg">
+          <div class="r"><span class="k">FSSAI</span><span class="vv" id="x_fssai">—</span></div>
+          <div class="r"><span class="k">Batch No.</span><span class="vv" id="x_batch">—</span></div>
+          <div class="r"><span class="k">Mfg Date</span><span class="vv" id="x_mfg">—</span></div>
+          <div class="r"><span class="k">Exp Date</span><span class="vv" id="x_exp">—</span></div>
+        </div>
+        <div class="mfgby">
+          <div class="t">Manufactured by</div>
+          <div class="n" id="x_storename">—</div>
+          <div id="x_storeaddr"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- QR Modal -->
 <div id="qrOverlay" class="modal-overlay" onclick="closeQr()">
@@ -88,8 +266,11 @@
 <script src="/js/seed.js"></script>
 <script src="/js/auth.js"></script>
 <script src="/js/users.js"></script>
+<script src="/js/stores.js"></script>
 <script src="/js/patient-store.js?v=3.2"></script>
-<script src="/js/manufacturing.js"></script>
+<script src="/js/ingredients.js"></script>
+<script src="/js/nutrition-engine-v4.js"></script>
+<script src="/js/manufacturing.js?v=labels1"></script>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
@@ -98,23 +279,45 @@ auth.requireRole(['STORE', 'STORE_APPROVER']);
 const me = auth.getCurrentUser();
 const isApprover = (me.role === 'STORE_APPROVER');
 
-// Reflect role in the heading
+// Approver sees an approval-focused tab set; manager sees the full lifecycle.
+let _activeFilter = isApprover ? 'NEEDS_APPROVAL' : 'ALL';
+
+const TAB_DEFS = isApprover
+  ? [
+      { k:'NEEDS_APPROVAL',    l:'Needs Approval' },
+      { k:'PENDING_PROCESSING', l:'→ Processing' },
+      { k:'PENDING_DISPATCH',   l:'→ Dispatch' },
+      { k:'ALL',                l:'All' }
+    ]
+  : [
+      { k:'ALL',         l:'All' },
+      { k:'APPROVED',    l:'Open' },
+      { k:'PENDING',     l:'Pending Approval' },
+      { k:'PROCESSING',  l:'Processing' },
+      { k:'DISPATCHED',  l:'Dispatched' }
+    ];
+
+function buildTabs() {
+  const wrap = document.getElementById('statusTabs');
+  if (!wrap) return;
+  wrap.innerHTML = TAB_DEFS.map(d =>
+    `<button onclick="setFilter('${d.k}')" data-key="${d.k}" class="filter-tab${d.k === _activeFilter ? ' active' : ''}">${d.l}</button>`
+  ).join('');
+}
+
+// Reflect role in the heading + build the role-specific tabs
 window.addEventListener('DOMContentLoaded', () => {
   const h = document.getElementById('queueTitle');
   if (h) h.textContent = isApprover ? 'Approval Queue' : 'Production Queue';
   const chip = document.getElementById('roleChip');
   if (chip) chip.textContent = isApprover ? 'Store Approver' : 'Store Manager';
+  buildTabs();
 });
-
-let _activeFilter = 'ALL';
 
 function setFilter(f) {
   _activeFilter = f;
-  ['ALL','APPROVED','PENDING','PROCESSING','DISPATCHED'].forEach(k => {
-    const btn = document.getElementById('tab-' + k);
-    if (!btn) return;
-    btn.classList.toggle('active', k === f);
-    btn.disabled = false;
+  document.querySelectorAll('#statusTabs .filter-tab').forEach(btn => {
+    btn.classList.toggle('active', btn.getAttribute('data-key') === f);
   });
   render();
 }
@@ -193,14 +396,25 @@ function render(){
   jobs.sort((a,b)=> (b.updatedAt||'').localeCompare(a.updatedAt||''));
 
   // Apply filter
-  if (_activeFilter === 'PENDING') {
+  if (_activeFilter === 'PENDING' || _activeFilter === 'NEEDS_APPROVAL') {
     jobs = jobs.filter(j => manufacturingService.WORKFLOW.isPending(j.status));
   } else if (_activeFilter !== 'ALL') {
     jobs = jobs.filter(j => (j.status || 'APPROVED').toUpperCase() === _activeFilter);
   }
 
   if(jobs.length === 0){
-    tbody.innerHTML = `<tr><td colspan="7" style="padding:20px;color:#94a3b8;font-style:italic;">No ${_activeFilter === 'ALL' ? '' : _activeFilter.toLowerCase() + ' '}jobs.</td></tr>`;
+    const emptyLabels = {
+      ALL: 'No jobs.',
+      APPROVED: 'No open jobs.',
+      PENDING: 'No jobs awaiting approval.',
+      NEEDS_APPROVAL: 'Nothing needs your approval right now.',
+      PENDING_PROCESSING: 'No processing requests awaiting approval.',
+      PENDING_DISPATCH: 'No dispatch requests awaiting approval.',
+      PROCESSING: 'No jobs in processing.',
+      DISPATCHED: 'No dispatched jobs.'
+    };
+    const msg = emptyLabels[_activeFilter] || 'No jobs.';
+    tbody.innerHTML = `<tr><td colspan="7" style="padding:20px;color:#94a3b8;font-style:italic;">${msg}</td></tr>`;
     return;
   }
 
@@ -222,6 +436,7 @@ function render(){
           <div style="display:flex;gap:6px;flex-wrap:wrap;">
             <a href="/patients/profile?id=${p.id}&store=1" class="btn-primary" style="padding:6px 12px;font-size:12px;border-radius:6px;" onclick="event.stopPropagation();">View Plan</a>
             <button class="btn-warning" onclick="event.stopPropagation(); openPdf('${p.id}')" style="padding:6px 12px;font-size:12px;border-radius:6px;">PDF</button>
+            ${printLabelBtn(j)}
           </div>
           <div style="display:flex;gap:6px;flex-wrap:wrap;">
             ${statusActionBtn(j)}
@@ -232,6 +447,157 @@ function render(){
     tbody.appendChild(main);
   });
 }
+
+// Print Labels becomes available once production has started (Processing onward).
+function printLabelBtn(j) {
+  const s = (j.status || '').toUpperCase();
+  if (s === 'PROCESSING' || s === 'PENDING_DISPATCH' || s === 'DISPATCHED') {
+    return `<button class="btn-secondary" style="padding:6px 12px;font-size:12px;border-radius:6px;" onclick="event.stopPropagation(); openLabelModal('${j.id}')">🏷️ Print Labels</button>`;
+  }
+  return '';
+}
+
+// ===== Label modal =====
+let _lblJob = null, _lblPlan = null, _lblStore = null, _lblPatient = null;
+function _lblSet(id, v){ const el = document.getElementById(id); if (el) el.textContent = v; }
+function _lblFmtDate(d){ if(!d) return '—'; const s=(typeof d==='string')?d.slice(0,10):new Date(d).toISOString().slice(0,10); const m=s.match(/^(\d{4})-(\d{2})-(\d{2})$/); return m?`${m[3]}/${m[2]}/${m[1]}`:s; }
+function _lblNum(v){ const n=Math.round(parseFloat(v)); return isNaN(n)?'—':n; }
+function _lblNum1(v){ const n=Math.round(parseFloat(v)*10)/10; return isNaN(n)?'—':n; }
+
+function openLabelModal(jobId){
+  const job = manufacturingService.getJobs().find(j => j.id === jobId);
+  if(!job){ return; }
+  const p = getPatientById(job.patientId);
+  if(!p){ alert('Patient not found.'); return; }
+  if(typeof generateNutritionPlan !== 'function'){ alert('Nutrition engine not loaded — please refresh.'); return; }
+  let store = null;
+  if (typeof storeService !== 'undefined') {
+    const all = storeService.getStores() || [];
+    store = all.find(s => s.id === job.storeId)        // the job's store
+         || all.find(s => s.id === me.storeId)          // the logged-in user's store
+         || (all.length === 1 ? all[0] : null);         // single-store deployments
+  }
+  let plan;
+  try {
+    plan = generateNutritionPlan({
+      ...p,
+      weight: parseFloat(p.weight), height: parseFloat(p.height), albumin: parseFloat(p.albumin),
+      weightLossPercent: parseFloat(p.weightLossPercent || 0), giIssues: !!p.giIssues
+    });
+  } catch(e){ alert('Could not compute the plan: ' + e.message); return; }
+  _lblJob = job; _lblPlan = plan; _lblStore = store; _lblPatient = p;
+
+  document.getElementById('lblTitle').textContent = 'Product Labels — ' + (p.name || '');
+  const today = new Date().toISOString().slice(0,10);
+  document.getElementById('lblMfgDate').value = job.mfgDate ? String(job.mfgDate).slice(0,10) : today;
+  document.getElementById('lblErr').style.display = 'none';
+  document.getElementById('lblBatchInfo').textContent = '';
+  renderLabelModal();
+  document.getElementById('lblPrintBtn').disabled = !job.batchNo;
+  document.getElementById('lblPrintBoxBtn').disabled = !job.batchNo;
+  if(job.batchNo) showLblBatchInfo();
+  document.getElementById('labelOverlay').style.display = 'flex';
+}
+
+function renderLabelModal(){
+  const p = _lblPatient, plan = _lblPlan, job = _lblJob, store = _lblStore;
+  _lblSet('lf_name', p.name || '—');
+  document.getElementById('lf_meta').innerHTML = `<b>${p.age ? p.age+' yr' : '—'}</b> · <b>${p.sex || '—'}</b> · UHIC: <b>${p.uhic || '—'}</b>`;
+  _lblSet('lf_energy', _lblNum(plan.dailyCalories));
+  _lblSet('lf_protein', _lblNum(plan.dailyProtein));
+  _lblSet('lf_serv', plan.servingsPerDay || '—');
+  _lblSet('lf_route', plan.prescribedRoute || 'Oral Feeding');
+  _lblSet('lb_energy', _lblNum(plan.perServingCalories));
+  _lblSet('lb_protein', _lblNum(plan.perServingProtein));
+  _lblSet('lb_carb', _lblNum1(plan.macroCarbs));
+  _lblSet('lb_fat', _lblNum1(plan.macroFat));
+  const r = plan.recipe || {};
+  const names = [r.protein, r.carb, r.fat, r.omega, r.bcaa, r.glutamine].filter(Boolean).map(x => x.name).filter(Boolean);
+  document.getElementById('lb_formula').innerHTML = names.length ? names.map(n => '• ' + n).join('<br>') : '—';
+  _lblSet('lb_fssai', (store && (store.fssai_number || store.fssai)) || '—');
+  _lblSet('lb_batch', job.batchNo || '— (generate)');
+  _lblSet('lb_mfg', _lblFmtDate(job.mfgDate));
+  _lblSet('lb_exp', _lblFmtDate(job.expDate));
+  _lblSet('lb_storename', (store && store.name) || '—');
+  document.getElementById('lb_storeaddr').textContent = (store && (store.address || store.location)) || '';
+
+  // ---- Box label (100 x 150 mm) ----
+  _lblSet('x_name', p.name || '—');
+  _lblSet('x_uhic', p.uhic || '—');
+  _lblSet('x_agesex', `${p.age ? p.age + ' yr' : '—'} / ${p.sex || '—'}`);
+  _lblSet('x_cancer', p.cancer || '—');
+  _lblSet('x_regimen', (p.regimen && String(p.regimen).trim()) ? p.regimen : 'RT only / —');
+  _lblSet('x_route', plan.prescribedRoute || 'Oral Feeding');
+  _lblSet('x_serv', plan.servingsPerDay || '—');
+
+  _lblSet('x_ps_energy', _lblNum(plan.perServingCalories));
+  _lblSet('x_d_energy', _lblNum(plan.dailyCalories));
+  _lblSet('x_ps_protein', _lblNum(plan.perServingProtein));
+  _lblSet('x_d_protein', _lblNum(plan.dailyProtein));
+  _lblSet('x_ps_carb', _lblNum1(plan.macroCarbs));
+  _lblSet('x_d_carb', _lblNum1(plan.dailyCarbs));
+  _lblSet('x_ps_fat', _lblNum1(plan.macroFat));
+  _lblSet('x_d_fat', _lblNum1(plan.dailyFat));
+  _lblSet('x_ptype', plan.proteinType || '—');
+
+  const comps = [r.protein, r.carb, r.fat, r.omega, r.bcaa, r.glutamine].filter(Boolean);
+  const specBody = document.getElementById('x_spec');
+  specBody.innerHTML = comps.length
+    ? comps.map(c => {
+        const extra = (c.deliveredProtein != null) ? ` <span style="color:#64748b;">(${c.deliveredProtein} g protein)</span>` : '';
+        return `<tr><td>${c.name}${extra}</td><td class="r">${_lblNum1(c.grams)} g</td></tr>`;
+      }).join('')
+    : '<tr><td colspan="2" style="color:#94a3b8;">Formulation unavailable</td></tr>';
+  _lblSet('x_batch_kcal', (r.recipeKcal != null ? r.recipeKcal + ' kcal' : '—'));
+  _lblSet('x_batch_protein', (r.recipeProtein != null ? r.recipeProtein + ' g' : '—'));
+
+  _lblSet('x_fssai', (store && (store.fssai_number || store.fssai)) || '—');
+  _lblSet('x_batch', job.batchNo || '— (generate)');
+  _lblSet('x_mfg', _lblFmtDate(job.mfgDate));
+  _lblSet('x_exp', _lblFmtDate(job.expDate));
+  _lblSet('x_storename', (store && store.name) || '—');
+  document.getElementById('x_storeaddr').textContent = (store && (store.address || store.location)) || '';
+}
+
+function printLabelsSmall(){
+  document.body.classList.add('print-small');
+  document.body.classList.remove('print-box');
+  window.print();
+  setTimeout(() => document.body.classList.remove('print-small'), 600);
+}
+function printBoxLabel(){
+  document.body.classList.add('print-box');
+  document.body.classList.remove('print-small');
+  window.print();
+  setTimeout(() => document.body.classList.remove('print-box'), 600);
+}
+
+async function generateLabelBatch(){
+  const err = document.getElementById('lblErr'); err.style.display = 'none';
+  const mfg = document.getElementById('lblMfgDate').value;
+  if(!mfg){ err.textContent = 'Please enter the manufacturing date.'; err.style.display='block'; return; }
+  const btn = document.getElementById('lblGenBtn'); btn.disabled = true; btn.textContent = 'Generating…';
+  try {
+    const apiBase = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : '';
+    const res = await fetch(apiBase + '/api/manufacturing-jobs/' + _lblJob.id + '/batch', {
+      method: 'POST', headers: { 'Content-Type':'application/json', 'Authorization':'Bearer ' + me.token },
+      body: JSON.stringify({ mfgDate: mfg })
+    });
+    const data = await res.json().catch(() => ({}));
+    if(!res.ok) throw new Error(data.error || 'Server error');
+    _lblJob.batchNo = data.batch_no; _lblJob.mfgDate = data.mfg_date; _lblJob.expDate = data.exp_date;
+    renderLabelModal(); showLblBatchInfo();
+    document.getElementById('lblPrintBtn').disabled = false;
+    document.getElementById('lblPrintBoxBtn').disabled = false;
+  } catch(e){ err.textContent = 'Failed: ' + e.message; err.style.display = 'block'; }
+  finally { btn.disabled = false; btn.textContent = 'Save Date & Generate Batch'; }
+}
+
+function showLblBatchInfo(){
+  document.getElementById('lblBatchInfo').innerHTML =
+    `✅ Batch <b>${_lblJob.batchNo}</b> · Mfg ${_lblFmtDate(_lblJob.mfgDate)} · Exp ${_lblFmtDate(_lblJob.expDate)} (18 months). You can print now.`;
+}
+function closeLabelModal(){ document.getElementById('labelOverlay').style.display = 'none'; }
 
 // Manager requests the next step → job enters a PENDING_* state for approval.
 async function requestStep(jobId, next) {
