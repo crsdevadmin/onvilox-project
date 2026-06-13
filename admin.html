@@ -24,12 +24,15 @@
 
 <div class="container page">
 
-  <div class="page-header">
+  <div class="page-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
     <div>
       <h1 class="page-title">System Overview</h1>
       <div class="page-subtitle">Real-time metrics across all facilities</div>
     </div>
+    <button class="btn-primary" onclick="syncJobs(this)" title="Create missing production jobs for approved patients and show a diagnostic">Sync Production Jobs</button>
   </div>
+
+  <div id="syncResult" style="display:none;margin-bottom:16px;font-size:13px;"></div>
 
   <div class="kpis">
     <div class="kpi-card">
@@ -106,6 +109,60 @@ document.getElementById('tReady').innerText = countJobs('READY');
 document.getElementById('tDispatched').innerText = countJobs('DISPATCHED');
 document.getElementById('tDelivered').innerText = countJobs('DELIVERED');
 }); // end initStore().then
+
+// Manually reconcile production jobs (creates missing jobs for approved patients)
+// and render a diagnostic so mismatches are easy to spot.
+async function syncJobs(btn){
+  const apiBase = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : '';
+  const me = auth.getCurrentUser();
+  const box = document.getElementById('syncResult');
+  if(btn){ btn.disabled = true; btn.textContent = 'Syncing...'; }
+  try {
+    const res = await fetch(apiBase + '/api/admin/reconcile-jobs', {
+      method: 'POST', headers: { 'Content-Type':'application/json', 'Authorization': 'Bearer ' + me.token }
+    });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error || 'Server error');
+
+    const storeName = {};
+    (storeService.getStores() || []).forEach(s => { storeName[s.id] = s.name; });
+    const sid = (id) => id ? (storeName[id] || id) : '<span style="color:#dc2626;">(none)</span>';
+
+    let html = `<div class="card"><b>Sync complete.</b> Created ${data.created} new job(s).`;
+
+    // Rows the sync could not create, with the exact reason
+    if ((data.skipped || []).length) {
+      html += `<div style="margin-top:8px;color:#dc2626;"><b>${data.skipped.length} could not be created:</b><ul style="margin:6px 0 0 18px;">`;
+      data.skipped.forEach(s => { html += `<li>${s.patient} — ${s.reason}</li>`; });
+      html += `</ul></div>`;
+    }
+
+    // Patients still without a job after sync (problem cases)
+    const orphans = (data.approvedPatients || []).filter(p => !p.has_job);
+    if (orphans.length) {
+      html += `<div style="margin-top:8px;color:#b45309;"><b>${orphans.length} approved patient(s) still without a job</b> (usually a missing/orphaned store mapping):<ul style="margin:6px 0 0 18px;">`;
+      orphans.forEach(p => { html += `<li>${p.name || p.id} — status ${p.status||'?'}, store ${sid(p.store_id)}</li>`; });
+      html += `</ul></div>`;
+    }
+
+    // Store-id cross-check: jobs vs the store/approver users
+    const userStores = new Set((data.storeUsers||[]).filter(u=>u.role==='STORE'||u.role==='STORE_APPROVER').map(u=>u.store_id).filter(Boolean));
+    const jobStores = new Set((data.jobs||[]).map(j=>j.store_id).filter(Boolean));
+    const unmatched = [...jobStores].filter(s => !userStores.has(s));
+    if (unmatched.length) {
+      html += `<div style="margin-top:8px;color:#dc2626;"><b>Warning:</b> ${unmatched.length} job store(s) have no Store Manager/Approver mapped to them: ${unmatched.map(sid).join(', ')}. Map a store user to these in Admin → Mapping.</div>`;
+    }
+
+    html += `<div style="margin-top:8px;color:#475569;">Approved patients: ${ (data.approvedPatients||[]).length } · Jobs total: ${ (data.jobs||[]).length }</div></div>`;
+    box.innerHTML = html;
+    box.style.display = 'block';
+  } catch(e) {
+    box.innerHTML = `<div class="card" style="color:#dc2626;">Sync failed: ${e.message}</div>`;
+    box.style.display = 'block';
+  } finally {
+    if(btn){ btn.disabled = false; btn.textContent = 'Sync Production Jobs'; }
+  }
+}
 </script>
 
 <script src="/js/theme.js"></script>

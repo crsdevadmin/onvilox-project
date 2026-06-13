@@ -56,7 +56,7 @@
   function routeForRole(role){
     if(role === 'SUPER_ADMIN' || role === 'ADMIN') return '/admin';
     if(role === 'DOCTOR' || role === 'ASSISTANT') return '/dashboard';
-    if(role === 'STORE') return '/store';
+    if(role === 'STORE' || role === 'STORE_APPROVER') return '/store';
     if(role === 'COORDINATOR') return '/coordinator';
     return '/login';
   }

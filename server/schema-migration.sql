@@ -200,3 +200,53 @@ ALTER TABLE nutrition_plans ADD COLUMN IF NOT EXISTS full_data JSONB;
 -- Migration: Add store_id and phone to users
 ALTER TABLE users ADD COLUMN IF NOT EXISTS store_id VARCHAR(50);
 ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(50);
+
+-- Migration: Monitoring Logs table (Daily & Weekly forms)
+CREATE TABLE IF NOT EXISTS monitoring_logs (
+    id SERIAL PRIMARY KEY,
+    patient_id TEXT NOT NULL,
+    type TEXT NOT NULL,           -- 'daily' | 'weekly'
+    recorded_by TEXT,
+    recorded_at TIMESTAMPTZ DEFAULT NOW(),
+    data JSONB NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_monitoring_logs_patient ON monitoring_logs(patient_id);
+
+-- Migration: Radiation Therapy Module fields
+ALTER TABLE patients ADD COLUMN IF NOT EXISTS radiation_status VARCHAR(50);
+ALTER TABLE patients ADD COLUMN IF NOT EXISTS radiation_technique VARCHAR(100);
+ALTER TABLE patients ADD COLUMN IF NOT EXISTS sub_site VARCHAR(255);
+ALTER TABLE patients ADD COLUMN IF NOT EXISTS tnm_stage VARCHAR(50);
+ALTER TABLE patients ADD COLUMN IF NOT EXISTS total_dose_gy DOUBLE PRECISION;
+ALTER TABLE patients ADD COLUMN IF NOT EXISTS fraction_size_gy DOUBLE PRECISION;
+ALTER TABLE patients ADD COLUMN IF NOT EXISTS number_of_fractions INTEGER;
+ALTER TABLE patients ADD COLUMN IF NOT EXISTS fractions_completed INTEGER;
+ALTER TABLE patients ADD COLUMN IF NOT EXISTS radiation_week INTEGER;
+ALTER TABLE patients ADD COLUMN IF NOT EXISTS concurrent_therapy VARCHAR(100);
+
+-- Migration: Clinical Scoring fields
+ALTER TABLE patients ADD COLUMN IF NOT EXISTS must_score VARCHAR(10);
+ALTER TABLE patients ADD COLUMN IF NOT EXISTS pg_sga_score INTEGER;
+ALTER TABLE patients ADD COLUMN IF NOT EXISTS sarc_f_score INTEGER;
+
+-- Migration: Radiation Toxicity Grades (CTCAE 0-4)
+ALTER TABLE patients ADD COLUMN IF NOT EXISTS tox_mucositis INTEGER DEFAULT 0;
+ALTER TABLE patients ADD COLUMN IF NOT EXISTS tox_dysphagia INTEGER DEFAULT 0;
+ALTER TABLE patients ADD COLUMN IF NOT EXISTS tox_xerostomia INTEGER DEFAULT 0;
+ALTER TABLE patients ADD COLUMN IF NOT EXISTS tox_nausea INTEGER DEFAULT 0;
+ALTER TABLE patients ADD COLUMN IF NOT EXISTS tox_diarrhea INTEGER DEFAULT 0;
+
+-- Migration: FSSAI licence number on stores
+ALTER TABLE stores ADD COLUMN IF NOT EXISTS fssai_number VARCHAR(20);
+
+-- Migration: manufacturing_jobs (store production queue / approval workflow)
+CREATE TABLE IF NOT EXISTS manufacturing_jobs (
+    id TEXT PRIMARY KEY,
+    patient_id TEXT,
+    store_id TEXT,
+    doctor_id TEXT,
+    status TEXT DEFAULT 'APPROVED',
+    history JSONB DEFAULT '[]'::jsonb,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);

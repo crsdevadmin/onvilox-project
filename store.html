@@ -33,12 +33,16 @@
 
   <div class="card">
     <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px;">
-      <h2 style="margin:0;">Production Queue</h2>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <h2 style="margin:0;" id="queueTitle">Production Queue</h2>
+        <span id="roleChip" style="font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#0e2247;background:#e2e8f0;border-radius:999px;padding:3px 10px;"></span>
+      </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;" id="statusTabs">
-        <button onclick="setFilter('ALL')"       id="tab-ALL"        class="filter-tab active">All</button>
-        <button onclick="setFilter('APPROVED')"  id="tab-APPROVED"   class="filter-tab">Open</button>
+        <button onclick="setFilter('ALL')"        id="tab-ALL"        class="filter-tab active">All</button>
+        <button onclick="setFilter('APPROVED')"   id="tab-APPROVED"   class="filter-tab">Open</button>
+        <button onclick="setFilter('PENDING')"    id="tab-PENDING"    class="filter-tab">Pending Approval</button>
         <button onclick="setFilter('PROCESSING')" id="tab-PROCESSING" class="filter-tab">Processing</button>
-        <button onclick="setFilter('DISPATCHED')" id="tab-DISPATCHED" class="filter-tab" disabled>Dispatched</button>
+        <button onclick="setFilter('DISPATCHED')" id="tab-DISPATCHED" class="filter-tab">Dispatched</button>
       </div>
     </div>
 
@@ -90,25 +94,28 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
 <script>
-auth.requireRole(['STORE']);
+auth.requireRole(['STORE', 'STORE_APPROVER']);
 const me = auth.getCurrentUser();
+const isApprover = (me.role === 'STORE_APPROVER');
+
+// Reflect role in the heading
+window.addEventListener('DOMContentLoaded', () => {
+  const h = document.getElementById('queueTitle');
+  if (h) h.textContent = isApprover ? 'Approval Queue' : 'Production Queue';
+  const chip = document.getElementById('roleChip');
+  if (chip) chip.textContent = isApprover ? 'Store Approver' : 'Store Manager';
+});
 
 let _activeFilter = 'ALL';
 
 function setFilter(f) {
   _activeFilter = f;
-  // Update tab styles
-  ['ALL','APPROVED','PROCESSING','DISPATCHED'].forEach(k => {
+  ['ALL','APPROVED','PENDING','PROCESSING','DISPATCHED'].forEach(k => {
     const btn = document.getElementById('tab-' + k);
     if (!btn) return;
     btn.classList.toggle('active', k === f);
     btn.disabled = false;
   });
-  // When Processing selected: enable Dispatched tab too (next step)
-  const dispTab = document.getElementById('tab-DISPATCHED');
-  if (f !== 'PROCESSING' && f !== 'ALL') {
-    dispTab.disabled = (f !== 'DISPATCHED');
-  }
   render();
 }
 
@@ -119,16 +126,39 @@ function getUserName(id){
 }
 
 function statusClass(s){
-  return (s||'APPROVED').toLowerCase();
+  return manufacturingService.WORKFLOW.badgeClass(s);
 }
 
+const _btnAmber = 'padding:5px 10px;font-size:11px;border-radius:5px;border:1px solid #f59e0b;background:#fffbeb;color:#92400e;font-weight:600;cursor:pointer;';
+const _btnGreen = 'padding:5px 10px;font-size:11px;border-radius:5px;border:1px solid #16a34a;background:#f0fdf4;color:#15803d;font-weight:600;cursor:pointer;';
+const _btnRed   = 'padding:5px 10px;font-size:11px;border-radius:5px;border:1px solid #dc2626;background:#fef2f2;color:#b91c1c;font-weight:600;cursor:pointer;';
+
 function statusActionBtn(j) {
+  const W = manufacturingService.WORKFLOW;
   const s = (j.status || 'APPROVED').toUpperCase();
-  if (s === 'APPROVED') {
-    return `<button onclick="event.stopPropagation(); updateStatus('${j.id}', 'PROCESSING')" style="padding:5px 10px;font-size:11px;border-radius:5px;border:1px solid #f59e0b;background:#fffbeb;color:#92400e;font-weight:600;cursor:pointer;">Mark Processing</button>`;
+
+  // ── Store Approver view ──────────────────────────────────────────────
+  if (isApprover) {
+    const p = W.pending[s];
+    if (p) {
+      return `<div style="display:flex;gap:6px;flex-wrap:wrap;">
+        <button onclick="event.stopPropagation(); approveStep('${j.id}')" style="${_btnGreen}">Approve ${p.label}</button>
+        <button onclick="event.stopPropagation(); rejectStep('${j.id}')" style="${_btnRed}">Reject</button>
+      </div>`;
+    }
+    if (s === 'DISPATCHED') return `<span style="font-size:11px;color:#16a34a;font-weight:700;">✓ Dispatched</span>`;
+    return `<span style="font-size:11px;color:#94a3b8;">Awaiting manager</span>`;
   }
-  if (s === 'PROCESSING') {
-    return `<button onclick="event.stopPropagation(); updateStatus('${j.id}', 'DISPATCHED')" style="padding:5px 10px;font-size:11px;border-radius:5px;border:1px solid #16a34a;background:#f0fdf4;color:#15803d;font-weight:600;cursor:pointer;">Mark Dispatched</button>`;
+
+  // ── Store Manager view ───────────────────────────────────────────────
+  if (W.isPending(s)) {
+    return `<span style="font-size:11px;color:#d97706;font-weight:700;">⏳ Awaiting approval</span>`;
+  }
+  const req = W.requestFor(s);
+  if (req) {
+    const label = (req.next === 'PENDING_PROCESSING') ? 'Request Processing' : 'Request Dispatch';
+    const style = (req.next === 'PENDING_PROCESSING') ? _btnAmber : _btnGreen;
+    return `<button onclick="event.stopPropagation(); requestStep('${j.id}', '${req.next}')" style="${style}">${label}</button>`;
   }
   return `<span style="font-size:11px;color:#16a34a;font-weight:700;">✓ Dispatched</span>`;
 }
@@ -163,7 +193,9 @@ function render(){
   jobs.sort((a,b)=> (b.updatedAt||'').localeCompare(a.updatedAt||''));
 
   // Apply filter
-  if (_activeFilter !== 'ALL') {
+  if (_activeFilter === 'PENDING') {
+    jobs = jobs.filter(j => manufacturingService.WORKFLOW.isPending(j.status));
+  } else if (_activeFilter !== 'ALL') {
     jobs = jobs.filter(j => (j.status || 'APPROVED').toUpperCase() === _activeFilter);
   }
 
@@ -184,7 +216,7 @@ function render(){
       <td>${p.age ? p.age + ' yr' : '-'} / ${p.sex || '-'}</td>
       <td>${p.uhic || '-'}</td>
       <td>${p.cancer}</td>
-      <td><span class="status ${statusClass(j.status)}">${j.status}</span></td>
+      <td><span class="status ${statusClass(j.status)}">${manufacturingService.WORKFLOW.statusLabel(j.status)}</span></td>
       <td>
         <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-start;">
           <div style="display:flex;gap:6px;flex-wrap:wrap;">
@@ -201,8 +233,31 @@ function render(){
   });
 }
 
-async function updateStatus(jobId, status) {
-  await manufacturingService.updateJobStatus(jobId, status);
+// Manager requests the next step → job enters a PENDING_* state for approval.
+async function requestStep(jobId, next) {
+  await manufacturingService.updateJobStatus(jobId, next, { by: me.id, role: me.role, action: 'request' });
+  render();
+}
+
+// Approver approves a pending request → job advances to the real state.
+async function approveStep(jobId) {
+  const job = manufacturingService.getJobs().find(j => j.id === jobId);
+  if (!job) return;
+  const p = manufacturingService.WORKFLOW.pending[(job.status || '').toUpperCase()];
+  if (!p) return;
+  await manufacturingService.updateJobStatus(jobId, p.approve, { by: me.id, role: me.role, action: 'approve' });
+  render();
+}
+
+// Approver rejects a pending request → job reverts to the previous state.
+async function rejectStep(jobId) {
+  const job = manufacturingService.getJobs().find(j => j.id === jobId);
+  if (!job) return;
+  const W = manufacturingService.WORKFLOW;
+  const p = W.pending[(job.status || '').toUpperCase()];
+  if (!p) return;
+  if (!confirm('Reject this request? The job will revert to "' + W.statusLabel(p.reject) + '".')) return;
+  await manufacturingService.updateJobStatus(jobId, p.reject, { by: me.id, role: me.role, action: 'reject' });
   render();
 }
 
@@ -282,6 +337,7 @@ function openQrLink(){
 
 // ── NOTIFICATION POLLING ──────────────────────────────────────────────────
 let _knownJobIds = new Set();
+let _jobStatusMap = {}; // jobId -> last seen status, for change detection
 let _notifPermission = false;
 
 function _initNotifications() {
@@ -299,32 +355,108 @@ function _pollJobs() {
     .then(r => r.ok ? r.json() : [])
     .then(jobs => {
       if (!me.storeId) return;
+      const W = manufacturingService.WORKFLOW;
       const myJobs = jobs.filter(j => j.store_id === me.storeId || j.storeId === me.storeId);
+      const seeded = _knownJobIds.size > 0;
+      let changed = false;
+
       myJobs.forEach(j => {
+        const status = (j.status || 'APPROVED').toUpperCase();
+        const prev = _jobStatusMap[j.id];
+        const p = getPatientById(j.patient_id || j.patientId);
+        const name = p ? p.name : 'A patient';
+
+        // New job appeared
         if (!_knownJobIds.has(j.id)) {
-          if (_knownJobIds.size > 0) {
-            // New job appeared — notify
-            const p = getPatientById(j.patient_id || j.patientId);
-            const name = p ? p.name : 'A patient';
-            _showNotification('New Patient Approved', `${name} is ready for production.`);
-            render();
+          if (seeded && !isApprover && status === 'APPROVED') {
+            _showNotification('New Patient Approved', `${name} is ready for production.`, 'pending');
           }
           _knownJobIds.add(j.id);
+          changed = true;
+        } else if (prev && prev !== status) {
+          // Status changed since last poll
+          changed = true;
+          if (isApprover && W.isPending(status)) {
+            // An item now needs the approver's sign-off → urgent chime.
+            _showNotification('Approval Needed', `${name}: ${W.statusLabel(status)}.`, 'pending');
+          } else if (!isApprover && W.isPending(prev)) {
+            // Manager's pending request was resolved by the approver → info ping.
+            if (status === 'PROCESSING' || status === 'DISPATCHED') {
+              _showNotification('Request Approved', `${name} moved to ${W.statusLabel(status)}.`, 'info');
+            } else {
+              _showNotification('Request Rejected', `${name} reverted to ${W.statusLabel(status)}.`, 'info');
+            }
+          }
         }
+        _jobStatusMap[j.id] = status;
       });
+
+      // Refresh the in-memory job cache with the freshly-fetched rows so that
+      // render() reflects server truth (e.g. an approval done on another device).
+      if (manufacturingService.applyServerJobs) manufacturingService.applyServerJobs(jobs);
+
+      if (seeded && changed) render();
     }).catch(() => {});
 }
 
-function _showNotification(title, body) {
-  if (_notifPermission) {
-    try { new Notification(title, { body, icon: '/favicon.ico' }); } catch(e) {}
+// ── Custom alert sound (Web Audio) ─────────────────────────────────────────
+// Browsers won't let Notifications play a custom sound, so we synthesize our
+// own tone. 'pending' = an urgent rising 3-note chime that signals "something
+// needs YOUR action"; 'info' = a softer 2-note ping for status updates.
+let _audioCtx = null;
+function _ensureAudio() {
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return null;
+    if (!_audioCtx) _audioCtx = new Ctx();
+    if (_audioCtx.state === 'suspended') _audioCtx.resume();
+    return _audioCtx;
+  } catch(e) { return null; }
+}
+// Resume audio on the first user interaction (autoplay policy requirement).
+['click','keydown','touchstart'].forEach(ev =>
+  window.addEventListener(ev, _ensureAudio, { once: true }));
+
+function _playChime(kind) {
+  const ctx = _ensureAudio();
+  if (!ctx) return;
+  const now = ctx.currentTime;
+  const notes = (kind === 'pending') ? [880, 1175, 1568] : [659, 988];
+  const gap   = (kind === 'pending') ? 0.16 : 0.14;
+  const reps  = (kind === 'pending') ? 2 : 1; // pending plays twice for urgency
+  for (let r = 0; r < reps; r++) {
+    notes.forEach((f, i) => {
+      const t = now + r * (notes.length * gap + 0.18) + i * gap;
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type = 'sine';
+      o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.28, t + 0.025);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + gap + 0.05);
+      o.connect(g); g.connect(ctx.destination);
+      o.start(t); o.stop(t + gap + 0.08);
+    });
   }
-  // Always show in-page toast
+}
+
+function _showNotification(title, body, kind) {
+  // Distinct custom sound (so it's clearly different from the system default).
+  _playChime(kind);
+
+  // Only raise an OS notification when the tab is NOT visible — otherwise the
+  // in-page toast below already informs the user, and showing both is noisy.
+  if (_notifPermission && document.hidden) {
+    try { new Notification(title, { body, icon: '/favicon.ico', silent: true }); } catch(e) {}
+  }
+
+  // In-page toast (amber + ⏳ for pending action items, navy otherwise).
+  const pending = (kind === 'pending');
   const toast = document.createElement('div');
-  toast.style.cssText = 'position:fixed;top:70px;right:20px;background:#0e2247;color:#fff;padding:14px 20px;border-radius:8px;z-index:9999;font-size:14px;font-weight:600;box-shadow:0 4px 20px rgba(0,0,0,0.3);max-width:320px;';
-  toast.innerHTML = `<div style="font-weight:700;margin-bottom:4px;">🔔 ${title}</div><div style="font-size:12px;opacity:0.85;">${body}</div>`;
+  toast.style.cssText = 'position:fixed;top:70px;right:20px;color:#fff;padding:14px 20px;border-radius:8px;z-index:9999;font-size:14px;font-weight:600;box-shadow:0 4px 20px rgba(0,0,0,0.3);max-width:320px;background:' + (pending ? '#b45309' : '#0e2247') + ';';
+  toast.innerHTML = `<div style="font-weight:700;margin-bottom:4px;">${pending ? '⏳' : '🔔'} ${title}</div><div style="font-size:12px;opacity:0.9;">${body}</div>`;
   document.body.appendChild(toast);
-  setTimeout(() => toast.remove(), 6000);
+  setTimeout(() => toast.remove(), pending ? 9000 : 6000);
 }
 
 async function testPushNotification() {
@@ -363,6 +495,20 @@ function _updateNotifStatus() {
     el.style.cursor = 'pointer';
     el.onclick = () => Notification.requestPermission().then(() => _updateNotifStatus());
   }
+}
+
+// When the app is open, the service worker hands push messages to the page
+// (instead of showing a duplicate OS notification) so we can play the custom
+// chime + in-page toast. 'Approval Needed' alerts use the urgent 'pending' sound.
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.addEventListener('message', (e) => {
+    const msg = e.data || {};
+    if (msg.type !== 'push') return;
+    const d = msg.data || {};
+    const kind = /approval needed|awaiting/i.test((d.title || '') + ' ' + (d.body || '')) ? 'pending' : 'info';
+    _showNotification(d.title || 'Update', d.body || '', kind);
+    render();
+  });
 }
 
 // Start polling after page loads

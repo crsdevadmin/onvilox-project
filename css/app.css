@@ -197,6 +197,14 @@ body::before {
   background: linear-gradient(90deg, var(--violet), transparent);
 }
 
+.card-rose {
+  border-color: var(--rose-dim);
+}
+
+.card-rose::before {
+  background: linear-gradient(90deg, var(--rose), transparent);
+}
+
 .card-amber {
   border-color: var(--amber-dim);
 }

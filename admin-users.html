@@ -35,6 +35,7 @@
       <option value="">Select Role</option>
       <option value="DOCTOR">Doctor</option>
       <option value="STORE">Store Manager</option>
+      <option value="STORE_APPROVER">Store Approver</option>
       <option value="COORDINATOR">Coordinator (Delivery)</option>
       <option value="ASSISTANT">Assistant</option>
     </select>
@@ -58,7 +59,7 @@
     <div class="validation-msg" id="phone_msg"></div>
   </div>
 
-  <div class="form-group">
+  <div class="form-group" id="addressGroup">
     <label>Address</label>
     <input id="address" type="text" onkeyup="validateUserField(this,'Address')" onblur="validateUserField(this,'Address')">
     <div class="validation-msg" id="address_msg"></div>
@@ -261,9 +262,9 @@ function validateUserForm(){
 
   // Role-specific required mapping
   const role = roleEl.value;
-  if(role === 'DOCTOR' || role === 'STORE'){
+  if(role === 'DOCTOR' || role === 'STORE' || role === 'STORE_APPROVER' || role === 'COORDINATOR'){
     if(role === 'DOCTOR' && !validateUserField(hospitalEl,'Hospital Name')) return false;
-    
+
     const storeEl = document.getElementById('storeSelect');
     if(!storeEl.value){
       storeEl.classList.add('field-invalid');
@@ -294,14 +295,14 @@ function validateUserForm(){
 function fillStores(role){
   const sel = document.getElementById('storeSelect');
   const stores = storeService.getStores();
-  const managedStoreIds = new Set(
-    userService.getUsersByRole('STORE')
-      .map(u => u.storeId)
-      .filter(Boolean)
-  );
+  // For STORE and STORE_APPROVER, only one user of that role per store.
+  const takenStoreIds = (role === 'STORE' || role === 'STORE_APPROVER')
+    ? new Set(userService.getUsersByRole(role).map(u => u.storeId).filter(Boolean))
+    : new Set();
+  const restricted = (role === 'STORE' || role === 'STORE_APPROVER');
   sel.innerHTML = '<option value="">Select Store</option>';
   stores
-    .filter(s => role !== 'STORE' || !managedStoreIds.has(s.id))
+    .filter(s => !restricted || !takenStoreIds.has(s.id))
     .forEach(s => {
     const opt = document.createElement('option');
     opt.value = s.id;
@@ -309,9 +310,9 @@ function fillStores(role){
     sel.add(opt);
   });
 
-  // If creating a store manager and none are available
-  if(role === 'STORE'){
-    const availableCount = stores.filter(s => !managedStoreIds.has(s.id)).length;
+  // If every store already has a user of this role
+  if(restricted){
+    const availableCount = stores.filter(s => !takenStoreIds.has(s.id)).length;
     if(availableCount === 0){
       sel.innerHTML = '<option value="">No available stores</option>';
     }
@@ -339,11 +340,23 @@ function onRoleChange(){
   const doctorGroup = document.getElementById('doctorGroup');
   const doctorHospitalGroup = document.getElementById('doctorHospitalGroup');
 
-  storeGroup.style.display = (role === 'DOCTOR' || role === 'STORE') ? 'block' : 'none';
+  storeGroup.style.display = (role === 'DOCTOR' || role === 'STORE' || role === 'STORE_APPROVER' || role === 'COORDINATOR') ? 'block' : 'none';
   doctorGroup.style.display = (role === 'ASSISTANT') ? 'block' : 'none';
   doctorHospitalGroup.style.display = (role === 'DOCTOR') ? 'block' : 'none';
 
-  if(role === 'DOCTOR' || role === 'STORE'){
+  // Address is not collected for Store Manager / Store Approver
+  const addressGroup = document.getElementById('addressGroup');
+  if (addressGroup) {
+    const hideAddress = (role === 'STORE' || role === 'STORE_APPROVER');
+    addressGroup.style.display = hideAddress ? 'none' : 'block';
+    if (hideAddress) {
+      const a = document.getElementById('address');
+      if (a) { a.value = ''; a.classList.remove('field-valid','field-invalid'); }
+      document.getElementById('address_msg').innerText = '';
+    }
+  }
+
+  if(role === 'DOCTOR' || role === 'STORE' || role === 'STORE_APPROVER' || role === 'COORDINATOR'){
     fillStores(role);
   }
   if(role === 'ASSISTANT'){
@@ -366,17 +379,19 @@ async function createUserUI(){
   }
 
   // enforce prerequisites
-  if((role === 'DOCTOR' || role === 'STORE') && storeService.getStores().length === 0){
+  if((role === 'DOCTOR' || role === 'STORE' || role === 'STORE_APPROVER' || role === 'COORDINATOR') && storeService.getStores().length === 0){
     document.getElementById('errorBox').innerText = 'Please create a Store first (Store Master).';
     return;
   }
 
-  // one store manager per store UX guard
-  if(role === 'STORE'){
-    const managed = userService.getUsersByRole('STORE').filter(u => u.storeId).length;
+  // one store manager / approver per store UX guard
+  if(role === 'STORE' || role === 'STORE_APPROVER'){
+    const taken = userService.getUsersByRole(role).filter(u => u.storeId).length;
     const totalStores = storeService.getStores().length;
-    if(totalStores > 0 && managed >= totalStores){
-      document.getElementById('errorBox').innerText = 'All stores already have a Store.';
+    if(totalStores > 0 && taken >= totalStores){
+      document.getElementById('errorBox').innerText = (role === 'STORE')
+        ? 'All stores already have a Store Manager.'
+        : 'All stores already have a Store Approver.';
       return;
     }
   }
@@ -434,7 +449,7 @@ function renderUsersTable(){
     let mapped = '-';
     if(u.role === 'DOCTOR'){
       mapped = storeName(u.storeId);
-    } else if(u.role === 'STORE'){
+    } else if(u.role === 'STORE' || u.role === 'STORE_APPROVER' || u.role === 'COORDINATOR'){
       mapped = storeName(u.storeId);
     } else if(u.role === 'ASSISTANT'){
       const docId = assistantMap.find(m => m.assistantId === u.id)?.doctorId;

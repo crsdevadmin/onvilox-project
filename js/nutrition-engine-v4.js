@@ -99,10 +99,20 @@ function generateNutritionPlan(patient, engineConfig) {
     c.includes('nephropathy') || c.includes('dialysis') || c.includes('aki') || c.includes('acute kidney')
   );
   var hasRenalIssue = hasRenalDisease || creatinine > fv('creatinine_renal_danger', 1.3) || urea >= fv('urea_high', 50);
-  
-  var hasNausea = sideEffects.some(s => s.includes('nausea') || s.includes('vomit'));
+
+  // Toxicity grades — declared early to avoid temporal dead zone (used in hasNausea/hasMucositis below)
+  const toxMucositis = parseInt(patient.toxMucositis || 0);
+  const toxDysphagia = parseInt(patient.toxDysphagia || 0);
+  const toxXerostomia = parseInt(patient.toxXerostomia || 0);
+  const toxNausea = parseInt(patient.toxNausea || 0);
+  const toxDiarrhea = parseInt(patient.toxDiarrhea || 0);
+
+  var hasNausea = sideEffects.some(s => s.includes('nausea') || s.includes('vomit')) || toxNausea >= 1;
   var hasAppetiteLoss = sideEffects.some(s => s.includes('appetite') || s.includes('satiety'));
-  var hasMucositis = sideEffects.some(s => s.includes('mucositis') || s.includes('mouth sore') || regimen.includes('5-fu') || regimen.includes('folfirinox'));
+  var hasMucositis = sideEffects.some(s => s.includes('mucositis') || s.includes('mouth sore') || regimen.includes('5-fu') || regimen.includes('folfirinox')) || toxMucositis >= 1;
+  var hasDysphagia = sideEffects.some(s => s.includes('dysphagia') || s.includes('swallow')) || toxDysphagia >= 2;
+  var hasXerostomia = toxXerostomia >= 2;
+  var hasGIDiarrhea = sideEffects.some(s => s.includes('diarrhea') || s.includes('diarrhoea')) || toxDiarrhea >= 2;
   
   // Normalise common platinum abbreviations/typos so all downstream checks work
   const hasCisplatin = regimen.includes('cisplatin') || regimen.includes('cepatin') || regimen.includes('gem-cis') || regimen.includes('gemcis');
@@ -145,9 +155,31 @@ function generateNutritionPlan(patient, engineConfig) {
   // Detect pelvic/abdominal radiation — drives mucosal-adapted formula requirement
   // Declared here (before use at nutritionRisk block) to avoid temporal dead zone
   var treatmentTypes = (Array.isArray(patient.treatmentTypes) ? patient.treatmentTypes : []).map(t => (t || '').toLowerCase());
+
+  // Structured RT fields (new RT module)
+  const rtStatus = (patient.radiationStatus || 'None').toLowerCase();
+  const rtSubSite = (patient.subSite || '').toLowerCase();
+  const rtTechnique = (patient.radiationTechnique || '').toLowerCase();
+  const concurrentTherapy = (patient.concurrentTherapy || 'None').toLowerCase();
+  const hasActiveRadiation = rtStatus === 'active' || rtStatus === 'planned';
+  const hasCompletedRadiation = rtStatus === 'completed';
+  const hasAnyRadiation = hasActiveRadiation || hasCompletedRadiation;
+
+  // Toxicity grades already declared above (early declaration to avoid temporal dead zone)
+  const maxToxicity = Math.max(toxMucositis, toxDysphagia, toxXerostomia, toxNausea, toxDiarrhea);
+
+  // Clinical scores (new RT module)
+  const pgSgaScore = parseInt(patient.pgSgaScore) || 0;
+  const sarcFScore = parseInt(patient.sarcFScore) || 0;
+  const mustScoreRaw = patient.mustScore ? parseInt(patient.mustScore) : null;
+
+  // Update existing condition flags using structured toxicity grades
+  // (Upgrade hasMucositis / hasNausea to use CTCAE grade if available)
   var hasPelvicRadiation = treatmentTypes.some(t => t.includes('pelvic') || t.includes('abdominal') || t.includes('radiation') || t.includes('radiotherapy') || t.includes('ebrt') || t.includes('brachytherapy'))
     || lowerComorbidities.some(c => c.includes('radiation enteritis') || c.includes('enteritis'))
-    || sideEffects.some(s => s.includes('radiation') || s.includes('enteritis'));
+    || sideEffects.some(s => s.includes('radiation') || s.includes('enteritis'))
+    // Structured RT module: pelvic/abdominal sub-site triggers same protocol
+    || (hasAnyRadiation && (rtSubSite.includes('pelv') || rtSubSite.includes('abdom') || rtSubSite.includes('rectum') || rtSubSite.includes('bladder') || rtSubSite.includes('cervix') || rtSubSite.includes('prostate') || rtSubSite.includes('bowel')));
 
   const nutritionRiskReasons = [];
   let riskScore = 0;
@@ -206,6 +238,46 @@ function generateNutritionPlan(patient, engineConfig) {
     nutritionRiskReasons.push('Pelvic/Abdominal Radiation — Enteritis Risk');
     safetyAlerts.push({ condition: 'RADIATION ENTERITIS PROTOCOL', severity: 'High', action: 'Pelvic/abdominal radiation detected. Formula switched to peptide-based (pre-digested). Low-residue carbohydrate source required. Avoid intact disaccharides (e.g. Palatinose). Reassess formula at each radiation milestone (10 Gy, 20 Gy, completion). If brachytherapy planned: consider elemental formula peri-procedure.' });
   }
+
+  // ── ACTIVE RADIATION THERAPY RISK SCORING ────────────────────────────────
+  if (hasActiveRadiation && !hasPelvicRadiation) {
+    riskScore += 1;
+    const rtSiteLabel = patient.subSite || 'Site not specified';
+    nutritionRiskReasons.push(`Active Radiation Therapy (${rtSiteLabel})`);
+  }
+  if (hasActiveRadiation && concurrentTherapy !== 'none') {
+    riskScore += 1;
+    nutritionRiskReasons.push('Concurrent Chemo-Radiation — Increased Metabolic Demand');
+    safetyAlerts.push({ condition: 'CONCURRENT CHEMO-RT PROTOCOL', severity: 'High', action: 'Concurrent chemoradiation significantly increases metabolic demand, mucositis risk, and weight loss trajectory. Minimum 35 kcal/kg and 1.8 g/kg protein. Weekly nutritional reassessment mandatory. Proactive PEG placement should be discussed for H&N cases before Grade 3 dysphagia onset.' });
+  }
+  // Toxicity grade-based safety alerts
+  if (toxMucositis >= 2) {
+    safetyAlerts.push({ condition: `MUCOSITIS Grade ${toxMucositis} (CTCAE)`, severity: toxMucositis >= 3 ? 'High' : 'Moderate', action: toxMucositis >= 3 ? 'Severe mucositis: transition to liquid/enteral nutrition. Glutamine 16 g/day mandatory. Cold/bland foods only. IV hydration may be required.' : 'Moderate mucositis: soft liquid diet. Avoid acidic, spicy, or coarse foods. Glutamine 16 g/day indicated.' });
+  }
+  if (toxDysphagia >= 2) {
+    safetyAlerts.push({ condition: `DYSPHAGIA Grade ${toxDysphagia} (CTCAE)`, severity: toxDysphagia >= 3 ? 'High' : 'Moderate', action: toxDysphagia >= 3 ? 'Severe dysphagia: enteral tube feeding (NG or PEG) is required. Full caloric and protein targets via formula.' : 'Moderate dysphagia: liquid-only diet. Evaluate for tube feeding if intake <50%.' });
+  }
+  if (toxXerostomia >= 2) {
+    safetyAlerts.push({ condition: `XEROSTOMIA Grade ${toxXerostomia} (CTCAE)`, severity: 'Moderate', action: 'Significant dry mouth: increase fluid intake to ≥2.5L/day. Encourage moist soft foods. Avoid dry, crumbly textures. Mucin-based mouth rinse indicated.' });
+  }
+  if (toxDiarrhea >= 2) {
+    safetyAlerts.push({ condition: `DIARRHEA Grade ${toxDiarrhea} (CTCAE)`, severity: toxDiarrhea >= 3 ? 'High' : 'Moderate', action: toxDiarrhea >= 3 ? 'Severe radiation diarrhea: aggressive electrolyte replacement, low-residue formula, consider peptide-based EN. Hospitalization may be required.' : 'Moderate radiation diarrhea: BRAT-adjacent low-residue diet, avoid lactose and high-fiber foods, increase fluid/electrolyte intake.' });
+  }
+  // PG-SGA critical risk alert
+  if (pgSgaScore >= 9) {
+    riskScore += 2;
+    nutritionRiskReasons.push(`PG-SGA Score ${pgSgaScore} — Critical Nutritional Risk`);
+    safetyAlerts.push({ condition: `PG-SGA Score ${pgSgaScore} (Critical ≥9)`, severity: 'High', action: 'PG-SGA ≥9 indicates critical malnutrition requiring immediate intensive nutrition intervention. MDT review and dietitian-led individual care plan mandatory.' });
+  } else if (pgSgaScore >= 4) {
+    riskScore += 1;
+    nutritionRiskReasons.push(`PG-SGA Score ${pgSgaScore} — Moderate Nutritional Risk`);
+  }
+  // SARC-F screening
+  if (sarcFScore >= 4 && !sarcopenia) {
+    nutritionRiskReasons.push(`SARC-F Score ${sarcFScore} — Sarcopenia Screening Positive`);
+    safetyAlerts.push({ condition: `SARC-F Score ${sarcFScore} (≥4 = Sarcopenia Risk)`, severity: 'Moderate', action: 'SARC-F screening positive. Confirm sarcopenia with CT/DEXA (L3-SMI or ASMI) and grip strength. Begin resistance-exercise compatible leucine-enriched nutrition immediately.' });
+  }
+  // ─────────────────────────────────────────────────────────────────────────
   if (hasIBD) {
     riskScore += 1;
     nutritionRiskReasons.push('IBD / Malabsorption Risk');
@@ -280,6 +352,29 @@ function generateNutritionPlan(patient, engineConfig) {
     kcalPerKg = Math.max(kcalPerKg, fv('kcal_active_chemo_min', 28));
   }
 
+  // ── RADIATION THERAPY ESCALATION (ESPEN/ASCO RT Guidelines) ─────────────
+  if (hasActiveRadiation) {
+    // Base RT: minimum 30 kcal/kg (any active RT, regardless of risk tier)
+    kcalPerKg = Math.max(kcalPerKg, 30);
+    // Concurrent chemo+RT: escalate to 35 kcal/kg minimum
+    if (concurrentTherapy !== 'none') {
+      kcalPerKg = Math.max(kcalPerKg, 35);
+    }
+    // Severe toxicity (grade ≥3 any domain): escalate to 35 kcal/kg minimum
+    if (maxToxicity >= 3) {
+      kcalPerKg = Math.max(kcalPerKg, 35);
+    }
+    // Head & Neck RT: highest metabolic demand
+    if (rtSubSite.includes('head') || rtSubSite.includes('neck') || rtSubSite.includes('orophary') || rtSubSite.includes('laryn') || rtSubSite.includes('nasopharyn')) {
+      kcalPerKg = Math.max(kcalPerKg, 35);
+    }
+  }
+  // PG-SGA ≥9 = critical nutritional risk → always escalate calories
+  if (pgSgaScore >= 9) {
+    kcalPerKg = Math.max(kcalPerKg, 35);
+  }
+  // ────────────────────────────────────────────────────────────────────────
+
   const actualIntake = 100 - (reducedFoodIntake || 0);
 
   // --- MUST SCORE (Malnutrition Universal Screening Tool) ---
@@ -306,6 +401,10 @@ function generateNutritionPlan(patient, engineConfig) {
     // High catabolism: platinum or FOLFIRINOX or immunotherapy + cachexia/sarcopenia
     if ((regimen.includes('folfirinox') || regimen.includes('platin') || chemFlags.pembrolizumab || regimen.includes('nivolumab') || regimen.includes('atezolizumab') || regimen.includes('durvalumab')) && (cachexia || sarcopenia) && proteinPerKg < fv('protein_high_catabolism', 2.0)) {
       proteinPerKg = fv('protein_high_catabolism', 2.0);
+    }
+    // Concurrent chemo+RT or active RT with dysphagia/mucositis: minimum 1.8 g/kg
+    if (hasActiveRadiation && (concurrentTherapy !== 'none' || maxToxicity >= 2) && proteinPerKg < 1.8) {
+      proteinPerKg = 1.8;
     }
   }
 
@@ -417,7 +516,7 @@ function generateNutritionPlan(patient, engineConfig) {
     leucine: (sarcopenia || tumorBurden || ecog >= 2)
       ? `${fv('micro_leucine_high', 5)} g/day`
       : `${fv('micro_leucine_standard', 3)} g/day`,
-    glutamine: (patient.giIssues || hasMucositis || hasNausea || regimen.includes('folfirinox') || hasIBD || hasPelvicRadiation)
+    glutamine: (patient.giIssues || hasMucositis || hasNausea || hasGIDiarrhea || regimen.includes('folfirinox') || hasIBD || hasPelvicRadiation || (hasActiveRadiation && maxToxicity >= 1))
       ? (tumorBurden ? `${fv('micro_glutamine_daily', 16)} g/day — MDT REVIEW REQUIRED (High Tumor Burden)` : `${fv('micro_glutamine_daily', 16)} g/day`)
       : 'Consider if GI toxicity persists',
     bcaa: (alt > 50 || ast > 50 || bilirubin > 1.2)
@@ -841,6 +940,20 @@ function generateNutritionPlan(patient, engineConfig) {
   }
   if (hasIBD) rationale.push(`<b>GI Strategy (IBD):</b> Low-residue focus and hydrolyzed protein used.`);
   if (cancer.includes('pancreatic')) rationale.push(`<b>PERT Focus:</b> Enzymes strongly recommended to address EPI.`);
+  if (hasActiveRadiation) {
+    const rtWeek = patient.radiationWeek || '?';
+    const rtDose = patient.totalDoseGy ? `${patient.fractionsCompleted || 0}/${patient.numberOfFractions || '?'} fractions (Week ${rtWeek})` : 'ongoing';
+    rationale.push(`<b>RT Escalation:</b> Active radiation therapy (${patient.subSite || 'site TBC'}, ${rtDose}). Calorie target raised to ${kcalPerKg} kcal/kg per ESPEN RT guidelines.${concurrentTherapy !== 'none' ? ' Concurrent ' + patient.concurrentTherapy + ' further escalates metabolic demand.' : ''}`);
+  }
+  if (maxToxicity >= 2) {
+    const toxList = [];
+    if (toxMucositis >= 2) toxList.push(`Mucositis G${toxMucositis}`);
+    if (toxDysphagia >= 2) toxList.push(`Dysphagia G${toxDysphagia}`);
+    if (toxXerostomia >= 2) toxList.push(`Xerostomia G${toxXerostomia}`);
+    if (toxNausea >= 2) toxList.push(`Nausea G${toxNausea}`);
+    if (toxDiarrhea >= 2) toxList.push(`Diarrhea G${toxDiarrhea}`);
+    rationale.push(`<b>Toxicity-Driven Targets:</b> CTCAE Grade ≥2 toxicity detected (${toxList.join(', ')}). Protein, glutamine, and formula texture adjusted accordingly.`);
+  }
   const currentIsEnteral = feedingMethodLC.includes('enteral') || feedingMethodLC.includes('parenteral');
   if (actualIntake <= 50 && !currentIsEnteral) {
     rationale.push(`<b>Escalation Strategy:</b> Critical intake deficit (${actualIntake}%) detected; clinical transition to Enteral Feeding (Liquid format) strongly recommended to meet targets.`);
@@ -877,7 +990,7 @@ function generateNutritionPlan(patient, engineConfig) {
     const oGrams = Math.round(oGramsPerServing * servingsPerDay * 10) / 10;
 
     // Therapeutic add-ons — daily batch totals (compounding unit makes one daily box)
-    const glutamineGrams = (patient.giIssues || hasMucositis || hasNausea || hasIBD || hasPelvicRadiation) ? 16 : 0; // 16g/day fixed
+    const glutamineGrams = (patient.giIssues || hasMucositis || hasNausea || hasGIDiarrhea || hasIBD || hasPelvicRadiation || (hasActiveRadiation && maxToxicity >= 1)) ? 16 : 0; // 16g/day fixed
     const glutamineProtein = glutamineGrams;
     const bcaaDailyGrams = (patient.alt > 50 || patient.ast > 50 || patient.bilirubin > 1.2) ? 20 : 0; // 20g/day fixed
     const bcaaProtein = bcaaDailyGrams;

@@ -924,6 +924,41 @@
         <!-- NEW: CLINICAL PROTOCOLS CONTAINER -->
         <div id="clinicalProtocolsContainer" class="rs" style="display:none; margin-top:20px;"></div>
 
+        <!-- RADIATION THERAPY SUMMARY SECTION -->
+        <div id="rtSummarySection" class="rs" style="display:none; margin-bottom:16px;">
+          <div style="background:linear-gradient(135deg,#2d1b69 0%,#4c1d95 100%); border-radius:10px; padding:14px 18px 10px; color:#fff; margin-bottom:0;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+              <div>
+                <div style="font-size:8.5px; font-weight:900; text-transform:uppercase; letter-spacing:0.12em; color:rgba(255,255,255,0.55);">Radiation Therapy Module</div>
+                <div style="font-size:15px; font-weight:800; margin-top:2px;" id="rtStatusBadge">—</div>
+              </div>
+              <div style="text-align:right;">
+                <div style="font-size:8.5px; color:rgba(255,255,255,0.5);">Sub-site</div>
+                <div style="font-size:13px; font-weight:700;" id="rtSubSiteDisplay">—</div>
+              </div>
+            </div>
+            <div style="display:grid; grid-template-columns:repeat(5,1fr); gap:8px; border-top:1px solid rgba(255,255,255,0.1); padding-top:10px;">
+              <div><div style="font-size:8px; color:rgba(255,255,255,0.45); margin-bottom:2px;">Technique</div><div style="font-size:11px; font-weight:700;" id="rtTechniqueDisplay">—</div></div>
+              <div><div style="font-size:8px; color:rgba(255,255,255,0.45); margin-bottom:2px;">Total Dose</div><div style="font-size:11px; font-weight:700;" id="rtDoseDisplay">—</div></div>
+              <div><div style="font-size:8px; color:rgba(255,255,255,0.45); margin-bottom:2px;">Fractions</div><div style="font-size:11px; font-weight:700;" id="rtFractionsDisplay">—</div></div>
+              <div><div style="font-size:8px; color:rgba(255,255,255,0.45); margin-bottom:2px;">Radiation Week</div><div style="font-size:11px; font-weight:700;" id="rtWeekDisplay">—</div></div>
+              <div><div style="font-size:8px; color:rgba(255,255,255,0.45); margin-bottom:2px;">Concurrent</div><div style="font-size:11px; font-weight:700;" id="rtConcurrentDisplay">—</div></div>
+            </div>
+          </div>
+          <div style="display:grid; grid-template-columns:3fr 2fr; gap:8px; margin-top:8px;">
+            <div style="border:1px solid #ddd6fe; border-radius:8px; overflow:hidden;">
+              <div style="background:#ede9fe; padding:5px 10px; font-size:8.5px; font-weight:900; text-transform:uppercase; letter-spacing:0.08em; color:#5b21b6;">Radiation Toxicity Grades (CTCAE)</div>
+              <div style="display:grid; grid-template-columns:repeat(5,1fr); gap:4px; padding:8px;">
+                <div style="text-align:center;"><div style="font-size:8px; color:#64748b; margin-bottom:3px;">Mucositis</div><div id="rtToxMucositis" style="font-size:18px; font-weight:900; color:#0f172a;">0</div></div>
+                <div style="text-align:center;"><div style="font-size:8px; color:#64748b; margin-bottom:3px;">Dysphagia</div><div id="rtToxDysphagia" style="font-size:18px; font-weight:900; color:#0f172a;">0</div></div>
+                <div style="text-align:center;"><div style="font-size:8px; color:#64748b; margin-bottom:3px;">Xerostomia</div><div id="rtToxXerostomia" style="font-size:18px; font-weight:900; color:#0f172a;">0</div></div>
+                <div style="text-align:center;"><div style="font-size:8px; color:#64748b; margin-bottom:3px;">Nausea</div><div id="rtToxNausea" style="font-size:18px; font-weight:900; color:#0f172a;">0</div></div>
+                <div style="text-align:center;"><div style="font-size:8px; color:#64748b; margin-bottom:3px;">Diarrhea</div><div id="rtToxDiarrhea" style="font-size:18px; font-weight:900; color:#0f172a;">0</div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- NUTRITION RX -->
         <div class="rs" id="sectionPrescription">
           <div class="rs-title" id="pPrescriptionTitle">Prescription Target</div>
@@ -1095,7 +1130,7 @@
         </div>
 
         <!-- MICROS -->
-        <div class="rs">
+        <div class="rs" id="micronutrientSection">
           <div class="rs-title">Micronutrient & Functional Support</div>
           <table class="rt">
             <thead>
@@ -1301,189 +1336,95 @@
         </div>
         <!-- PATIENT PROGRESS MONITORING -->
         <div id="monitoringSection" class="rs" style="margin-top:20px;">
-          <div class="rs-title" style="display:flex; align-items:center; justify-content:space-between;">
-            <span>Patient Progress Monitoring</span>
-            <div style="display:flex; gap:8px;">
-              <button onclick="showMonitorTab('daily')" id="monTabDaily" style="background:#0e2247;color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:11px;font-weight:700;cursor:pointer;">Daily Endpoints</button>
-              <button onclick="showMonitorTab('weekly')" id="monTabWeekly" style="background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0;border-radius:6px;padding:6px 14px;font-size:11px;font-weight:700;cursor:pointer;">Weekly Endpoints</button>
-            </div>
+          <div class="rs-title" style="color:#000;">Patient Monitoring</div>
+          <div style="display:flex; gap:0; border-bottom:2px solid #e2e8f0; margin-bottom:16px;">
+            <button id="monTabDaily" onclick="showMonitorTab('daily')"
+              style="padding:9px 22px; font-size:12px; font-weight:800; color:#000; background:none; border:none; border-bottom:3px solid #0e2247; margin-bottom:-2px; cursor:pointer; letter-spacing:0.04em;">
+              FORM 3: Daily Monitoring
+            </button>
+            <button id="monTabWeekly" onclick="showMonitorTab('weekly')"
+              style="padding:9px 22px; font-size:12px; font-weight:800; color:#000; background:none; border:none; border-bottom:3px solid transparent; margin-bottom:-2px; cursor:pointer; letter-spacing:0.04em;">
+              FORM 4: Weekly Assessment
+            </button>
           </div>
 
-          <!-- DAILY TAB -->
+          <!-- DAILY TAB: FORM 3 -->
           <div id="monPanelDaily">
-            <div style="display:flex; align-items:center; justify-content:space-between; margin:12px 0 8px;">
-              <div style="font-size:11px; color:#64748b; font-weight:600;">Primary Endpoints — log daily during radiation therapy</div>
-              <button onclick="toggleMonitorForm('daily')" style="background:#10b981;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">+ Log Today</button>
+            <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:14px 16px; margin-bottom:14px;">
+              <div style="font-size:11px; font-weight:800; color:#000; text-transform:uppercase; letter-spacing:0.08em; margin-bottom:12px;">Add Daily Entry</div>
+              <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px;">
+                <div><label style="font-size:10px;font-weight:700;color:#000;display:block;margin-bottom:3px;">Date</label><input type="date" id="monD_date" style="width:100%;font-size:12px;padding:6px 8px;border:1px solid #cbd5e1;border-radius:5px;box-sizing:border-box;"></div>
+                <div><label style="font-size:10px;font-weight:700;color:#000;display:block;margin-bottom:3px;">Oral Intake %</label><input type="number" id="monD_oralIntake" min="0" max="100" placeholder="e.g. 60" style="width:100%;font-size:12px;padding:6px 8px;border:1px solid #cbd5e1;border-radius:5px;box-sizing:border-box;"></div>
+                <div><label style="font-size:10px;font-weight:700;color:#000;display:block;margin-bottom:3px;">Supplement Prescribed</label><input type="text" id="monD_suppPrescribed" placeholder="e.g. Onvilox 3x/day" style="width:100%;font-size:12px;padding:6px 8px;border:1px solid #cbd5e1;border-radius:5px;box-sizing:border-box;"></div>
+                <div><label style="font-size:10px;font-weight:700;color:#000;display:block;margin-bottom:3px;">Supplement Consumed %</label><input type="number" id="monD_suppConsumed" min="0" max="100" placeholder="e.g. 80" style="width:100%;font-size:12px;padding:6px 8px;border:1px solid #cbd5e1;border-radius:5px;box-sizing:border-box;"></div>
+                <div><label style="font-size:10px;font-weight:700;color:#000;display:block;margin-bottom:3px;">Nausea</label><select id="monD_nausea" style="width:100%;font-size:12px;padding:6px 8px;border:1px solid #cbd5e1;border-radius:5px;box-sizing:border-box;"><option value="None">None</option><option value="Mild">Mild</option><option value="Moderate">Moderate</option><option value="Severe">Severe</option></select></div>
+                <div><label style="font-size:10px;font-weight:700;color:#000;display:block;margin-bottom:3px;">Vomiting</label><select id="monD_vomiting" style="width:100%;font-size:12px;padding:6px 8px;border:1px solid #cbd5e1;border-radius:5px;box-sizing:border-box;"><option value="None">None</option><option value="1x today">1x today</option><option value="2x today">2x today</option><option value="3+ times">3+ times</option></select></div>
+                <div><label style="font-size:10px;font-weight:700;color:#000;display:block;margin-bottom:3px;">Mucositis Grade (0-4)</label><select id="monD_mucositis" style="width:100%;font-size:12px;padding:6px 8px;border:1px solid #cbd5e1;border-radius:5px;box-sizing:border-box;"><option value="0">0 - None</option><option value="1">1 - Mild</option><option value="2">2 - Moderate</option><option value="3">3 - Severe</option><option value="4">4 - Life-threatening</option></select></div>
+                <div><label style="font-size:10px;font-weight:700;color:#000;display:block;margin-bottom:3px;">Bowel Movement</label><select id="monD_bowel" style="width:100%;font-size:12px;padding:6px 8px;border:1px solid #cbd5e1;border-radius:5px;box-sizing:border-box;"><option value="Normal">Normal</option><option value="Constipated">Constipated</option><option value="Loose (1-2x)">Loose (1-2x)</option><option value="Diarrhea (3+)">Diarrhea (3+)</option><option value="Nil">Nil</option></select></div>
+                <div><label style="font-size:10px;font-weight:700;color:#000;display:block;margin-bottom:3px;">Hydration Status</label><select id="monD_hydration" style="width:100%;font-size:12px;padding:6px 8px;border:1px solid #cbd5e1;border-radius:5px;box-sizing:border-box;"><option value="Adequate">Adequate</option><option value="Mildly Dehydrated">Mildly Dehydrated</option><option value="Moderately Dehydrated">Moderately Dehydrated</option><option value="IV Fluids">IV Fluids Given</option></select></div>
+                <div style="grid-column:1 / -1;"><label style="font-size:10px;font-weight:700;color:#000;display:block;margin-bottom:3px;">Remarks</label><input type="text" id="monD_notes" placeholder="Clinical observations..." style="width:100%;font-size:12px;padding:6px 8px;border:1px solid #cbd5e1;border-radius:5px;box-sizing:border-box;"></div>
+              </div>
+              <div style="margin-top:12px; text-align:right;"><button onclick="saveMonitorLog('daily')" style="background:#0e2247;color:#fff;border:none;border-radius:6px;padding:8px 20px;font-size:12px;font-weight:700;cursor:pointer;">Save Daily Entry</button></div>
             </div>
-            <!-- Daily entry form -->
-            <div id="monFormDaily" style="display:none; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:14px; margin-bottom:12px;">
-              <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-bottom:10px;">
-                <div>
-                  <label style="font-size:11px;font-weight:700;color:#374151;display:block;margin-bottom:3px;">Weight (kg)</label>
-                  <input type="number" id="monD_weight" step="0.1" style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:5px;font-size:12px;">
-                </div>
-                <div>
-                  <label style="font-size:11px;font-weight:700;color:#374151;display:block;margin-bottom:3px;">Oral Intake (%)</label>
-                  <input type="number" id="monD_oralIntake" min="0" max="100" style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:5px;font-size:12px;">
-                </div>
-                <div>
-                  <label style="font-size:11px;font-weight:700;color:#374151;display:block;margin-bottom:3px;">Radiation Session Completed</label>
-                  <select id="monD_radiation" style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:5px;font-size:12px;">
-                    <option value="">— Select —</option>
-                    <option value="Yes">Yes — Completed</option>
-                    <option value="No">No — Interrupted</option>
-                    <option value="NA">Not Applicable</option>
-                  </select>
-                </div>
-                <div>
-                  <label style="font-size:11px;font-weight:700;color:#374151;display:block;margin-bottom:3px;">Nutrition Compliance</label>
-                  <select id="monD_compliance" style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:5px;font-size:12px;">
-                    <option value="">— Select —</option>
-                    <option value="Full">Full — all servings taken</option>
-                    <option value="Partial">Partial — some servings missed</option>
-                    <option value="Poor">Poor — most servings missed</option>
-                  </select>
-                </div>
-              </div>
-              <div style="margin-bottom:10px;">
-                <label style="font-size:11px;font-weight:700;color:#374151;display:block;margin-bottom:3px;">Notes</label>
-                <input type="text" id="monD_notes" placeholder="Any observations..." style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:5px;font-size:12px;box-sizing:border-box;">
-              </div>
-              <div style="display:flex;gap:8px;">
-                <button onclick="saveMonitorLog('daily')" style="background:#0e2247;color:#fff;border:none;border-radius:6px;padding:6px 16px;font-size:12px;font-weight:700;cursor:pointer;">Save Entry</button>
-                <button onclick="toggleMonitorForm('daily')" style="background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0;border-radius:6px;padding:6px 12px;font-size:12px;cursor:pointer;">Cancel</button>
-              </div>
-            </div>
-            <!-- Daily history table -->
+            <div style="font-size:10px;font-weight:800;color:#000;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;">History</div>
             <div style="overflow-x:auto;">
               <table style="width:100%;border-collapse:collapse;font-size:11px;">
                 <thead>
-                  <tr style="background:#f1f5f9;">
-                    <th style="padding:7px 8px;text-align:left;border:1px solid #e2e8f0;font-weight:700;color:#374151;">Date</th>
-                    <th style="padding:7px 8px;text-align:center;border:1px solid #e2e8f0;font-weight:700;">Weight</th>
-                    <th style="padding:7px 8px;text-align:center;border:1px solid #e2e8f0;font-weight:700;">Δ Weight</th>
-                    <th style="padding:7px 8px;text-align:center;border:1px solid #e2e8f0;font-weight:700;">Oral Intake</th>
-                    <th style="padding:7px 8px;text-align:center;border:1px solid #e2e8f0;font-weight:700;">Δ Intake</th>
-                    <th style="padding:7px 8px;text-align:center;border:1px solid #e2e8f0;font-weight:700;">Radiation</th>
-                    <th style="padding:7px 8px;text-align:center;border:1px solid #e2e8f0;font-weight:700;">Compliance</th>
-                    <th style="padding:7px 8px;text-align:left;border:1px solid #e2e8f0;font-weight:700;">Notes</th>
+                  <tr style="background:#f1f5f9;text-align:left;">
+                    <th style="padding:6px 8px;font-weight:800;color:#000;border:1px solid #e2e8f0;white-space:nowrap;">Date</th>
+                    <th style="padding:6px 8px;font-weight:800;color:#000;border:1px solid #e2e8f0;">Oral %</th>
+                    <th style="padding:6px 8px;font-weight:800;color:#000;border:1px solid #e2e8f0;">Supplement Prescribed</th>
+                    <th style="padding:6px 8px;font-weight:800;color:#000;border:1px solid #e2e8f0;">Supp %</th>
+                    <th style="padding:6px 8px;font-weight:800;color:#000;border:1px solid #e2e8f0;">Nausea</th>
+                    <th style="padding:6px 8px;font-weight:800;color:#000;border:1px solid #e2e8f0;">Vomiting</th>
+                    <th style="padding:6px 8px;font-weight:800;color:#000;border:1px solid #e2e8f0;">Mucositis</th>
+                    <th style="padding:6px 8px;font-weight:800;color:#000;border:1px solid #e2e8f0;">Bowel</th>
+                    <th style="padding:6px 8px;font-weight:800;color:#000;border:1px solid #e2e8f0;">Hydration</th>
+                    <th style="padding:6px 8px;font-weight:800;color:#000;border:1px solid #e2e8f0;">Remarks</th>
                   </tr>
                 </thead>
                 <tbody id="monTableDaily">
-                  <tr><td colspan="8" style="padding:12px;text-align:center;color:#94a3b8;font-style:italic;">No daily entries yet.</td></tr>
+                  <tr><td colspan="10" style="padding:12px;text-align:center;color:#94a3b8;font-style:italic;">No daily entries yet.</td></tr>
                 </tbody>
               </table>
             </div>
           </div>
 
-          <!-- WEEKLY TAB -->
+          <!-- WEEKLY TAB: FORM 4 -->
           <div id="monPanelWeekly" style="display:none;">
-            <div style="display:flex; align-items:center; justify-content:space-between; margin:12px 0 8px;">
-              <div style="font-size:11px; color:#64748b; font-weight:600;">Secondary Endpoints — log weekly</div>
-              <button onclick="toggleMonitorForm('weekly')" style="background:#7c3aed;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">+ Log This Week</button>
+            <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:14px 16px; margin-bottom:14px;">
+              <div style="font-size:11px; font-weight:800; color:#000; text-transform:uppercase; letter-spacing:0.08em; margin-bottom:12px;">Add Weekly Entry</div>
+              <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px;">
+                <div><label style="font-size:10px;font-weight:700;color:#000;display:block;margin-bottom:3px;">Week Number</label><input type="number" id="monW_week" min="1" placeholder="e.g. 3" style="width:100%;font-size:12px;padding:6px 8px;border:1px solid #cbd5e1;border-radius:5px;box-sizing:border-box;"></div>
+                <div><label style="font-size:10px;font-weight:700;color:#000;display:block;margin-bottom:3px;">Weight (kg)</label><input type="number" id="monW_weight" step="0.1" placeholder="e.g. 58.5" oninput="calcWeeklyBMI()" style="width:100%;font-size:12px;padding:6px 8px;border:1px solid #cbd5e1;border-radius:5px;box-sizing:border-box;"></div>
+                <div><label style="font-size:10px;font-weight:700;color:#000;display:block;margin-bottom:3px;">BMI - Auto</label><input type="number" id="monW_bmi" step="0.1" readonly placeholder="Auto" style="width:100%;font-size:12px;padding:6px 8px;border:1px solid #cbd5e1;border-radius:5px;background:#f1f5f9;box-sizing:border-box;"></div>
+                <div><label style="font-size:10px;font-weight:700;color:#000;display:block;margin-bottom:3px;">MUAC (cm)</label><input type="number" id="monW_muac" step="0.1" placeholder="e.g. 24.0" style="width:100%;font-size:12px;padding:6px 8px;border:1px solid #cbd5e1;border-radius:5px;box-sizing:border-box;"></div>
+                <div><label style="font-size:10px;font-weight:700;color:#000;display:block;margin-bottom:3px;">Hand Grip Strength (kg)</label><input type="number" id="monW_handGrip" step="0.1" placeholder="e.g. 22.0" style="width:100%;font-size:12px;padding:6px 8px;border:1px solid #cbd5e1;border-radius:5px;box-sizing:border-box;"></div>
+                <div><label style="font-size:10px;font-weight:700;color:#000;display:block;margin-bottom:3px;">ECOG</label><select id="monW_ecog" style="width:100%;font-size:12px;padding:6px 8px;border:1px solid #cbd5e1;border-radius:5px;box-sizing:border-box;"><option value="0">0 - Fully Active</option><option value="1">1 - Restricted</option><option value="2">2 - Self-care</option><option value="3">3 - Limited</option><option value="4">4 - Disabled</option></select></div>
+                <div><label style="font-size:10px;font-weight:700;color:#000;display:block;margin-bottom:3px;">Albumin (g/dL)</label><input type="number" id="monW_albumin" step="0.1" placeholder="e.g. 3.8" style="width:100%;font-size:12px;padding:6px 8px;border:1px solid #cbd5e1;border-radius:5px;box-sizing:border-box;"></div>
+                <div><label style="font-size:10px;font-weight:700;color:#000;display:block;margin-bottom:3px;">CRP (mg/L)</label><input type="number" id="monW_crp" step="0.1" placeholder="e.g. 5.2" style="width:100%;font-size:12px;padding:6px 8px;border:1px solid #cbd5e1;border-radius:5px;box-sizing:border-box;"></div>
+                <div><label style="font-size:10px;font-weight:700;color:#000;display:block;margin-bottom:3px;">Blood Glucose (mg/dL)</label><input type="number" id="monW_glucose" step="1" placeholder="e.g. 110" style="width:100%;font-size:12px;padding:6px 8px;border:1px solid #cbd5e1;border-radius:5px;box-sizing:border-box;"></div>
+                <div><label style="font-size:10px;font-weight:700;color:#000;display:block;margin-bottom:3px;">Treatment Interruptions</label><select id="monW_interruptions" style="width:100%;font-size:12px;padding:6px 8px;border:1px solid #cbd5e1;border-radius:5px;box-sizing:border-box;"><option value="None">None</option><option value="Dose Delay">Dose Delay</option><option value="Dose Reduction">Dose Reduction</option><option value="RT Interruption">RT Interruption</option><option value="Treatment Held">Treatment Held</option><option value="Hospitalisation">Hospitalisation</option></select></div>
+                <div style="grid-column:1 / -1;"><label style="font-size:10px;font-weight:700;color:#000;display:block;margin-bottom:3px;">Remarks</label><input type="text" id="monW_notes" placeholder="Clinical observations for the week..." style="width:100%;font-size:12px;padding:6px 8px;border:1px solid #cbd5e1;border-radius:5px;box-sizing:border-box;"></div>
+              </div>
+              <div style="margin-top:12px; text-align:right;"><button onclick="saveMonitorLog('weekly')" style="background:#0e2247;color:#fff;border:none;border-radius:6px;padding:8px 20px;font-size:12px;font-weight:700;cursor:pointer;">Save Weekly Entry</button></div>
             </div>
-            <!-- Weekly entry form -->
-            <div id="monFormWeekly" style="display:none; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:14px; margin-bottom:12px;">
-              <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-bottom:10px;">
-                <div>
-                  <label style="font-size:11px;font-weight:700;color:#374151;display:block;margin-bottom:3px;">Mucositis Grade (CTCAE 0–4)</label>
-                  <select id="monW_mucositis" style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:5px;font-size:12px;">
-                    <option value="">— Select —</option>
-                    <option value="0">Grade 0 — None</option>
-                    <option value="1">Grade 1 — Mild</option>
-                    <option value="2">Grade 2 — Moderate</option>
-                    <option value="3">Grade 3 — Severe</option>
-                    <option value="4">Grade 4 — Life-threatening</option>
-                  </select>
-                </div>
-                <div>
-                  <label style="font-size:11px;font-weight:700;color:#374151;display:block;margin-bottom:3px;">Feeding Escalation</label>
-                  <select id="monW_feeding" style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:5px;font-size:12px;">
-                    <option value="">— Select —</option>
-                    <option value="Oral">Oral — no change</option>
-                    <option value="ONS">ONS supplement added</option>
-                    <option value="NGT">NGT initiated</option>
-                    <option value="TPN">TPN initiated</option>
-                  </select>
-                </div>
-                <div>
-                  <label style="font-size:11px;font-weight:700;color:#374151;display:block;margin-bottom:3px;">ECOG Performance Status</label>
-                  <select id="monW_ecog" style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:5px;font-size:12px;">
-                    <option value="">— Select —</option>
-                    <option value="0">0 — Fully active</option>
-                    <option value="1">1 — Restricted but ambulatory</option>
-                    <option value="2">2 — Self-care, not working</option>
-                    <option value="3">3 — Limited self-care</option>
-                    <option value="4">4 — Disabled</option>
-                  </select>
-                </div>
-                <div>
-                  <label style="font-size:11px;font-weight:700;color:#374151;display:block;margin-bottom:3px;">Hospital Stay (days this week)</label>
-                  <input type="number" id="monW_hospitalDays" min="0" max="7" style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:5px;font-size:12px;">
-                </div>
-                <div>
-                  <label style="font-size:11px;font-weight:700;color:#374151;display:block;margin-bottom:3px;">Hand Grip Strength (kg)</label>
-                  <input type="number" id="monW_handGrip" step="0.1" style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:5px;font-size:12px;">
-                </div>
-                <div>
-                  <label style="font-size:11px;font-weight:700;color:#374151;display:block;margin-bottom:3px;">Albumin (g/dL)</label>
-                  <input type="number" id="monW_albumin" step="0.1" style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:5px;font-size:12px;">
-                </div>
-                <div>
-                  <label style="font-size:11px;font-weight:700;color:#374151;display:block;margin-bottom:3px;">CRP (mg/L)</label>
-                  <input type="number" id="monW_crp" step="0.1" style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:5px;font-size:12px;">
-                </div>
-                <div>
-                  <label style="font-size:11px;font-weight:700;color:#374151;display:block;margin-bottom:3px;">Patient Tolerance</label>
-                  <select id="monW_tolerance" style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:5px;font-size:12px;">
-                    <option value="">— Select —</option>
-                    <option value="Good">Good</option>
-                    <option value="Fair">Fair</option>
-                    <option value="Poor">Poor</option>
-                  </select>
-                </div>
-                <div>
-                  <label style="font-size:11px;font-weight:700;color:#374151;display:block;margin-bottom:3px;">Dietitian Acceptance</label>
-                  <select id="monW_dietitian" style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:5px;font-size:12px;">
-                    <option value="">— Select —</option>
-                    <option value="Yes">Yes</option>
-                    <option value="No">No</option>
-                  </select>
-                </div>
-                <div>
-                  <label style="font-size:11px;font-weight:700;color:#374151;display:block;margin-bottom:3px;">Physician Acceptance</label>
-                  <select id="monW_physician" style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:5px;font-size:12px;">
-                    <option value="">— Select —</option>
-                    <option value="Yes">Yes</option>
-                    <option value="No">No</option>
-                  </select>
-                </div>
-              </div>
-              <div style="margin-bottom:10px;">
-                <label style="font-size:11px;font-weight:700;color:#374151;display:block;margin-bottom:3px;">Notes</label>
-                <input type="text" id="monW_notes" placeholder="Clinical observations..." style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:5px;font-size:12px;box-sizing:border-box;">
-              </div>
-              <div style="display:flex;gap:8px;">
-                <button onclick="saveMonitorLog('weekly')" style="background:#7c3aed;color:#fff;border:none;border-radius:6px;padding:6px 16px;font-size:12px;font-weight:700;cursor:pointer;">Save Entry</button>
-                <button onclick="toggleMonitorForm('weekly')" style="background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0;border-radius:6px;padding:6px 12px;font-size:12px;cursor:pointer;">Cancel</button>
-              </div>
-            </div>
-            <!-- Weekly history table -->
+            <div style="font-size:10px;font-weight:800;color:#000;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;">History</div>
             <div style="overflow-x:auto;">
               <table style="width:100%;border-collapse:collapse;font-size:11px;">
                 <thead>
-                  <tr style="background:#f5f3ff;">
-                    <th style="padding:7px 8px;text-align:left;border:1px solid #e2e8f0;font-weight:700;color:#374151;">Week of</th>
-                    <th style="padding:7px 8px;text-align:center;border:1px solid #e2e8f0;font-weight:700;">Mucositis</th>
-                    <th style="padding:7px 8px;text-align:center;border:1px solid #e2e8f0;font-weight:700;">Feeding</th>
-                    <th style="padding:7px 8px;text-align:center;border:1px solid #e2e8f0;font-weight:700;">ECOG</th>
-                    <th style="padding:7px 8px;text-align:center;border:1px solid #e2e8f0;font-weight:700;">Grip (kg)</th>
-                    <th style="padding:7px 8px;text-align:center;border:1px solid #e2e8f0;font-weight:700;">Albumin</th>
-                    <th style="padding:7px 8px;text-align:center;border:1px solid #e2e8f0;font-weight:700;">CRP</th>
-                    <th style="padding:7px 8px;text-align:center;border:1px solid #e2e8f0;font-weight:700;">Tolerance</th>
-                    <th style="padding:7px 8px;text-align:center;border:1px solid #e2e8f0;font-weight:700;">Dietitian</th>
-                    <th style="padding:7px 8px;text-align:center;border:1px solid #e2e8f0;font-weight:700;">Physician</th>
-                    <th style="padding:7px 8px;text-align:left;border:1px solid #e2e8f0;font-weight:700;">Notes</th>
+                  <tr style="background:#f1f5f9;text-align:left;">
+                    <th style="padding:6px 8px;font-weight:800;color:#000;border:1px solid #e2e8f0;">Week</th>
+                    <th style="padding:6px 8px;font-weight:800;color:#000;border:1px solid #e2e8f0;">Weight</th>
+                    <th style="padding:6px 8px;font-weight:800;color:#000;border:1px solid #e2e8f0;">BMI</th>
+                    <th style="padding:6px 8px;font-weight:800;color:#000;border:1px solid #e2e8f0;">MUAC</th>
+                    <th style="padding:6px 8px;font-weight:800;color:#000;border:1px solid #e2e8f0;">Grip</th>
+                    <th style="padding:6px 8px;font-weight:800;color:#000;border:1px solid #e2e8f0;">ECOG</th>
+                    <th style="padding:6px 8px;font-weight:800;color:#000;border:1px solid #e2e8f0;">Albumin</th>
+                    <th style="padding:6px 8px;font-weight:800;color:#000;border:1px solid #e2e8f0;">CRP</th>
+                    <th style="padding:6px 8px;font-weight:800;color:#000;border:1px solid #e2e8f0;">Glucose</th>
+                    <th style="padding:6px 8px;font-weight:800;color:#000;border:1px solid #e2e8f0;">Interruptions</th>
+                    <th style="padding:6px 8px;font-weight:800;color:#000;border:1px solid #e2e8f0;">Remarks</th>
                   </tr>
                 </thead>
                 <tbody id="monTableWeekly">
@@ -1651,6 +1592,14 @@
             <input id="epUW" type="number" min="25" max="300" step="0.1">
             <div class="validation-msg" id="epUW_msg"></div>
           </div>
+          <div class="form-group">
+            <label>Calculation Weight Basis</label>
+            <select id="epWeightBasisOverride">
+              <option value="ibw">IBW — Ideal Body Weight (Hamwi Formula)</option>
+              <option value="actual">Actual / Current Weight</option>
+            </select>
+            <div style="font-size:11px; color:#64748b; margin-top:4px;">Determines which weight is used for kcal &amp; protein targets. IBW is recommended for oncology patients.</div>
+          </div>
         </div>
 
         <!-- CLINICAL ASSESSMENT CARDS RESTRUCTURED (Sync with patient-create) -->
@@ -1761,6 +1710,21 @@
                       oninput="validateOptionalNumber('epHemoglobin','Hemoglobin',2,25); updateLabStatus('epHemoglobin', this.value)">
                     <div class="range-hint">Normal: 12 - 16 g/dL</div>
                     <div class="validation-msg" id="epHemoglobin_msg"></div>
+                  </div>
+                  <div class="form-group">
+                    <label>WBC (cells/μL) <span id="epWBC_status" class="status-badge"></span></label>
+                    <input id="epWBC" type="number" step="1" placeholder="e.g. 5000" oninput="updateLabStatus('epWBC', this.value)">
+                    <div class="range-hint">Normal: 4000 - 11000 cells/μL</div>
+                  </div>
+                  <div class="form-group">
+                    <label>ANC (cells/μL) <span id="epANC_status" class="status-badge"></span></label>
+                    <input id="epANC" type="number" step="1" placeholder="e.g. 2000" oninput="updateLabStatus('epANC', this.value)">
+                    <div class="range-hint">Normal: 1500 - 8000 cells/μL</div>
+                  </div>
+                  <div class="form-group">
+                    <label>Platelets (×10³/μL) <span id="epPlatelet_status" class="status-badge"></span></label>
+                    <input id="epPlatelet" type="number" step="1" placeholder="e.g. 200" oninput="updateLabStatus('epPlatelet', this.value)">
+                    <div class="range-hint">Normal: 150 - 400 ×10³/μL</div>
                   </div>
                   <div class="form-group">
                     <label>Vitamin D (ng/mL) <span id="epVitD_status" class="status-badge"></span></label>
@@ -1942,6 +1906,138 @@
                 </div>
               </div>
 
+              <!-- SECTION: RADIATION THERAPY -->
+              <div class="ai-panel card-violet" style="margin:0; grid-column:1 / -1;">
+                <div class="ai-header">
+                  <div class="ai-badge">RADIATION</div>
+                  <h4>Radiation Therapy Details</h4>
+                </div>
+                <div class="form-grid" style="grid-template-columns: 1fr 1fr;">
+                  <div class="form-group">
+                    <label>Radiation Status</label>
+                    <select id="epRadiationStatus">
+                      <option value="None">None / Not Applicable</option>
+                      <option value="Planned">Planned (Not yet started)</option>
+                      <option value="Active">Active (Currently undergoing)</option>
+                      <option value="Completed">Completed</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label>Radiation Technique</label>
+                    <select id="epRadiationTechnique">
+                      <option value="">Select...</option>
+                      <option value="IMRT">IMRT (Intensity-Modulated)</option>
+                      <option value="VMAT">VMAT (Volumetric Arc)</option>
+                      <option value="3D-CRT">3D-CRT (Conformal)</option>
+                      <option value="SBRT">SBRT / SABR (Stereotactic Body)</option>
+                      <option value="SRS">SRS (Stereotactic Radiosurgery)</option>
+                      <option value="Brachytherapy">Brachytherapy (Internal)</option>
+                      <option value="Proton">Proton Beam Therapy</option>
+                      <option value="Electrons">Electron Beam</option>
+                      <option value="Palliative">Palliative RT</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label>Sub-Site (Region Irradiated)</label>
+                    <input type="text" id="epSubSite" placeholder="e.g. Pelvis, Head &amp; Neck, Thorax">
+                  </div>
+                  <div class="form-group">
+                    <label>TNM Stage</label>
+                    <input type="text" id="epTnmStage" placeholder="e.g. T2N1M0">
+                  </div>
+                  <div class="form-group">
+                    <label>Total Prescribed Dose (Gy)</label>
+                    <input type="number" id="epTotalDoseGy" step="0.1" min="0" placeholder="e.g. 60" oninput="epCalcRadiationWeek()">
+                  </div>
+                  <div class="form-group">
+                    <label>Fraction Size (Gy / fraction)</label>
+                    <input type="number" id="epFractionSizeGy" step="0.01" min="0" placeholder="e.g. 2.0">
+                  </div>
+                  <div class="form-group">
+                    <label>Total Number of Fractions</label>
+                    <input type="number" id="epNumberOfFractions" step="1" min="0" placeholder="e.g. 30" oninput="epCalcRadiationWeek()">
+                  </div>
+                  <div class="form-group">
+                    <label>Fractions Completed</label>
+                    <input type="number" id="epFractionsCompleted" step="1" min="0" placeholder="e.g. 15" oninput="epCalcRadiationWeek()">
+                  </div>
+                  <div class="form-group">
+                    <label>Radiation Week — Auto <span style="font-size:11px; color:#94a3b8;">(assumes 5 fx/week)</span></label>
+                    <input type="number" id="epRadiationWeek" readonly step="1" placeholder="Auto-calculated" style="background:var(--bg-2); color:#94a3b8;">
+                  </div>
+                  <div class="form-group">
+                    <label>Concurrent Therapy</label>
+                    <select id="epConcurrentTherapy">
+                      <option value="None">None (RT only)</option>
+                      <option value="Chemotherapy">Concurrent Chemotherapy</option>
+                      <option value="Immunotherapy">Concurrent Immunotherapy</option>
+                      <option value="Targeted">Concurrent Targeted Therapy</option>
+                      <option value="ChemoImmuno">Chemotherapy + Immunotherapy</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <!-- SECTION: RADIATION TOXICITY -->
+              <div class="ai-panel card-rose" style="margin:0; grid-column:1 / -1;">
+                <div class="ai-header">
+                  <div class="ai-badge">TOXICITY</div>
+                  <h4>Radiation Toxicity Grades</h4>
+                </div>
+                <div class="form-grid" style="grid-template-columns: 1fr 1fr;">
+                  <div class="form-group">
+                    <label>Mucositis Grade (CTCAE 0–4)</label>
+                    <select id="epToxMucositis">
+                      <option value="0">0 — None</option>
+                      <option value="1">1 — Mild (asymptomatic)</option>
+                      <option value="2">2 — Moderate (diet modification needed)</option>
+                      <option value="3">3 — Severe (IV hydration required)</option>
+                      <option value="4">4 — Life-threatening</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label>Dysphagia Grade (CTCAE 0–4)</label>
+                    <select id="epToxDysphagia">
+                      <option value="0">0 — None</option>
+                      <option value="1">1 — Mild (soft diet)</option>
+                      <option value="2">2 — Moderate (liquid diet only)</option>
+                      <option value="3">3 — Severe (tube feeding required)</option>
+                      <option value="4">4 — Life-threatening</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label>Xerostomia Grade (CTCAE 0–4)</label>
+                    <select id="epToxXerostomia">
+                      <option value="0">0 — None</option>
+                      <option value="1">1 — Mild (symptomatic, no intake change)</option>
+                      <option value="2">2 — Moderate (diet modification needed)</option>
+                      <option value="3">3 — Severe (unable to eat orally)</option>
+                      <option value="4">4 — Life-threatening</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label>Nausea Grade (CTCAE 0–4)</label>
+                    <select id="epToxNausea">
+                      <option value="0">0 — None</option>
+                      <option value="1">1 — Loss of appetite, intake unchanged</option>
+                      <option value="2">2 — Decreased oral intake, no significant weight loss</option>
+                      <option value="3">3 — Inadequate caloric/fluid intake</option>
+                      <option value="4">4 — Life-threatening</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label>Diarrhea Grade (CTCAE 0–4)</label>
+                    <select id="epToxDiarrhea">
+                      <option value="0">0 — None</option>
+                      <option value="1">1 — &lt;4 extra stools/day</option>
+                      <option value="2">2 — 4–6 extra stools/day</option>
+                      <option value="3">3 — ≥7 stools/day; hospitalization indicated</option>
+                      <option value="4">4 — Life-threatening</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
               <!-- SECTION 5 (LIFESTYLE & METADATA) -->
               <div class="ai-panel card-slate" style="margin:0; padding:15px; border-radius:12px; margin-top:24px;">
                 <div
@@ -2064,7 +2160,6 @@
                 <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:center;">
                   <button class="btn-warning" type="button" onclick="savePatientEditsAndAudit()" style="background:#6d28d9; border-color:#5b21b6; color:white; font-weight:700;">💾 Update Plan & AI Audit</button>
                   <button id="approveBtn" class="btn-primary" type="button" onclick="approveFromReport()">Approve & Finalize</button>
-                  <button class="btn-warning" onclick="enableFollowUpMode()">🔄 Log Follow-up</button>
                 </div>
               </div>
             </div> <!-- end .card -->
@@ -2203,13 +2298,13 @@
             });
           }
 
-          auth.requireRole(['DOCTOR', 'ASSISTANT', 'STORE']);
+          auth.requireRole(['DOCTOR', 'ASSISTANT', 'STORE', 'STORE_APPROVER']);
           loadEngineConfig(); // Part 3: load formula constants + active rules from DB
 
           const me = auth.getCurrentUser();
 
-          // Hide AI elements immediately for STORE users (before initStore delay)
-          if (me && me.role === 'STORE') {
+          // Hide AI elements immediately for store-side users (before initStore delay)
+          if (me && (me.role === 'STORE' || me.role === 'STORE_APPROVER')) {
             const aiHideStyle = document.createElement('style');
             aiHideStyle.textContent = `
               .ai-chat-launcher, #aiChatWindow, #aiNotGeneratedBanner,
@@ -2258,10 +2353,11 @@
             storeStyle.textContent = `
               /* Hide all .rs sections by default in store mode */
               #reportDoc .rs { display:none !important; }
-              /* Show only the 3 production-relevant sections (higher specificity to win over the hide rule) */
+              /* Show only the production-relevant sections (higher specificity to win over the hide rule) */
               #reportDoc #sectionPrescription,
               #reportDoc #sectionServings,
-              #reportDoc #sectionProduction { display:block !important; }
+              #reportDoc #sectionProduction,
+              #reportDoc #micronutrientSection { display:block !important; }
               /* Hide global UI elements not needed by store */
               #editPatientSection, .rpt-actions-bar, .ai-chat-launcher,
               #safetyAlertsBlock, #clinicalProtocolsContainer,
@@ -2473,6 +2569,35 @@
               document.getElementById('epPotassium').value = patient.potassium ?? '';
               document.getElementById('epUrea').value = patient.urea ?? '';
               document.getElementById('epHbA1c').value = patient.hba1c ?? '';
+
+              // Weight calculation basis
+              if (document.getElementById('epWeightBasisOverride')) {
+                document.getElementById('epWeightBasisOverride').value = patient.weightBasisOverride ?? 'ibw';
+              }
+
+              // Blood counts
+              document.getElementById('epWBC').value = patient.wbc ?? '';
+              document.getElementById('epANC').value = patient.anc ?? '';
+              document.getElementById('epPlatelet').value = patient.platelet ?? '';
+
+              // Radiation Therapy
+              document.getElementById('epRadiationStatus').value = patient.radiationStatus ?? 'None';
+              document.getElementById('epRadiationTechnique').value = patient.radiationTechnique ?? '';
+              document.getElementById('epSubSite').value = patient.subSite ?? '';
+              document.getElementById('epTnmStage').value = patient.tnmStage ?? '';
+              document.getElementById('epTotalDoseGy').value = patient.totalDoseGy || '';
+              document.getElementById('epFractionSizeGy').value = patient.fractionSizeGy || '';
+              document.getElementById('epNumberOfFractions').value = patient.numberOfFractions || '';
+              document.getElementById('epFractionsCompleted').value = patient.fractionsCompleted || '';
+              document.getElementById('epRadiationWeek').value = patient.radiationWeek || '';
+              document.getElementById('epConcurrentTherapy').value = patient.concurrentTherapy ?? 'None';
+
+              // Clinical Scoring & Toxicity
+              document.getElementById('epToxMucositis').value = patient.toxMucositis ?? 0;
+              document.getElementById('epToxDysphagia').value = patient.toxDysphagia ?? 0;
+              document.getElementById('epToxXerostomia').value = patient.toxXerostomia ?? 0;
+              document.getElementById('epToxNausea').value = patient.toxNausea ?? 0;
+              document.getElementById('epToxDiarrhea').value = patient.toxDiarrhea ?? 0;
 
               // Micronutrients
               document.getElementById('epPrealbumin').value = patient.prealbumin ?? '';
@@ -2914,6 +3039,14 @@
             panel.style.display = (method === 'Oral Feeding (Normal Diet)') ? 'block' : 'none';
           }
 
+          function epCalcRadiationWeek() {
+            // Auto-calculate the current radiation treatment week (assumes 5 fractions/week)
+            const done = parseInt(document.getElementById('epFractionsCompleted').value) || 0;
+            const out = document.getElementById('epRadiationWeek');
+            if (!out) return;
+            out.value = done > 0 ? Math.ceil(done / 5) : '';
+          }
+
           function savePatientEdits() {
             // validate
             const ok =
@@ -3000,6 +3133,35 @@
             patient.vegetarian = document.getElementById('epVegetarian').value === 'true';
             patient.culturalPreferences = document.getElementById('epCultural').value.trim();
             patient.notes = document.getElementById('epNotes').value.trim();
+
+            // Weight calculation basis
+            if (document.getElementById('epWeightBasisOverride')) {
+              patient.weightBasisOverride = document.getElementById('epWeightBasisOverride').value;
+            }
+
+            // Blood counts
+            patient.wbc = parseFloat(document.getElementById('epWBC').value || 0);
+            patient.anc = parseFloat(document.getElementById('epANC').value || 0);
+            patient.platelet = parseFloat(document.getElementById('epPlatelet').value || 0);
+
+            // Radiation Therapy
+            patient.radiationStatus = document.getElementById('epRadiationStatus').value;
+            patient.radiationTechnique = document.getElementById('epRadiationTechnique').value;
+            patient.subSite = document.getElementById('epSubSite').value;
+            patient.tnmStage = document.getElementById('epTnmStage').value;
+            patient.totalDoseGy = parseFloat(document.getElementById('epTotalDoseGy').value) || 0;
+            patient.fractionSizeGy = parseFloat(document.getElementById('epFractionSizeGy').value) || 0;
+            patient.numberOfFractions = parseInt(document.getElementById('epNumberOfFractions').value) || 0;
+            patient.fractionsCompleted = parseInt(document.getElementById('epFractionsCompleted').value) || 0;
+            patient.radiationWeek = parseInt(document.getElementById('epRadiationWeek').value) || 0;
+            patient.concurrentTherapy = document.getElementById('epConcurrentTherapy').value;
+
+            // Clinical Scoring & Toxicity
+            patient.toxMucositis = parseInt(document.getElementById('epToxMucositis').value) || 0;
+            patient.toxDysphagia = parseInt(document.getElementById('epToxDysphagia').value) || 0;
+            patient.toxXerostomia = parseInt(document.getElementById('epToxXerostomia').value) || 0;
+            patient.toxNausea = parseInt(document.getElementById('epToxNausea').value) || 0;
+            patient.toxDiarrhea = parseInt(document.getElementById('epToxDiarrhea').value) || 0;
 
             // Age is critical for V3 protein calculation
             patient.age = parseInt(document.getElementById('epAge').value || 0);
@@ -3407,6 +3569,34 @@
             setVal('pMetastasis', patient.metastasisSites || 'None reported');
             setVal('pTreatments', (Array.isArray(patient.treatmentTypes) && patient.treatmentTypes.length) ? patient.treatmentTypes.join(', ') : 'None Reported');
             setVal('pCultural', patient.culturalPreferences || 'Not Reported');
+            // ── RADIATION THERAPY SECTION ─────────────────────────────────────────────────
+            (function() {
+              var rtStatus = patient.radiationStatus || 'None';
+              var hasRT = rtStatus !== 'None' && rtStatus !== '';
+              var rtSection = document.getElementById('rtSummarySection');
+              if (!rtSection) return;
+              if (!hasRT) { rtSection.style.display = 'none'; return; }
+              rtSection.style.display = 'block';
+              var statusEl = document.getElementById('rtStatusBadge');
+              if (statusEl) {
+                var statusColor = rtStatus === 'Active' ? '#34d399' : rtStatus === 'Planned' ? '#fbbf24' : rtStatus === 'Completed' ? '#94a3b8' : '#cbd5e1';
+                statusEl.textContent = 'RT Status: ' + rtStatus;
+                statusEl.style.color = statusColor;
+              }
+              var g = function(id, val) { var el = document.getElementById(id); if (el) el.textContent = val || '—'; };
+              g('rtSubSiteDisplay', patient.subSite);
+              g('rtTechniqueDisplay', patient.radiationTechnique);
+              g('rtDoseDisplay', patient.totalDoseGy ? patient.totalDoseGy + ' Gy' : null);
+              g('rtFractionsDisplay', (patient.fractionsCompleted != null && patient.numberOfFractions) ? patient.fractionsCompleted + ' / ' + patient.numberOfFractions : null);
+              g('rtWeekDisplay', patient.radiationWeek ? 'Week ' + patient.radiationWeek : null);
+              g('rtConcurrentDisplay', patient.concurrentTherapy);
+              var toxColor = function(grade) { var gv = parseInt(grade)||0; return gv===0?'#10b981':gv===1?'#f59e0b':gv===2?'#f97316':'#ef4444'; };
+              [['rtToxMucositis',patient.toxMucositis],['rtToxDysphagia',patient.toxDysphagia],['rtToxXerostomia',patient.toxXerostomia],['rtToxNausea',patient.toxNausea],['rtToxDiarrhea',patient.toxDiarrhea]].forEach(function(pair){
+                var el = document.getElementById(pair[0]); if(!el) return;
+                var grade = parseInt(pair[1])||0; el.textContent = grade; el.style.color = toxColor(grade);
+              });
+            })();
+            // ─────────────────────────────────────────────────────────────────
 
             // Fill Edit section too
             const epN = document.getElementById('epName'); if (epN) epN.value = patient.name || '';
@@ -5287,27 +5477,43 @@ function _yesNo(v) {
   return v === 'Yes' ? '<span style="color:#16a34a;font-weight:700;">✓</span>' : '<span style="color:#dc2626;font-weight:700;">✗</span>';
 }
 
+function calcWeeklyBMI() {
+  var wEl = document.getElementById('monW_weight');
+  var bEl = document.getElementById('monW_bmi');
+  if (!wEl || !bEl) return;
+  var w = parseFloat(wEl.value);
+  var p = window.patient;
+  var h = p ? parseFloat(p.height || 0) : 0;
+  if (h > 3) h = h / 100;
+  if (w > 0 && h > 0) bEl.value = (w / (h * h)).toFixed(1);
+  else bEl.value = '';
+}
+
 function renderMonitorTables() {
   var daily  = _monLogs.filter(function(l){return l.type==='daily';}).map(function(l){return Object.assign({},l,{data:typeof l.data==='string'?JSON.parse(l.data):l.data});});
   var weekly = _monLogs.filter(function(l){return l.type==='weekly';}).map(function(l){return Object.assign({},l,{data:typeof l.data==='string'?JSON.parse(l.data):l.data});});
   var dtBody = document.getElementById('monTableDaily');
   var wtBody = document.getElementById('monTableWeekly');
   if (!dtBody || !wtBody) return;
+  var td = function(v, extra) { return '<td style="padding:6px 8px;border:1px solid #e2e8f0;color:#0f172a;' + (extra||'') + '">' + (v != null && v !== '' ? v : '—') + '</td>'; };
+  var nauseaColor = {None:'#16a34a',Mild:'#f59e0b',Moderate:'#f97316',Severe:'#dc2626'};
   if (daily.length === 0) {
-    dtBody.innerHTML = '<tr><td colspan="8" style="padding:12px;text-align:center;color:#94a3b8;font-style:italic;">No daily entries yet.</td></tr>';
+    dtBody.innerHTML = '<tr><td colspan="10" style="padding:12px;text-align:center;color:#94a3b8;font-style:italic;">No daily entries yet.</td></tr>';
   } else {
     dtBody.innerHTML = daily.map(function(row, i) {
-      var d = row.data, prev = daily[i+1] ? daily[i+1].data : null;
-      var date = new Date(row.recorded_at).toLocaleDateString('en-IN',{day:'2-digit',month:'short'});
-      var radBadge = d.radiation==='Yes'?'<span style="color:#16a34a;font-weight:700;">✓</span>':d.radiation==='No'?'<span style="color:#dc2626;font-weight:700;">✗</span>':(d.radiation||'—');
-      return '<tr style="background:' + (i===0?'#f0fdf4':'#fff') + '">' +
-        '<td style="padding:6px 8px;border:1px solid #e2e8f0;font-weight:600;">' + date + (i===0?' <span style="background:#dcfce7;color:#15803d;font-size:9px;padding:1px 5px;border-radius:3px;font-weight:700;">NEW</span>':'') + '</td>' +
-        '<td style="padding:6px 8px;border:1px solid #e2e8f0;text-align:center;">' + (d.weight!=null?d.weight+' kg':'—') + '</td>' +
-        '<td style="padding:6px 8px;border:1px solid #e2e8f0;text-align:center;">' + _delta(d.weight, prev&&prev.weight, false) + '</td>' +
-        '<td style="padding:6px 8px;border:1px solid #e2e8f0;text-align:center;">' + (d.oralIntake!=null?d.oralIntake+'%':'—') + '</td>' +
-        '<td style="padding:6px 8px;border:1px solid #e2e8f0;text-align:center;">' + _delta(d.oralIntake, prev&&prev.oralIntake, true) + '</td>' +
-        '<td style="padding:6px 8px;border:1px solid #e2e8f0;text-align:center;">' + radBadge + '</td>' +
-        '<td style="padding:6px 8px;border:1px solid #e2e8f0;text-align:center;">' + _badge(d.compliance,{Full:'#16a34a',Partial:'#d97706',Poor:'#dc2626'}) + '</td>' +
+      var d = row.data;
+      var date = d.date || (row.recorded_at ? new Date(row.recorded_at).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}) : '—');
+      var mColor = ['#16a34a','#f59e0b','#f97316','#ea580c','#dc2626'][parseInt(d.mucositis)||0];
+      return '<tr style="background:' + (i===0?'#f0fdf4':'') + '">' +
+        '<td style="padding:6px 8px;border:1px solid #e2e8f0;font-weight:700;color:#0f172a;white-space:nowrap;">' + date + (i===0?' <span style="background:#dcfce7;color:#15803d;font-size:9px;padding:1px 5px;border-radius:3px;">NEW</span>':'') + '</td>' +
+        td(d.oralIntake!=null ? d.oralIntake+'%' : null) +
+        td(d.suppPrescribed) +
+        td(d.suppConsumed!=null ? d.suppConsumed+'%' : null) +
+        '<td style="padding:6px 8px;border:1px solid #e2e8f0;color:' + (nauseaColor[d.nausea]||'#0f172a') + ';font-weight:700;">' + (d.nausea||'—') + '</td>' +
+        td(d.vomiting) +
+        '<td style="padding:6px 8px;border:1px solid #e2e8f0;"><span style="background:' + mColor + '22;color:' + mColor + ';padding:2px 7px;border-radius:4px;font-weight:700;font-size:10px;">Grade ' + (d.mucositis||0) + '</span></td>' +
+        td(d.bowel) +
+        td(d.hydration) +
         '<td style="padding:6px 8px;border:1px solid #e2e8f0;color:#64748b;">' + (d.notes||'—') + '</td></tr>';
     }).join('');
   }
@@ -5316,18 +5522,17 @@ function renderMonitorTables() {
   } else {
     wtBody.innerHTML = weekly.map(function(row, i) {
       var d = row.data, prev = weekly[i+1] ? weekly[i+1].data : null;
-      var date = new Date(row.recorded_at).toLocaleDateString('en-IN',{day:'2-digit',month:'short'});
-      return '<tr style="background:' + (i===0?'#faf5ff':'#fff') + '">' +
-        '<td style="padding:6px 8px;border:1px solid #e2e8f0;font-weight:600;">' + date + (i===0?' <span style="background:#ede9fe;color:#6d28d9;font-size:9px;padding:1px 5px;border-radius:3px;font-weight:700;">NEW</span>':'') + '</td>' +
-        '<td style="padding:6px 8px;border:1px solid #e2e8f0;text-align:center;">' + _mucositisBadge(d.mucositis) + '</td>' +
-        '<td style="padding:6px 8px;border:1px solid #e2e8f0;text-align:center;">' + (d.feeding||'—') + '</td>' +
-        '<td style="padding:6px 8px;border:1px solid #e2e8f0;text-align:center;">' + (d.ecog!=null?'ECOG '+d.ecog:'—') + '</td>' +
-        '<td style="padding:6px 8px;border:1px solid #e2e8f0;text-align:center;">' + (d.handGrip!=null?d.handGrip+' kg':'—') + _delta(d.handGrip,prev&&prev.handGrip,true) + '</td>' +
-        '<td style="padding:6px 8px;border:1px solid #e2e8f0;text-align:center;">' + (d.albumin!=null?d.albumin+' g/dL':'—') + _delta(d.albumin,prev&&prev.albumin,true) + '</td>' +
-        '<td style="padding:6px 8px;border:1px solid #e2e8f0;text-align:center;">' + (d.crp!=null?d.crp+' mg/L':'—') + _delta(d.crp,prev&&prev.crp,false) + '</td>' +
-        '<td style="padding:6px 8px;border:1px solid #e2e8f0;text-align:center;">' + _badge(d.tolerance,{Good:'#16a34a',Fair:'#d97706',Poor:'#dc2626'}) + '</td>' +
-        '<td style="padding:6px 8px;border:1px solid #e2e8f0;text-align:center;">' + _yesNo(d.dietitian) + '</td>' +
-        '<td style="padding:6px 8px;border:1px solid #e2e8f0;text-align:center;">' + _yesNo(d.physician) + '</td>' +
+      return '<tr style="background:' + (i===0?'#f0f9ff':'') + '">' +
+        '<td style="padding:6px 8px;border:1px solid #e2e8f0;font-weight:700;color:#0f172a;">' + (d.week ? 'Week '+d.week : '—') + (i===0?' <span style="background:#e0f2fe;color:#0369a1;font-size:9px;padding:1px 5px;border-radius:3px;">NEW</span>':'') + '</td>' +
+        td(d.weight!=null ? d.weight+' kg' : null) +
+        td(d.bmi!=null ? d.bmi+' kg/m²' : null) +
+        td(d.muac!=null ? d.muac+' cm' : null) +
+        td(d.handGrip!=null ? d.handGrip+' kg' : null) +
+        td(d.ecog!=null ? 'ECOG '+d.ecog : null) +
+        td(d.albumin!=null ? d.albumin+' g/dL' : null) +
+        td(d.crp!=null ? d.crp+' mg/L' : null) +
+        td(d.glucose!=null ? d.glucose+' mg/dL' : null) +
+        td(d.interruptions) +
         '<td style="padding:6px 8px;border:1px solid #e2e8f0;color:#64748b;">' + (d.notes||'—') + '</td></tr>';
     }).join('');
   }
@@ -5336,10 +5541,10 @@ function renderMonitorTables() {
 function showMonitorTab(tab) {
   document.getElementById('monPanelDaily').style.display  = tab==='daily'  ? 'block' : 'none';
   document.getElementById('monPanelWeekly').style.display = tab==='weekly' ? 'block' : 'none';
-  document.getElementById('monTabDaily').style.background  = tab==='daily'  ? '#0e2247' : '#f1f5f9';
-  document.getElementById('monTabDaily').style.color       = tab==='daily'  ? '#fff'    : '#64748b';
-  document.getElementById('monTabWeekly').style.background = tab==='weekly' ? '#7c3aed' : '#f1f5f9';
-  document.getElementById('monTabWeekly').style.color      = tab==='weekly' ? '#fff'    : '#64748b';
+  var tdBtn = document.getElementById('monTabDaily');
+  var twBtn = document.getElementById('monTabWeekly');
+  if (tdBtn) { tdBtn.style.borderBottomColor = tab==='daily' ? '#0e2247' : 'transparent'; tdBtn.style.color = '#000'; }
+  if (twBtn) { twBtn.style.borderBottomColor = tab==='weekly' ? '#0e2247' : 'transparent'; twBtn.style.color = '#000'; }
 }
 
 function toggleMonitorForm(type) {
@@ -5354,27 +5559,35 @@ async function saveMonitorLog(type) {
   var token = u && u.token ? 'Bearer ' + u.token : '';
   var apiBase = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : '';
   var data = {};
+  var gv = function(id){var el=document.getElementById(id);return el?el.value:'';};
+  var gn = function(id){var v=parseFloat(gv(id));return isNaN(v)?null:v;};
+  var gi = function(id){var v=parseInt(gv(id));return isNaN(v)?null:v;};
   if (type === 'daily') {
     data = {
-      weight: parseFloat(document.getElementById('monD_weight').value) || null,
-      oralIntake: parseInt(document.getElementById('monD_oralIntake').value) || null,
-      radiation: document.getElementById('monD_radiation').value || null,
-      compliance: document.getElementById('monD_compliance').value || null,
-      notes: document.getElementById('monD_notes').value || ''
+      date: gv('monD_date') || new Date().toISOString().split('T')[0],
+      oralIntake: gi('monD_oralIntake'),
+      suppPrescribed: gv('monD_suppPrescribed') || null,
+      suppConsumed: gi('monD_suppConsumed'),
+      nausea: gv('monD_nausea') || 'None',
+      vomiting: gv('monD_vomiting') || 'None',
+      mucositis: gv('monD_mucositis') || '0',
+      bowel: gv('monD_bowel') || 'Normal',
+      hydration: gv('monD_hydration') || 'Adequate',
+      notes: gv('monD_notes') || ''
     };
   } else {
     data = {
-      mucositis: document.getElementById('monW_mucositis').value || null,
-      feeding: document.getElementById('monW_feeding').value || null,
-      ecog: document.getElementById('monW_ecog').value || null,
-      hospitalDays: parseInt(document.getElementById('monW_hospitalDays').value) || null,
-      handGrip: parseFloat(document.getElementById('monW_handGrip').value) || null,
-      albumin: parseFloat(document.getElementById('monW_albumin').value) || null,
-      crp: parseFloat(document.getElementById('monW_crp').value) || null,
-      tolerance: document.getElementById('monW_tolerance').value || null,
-      dietitian: document.getElementById('monW_dietitian').value || null,
-      physician: document.getElementById('monW_physician').value || null,
-      notes: document.getElementById('monW_notes').value || ''
+      week: gi('monW_week'),
+      weight: gn('monW_weight'),
+      bmi: gn('monW_bmi'),
+      muac: gn('monW_muac'),
+      handGrip: gn('monW_handGrip'),
+      ecog: gv('monW_ecog') || '0',
+      albumin: gn('monW_albumin'),
+      crp: gn('monW_crp'),
+      glucose: gi('monW_glucose'),
+      interruptions: gv('monW_interruptions') || 'None',
+      notes: gv('monW_notes') || ''
     };
   }
   try {

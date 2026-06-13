@@ -1009,7 +1009,7 @@
     if (typeof auth !== 'undefined') {
       const u = auth.getCurrentUser();
       if (!u) { window.location.href='/login'; return; }
-      if (u.role !== 'ADMIN') { alert('Admin access only.'); window.location.href='/login'; return; }
+      if (u.role !== 'ADMIN' && u.role !== 'SUPER_ADMIN') { alert('Admin access only.'); window.location.href='/login'; return; }
     }
     await loadAll();
   });

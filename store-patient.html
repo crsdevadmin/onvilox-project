@@ -55,10 +55,8 @@
 </div>
 
 <div class="card">
-  <h3>Update Production Status</h3>
-  <div style="display:flex;gap:12px;flex-wrap:wrap;">
-    <button class="btn-warning" onclick="setStatus('PROCESSING')">Mark Processing</button>
-    <button class="btn-primary" onclick="setStatus('DISPATCHED')">Mark Dispatched</button>
+  <h3 id="statusCardTitle">Update Production Status</h3>
+  <div id="statusActions" style="display:flex;gap:12px;flex-wrap:wrap;">
     <button class="btn-secondary" onclick="location.href='/store'">Back</button>
   </div>
 </div>
@@ -74,8 +72,9 @@
 <script src="/js/manufacturing.js"></script>
 
 <script>
-auth.requireRole(['STORE']);
+auth.requireRole(['STORE', 'STORE_APPROVER']);
 const me = auth.getCurrentUser();
+const isApprover = (me.role === 'STORE_APPROVER');
 
 const params = new URLSearchParams(window.location.search);
 const jobId = params.get('job');
@@ -108,11 +107,21 @@ function getUserName(id){
   return u ? u.name : '-';
 }
 
-function statusClass(s){ return (s||'APPROVED').toLowerCase(); }
+const W = manufacturingService.WORKFLOW;
+
+function statusClass(s){ return W.badgeClass(s); }
+
+// Map a pending status to the workflow step it is awaiting approval to leave.
+function effectiveStep(status){
+  const s = (status || 'APPROVED').toUpperCase();
+  if (s === 'PENDING_PROCESSING') return 'APPROVED';
+  if (s === 'PENDING_DISPATCH')   return 'PROCESSING';
+  return s;
+}
 
 function renderWorkflow(status){
   const steps = ['CREATED','APPROVED','PROCESSING','READY','DISPATCHED','DELIVERED'];
-  const idx = steps.indexOf(status);
+  const idx = steps.indexOf(effectiveStep(status));
   const wrap = document.getElementById('workflow');
   wrap.innerHTML = '';
   steps.forEach((s,i)=>{
@@ -123,27 +132,90 @@ function renderWorkflow(status){
   });
 }
 
+function renderActions(){
+  const wrap = document.getElementById('statusActions');
+  const back = `<button class="btn-secondary" onclick="location.href='/store'">Back</button>`;
+  const s = (job.status || 'APPROVED').toUpperCase();
+  let html = '';
+  const title = document.getElementById('statusCardTitle');
+
+  if (isApprover) {
+    title.innerText = 'Review Production Request';
+    const p = W.pending[s];
+    if (p) {
+      html += `<button class="btn-primary" onclick="approveStep()">Approve ${p.label}</button>`;
+      html += `<button onclick="rejectStep()" style="background:#fef2f2;color:#b91c1c;border:1px solid #dc2626;border-radius:6px;padding:8px 16px;font-weight:600;cursor:pointer;">Reject</button>`;
+    } else if (s === 'DISPATCHED') {
+      html += `<span style="align-self:center;color:#16a34a;font-weight:700;">✓ Dispatched</span>`;
+    } else {
+      html += `<span style="align-self:center;color:#94a3b8;">No request awaiting approval.</span>`;
+    }
+  } else {
+    title.innerText = 'Update Production Status';
+    if (W.isPending(s)) {
+      html += `<span style="align-self:center;color:#d97706;font-weight:700;">⏳ Awaiting approver sign-off</span>`;
+    } else {
+      const req = W.requestFor(s);
+      if (req) {
+        const label = (req.next === 'PENDING_PROCESSING') ? 'Request Processing' : 'Request Dispatch';
+        const cls = (req.next === 'PENDING_PROCESSING') ? 'btn-warning' : 'btn-primary';
+        html += `<button class="${cls}" onclick="requestStep('${req.next}')">${label}</button>`;
+      } else {
+        html += `<span style="align-self:center;color:#16a34a;font-weight:700;">✓ Dispatched</span>`;
+      }
+    }
+  }
+  wrap.innerHTML = html + back;
+}
+
 function bind(){
   pName.innerText = patient.name;
   pUHIC.innerText = patient.uhic;
   pDoctor.innerText = getUserName(job.doctorId);
   pCancer.innerText = patient.cancer;
   pStatus.className = 'status ' + statusClass(job.status);
-  pStatus.innerText = job.status;
+  pStatus.innerText = W.statusLabel(job.status);
   renderWorkflow(job.status);
+  renderActions();
 }
 
-function setStatus(status){
-  const updated = manufacturingService.updateJobStatus(job.id, status);
-  if(updated){
-    // reflect patient status too for clinician view
-    patient.status = status;
-    updatePatient(patient);
-    job.status = status;
-    bind();
-    alert('Status updated to ' + status);
-  }
+// Manager requests next step (pending). Patient clinician status is left
+// unchanged until an approver signs off.
+async function requestStep(next){
+  await manufacturingService.updateJobStatus(job.id, next, { by: me.id, role: me.role, action: 'request' });
+  job.status = next;
+  bind();
+  alert('Request submitted for approval.');
 }
+
+async function approveStep(){
+  const p = W.pending[(job.status || '').toUpperCase()];
+  if(!p) return;
+  await manufacturingService.updateJobStatus(job.id, p.approve, { by: me.id, role: me.role, action: 'approve' });
+  patient.status = p.approve;
+  updatePatient(patient);
+  job.status = p.approve;
+  bind();
+  alert('Approved — status is now ' + W.statusLabel(p.approve) + '.');
+}
+
+async function rejectStep(){
+  const p = W.pending[(job.status || '').toUpperCase()];
+  if(!p) return;
+  if(!confirm('Reject this request? It will revert to "' + W.statusLabel(p.reject) + '".')) return;
+  await manufacturingService.updateJobStatus(job.id, p.reject, { by: me.id, role: me.role, action: 'reject' });
+  patient.status = p.reject;
+  updatePatient(patient);
+  job.status = p.reject;
+  bind();
+  alert('Request rejected — reverted to ' + W.statusLabel(p.reject) + '.');
+}
+
+// Expose action handlers to the global scope so inline onclick can reach them
+// (they are defined inside the initStore().then() closure).
+window.requestStep = requestStep;
+window.approveStep = approveStep;
+window.rejectStep = rejectStep;
 
 bind();
 

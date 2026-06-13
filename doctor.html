@@ -239,18 +239,25 @@
         } catch (e) { /* ignore */ }
 
         const latestPlan = getLatestPlanForPatient(p.id);
-        const AI_LOCK_TTL = 8 * 60 * 1000; // 8 minutes (matches AI timeout)
+        // A job that has been "generating" longer than this is treated as orphaned
+        // (server restart, lost in-memory job, or Claude timeout) and shown as FAILED
+        // instead of spinning on ANALYZING forever. 7 min > the 6-min frontend poll timeout.
+        const AI_FAIL_TTL = 7 * 60 * 1000;
 
-        // A plan with claudeInsights.generating=true (set within TTL) counts as locked — don't re-trigger.
+        // A plan with claudeInsights.generating=true (set recently) counts as locked — don't re-trigger.
         // This lock is written to the DB so it works across devices and logins, not just tabs.
         const ci = latestPlan && latestPlan.claudeInsights;
-        const isGenerating = ci && ci.generating === true && (Date.now() - (ci.startedAt || 0)) < AI_LOCK_TTL;
+        const lockAge = (ci && ci.generating === true) ? (Date.now() - (ci.startedAt || 0)) : 0;
+        const isGenerating = ci && ci.generating === true && lockAge < AI_FAIL_TTL;
+        const staleLock = ci && ci.generating === true && lockAge >= AI_FAIL_TTL; // orphaned job
         const hasAI = !!(ci && !ci.generating);
+        const failed = !!__aiErrors[p.id] || staleLock;
 
+        const failTitle = (__aiErrors[p.id] || 'AI analysis did not complete (the job timed out or was lost). Click to retry.').replace(/"/g, '&quot;');
         const aiStatus = hasAI
           ? '<span class="status ready" style="background:#dcfce7; color:#166534; font-size:10px; margin-left:5px;">AI READY</span>'
-          : __aiErrors[p.id]
-            ? `<span class="status" style="background:#fee2e2; color:#991b1b; font-size:10px; margin-left:5px;" title="${__aiErrors[p.id]}">⚠ AI FAILED</span>`
+          : failed
+            ? `<span class="status" onclick="event.stopPropagation(); retryAI('${p.id}')" style="background:#fee2e2; color:#991b1b; font-size:10px; margin-left:5px; cursor:pointer;" title="${failTitle}">⚠ AI FAILED · Retry</span>`
             : '<span class="status processing" style="background:#fef9c3; color:#854d0e; font-size:10px; margin-left:5px; animation: pulse 1.5s infinite;">ANALYZING...</span>';
 
         const approveBtn = (me.role === 'DOCTOR' && status === 'CREATED')
@@ -259,7 +266,7 @@
 
         // Trigger AI whenever insights are missing and not already in-flight (per-tab) or locked in DB (cross-device).
         const planExists = !!(latestPlan && (latestPlan.finalPlan || latestPlan.engineOutput));
-        if (!hasAI && !isGenerating && !__aiTriggers[p.id]) {
+        if (!hasAI && !isGenerating && !failed && !__aiTriggers[p.id]) {
           __aiTriggers[p.id] = true;
 
           // Write server-side lock immediately so other devices/users see this patient is being processed.
@@ -523,6 +530,26 @@
 
       iframe.src = url;
     }
+
+    // Clear a failed/orphaned AI state and kick off a fresh analysis.
+    async function retryAI(patientId) {
+      delete __aiErrors[patientId];
+      delete __aiTriggers[patientId];
+      const plan = getLatestPlanForPatient(patientId);
+      if (plan && plan.claudeInsights && plan.claudeInsights.generating) {
+        plan.claudeInsights = null; // clear the orphaned lock in the in-memory cache
+        try {
+          const apiBase = (typeof CONFIG !== 'undefined' ? CONFIG.API_BASE_URL : '');
+          await fetch(`${apiBase}/api/nutrition-plans/${plan.id}/insights`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + ((auth.getCurrentUser() || {}).token || '') },
+            body: JSON.stringify({ insights: null })
+          });
+        } catch (e) { /* best effort — render() below will re-trigger regardless */ }
+      }
+      render(); // re-render → the trigger condition fires a fresh analysis
+    }
+    window.retryAI = retryAI;
 
     async function quickApprove(patientId, btn) {
       const patient = getPatientById(patientId);

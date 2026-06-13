@@ -36,18 +36,27 @@
     return getStores().find(s => s.id === id) || null;
   }
 
-  async function createStore({name, hospital, location}) {
+  async function createStore({name, fssai, hospital, location}) {
     const n = (name || '').trim();
     if (!n) return { ok: false, error: 'Store name is required' };
+
+    const f = (fssai || '').trim();
+    if (!f) return { ok: false, error: 'FSSAI licence number is required' };
+    if (!/^\d{14}$/.test(f)) return { ok: false, error: 'FSSAI number must be exactly 14 digits' };
 
     const stores = getStores();
     if (stores.some(s => (s.name || '').toLowerCase() === n.toLowerCase())) {
       return { ok: false, error: 'Store already exists' };
     }
+    if (stores.some(s => (s.fssai_number || s.fssai) === f)) {
+      return { ok: false, error: 'A store with this FSSAI number already exists' };
+    }
 
     const id = db.uid('store');
     const store = {
       id, name: n,
+      fssai: f,
+      fssai_number: f,
       hospital: (hospital || '').trim(),
       location: (location || '').trim(),
       createdAt: new Date().toISOString(),

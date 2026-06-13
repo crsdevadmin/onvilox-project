@@ -69,12 +69,32 @@ app.post('/api/push/subscribe', authenticateToken, async (req, res) => {
   } catch(e) { console.warn('push sub save:', e.message); }
   res.json({ ok: true });
 });
-async function notifyStore(storeId, title, body, url) {
-  if (!webpush) return;
+// Send a push to a specific set of user IDs (one per active subscription).
+async function notifyUsers(userIds, title, body, url) {
+  if (!webpush || !userIds || !userIds.length) return;
   const payload = JSON.stringify({ title, body, url });
-  for (const [userId, sub] of Object.entries(_pushSubs)) {
-    try { await webpush.sendNotification(sub, payload); } catch(e) { delete _pushSubs[userId]; }
+  for (const uid of userIds) {
+    const sub = _pushSubs[uid];
+    if (!sub) continue;
+    try { await webpush.sendNotification(sub, payload); } catch(e) { delete _pushSubs[uid]; }
   }
+}
+
+// Resolve the user IDs belonging to a store, optionally filtered by role.
+async function storeUserIds(storeId, roles) {
+  if (!storeId) return [];
+  try {
+    const r = roles && roles.length
+      ? await pool.query('SELECT id FROM users WHERE store_id=$1 AND role = ANY($2)', [storeId, roles])
+      : await pool.query('SELECT id FROM users WHERE store_id=$1', [storeId]);
+    return r.rows.map(x => x.id);
+  } catch(e) { console.warn('storeUserIds:', e.message); return []; }
+}
+
+// Notify only the users mapped to a given store (default: store roles).
+async function notifyStore(storeId, title, body, url, roles) {
+  const ids = await storeUserIds(storeId, roles || ['STORE', 'STORE_APPROVER']);
+  return notifyUsers(ids, title, body, url);
 }
 
 // Health Check
@@ -271,12 +291,13 @@ app.put('/api/patients/:id', authenticateToken, async (req, res) => {
         req.params.id
       ]
     );
-    // Push notification when patient is approved
+    // Push notification when patient is approved — only the store's manager(s)
     if ((p.status === 'APPROVED') && p.storeId) {
       notifyStore(p.storeId,
         '✅ New Patient Approved',
         `${p.name || 'A patient'} is ready for production. Tap to view plan.`,
-        `/patients/profile?id=${req.params.id}&store=1`
+        `/patients/profile?id=${req.params.id}&store=1`,
+        ['STORE']
       ).catch(() => {});
     }
     res.json(p);
@@ -541,10 +562,11 @@ app.get('/api/stores', authenticateToken, async (req, res) => {
 // Stores: Create
 app.post('/api/stores', authenticateToken, async (req, res) => {
   const { id, name, hospital, location } = req.body;
+  const fssai = req.body.fssai_number || req.body.fssai || null;
   try {
     const result = await pool.query(
-      'INSERT INTO stores (id, name, hospital, location) VALUES ($1,$2,$3,$4) RETURNING *',
-      [id || `store_${Date.now()}`, name, hospital || '', location || '']
+      'INSERT INTO stores (id, name, hospital, location, fssai_number) VALUES ($1,$2,$3,$4,$5) RETURNING *',
+      [id || `store_${Date.now()}`, name, hospital || '', location || '', fssai]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -562,11 +584,85 @@ app.delete('/api/stores/:id', authenticateToken, async (req, res) => {
   }
 });
 
+// Create manufacturing jobs for any approved (or further) patient that lacks one.
+// Derives status/store/doctor from dedicated columns, falling back to the
+// full_data JSON blob and to the assigned doctor's store mapping.
+async function reconcileJobs() {
+  // The manufacturing_jobs table has FKs (store_id -> stores, doctor_id -> users),
+  // so we resolve each candidate to ids that actually exist, then insert row by
+  // row — one bad row can't abort the batch, and we report why any were skipped.
+  const cand = await pool.query(`
+    SELECT p.id AS patient_id,
+           p.name,
+           COALESCE(
+             (SELECT s.id FROM stores s WHERE s.id = p.store_id),
+             (SELECT s.id FROM stores s WHERE s.id = u.store_id),
+             (SELECT s.id FROM stores s WHERE s.id = p.full_data->>'storeId')
+           ) AS store_id,
+           (SELECT us.id FROM users us WHERE us.id = COALESCE(p.assigned_doctor_id, p.full_data->>'assignedDoctorId')) AS doctor_id,
+           COALESCE(p.status, p.full_data->>'status') AS status
+    FROM patients p
+    LEFT JOIN users u ON u.id = COALESCE(p.assigned_doctor_id, p.full_data->>'assignedDoctorId')
+    WHERE COALESCE(p.status, p.full_data->>'status') IN ('APPROVED','PROCESSING','DISPATCHED','DELIVERED')
+      AND NOT EXISTS (SELECT 1 FROM manufacturing_jobs mj WHERE mj.patient_id = p.id)
+  `);
+
+  let created = 0;
+  const skipped = [];
+  for (const r of cand.rows) {
+    if (!r.store_id) {
+      skipped.push({ patient: r.name || r.patient_id, reason: 'no valid store mapping (orphaned store id)' });
+      continue;
+    }
+    try {
+      const ins = await pool.query(
+        `INSERT INTO manufacturing_jobs (id, patient_id, store_id, doctor_id, status, history)
+         VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT (id) DO NOTHING`,
+        ['job_' + r.patient_id, r.patient_id, r.store_id, r.doctor_id, r.status,
+         JSON.stringify([{ status: r.status, at: new Date().toISOString() }])]
+      );
+      created += ins.rowCount;
+    } catch (e) {
+      skipped.push({ patient: r.name || r.patient_id, reason: e.message });
+    }
+  }
+  return { created, skipped };
+}
+
 // Manufacturing Jobs: Get All
 app.get('/api/manufacturing-jobs', authenticateToken, async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM manufacturing_jobs ORDER BY created_at DESC');
     res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Admin: reconcile / backfill jobs on demand + return a diagnostic snapshot.
+app.post('/api/admin/reconcile-jobs', authenticateToken, async (req, res) => {
+  const role = req.user && req.user.role;
+  if (role !== 'ADMIN' && role !== 'SUPER_ADMIN') return res.status(403).json({ error: 'Admin only' });
+  try {
+    const bf = await reconcileJobs();
+    const approved = await pool.query(`
+      SELECT p.id, p.name,
+             COALESCE(p.status, p.full_data->>'status') AS status,
+             COALESCE(p.store_id, u.store_id, p.full_data->>'storeId') AS store_id,
+             (SELECT 1 FROM manufacturing_jobs mj WHERE mj.patient_id = p.id LIMIT 1) AS has_job
+      FROM patients p
+      LEFT JOIN users u ON u.id = COALESCE(p.assigned_doctor_id, p.full_data->>'assignedDoctorId')
+      WHERE COALESCE(p.status, p.full_data->>'status') IN ('APPROVED','PROCESSING','DISPATCHED','DELIVERED')
+    `);
+    const jobs = await pool.query('SELECT id, patient_id, store_id, status FROM manufacturing_jobs');
+    const storeUsers = await pool.query("SELECT id, name, role, store_id FROM users WHERE role IN ('STORE','STORE_APPROVER','COORDINATOR','DOCTOR')");
+    res.json({
+      created: bf.created,
+      skipped: bf.skipped,
+      approvedPatients: approved.rows,
+      jobs: jobs.rows,
+      storeUsers: storeUsers.rows
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -586,15 +682,94 @@ app.post('/api/manufacturing-jobs', authenticateToken, async (req, res) => {
   }
 });
 
+// Allowed job status transitions, keyed by current status.
+// Value maps target status -> role required to perform it.
+const JOB_TRANSITIONS = {
+  APPROVED:           { PENDING_PROCESSING: 'STORE' },
+  PROCESSING:         { PENDING_DISPATCH:   'STORE' },
+  PENDING_PROCESSING: { PROCESSING: 'STORE_APPROVER', APPROVED:   'STORE_APPROVER' },
+  PENDING_DISPATCH:   { DISPATCHED: 'STORE_APPROVER', PROCESSING: 'STORE_APPROVER' },
+  DISPATCHED:         { DELIVERED:  'COORDINATOR' }
+};
+
 // Manufacturing Jobs: Update Status
 app.put('/api/manufacturing-jobs/:id', authenticateToken, async (req, res) => {
   const { status, history } = req.body;
   try {
+    const role = req.user && req.user.role;
+    const isAdmin = role === 'ADMIN' || role === 'SUPER_ADMIN';
+    const target = (status || '').toUpperCase();
+
+    // Load the current job to validate the transition and ownership.
+    const cur = await pool.query('SELECT status, store_id FROM manufacturing_jobs WHERE id=$1', [req.params.id]);
+    if (!cur.rows.length) return res.status(404).json({ error: 'Job not found' });
+    const currentStatus = (cur.rows[0].status || '').toUpperCase();
+    const jobStore = cur.rows[0].store_id;
+
+    if (!isAdmin) {
+      // Store-scope: a manager/approver may only touch their own store's jobs.
+      if (role === 'STORE' || role === 'STORE_APPROVER') {
+        const ur = await pool.query('SELECT store_id FROM users WHERE id=$1', [req.user.id]);
+        const userStore = ur.rows[0] && ur.rows[0].store_id;
+        if (userStore && jobStore && userStore !== jobStore) {
+          return res.status(403).json({ error: 'This job belongs to another store.' });
+        }
+      }
+      // Transition legality + role requirement.
+      const allowed = JOB_TRANSITIONS[currentStatus] || {};
+      if (!(target in allowed)) {
+        return res.status(409).json({ error: `Illegal status change: ${currentStatus} → ${target || '(empty)'}.` });
+      }
+      const requiredRole = allowed[target];
+      if (requiredRole && role !== requiredRole) {
+        return res.status(403).json({ error: `Only a ${requiredRole.replace('_', ' ').toLowerCase()} may perform this action.` });
+      }
+    }
+
     const result = await pool.query(
       'UPDATE manufacturing_jobs SET status=$1, history=$2, updated_at=NOW() WHERE id=$3 RETURNING *',
       [status, JSON.stringify(history || []), req.params.id]
     );
-    res.json(result.rows[0]);
+    const job = result.rows[0];
+    res.json(job);
+
+    // ── Approval-workflow notifications (sent after responding) ──────────────
+    // The last history entry carries the action: request | approve | reject.
+    try {
+      const storeId = job && (job.store_id || job.storeId);
+      const last = Array.isArray(history) && history.length ? history[history.length - 1] : null;
+      const action = last && last.action;
+      if (storeId && action) {
+        let pName = 'A patient';
+        try {
+          const pr = await pool.query('SELECT name FROM patients WHERE id=$1', [job.patient_id]);
+          if (pr.rows[0] && pr.rows[0].name) pName = pr.rows[0].name;
+        } catch(e) { /* ignore */ }
+        const s = (status || '').toUpperCase();
+        const nice = s === 'PROCESSING' ? 'Processing'
+                   : s === 'DISPATCHED' ? 'Dispatched'
+                   : s.charAt(0) + s.slice(1).toLowerCase();
+        if (action === 'request') {
+          // Manager submitted a request → alert the store's approver(s).
+          notifyStore(storeId,
+            '🟠 Approval Needed',
+            `${pName} is awaiting your sign-off (${s === 'PENDING_DISPATCH' ? 'Dispatch' : 'Processing'}).`,
+            '/store', ['STORE_APPROVER']).catch(() => {});
+        } else if (action === 'approve') {
+          // Approver approved → tell the store's manager(s).
+          notifyStore(storeId,
+            '✅ Request Approved',
+            `${pName} moved to ${nice}.`,
+            '/store', ['STORE']).catch(() => {});
+        } else if (action === 'reject') {
+          // Approver rejected → tell the store's manager(s).
+          notifyStore(storeId,
+            '🔴 Request Rejected',
+            `${pName} was reverted to ${nice}.`,
+            '/store', ['STORE']).catch(() => {});
+        }
+      }
+    } catch(e) { console.warn('job notify:', e.message); }
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -1090,6 +1265,33 @@ OUTPUT FORMAT — return ONLY valid JSON, no markdown, no text outside the JSON 
       )
     `);
   } catch(e) { console.error('monitoring_logs migration:', e.message); }
+})();
+
+// Migration: add FSSAI licence number to stores
+(async () => {
+  try {
+    await pool.query('ALTER TABLE stores ADD COLUMN IF NOT EXISTS fssai_number VARCHAR(20)');
+  } catch(e) { console.error('stores fssai_number migration:', e.message); }
+})();
+
+// Migration: ensure manufacturing_jobs table exists (production queue / approvals)
+(async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS manufacturing_jobs (
+        id TEXT PRIMARY KEY,
+        patient_id TEXT,
+        store_id TEXT,
+        doctor_id TEXT,
+        status TEXT DEFAULT 'APPROVED',
+        history JSONB DEFAULT '[]'::jsonb,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    const bf = await reconcileJobs();
+    if (bf.created) console.log('manufacturing_jobs backfill: created ' + bf.created + ' job(s) for approved patients.');
+  } catch(e) { console.error('manufacturing_jobs migration:', e.message); }
 })();
 
 (async () => {

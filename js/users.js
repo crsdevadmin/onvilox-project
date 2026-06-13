@@ -88,7 +88,7 @@
       if (!stores.length) return { ok: false, error: 'Please create at least one Store before creating a Doctor.' };
     }
 
-    if ((role === 'DOCTOR' || role === 'STORE') && !storeId) {
+    if ((role === 'DOCTOR' || role === 'STORE' || role === 'STORE_APPROVER') && !storeId) {
       return { ok: false, error: 'Store mapping is required for this role' };
     }
     if (role === 'COORDINATOR' && !storeId) {
@@ -98,6 +98,11 @@
     if (role === 'STORE') {
       const existingMgr = getUsersByRole('STORE').find(u => (u.storeId || u.store_id) === storeId);
       if (existingMgr) return { ok: false, error: 'This store already has a Store login.' };
+    }
+
+    if (role === 'STORE_APPROVER') {
+      const existingApprover = getUsersByRole('STORE_APPROVER').find(u => (u.storeId || u.store_id) === storeId);
+      if (existingApprover) return { ok: false, error: 'This store already has a Store Approver.' };
     }
 
     if (role === 'ASSISTANT' && !mappedDoctorId) {

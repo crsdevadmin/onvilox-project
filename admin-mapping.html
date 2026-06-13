@@ -39,11 +39,12 @@
   </div>
 
   <div class="card">
-    <h2>Store Manager / Coordinator → Store Mapping</h2>
+    <h2>Store Manager / Approver / Coordinator → Store Mapping</h2>
     <table>
       <thead>
         <tr>
-          <th>Store Manager</th>
+          <th>User</th>
+          <th>Role</th>
           <th>Mapped Store</th>
           <th>Change</th>
         </tr>
@@ -171,13 +172,19 @@ function updateAssistantDoctor(assistantId){
   renderAssistantDoctor();
 }
 
+const ROLE_LABELS = { STORE: 'Store Manager', STORE_APPROVER: 'Store Approver', COORDINATOR: 'Coordinator' };
+
 function renderStoreManagerStore(){
-  const managers = [...userService.getUsersByRole('STORE'), ...userService.getUsersByRole('COORDINATOR')];
+  const managers = [
+    ...userService.getUsersByRole('STORE'),
+    ...userService.getUsersByRole('STORE_APPROVER'),
+    ...userService.getUsersByRole('COORDINATOR')
+  ];
   const stores = storeService.getStores();
   const tbody = document.getElementById('smStoreTable');
   tbody.innerHTML='';
   if (managers.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="3" style="color:#94a3b8;font-style:italic;padding:10px;">No store manager accounts found.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="4" style="color:#94a3b8;font-style:italic;padding:10px;">No store manager / approver / coordinator accounts found.</td></tr>';
     return;
   }
   managers.forEach(m => {
@@ -188,6 +195,7 @@ function renderStoreManagerStore(){
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td>${m.name} (${m.username || m.email})</td>
+      <td>${ROLE_LABELS[m.role] || m.role}</td>
       <td>${storeName}</td>
       <td>
         <select id="sm_${m.id}">${options}</select>
@@ -219,9 +227,18 @@ async function updateStoreManagerStore(userId){
   }
 }
 
-renderDoctorStore();
-renderStoreManagerStore();
-renderAssistantDoctor();
+function renderAllMappings(){
+  renderDoctorStore();
+  renderStoreManagerStore();
+  renderAssistantDoctor();
+}
+
+// Load fresh users + stores from the server before rendering, so newly
+// created accounts (e.g. coordinators / store approvers) always appear.
+Promise.all([
+  (userService.initUsers ? userService.initUsers() : Promise.resolve()),
+  (storeService.initStores ? storeService.initStores() : Promise.resolve())
+]).then(renderAllMappings).catch(renderAllMappings);
 </script>
 
 <script src="/js/theme.js"></script>

@@ -20,23 +20,30 @@
       const res = await fetch(_apiBase() + '/api/manufacturing-jobs', { headers: _headers() });
       if (res.ok) {
         const rows = await res.json();
-        // Normalize DB row format to client format
-        _cache.jobs = rows.map(r => ({
-          id: r.id,
-          patientId: r.patient_id || r.patientId,
-          storeId: r.store_id || r.storeId,
-          doctorId: r.doctor_id || r.doctorId,
-          status: r.status,
-          history: r.history || [],
-          createdAt: r.created_at || r.createdAt,
-          updatedAt: r.updated_at || r.updatedAt
-        }));
-        db.setTable('manufacturing_jobs', _cache.jobs);
+        applyServerJobs(rows);
       }
     } catch(e) {
       console.warn('initJobs: server unreachable, using localStorage');
       _cache.jobs = db.getTable('manufacturing_jobs', []);
     }
+  }
+
+  // Replace the in-memory job cache with freshly-fetched server rows.
+  // Used by initJobs and by the dashboard's live poll so render() always
+  // reflects server truth (e.g. an approval made on another device).
+  function applyServerJobs(rows) {
+    _cache.jobs = (rows || []).map(r => ({
+      id: r.id,
+      patientId: r.patient_id || r.patientId,
+      storeId: r.store_id || r.storeId,
+      doctorId: r.doctor_id || r.doctorId,
+      status: r.status,
+      history: r.history || [],
+      createdAt: r.created_at || r.createdAt,
+      updatedAt: r.updated_at || r.updatedAt
+    }));
+    db.setTable('manufacturing_jobs', _cache.jobs);
+    return _cache.jobs;
   }
 
   function getJobs() {
@@ -58,22 +65,32 @@
     db.setTable('manufacturing_jobs', getJobs());
 
     try {
-      await fetch(_apiBase() + '/api/manufacturing-jobs', {
+      const res = await fetch(_apiBase() + '/api/manufacturing-jobs', {
         method: 'POST', headers: _headers(), body: JSON.stringify(job)
       });
+      if (!res.ok) {
+        const err = await res.text().catch(() => '');
+        console.error('createJob: server rejected job (status ' + res.status + '). It will not reach the store. ', err);
+      }
     } catch(e) { console.warn('createJob: server unreachable'); }
 
     return job;
   }
 
-  async function updateJobStatus(jobId, status) {
+  async function updateJobStatus(jobId, status, actor) {
     const jobs = getJobs();
     const job = jobs.find(j => j.id === jobId);
     if (!job) return null;
     job.status = status;
     job.updatedAt = new Date().toISOString();
     job.history = job.history || [];
-    job.history.push({ status, at: job.updatedAt });
+    const entry = { status, at: job.updatedAt };
+    if (actor) {
+      if (actor.by) entry.by = actor.by;
+      if (actor.role) entry.role = actor.role;
+      if (actor.action) entry.action = actor.action;
+    }
+    job.history.push(entry);
 
     if (_cache.jobs) _cache.jobs = jobs;
     db.setTable('manufacturing_jobs', jobs);
@@ -96,5 +113,45 @@
     return getJobs().find(j => (j.patientId || j.patient_id) === patientId) || null;
   }
 
-  global.manufacturingService = { initJobs, getJobs, createJob, updateJobStatus, getJobsForStore, getJobByPatient };
+  // ── Store approval workflow ────────────────────────────────────────────────
+  // Two-step sign-off: the Store Manager REQUESTS a transition (job enters a
+  // PENDING_* state); the Store Approver then APPROVES (advances) or REJECTS
+  // (reverts to the prior state).
+  const WORKFLOW = {
+    // When a manager requests the next step, the job moves to this pending state.
+    requestNext: {
+      APPROVED:   'PENDING_PROCESSING',
+      PROCESSING: 'PENDING_DISPATCH'
+    },
+    // What each pending state resolves to on approve / reject.
+    pending: {
+      PENDING_PROCESSING: { approve: 'PROCESSING',  reject: 'APPROVED',   label: 'Processing' },
+      PENDING_DISPATCH:   { approve: 'DISPATCHED',  reject: 'PROCESSING', label: 'Dispatch' }
+    },
+    isPending: function(status){
+      return !!WORKFLOW.pending[(status || '').toUpperCase()];
+    },
+    // The transition a manager can request from the current status (or null).
+    requestFor: function(status){
+      const s = (status || 'APPROVED').toUpperCase();
+      const next = WORKFLOW.requestNext[s];
+      if (!next) return null;
+      return { next: next, label: WORKFLOW.pending[next].label };
+    },
+    // Human-friendly label for any status.
+    statusLabel: function(status){
+      const s = (status || 'APPROVED').toUpperCase();
+      if (s === 'PENDING_PROCESSING') return 'Pending Processing Approval';
+      if (s === 'PENDING_DISPATCH')   return 'Pending Dispatch Approval';
+      return s.charAt(0) + s.slice(1).toLowerCase();
+    },
+    // CSS badge class (reuses existing .pending / .processing / etc.).
+    badgeClass: function(status){
+      const s = (status || 'APPROVED').toUpperCase();
+      if (WORKFLOW.isPending(s)) return 'pending';
+      return s.toLowerCase();
+    }
+  };
+
+  global.manufacturingService = { initJobs, applyServerJobs, getJobs, createJob, updateJobStatus, getJobsForStore, getJobByPatient, WORKFLOW };
 })(window);

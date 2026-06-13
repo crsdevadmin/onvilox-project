@@ -34,8 +34,9 @@
         <div class="validation-msg" id="storeName_msg"></div>
       </div>
       <div class="form-group">
-        <label for="storeHospital">Client / Hospital (optional)</label>
-        <input id="storeHospital" type="text" placeholder="Apollo Hospital">
+        <label class="required" for="storeFssai">FSSAI Licence No.</label>
+        <input id="storeFssai" type="text" inputmode="numeric" maxlength="14" placeholder="14-digit FSSAI number" onkeyup="validateStoreFssai()" onblur="validateStoreFssai()">
+        <div class="validation-msg" id="storeFssai_msg"></div>
       </div>
       <div class="form-group">
         <label for="storeLocation">Location</label>
@@ -56,7 +57,7 @@
       <thead>
         <tr>
           <th>Store</th>
-          <th>Client / Hospital</th>
+          <th>FSSAI No.</th>
           <th>Location</th>
           <th>Store Login</th>
           <th>Action</th>
@@ -117,7 +118,7 @@ function renderStores(){
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td>${s.name}</td>
-      <td>${s.hospital || '-'}</td>
+      <td>${s.fssai_number || s.fssai || '-'}</td>
       <td>${s.location || '-'}</td>
       <td>${loginText}</td>
       <td style="display:flex;gap:10px;flex-wrap:wrap;">
@@ -133,13 +134,36 @@ function renderStores(){
   }
 }
 
+function validateStoreFssai(){
+  const el = document.getElementById('storeFssai');
+  const msg = document.getElementById('storeFssai_msg');
+  const val = (el.value||'').trim();
+  if(!val){
+    el.classList.add('field-invalid'); el.classList.remove('field-valid');
+    msg.className = 'validation-msg validation-error';
+    msg.innerText = 'FSSAI licence number is required';
+    return false;
+  }
+  if(!/^\d{14}$/.test(val)){
+    el.classList.add('field-invalid'); el.classList.remove('field-valid');
+    msg.className = 'validation-msg validation-error';
+    msg.innerText = 'FSSAI number must be exactly 14 digits';
+    return false;
+  }
+  el.classList.add('field-valid'); el.classList.remove('field-invalid');
+  msg.className = 'validation-msg validation-success';
+  msg.innerText = '✓ Looks good';
+  return true;
+}
+
 async function createStoreUI(){
   if(!validateStoreName()) return;
+  if(!validateStoreFssai()) return;
   const name = document.getElementById('storeName').value;
-  const hospital = document.getElementById('storeHospital').value;
+  const fssai = document.getElementById('storeFssai').value;
   const location = document.getElementById('storeLocation').value;
 
-  const res = await storeService.createStore({name, hospital, location});
+  const res = await storeService.createStore({name, fssai, location});
   if(!res.ok){
     document.getElementById('storeError').innerText = res.error;
     return;
@@ -154,7 +178,9 @@ async function createStoreUI(){
     );
   }
   document.getElementById('storeName').value='';
-  document.getElementById('storeHospital').value='';
+  document.getElementById('storeFssai').value='';
+  document.getElementById('storeFssai_msg').innerText='';
+  document.getElementById('storeFssai').classList.remove('field-valid','field-invalid');
   document.getElementById('storeLocation').value='';
   renderStores();
 }

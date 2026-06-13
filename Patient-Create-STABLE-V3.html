@@ -49,6 +49,17 @@
     .completeness-bar-bg { flex: 1; height: 10px; background: var(--bg-3); border-radius: 5px; overflow: hidden; }
     .completeness-bar-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #3b82f6, #10b981); transition: width 0.4s ease; }
     .completeness-pct { font-weight: 800; font-size: 18px; color: #10b981; min-width: 50px; text-align: right; }
+
+    /* ---- Layout gap fixes (scoped to this page) ---- */
+    /* The grid already spaces rows via `gap`; the extra margin-bottom on each
+       form-group was doubling vertical spacing to ~36px between rows. */
+    .container.page .form-group { margin-bottom: 0; }
+    /* Don't force fixed-height cards: short cards (e.g. Oncology) were left with
+       a large empty area below their content. Let them size to content. */
+    .container.page .ai-panel { min-height: 0 !important; }
+    /* Keep cards top-aligned so a short card doesn't stretch to match a taller
+       neighbour in the same row and show an empty gap. */
+    .container.page .clinical-cards { align-items: start; }
   </style>
 </head>
 <body>
@@ -168,7 +179,7 @@
 </div>
 
 <!-- CLINICAL ASSESSMENT CARDS RESTRUCTURED -->
-<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(400px, 1fr)); gap:20px; margin-top:24px;">
+<div class="clinical-cards" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(400px, 1fr)); gap:20px; margin-top:24px; align-items:start;">
 
   <!-- SECTION 1 (METABOLIC & RENAL) -->
   <div class="ai-panel card-cyan" style="margin:0; min-height:480px;">
@@ -363,6 +374,78 @@
     </div>
   </div>
 
+  <!-- SECTION: RADIATION THERAPY -->
+  <div class="ai-panel card-violet" style="margin:0; grid-column:1 / -1;">
+    <div class="ai-header">
+      <div class="ai-badge">RADIATION</div>
+      <h4>Radiation Therapy Details</h4>
+    </div>
+    <div class="form-grid" style="grid-template-columns: 1fr 1fr;">
+      <div class="form-group">
+        <label>Radiation Status</label>
+        <select id="radiationStatus">
+          <option value="None">None / Not Applicable</option>
+          <option value="Planned">Planned (Not yet started)</option>
+          <option value="Active">Active (Currently undergoing)</option>
+          <option value="Completed">Completed</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Radiation Technique</label>
+        <select id="radiationTechnique">
+          <option value="">Select...</option>
+          <option value="IMRT">IMRT (Intensity-Modulated)</option>
+          <option value="VMAT">VMAT (Volumetric Arc)</option>
+          <option value="3D-CRT">3D-CRT (Conformal)</option>
+          <option value="SBRT">SBRT / SABR (Stereotactic Body)</option>
+          <option value="SRS">SRS (Stereotactic Radiosurgery)</option>
+          <option value="Brachytherapy">Brachytherapy (Internal)</option>
+          <option value="Proton">Proton Beam Therapy</option>
+          <option value="Electrons">Electron Beam</option>
+          <option value="Palliative">Palliative RT</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Sub-Site (Region Irradiated)</label>
+        <input type="text" id="subSite" placeholder="e.g. Pelvis, Head &amp; Neck, Thorax">
+      </div>
+      <div class="form-group">
+        <label>TNM Stage</label>
+        <input type="text" id="tnmStage" placeholder="e.g. T2N1M0">
+      </div>
+      <div class="form-group">
+        <label>Total Prescribed Dose (Gy)</label>
+        <input type="number" id="totalDoseGy" step="0.1" min="0" placeholder="e.g. 60" oninput="calcRadiationWeek()">
+      </div>
+      <div class="form-group">
+        <label>Fraction Size (Gy / fraction)</label>
+        <input type="number" id="fractionSizeGy" step="0.01" min="0" placeholder="e.g. 2.0">
+      </div>
+      <div class="form-group">
+        <label>Total Number of Fractions</label>
+        <input type="number" id="numberOfFractions" step="1" min="0" placeholder="e.g. 30" oninput="calcRadiationWeek()">
+      </div>
+      <div class="form-group">
+        <label>Fractions Completed</label>
+        <input type="number" id="fractionsCompleted" step="1" min="0" placeholder="e.g. 15" oninput="calcRadiationWeek()">
+      </div>
+      <div class="form-group">
+        <label>Radiation Week — Auto <span style="font-size:11px; color:#94a3b8;">(assumes 5 fx/week)</span></label>
+        <input type="number" id="radiationWeek" readonly step="1" placeholder="Auto-calculated" style="background:var(--bg-2); color:#94a3b8;">
+      </div>
+      <div class="form-group">
+        <label>Concurrent Therapy</label>
+        <select id="concurrentTherapy">
+          <option value="None">None (RT only)</option>
+          <option value="Chemotherapy">Concurrent Chemotherapy</option>
+          <option value="Immunotherapy">Concurrent Immunotherapy</option>
+          <option value="Targeted">Concurrent Targeted Therapy</option>
+          <option value="ChemoImmuno">Chemotherapy + Immunotherapy</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
   <!-- SECTION 4 (FUNCTIONAL & GI) -->
   <div class="ai-panel card-green" style="margin:0; min-height:480px;">
     <div class="ai-header">
@@ -448,6 +531,66 @@
       <div class="form-group" style="grid-column: 1 / -1;">
         <label>BSA (m²) - Auto</label>
         <input type="number" id="bsa" readonly style="background:var(--bg-2);">
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION: RADIATION TOXICITY -->
+  <div class="ai-panel card-rose" style="margin:0; grid-column:1 / -1;">
+    <div class="ai-header">
+      <div class="ai-badge">TOXICITY</div>
+      <h4>Radiation Toxicity Grades</h4>
+    </div>
+    <div class="form-grid" style="grid-template-columns: 1fr 1fr;">
+      <div class="form-group">
+        <label>Mucositis Grade (CTCAE 0–4)</label>
+        <select id="toxMucositis">
+          <option value="0">0 — None</option>
+          <option value="1">1 — Mild (asymptomatic)</option>
+          <option value="2">2 — Moderate (diet modification needed)</option>
+          <option value="3">3 — Severe (IV hydration required)</option>
+          <option value="4">4 — Life-threatening</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Dysphagia Grade (CTCAE 0–4)</label>
+        <select id="toxDysphagia">
+          <option value="0">0 — None</option>
+          <option value="1">1 — Mild (soft diet)</option>
+          <option value="2">2 — Moderate (liquid diet only)</option>
+          <option value="3">3 — Severe (tube feeding required)</option>
+          <option value="4">4 — Life-threatening</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Xerostomia Grade (CTCAE 0–4)</label>
+        <select id="toxXerostomia">
+          <option value="0">0 — None</option>
+          <option value="1">1 — Mild (symptomatic, no intake change)</option>
+          <option value="2">2 — Moderate (diet modification needed)</option>
+          <option value="3">3 — Severe (unable to eat orally)</option>
+          <option value="4">4 — Life-threatening</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Nausea Grade (CTCAE 0–4)</label>
+        <select id="toxNausea">
+          <option value="0">0 — None</option>
+          <option value="1">1 — Loss of appetite, intake unchanged</option>
+          <option value="2">2 — Decreased oral intake, no significant weight loss</option>
+          <option value="3">3 — Inadequate caloric/fluid intake</option>
+          <option value="4">4 — Life-threatening</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Diarrhea Grade (CTCAE 0–4)</label>
+        <select id="toxDiarrhea">
+          <option value="0">0 — None</option>
+          <option value="1">1 — &lt;4 extra stools/day</option>
+          <option value="2">2 — 4–6 extra stools/day</option>
+          <option value="3">3 — ≥7 stools/day; hospitalization indicated</option>
+          <option value="4">4 — Life-threatening</option>
+        </select>
       </div>
     </div>
   </div>
@@ -714,6 +857,24 @@ function submitPatient(){
     sodium: parseFloat(document.getElementById('sodium').value) || 0,
     potassium: parseFloat(document.getElementById('potassium').value) || 0,
     urea: parseFloat(document.getElementById('urea').value) || 0,
+    // Radiation Therapy fields
+    radiationStatus: document.getElementById('radiationStatus').value,
+    radiationTechnique: document.getElementById('radiationTechnique').value,
+    subSite: document.getElementById('subSite').value,
+    tnmStage: document.getElementById('tnmStage').value,
+    totalDoseGy: parseFloat(document.getElementById('totalDoseGy').value) || 0,
+    fractionSizeGy: parseFloat(document.getElementById('fractionSizeGy').value) || 0,
+    numberOfFractions: parseInt(document.getElementById('numberOfFractions').value) || 0,
+    fractionsCompleted: parseInt(document.getElementById('fractionsCompleted').value) || 0,
+    radiationWeek: parseInt(document.getElementById('radiationWeek').value) || 0,
+    concurrentTherapy: document.getElementById('concurrentTherapy').value,
+    // Clinical Scoring
+    // Radiation Toxicity Grades (CTCAE)
+    toxMucositis: parseInt(document.getElementById('toxMucositis').value) || 0,
+    toxDysphagia: parseInt(document.getElementById('toxDysphagia').value) || 0,
+    toxXerostomia: parseInt(document.getElementById('toxXerostomia').value) || 0,
+    toxNausea: parseInt(document.getElementById('toxNausea').value) || 0,
+    toxDiarrhea: parseInt(document.getElementById('toxDiarrhea').value) || 0,
     lastUpdate: new Date().toISOString()
   };
 
@@ -1174,6 +1335,24 @@ function applyExtractionData(data) {
   setVal('sarcopeniaStatus', data.sarcopeniaStatus);
   setVal('activityLevel', data.activityLevel);
 
+  // Radiation Therapy fields
+  setVal('radiationStatus', data.radiationStatus);
+  setVal('radiationTechnique', data.radiationTechnique);
+  setVal('subSite', data.subSite);
+  setVal('tnmStage', data.tnmStage);
+  setVal('totalDoseGy', data.totalDoseGy);
+  setVal('fractionSizeGy', data.fractionSizeGy);
+  setVal('numberOfFractions', data.numberOfFractions);
+  setVal('fractionsCompleted', data.fractionsCompleted);
+  setVal('radiationWeek', data.radiationWeek);
+  setVal('concurrentTherapy', data.concurrentTherapy);
+  // Toxicity grades
+  if (data.toxMucositis != null) setVal('toxMucositis', data.toxMucositis);
+  if (data.toxDysphagia != null) setVal('toxDysphagia', data.toxDysphagia);
+  if (data.toxXerostomia != null) setVal('toxXerostomia', data.toxXerostomia);
+  if (data.toxNausea != null) setVal('toxNausea', data.toxNausea);
+  if (data.toxDiarrhea != null) setVal('toxDiarrhea', data.toxDiarrhea);
+
   // Feeding method: fuzzy-map partial strings to exact <select> option values
   if (data.feedingMethod) {
     const fmRaw = (data.feedingMethod || '').toLowerCase().trim();
@@ -1245,6 +1424,19 @@ function applyExtractionData(data) {
   if (data.height || data.weight) updateBSAAuto();
   updateBodyCompAuto();
   updateCompletenessScore();
+}
+
+function calcRadiationWeek() {
+  const completed = parseInt(document.getElementById('fractionsCompleted').value) || 0;
+  const total = parseInt(document.getElementById('numberOfFractions').value) || 0;
+  const weekEl = document.getElementById('radiationWeek');
+  if (!weekEl) return;
+  if (completed > 0) {
+    // Standard RT = 5 fractions/week
+    weekEl.value = Math.ceil(completed / 5);
+  } else {
+    weekEl.value = '';
+  }
 }
 
 function runAiExtraction(text) { /* Retired */ }
