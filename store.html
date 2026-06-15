@@ -61,18 +61,18 @@
 
     @media print {
       body > *:not(#labelOverlay) { display:none !important; }
-      #labelOverlay { position:static; display:block !important; background:#fff; padding:0; overflow:visible; }
-      #labelDialog { box-shadow:none; background:#fff; max-width:none; padding:0; }
+      #labelOverlay { position:static !important; inset:auto; display:block !important; background:#fff; padding:0; margin:0; overflow:visible; }
+      #labelDialog { box-shadow:none; background:#fff; max-width:none; width:auto; padding:0; margin:0; }
       .lbl-modal-chrome, .lbl-cap { display:none !important; }
-      @page small { size:100mm 75mm; margin:0; }
-      @page box   { size:100mm 150mm; margin:0; }
-      .lbl  { page:small; border:none; box-shadow:none; margin:0; page-break-after:always; border-radius:0; }
-      .lbl3 { page:box;   border:none; box-shadow:none; margin:0; page-break-after:always; border-radius:0; }
+      .lbl, .lbl3 { border:none !important; box-shadow:none !important; margin:0 !important; page-break-after:always; break-after:page; border-radius:0; }
       /* Print only the set the user chose */
       body.print-small .lbl3 { display:none !important; }
       body.print-box   .lbl  { display:none !important; }
+      body.print-small .lbl, body.print-box .lbl3 { display:block !important; }
     }
   </style>
+  <!-- dynamic @page size injected before printing -->
+  <style id="dynPrintPage"></style>
 </head>
 <body>
 
@@ -135,8 +135,8 @@
         <input id="lblMfgDate" type="date" style="padding:7px 10px;border:1px solid #cbd5e1;border-radius:6px;">
       </div>
       <button class="btn-primary" id="lblGenBtn" onclick="generateLabelBatch()" style="padding:8px 14px;border-radius:6px;">Save Date &amp; Generate Batch</button>
-      <button class="btn-secondary" id="lblPrintBtn" onclick="printLabelsSmall()" style="padding:8px 14px;border-radius:6px;" disabled>Print Pouch Labels (100×75)</button>
-      <button class="btn-secondary" id="lblPrintBoxBtn" onclick="printBoxLabel()" style="padding:8px 14px;border-radius:6px;" disabled>Print Box Label (100×150)</button>
+      <button class="btn-secondary" id="lblPrintBtn" onclick="printLabelsSmall()" style="padding:8px 14px;border-radius:6px;" disabled>🖨️ Print Pouch Labels (100×75)</button>
+      <button class="btn-secondary" id="lblPrintBoxBtn" onclick="printBoxLabel()" style="padding:8px 14px;border-radius:6px;" disabled>🖨️ Print Box Label (100×150)</button>
     </div>
     <div class="lbl-modal-chrome" id="lblBatchInfo" style="font-size:12.5px;color:#0f172a;margin-bottom:6px;"></div>
 
@@ -146,7 +146,7 @@
       <div class="lb-brand">Gquence · Personalized Oncology Nutrition</div>
       <div class="lb-name" id="lf_name">—</div>
       <div class="lb-meta" id="lf_meta">—</div>
-      <div class="lb-th">Daily Therapeutic Target</div>
+      <div class="lb-th">Per Serving Target</div>
       <div class="lb-row">
         <div class="lb-cell"><div class="l">Energy</div><div class="v"><span id="lf_energy">—</span></div><div class="u">kcal</div></div>
         <div class="lb-cell"><div class="l">Protein</div><div class="v"><span id="lf_protein">—</span></div><div class="u">g</div></div>
@@ -503,8 +503,8 @@ function renderLabelModal(){
   const p = _lblPatient, plan = _lblPlan, job = _lblJob, store = _lblStore;
   _lblSet('lf_name', p.name || '—');
   document.getElementById('lf_meta').innerHTML = `<b>${p.age ? p.age+' yr' : '—'}</b> · <b>${p.sex || '—'}</b> · UHIC: <b>${p.uhic || '—'}</b>`;
-  _lblSet('lf_energy', _lblNum(plan.dailyCalories));
-  _lblSet('lf_protein', _lblNum(plan.dailyProtein));
+  _lblSet('lf_energy', _lblNum(plan.perServingCalories));
+  _lblSet('lf_protein', _lblNum(plan.perServingProtein));
   _lblSet('lf_serv', plan.servingsPerDay || '—');
   _lblSet('lf_route', plan.prescribedRoute || 'Oral Feeding');
   _lblSet('lb_energy', _lblNum(plan.perServingCalories));
@@ -559,17 +559,20 @@ function renderLabelModal(){
   document.getElementById('x_storeaddr').textContent = (store && (store.address || store.location)) || '';
 }
 
+function _setPrintPage(w, h){
+  document.getElementById('dynPrintPage').textContent = `@media print { @page { size:${w}mm ${h}mm; margin:0; } }`;
+}
 function printLabelsSmall(){
+  _setPrintPage(100, 75);
   document.body.classList.add('print-small');
   document.body.classList.remove('print-box');
-  window.print();
-  setTimeout(() => document.body.classList.remove('print-small'), 600);
+  setTimeout(() => { window.print(); setTimeout(() => document.body.classList.remove('print-small'), 800); }, 60);
 }
 function printBoxLabel(){
+  _setPrintPage(100, 150);
   document.body.classList.add('print-box');
   document.body.classList.remove('print-small');
-  window.print();
-  setTimeout(() => document.body.classList.remove('print-box'), 600);
+  setTimeout(() => { window.print(); setTimeout(() => document.body.classList.remove('print-box'), 800); }, 60);
 }
 
 async function generateLabelBatch(){

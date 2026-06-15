@@ -540,11 +540,28 @@ app.patch('/api/users/:id/store', authenticateToken, async (req, res) => {
 // Users: Reset Password
 app.put('/api/users/:id/password', authenticateToken, async (req, res) => {
   const { password } = req.body;
+  const targetId = req.params.id;
   try {
+    // Safety: confirm exactly ONE user matches this id before changing anything.
+    // If duplicate ids exist in the DB, a blind UPDATE would reset every matching
+    // user's password at once - so we refuse and report it instead.
+    const match = await pool.query('SELECT id, email FROM users WHERE id = $1', [targetId]);
+    if (match.rowCount === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    if (match.rowCount > 1) {
+      console.error(`[reset-password] REFUSED: id "${targetId}" matches ${match.rowCount} users (duplicate IDs). No passwords changed.`);
+      return res.status(409).json({
+        error: `Reset blocked: ${match.rowCount} users share this ID. Fix duplicate IDs before resetting so other users are not affected.`
+      });
+    }
+
     const hash = await bcrypt.hash(password, 10);
-    await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [hash, req.params.id]);
+    const upd = await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [hash, targetId]);
+    console.log(`[reset-password] OK: reset password for id "${targetId}" (${match.rows[0].email}) by admin ${req.user && req.user.id}. Rows changed: ${upd.rowCount}`);
     res.json({ success: true });
   } catch (err) {
+    console.error('[reset-password] ERROR:', err.message);
     res.status(500).json({ error: err.message });
   }
 });

@@ -100,8 +100,11 @@
     <div style="margin-top:8px;">Share these credentials:</div>
     <div style="margin-top:10px;">
       <div><b>Username:</b> <span id="sUser"></span></div>
-      <div><b>Password:</b> <span id="sPass"></span></div>
+      <div><b>Password:</b> <span id="sPass" style="font-family:monospace;"></span>
+        <button type="button" class="btn-sm" style="margin-left:8px;" onclick="copyPassword('sPass', this)">Copy</button>
+      </div>
       <div><b>Role:</b> <span id="sRole"></span></div>
+      <div style="margin-top:6px;color:#166534;font-size:12px;">For security this password is shown only once. If it's missed, use Reset Password.</div>
     </div>
   </div>
 </div>
@@ -132,8 +135,11 @@
     <div style="margin-top:8px;">New credentials (share securely):</div>
     <div style="margin-top:10px;">
       <div><b>Username:</b> <span id="rUser"></span></div>
-      <div><b>New Password:</b> <span id="rPass"></span></div>
+      <div><b>New Password:</b> <span id="rPass" style="font-family:monospace;"></span>
+        <button type="button" class="btn-sm" style="margin-left:8px;" onclick="copyPassword('rPass', this)">Copy</button>
+      </div>
       <div><b>Role:</b> <span id="rRole"></span></div>
+      <div style="margin-top:6px;color:#9a3412;font-size:12px;">Shown only once. Copy it now and share it securely.</div>
     </div>
   </div>
 </div>
@@ -473,6 +479,24 @@ function renderUsersTable(){
     `;
     tbody.appendChild(tr);
   });
+}
+
+function copyPassword(spanId, btn){
+  const txt = (document.getElementById(spanId) || {}).innerText || '';
+  if(!txt) return;
+  const done = () => { if(btn){ const o = btn.innerText; btn.innerText = 'Copied!'; setTimeout(() => btn.innerText = o, 1500); } };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt).then(done).catch(() => fallbackCopy(txt, done));
+  } else {
+    fallbackCopy(txt, done);
+  }
+}
+function fallbackCopy(txt, done){
+  const ta = document.createElement('textarea');
+  ta.value = txt; ta.style.position = 'fixed'; ta.style.left = '-9999px';
+  document.body.appendChild(ta); ta.select();
+  try { document.execCommand('copy'); done && done(); } catch(e){ alert('Copy failed - please select and copy manually.'); }
+  document.body.removeChild(ta);
 }
 
 async function resetPasswordUI(userId){

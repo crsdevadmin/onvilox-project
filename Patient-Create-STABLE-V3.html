@@ -744,7 +744,7 @@ function updateCompletenessScore() {
   if (score) score.innerText = pct + '%';
 }
 
-function submitPatient(){
+async function submitPatient(){
   const fields = [
     { id: "patientName", name: "Patient Name" },
     { id: "uhic", name: "UHIC Code" },
@@ -881,8 +881,17 @@ function submitPatient(){
   try {
     const saved = savePatient(patient);
     const engineOutput = generateNutritionPlan(saved);
-    createOrUpdatePlan(saved, engineOutput, {}, 'Initial automated baseline');
-    // Bridge the API race condition: pass patient directly via sessionStorage
+    const plan = createOrUpdatePlan(saved, engineOutput, {}, 'Initial automated baseline');
+    // Wait for the server to confirm the save before navigating away. This closes
+    // the redirect race that could leave a patient saved only in the browser.
+    // _syncRecord never rejects (it resolves true/false), so this can't hang;
+    // anything still unconfirmed is retried by syncPending() on the next load.
+    try {
+      await Promise.all([
+        saved && saved._syncPromise,
+        plan && plan._syncPromise
+      ].filter(Boolean));
+    } catch (e) { /* retry layer covers any failure */ }
     window.location.href = '/dashboard';
   } catch (err) {
     console.error("Clinical Save Error:", err);

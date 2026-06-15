@@ -12,6 +12,50 @@
     .filter-tab { padding:7px 16px; font-size:12px; font-weight:700; border-radius:20px; border:1.5px solid #d1d5db; background:#fff; color:#64748b; cursor:pointer; transition:all .15s; }
     .filter-tab:hover { border-color:#0e2247; color:#0e2247; }
     .filter-tab.active { background:#0e2247; color:#fff; border-color:#0e2247; }
+    .btn-csd { background:#0e2247; color:#fff; border:none; padding:6px 10px; border-radius:6px; font-size:11px; font-weight:800; cursor:pointer; letter-spacing:.5px; display:flex; align-items:center; gap:4px; }
+    .btn-csd:hover { background:#1a3a6e; }
+    /* ── CSD PRINT STYLES ───────────────────────────── */
+    @media print {
+      body > *:not(#csdPrintDoc) { display: none !important; }
+      #csdPrintDoc { display: block !important; }
+      @page { size: A4 portrait; margin: 18mm 15mm 20mm 25mm; }
+    }
+    #csdPrintDoc {
+      display: none;
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 9.5pt;
+      color: #111;
+    }
+    .cp-page { border: 2px solid #222; padding: 10pt 12pt 24pt; min-height: 257mm; page-break-after: always; position: relative; box-sizing: border-box; }
+    .cp-page:last-child { page-break-after: auto; }
+    .cp-logo { text-align:center; font-size:20pt; font-weight:bold; letter-spacing:3px; margin-bottom:2pt; }
+    .cp-hr   { border:none; border-top:2px solid #222; margin:4pt 0; }
+    .cp-prog { text-align:center; font-size:11pt; font-weight:bold; margin-bottom:2pt; }
+    .cp-sub  { text-align:center; font-size:9pt; color:#555; margin-bottom:12pt; }
+    .cp-banner { background:#333; color:#fff; padding:6pt 10pt; font-size:11pt; font-weight:bold; margin-bottom:6pt; }
+    .cp-banner-sub { font-size:8pt; font-weight:normal; margin-top:1pt; }
+    .cp-section { background:#d0d0d0; padding:3pt 6pt; font-size:9pt; font-weight:bold; margin-bottom:3pt; }
+    .cp-table { width:100%; border-collapse:collapse; margin-bottom:6pt; }
+    .cp-table td, .cp-table th { border:0.5pt solid #888; padding:4pt 5pt; vertical-align:middle; }
+    .cp-table th { background:#e8e8e8; font-size:8.5pt; font-weight:bold; }
+    .cp-lbl { background:#f5f5f5; font-weight:bold; width:42%; }
+    .cp-val { width:58%; }
+    .cp-filled { font-weight:bold; color:#0e2247; }
+    .cp-blank  { color:#aaa; font-size:8pt; font-style:italic; }
+    .cp-ruled { border:1pt solid #222; margin-bottom:6pt; }
+    .cp-ruled-hdr { background:#d0d0d0; padding:3pt 6pt; font-size:8.5pt; font-weight:bold; border-bottom:0.5pt solid #888; }
+    .cp-ruled-body { min-height:40pt; padding:4pt 6pt; font-size:9pt; }
+    .cp-stamp { border:1.5pt solid #222; margin-bottom:8pt; }
+    .cp-stamp-hdr { background:#d0d0d0; padding:3pt 6pt; font-size:8.5pt; font-weight:bold; border-bottom:0.5pt solid #888; }
+    .cp-stamp-body { height:50pt; }
+    .cp-sig { width:100%; border-collapse:collapse; }
+    .cp-sig td { border:0.5pt solid #888; padding:4pt 6pt; font-size:8.5pt; height:36pt; vertical-align:top; }
+    .cp-footer { position:absolute; bottom:0; left:0; right:0; background:#e8e8e8; padding:3pt 8pt; font-size:7.5pt; color:#555; display:flex; justify-content:space-between; border-top:1pt solid #aaa; }
+    .cp-week th, .cp-week td { font-size:8pt; text-align:center; }
+    .cp-week td:first-child { text-align:left; font-weight:bold; }
+    .cp-daily th, .cp-daily td { font-size:8pt; text-align:center; height:14pt; }
+    .cp-tox th, .cp-tox td { text-align:center; font-size:8.5pt; }
+    .cp-tox td:first-child { text-align:left; padding-left:5pt; }
     @keyframes pulse {
       0% {
         opacity: 1;
@@ -43,6 +87,17 @@
 
 
   <div class="container page">
+
+    <div id="syncBanner" style="display:none;margin-bottom:16px;padding:14px 16px;border:1px solid #fed7aa;background:#fff7ed;border-radius:8px;">
+      <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;justify-content:space-between;">
+        <div style="color:#9a3412;font-size:14px;">
+          <b>⚠ Unsaved patient data on this device.</b>
+          <span id="syncBannerMsg"></span>
+        </div>
+        <button id="syncNowBtn" class="btn-primary" onclick="syncLocalPatientsNow()">Sync to database</button>
+      </div>
+      <div id="syncBannerResult" style="margin-top:8px;font-size:13px;color:#166534;"></div>
+    </div>
 
     <div class="page-header">
       <div>
@@ -260,6 +315,14 @@
             ? `<span class="status" onclick="event.stopPropagation(); retryAI('${p.id}')" style="background:#fee2e2; color:#991b1b; font-size:10px; margin-left:5px; cursor:pointer;" title="${failTitle}">⚠ AI FAILED · Retry</span>`
             : '<span class="status processing" style="background:#fef9c3; color:#854d0e; font-size:10px; margin-left:5px; animation: pulse 1.5s infinite;">ANALYZING...</span>';
 
+        // CSD button — only when APPROVED (doctor role or assistant)
+        const csdBtn = (status !== 'CREATED')
+          ? `<button class="btn-csd" onclick="event.stopPropagation(); printCSD('${p.id}')" title="Print Clinical Source Document (CSD)">
+               <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" fill="currentColor" viewBox="0 0 16 16"><path d="M5 1a2 2 0 0 0-2 2v1h10V3a2 2 0 0 0-2-2H5zm6 8H5a1 1 0 0 0-1 1v3a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-3a1 1 0 0 0-1-1z"/><path d="M0 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2h-1v-2a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v2H2a2 2 0 0 1-2-2V7zm2.5 1a.5.5 0 1 0 0-1 .5.5 0 0 0 0 1z"/></svg>
+               CSD
+             </button>`
+          : '';
+
         const approveBtn = (me.role === 'DOCTOR' && status === 'CREATED')
           ? `<button class="btn-warning" style="padding:6px 12px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:5px;${!hasAI ? 'opacity:0.5;pointer-events:none;' : ''}" title="${hasAI ? 'Approve' : 'Analyzing...'}" onclick="event.stopPropagation(); quickApprove('${p.id}', this)"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M10.97 4.97a.75.75 0 0 1 1.07 1.05l-3.99 4.99a.75.75 0 0 1-1.08.02L4.324 8.384a.75.75 0 1 1 1.06-1.06l2.094 2.093 3.473-4.425a.267.267 0 0 1 .02-.022z"/></svg> Approve</button>`
           : '';
@@ -379,6 +442,7 @@
           <button class="btn-secondary" onclick="openPdf('${p.id}', this)" style="padding: 6px 10px; border-radius: 6px; display:flex; align-items:center; justify-content:center; ${!hasAI ? 'opacity:0.5; pointer-events:none;' : ''}" title="${hasAI ? 'Download PDF' : 'Analyzing clinical data...'}">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/><path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/></svg>
           </button>
+          ${csdBtn}
           <button class="btn-secondary" onclick="confirmDelete('${p.id}', '${p.name.replace(/'/g, "\\'")}')" style="padding: 6px 10px; border-radius: 6px; display:flex; align-items:center; justify-content:center; color:#dc2626;" title="Delete Patient Record">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg>
           </button>
@@ -432,7 +496,51 @@
 
 
     // Load data from server DB before first render
-    initStore().then(() => render());
+    initStore().then(() => { render(); checkLocalUnsynced(); });
+
+    // Show a banner if this device holds patients that never reached the database.
+    function checkLocalUnsynced() {
+      try {
+        if (typeof getUnsyncedPatients !== 'function') return;
+        const who = (typeof me !== 'undefined' && me) ? me : auth.getCurrentUser();
+        let docId = who.id;
+        if (who.role === 'ASSISTANT' && typeof mappingService !== 'undefined') {
+          docId = mappingService.getDoctorForAssistant(who.id);
+        }
+        const unsynced = getUnsyncedPatients().filter(p => p.assignedDoctorId === docId || !p.assignedDoctorId);
+        const banner = document.getElementById('syncBanner');
+        if (!banner) return;
+        if (unsynced.length) {
+          const names = unsynced.map(p => p.name || '(unnamed)').join(', ');
+          document.getElementById('syncBannerMsg').textContent =
+            ' ' + unsynced.length + ' patient(s) are saved only on this device and not in the database: ' + names + '.';
+          banner.style.display = 'block';
+        } else {
+          banner.style.display = 'none';
+        }
+      } catch (e) { console.warn('checkLocalUnsynced failed:', e.message); }
+    }
+
+    async function syncLocalPatientsNow() {
+      const btn = document.getElementById('syncNowBtn');
+      const result = document.getElementById('syncBannerResult');
+      if (btn) { btn.disabled = true; btn.textContent = 'Syncing…'; }
+      try {
+        const r = await pushUnsyncedToServer();
+        if (result) {
+          result.textContent = 'Synced ' + r.patientsOk + ' of ' + r.attempted +
+            ' patient(s)' + (r.plansOk ? ' and ' + r.plansOk + ' plan(s)' : '') + ' to the database.';
+        }
+        // Re-check; hide the banner if everything is now saved.
+        checkLocalUnsynced();
+        render();
+        if (btn) { btn.textContent = 'Sync to database'; btn.disabled = false; }
+      } catch (e) {
+        if (result) { result.style.color = '#dc2626'; result.textContent = 'Sync failed: ' + e.message + '. Please try again.'; }
+        if (btn) { btn.textContent = 'Retry sync'; btn.disabled = false; }
+      }
+    }
+    window.syncLocalPatientsNow = syncLocalPatientsNow;
 
 
     let __qrCurrentLink = '';
@@ -597,6 +705,409 @@
 
   <script src="/js/theme.js"></script>
   <script src="/js/pwa.js"></script>
+
+  <!-- ═══ CSD PRINT CONTAINER ═══════════════════════════ -->
+  <div id="csdPrintDoc"></div>
+
+  <script>
+  /* ──────────────────────────────────────────────────────
+     printCSD(patientId)
+     Reads the patient from store, builds the filled CSD
+     HTML, injects it into #csdPrintDoc, and calls print().
+     ────────────────────────────────────────────────────── */
+  function printCSD(patientId) {
+    const p = getPatientById(patientId);
+    if (!p) { alert('Patient record not found.'); return; }
+
+    // ── helpers ──────────────────────────────────────────
+    const fv = (v, fallback) => (v !== undefined && v !== null && v !== '' && v !== 0)
+      ? `<span class="cp-filled">${v}</span>`
+      : (fallback ? `<span class="cp-blank">${fallback}</span>` : `<span class="cp-blank">—</span>`);
+
+    const row = (lbl, val) => `<tr><td class="cp-lbl">${lbl}</td><td class="cp-val">${val}</td></tr>`;
+    const blk = (lbl) => `<tr><td class="cp-lbl">${lbl}</td><td class="cp-val cp-blank">— fill on paper —</td></tr>`;
+
+    function fmtDate(iso) {
+      if (!iso) return '<span class="cp-blank">—</span>';
+      try { return `<span class="cp-filled">${new Date(iso).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}</span>`; }
+      catch(e) { return `<span class="cp-blank">—</span>`; }
+    }
+
+    // ── derived values ───────────────────────────────────
+    const studyId   = 'GQ-' + (p.uhic || p.id || '???');
+    const ageSex    = [p.age, p.sex].filter(Boolean).join(' / ') || '';
+    const bmi       = (p.weight && p.height) ? (p.weight / ((p.height/100)**2)).toFixed(1) : '';
+    const oralIntake = (p.reducedFoodIntake !== undefined && p.reducedFoodIntake !== '')
+                        ? (100 - parseFloat(p.reducedFoodIntake)) + '%'
+                        : '';
+    const comorbStr = Array.isArray(p.comorbidities) ? p.comorbidities.join(', ') : (p.comorbidities || '');
+    const today     = new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
+
+    const footer = (pg) => `<div class="cp-footer">
+      <span>Study ID: <b>${studyId}</b></span>
+      <span>GQ-CSD-V1.0 &nbsp;|&nbsp; GQUENCE™ Oncology Nutrition Support Program</span>
+      <span>Page ${pg}</span>
+    </div>`;
+
+    // toxicity grade to label
+    const toxLbl = (n) => { const g=parseInt(n||0); return g>0 ? `<span class="cp-filled">Grade ${g}</span>` : '<span class="cp-blank">G0</span>'; };
+
+    /* ── COVER PAGE ────────────────────────────────────── */
+    const cover = `
+    <div class="cp-page">
+      <div class="cp-logo">GQUENCE™</div>
+      <hr class="cp-hr">
+      <div class="cp-prog">Oncology Nutrition Support Program</div>
+      <div class="cp-sub">Clinical Source Document (CSD) &nbsp;|&nbsp; Version GQ-CSD-V1.0</div>
+      <table class="cp-table" style="margin-bottom:10pt;">
+        ${row('Study ID',        fv(studyId))}
+        ${row('Patient Name',    fv(p.name))}
+        ${row('UHID / UHIC',     fv(p.uhic))}
+        ${row('Age / Sex',       fv(ageSex))}
+        ${row('Cancer Site',     fv(p.cancer))}
+        ${row('Stage (TNM)',     fv(p.cancerStage || p.tnmStage))}
+        ${row('Treating Department', '<span class="cp-blank">— fill on paper —</span>')}
+        ${row('Date of Enrollment',  fmtDate(p.createdAt))}
+        ${row('Treating Physician',  fv(p.approvedByName))}
+        ${row('Date of Approval',    fmtDate(p.approvedAt))}
+        ${row('Dietitian / Nutritionist', '<span class="cp-blank">— fill on paper —</span>')}
+      </table>
+      <div class="cp-stamp">
+        <div class="cp-stamp-hdr">Hospital Stamp &amp; Physician Signature</div>
+        <div class="cp-stamp-body"></div>
+      </div>
+      <div style="text-align:center;font-size:8pt;color:#666;margin-top:6pt;">
+        CONFIDENTIAL — For clinical use only. Not to be reproduced without authorisation.<br>Printed: ${today}
+      </div>
+      ${footer(1)}
+    </div>`;
+
+    /* ── FORM 1 — BASELINE ─────────────────────────────── */
+    const form1 = `
+    <div class="cp-page">
+      <div class="cp-banner">FORM 1 – BASELINE ASSESSMENT
+        <div class="cp-banner-sub">Completed at enrolment &nbsp;|&nbsp; Study ID: ${studyId}</div>
+      </div>
+
+      <div class="cp-section">Section A – Patient Details &amp; RT Plan</div>
+      <table class="cp-table">
+        ${row('Study ID',           fv(studyId))}
+        ${row('UHID / UHIC',        fv(p.uhic))}
+        ${row('Patient Name',       fv(p.name))}
+        ${row('Age / Sex',          fv(ageSex))}
+        ${row('Cancer Site',        fv(p.cancer))}
+        ${row('Stage (TNM)',        fv(p.cancerStage || p.tnmStage))}
+        ${row('RT Dose (Gy)',       fv(p.totalDoseGy))}
+        ${row('RT Fractions',       fv(p.numberOfFractions))}
+        ${row('Radiation Technique',fv(p.radiationTechnique))}
+        ${row('Sub-site Irradiated',fv(p.subSite))}
+        ${row('Concurrent Therapy', fv(p.concurrentTherapy))}
+        ${row('Co-morbidities',     fv(comorbStr))}
+        ${row('Date of Baseline',   fmtDate(p.createdAt))}
+      </table>
+
+      <div class="cp-section">Section B – Anthropometry</div>
+      <table class="cp-table">
+        ${row('Weight (kg)',              fv(p.weight))}
+        ${row('Height (cm)',              fv(p.height))}
+        ${row('BMI (kg/m²)',              fv(bmi))}
+        ${row('MUAC (cm)',                fv(p.muac))}
+        ${row('Hand Grip Strength (kg)',  fv(p.handGrip))}
+        ${row('Weight Loss – 3 mths (%)', fv(p.weightLossPercent))}
+        ${row('Usual Body Weight (kg)',   fv(p.usualWeight))}
+        ${row('LBM (kg)',                 fv(p.leanBodyMass))}
+        ${row('BSA (m²)',                 fv(p.bsa))}
+        ${row('Body Fat (%)',             fv(p.fatPercent))}
+      </table>
+
+      <div class="cp-section">Section C – Laboratory Assessment</div>
+      <table class="cp-table">
+        ${row('Serum Albumin (g/dL)',     fv(p.albumin))}
+        ${row('Prealbumin (mg/dL)',       fv(p.prealbumin))}
+        ${row('CRP (mg/L)',               fv(p.crp))}
+        ${row('Serum Creatinine (mg/dL)', fv(p.creatinine))}
+        ${row('Blood Glucose (mg/dL)',    fv(p.bloodSugar))}
+        ${row('Hemoglobin (g/dL)',        fv(p.hemoglobin))}
+        ${row('WBC (cells/μL)',           fv(p.wbc))}
+        ${row('Platelet (×10³/μL)',       fv(p.platelet))}
+        ${row('ANC (cells/μL)',           fv(p.anc))}
+        ${row('ALT (U/L)',                fv(p.alt))}
+        ${row('AST (U/L)',                fv(p.ast))}
+        ${row('Sodium (mEq/L)',           fv(p.sodium))}
+        ${row('Potassium (mEq/L)',        fv(p.potassium))}
+        ${row('HbA1c (%)',                fv(p.hba1c))}
+        ${row('Vitamin D (ng/mL)',        fv(p.vitD))}
+        ${row('Vitamin B12 (pg/mL)',      fv(p.vitB12))}
+      </table>
+
+      <div class="cp-section">Section D – Nutritional Risk &amp; Functional Scores</div>
+      <table class="cp-table">
+        ${row('ECOG Performance Status', fv(p.ecogStatus !== undefined ? 'Grade ' + p.ecogStatus : ''))}
+        ${row('Sarcopenia Status',        fv(p.sarcopeniaStatus))}
+        ${row('Feeding Method',           fv(p.feedingMethod))}
+        ${row('Oral Intake (% of normal)',fv(oralIntake))}
+        ${row('GI Issues',                fv(p.giIssues !== undefined ? (p.giIssues ? 'Yes' : 'No') : ''))}
+        ${row('Activity Level',           fv(p.activityLevel))}
+        ${blk('MUST Score')}
+        ${blk('PG-SGA')}
+        ${blk('SARC-F Score (/10)')}
+      </table>
+
+      <div class="cp-section">Baseline Radiation Toxicity (CTCAE v5.0 – at enrolment)</div>
+      <table class="cp-table cp-tox">
+        <tr><th style="text-align:left;padding-left:5pt;width:40%">Toxicity</th><th>Grade at Baseline</th></tr>
+        <tr><td>Mucositis</td><td>${toxLbl(p.toxMucositis)}</td></tr>
+        <tr><td>Dysphagia</td><td>${toxLbl(p.toxDysphagia)}</td></tr>
+        <tr><td>Xerostomia</td><td>${toxLbl(p.toxXerostomia)}</td></tr>
+        <tr><td>Nausea / Vomiting</td><td>${toxLbl(p.toxNausea)}</td></tr>
+        <tr><td>Diarrhea</td><td>${toxLbl(p.toxDiarrhea)}</td></tr>
+      </table>
+
+      <div class="cp-ruled">
+        <div class="cp-ruled-hdr">Dietitian's Baseline Clinical Notes</div>
+        <div class="cp-ruled-body">${p.notes || ''}</div>
+      </div>
+      <table class="cp-sig">
+        <tr>
+          <td>Dietitian Name: ________________________</td>
+          <td>Signature: ___________________________</td>
+        </tr>
+        <tr>
+          <td>Date: __________________________________</td>
+          <td>Physician Co-Sign: ____________________</td>
+        </tr>
+      </table>
+      ${footer(2)}
+    </div>`;
+
+    /* ── FORM 2 — DAILY MONITORING ─────────────────────── */
+    const intakeRows = Array.from({length:18},()=>`
+      <tr><td></td><td></td><td></td><td></td><td></td><td></td></tr>`).join('');
+
+    const toxItems = ['Mucositis','Dysphagia','Xerostomia','Nausea / Vomiting','Diarrhea','Fatigue','Anorexia'];
+    const toxRows  = toxItems.map(t =>
+      `<tr><td style="text-align:left;padding-left:5pt;">${t}</td><td>□</td><td>□</td><td>□</td><td>□</td><td>□</td></tr>`
+    ).join('');
+
+    const form2 = `
+    <div class="cp-page">
+      <div class="cp-banner">FORM 2 – DAILY NUTRITION MONITORING
+        <div class="cp-banner-sub">Complete every treatment day &nbsp;|&nbsp; Study ID: ${studyId} &nbsp;|&nbsp; Patient: ${p.name}</div>
+      </div>
+      <div class="cp-section">Section A – Daily Intake Record</div>
+      <table class="cp-table cp-daily" style="margin-bottom:8pt;">
+        <tr>
+          <th style="width:13%">Date</th>
+          <th style="width:14%">Oral Intake %</th>
+          <th style="width:15%">Sachets Rx</th>
+          <th style="width:14%">Sachets Taken</th>
+          <th style="width:14%">Water (mL)</th>
+          <th>Nurse Sign</th>
+        </tr>
+        ${intakeRows}
+      </table>
+      <div class="cp-section">Section B – Daily Toxicity Assessment (CTCAE v5.0)</div>
+      <table class="cp-table cp-tox" style="margin-bottom:8pt;">
+        <tr><th style="text-align:left;padding-left:5pt;width:35%">Toxicity</th><th>G0</th><th>G1</th><th>G2</th><th>G3</th><th>G4</th></tr>
+        ${toxRows}
+      </table>
+      <div class="cp-ruled" style="min-height:52pt;">
+        <div class="cp-ruled-hdr">Daily Clinical Notes / Interventions</div>
+      </div>
+      ${footer(3)}
+    </div>`;
+
+    /* ── FORM 3 — WEEKLY REVIEW ────────────────────────── */
+    // wkTable: first column = label, then Baseline (pre-filled), then W1–W4 (blank)
+    function wkTable(header, rows) {
+      const hdr = `<tr><th style="text-align:left;width:26%">${header}</th><th>Baseline</th><th>Week 1</th><th>Week 2</th><th>Week 3</th><th>Week 4</th></tr>`;
+      return `<table class="cp-table cp-week" style="margin-bottom:6pt;">${hdr}
+        ${rows.map(([lbl, base])=>`<tr><td style="text-align:left;font-weight:bold;">${lbl}</td><td style="font-weight:bold;color:#0e2247;">${base||''}</td><td></td><td></td><td></td><td></td></tr>`).join('')}
+      </table>`;
+    }
+
+    const form3 = `
+    <div class="cp-page">
+      <div class="cp-banner">FORM 3 – WEEKLY REVIEW SHEET
+        <div class="cp-banner-sub">Complete at end of each week &nbsp;|&nbsp; Study ID: ${studyId} &nbsp;|&nbsp; Patient: ${p.name}</div>
+      </div>
+      <div class="cp-section">Section A – Anthropometry</div>
+      ${wkTable('Parameter', [
+        ['Date of Review',      today],
+        ['Weight (kg)',         p.weight||''],
+        ['BMI (kg/m²)',         bmi||''],
+        ['MUAC (cm)',           p.muac||''],
+        ['Grip Strength (kg)',  p.handGrip||''],
+        ['Weight Change (kg)',  '—']
+      ])}
+      <div class="cp-section">Section B – Laboratory Review</div>
+      ${wkTable('Parameter', [
+        ['Date of Labs',           today],
+        ['Serum Albumin (g/dL)',   p.albumin||''],
+        ['CRP (mg/L)',             p.crp||''],
+        ['Creatinine (mg/dL)',     p.creatinine||''],
+        ['Blood Glucose (mg/dL)',  p.bloodSugar||''],
+        ['Hemoglobin (g/dL)',      p.hemoglobin||'']
+      ])}
+      <div class="cp-section">Section C – Toxicity Review (Worst Grade This Week)</div>
+      ${wkTable('Toxicity', [
+        ['Mucositis',         p.toxMucositis ? 'G'+p.toxMucositis : 'G0'],
+        ['Dysphagia',         p.toxDysphagia ? 'G'+p.toxDysphagia : 'G0'],
+        ['Xerostomia',        p.toxXerostomia ? 'G'+p.toxXerostomia : 'G0'],
+        ['Nausea / Vomiting', p.toxNausea ? 'G'+p.toxNausea : 'G0'],
+        ['Diarrhea',          p.toxDiarrhea ? 'G'+p.toxDiarrhea : 'G0'],
+        ['Fatigue',           '—']
+      ])}
+      <div class="cp-section">Section D – Formula Compliance</div>
+      <table class="cp-table" style="margin-bottom:6pt;">
+        ${blk('Formula Prescribed (sachets/day)')}
+        ${blk('Formula Consumed (sachets/day)')}
+        ${blk('Compliance (%)')}
+        ${blk('Reason for Non-Compliance (if any)')}
+      </table>
+      <div class="cp-ruled" style="min-height:44pt;">
+        <div class="cp-ruled-hdr">Weekly Dietitian Notes &amp; Plan</div>
+      </div>
+      ${footer(4)}
+    </div>`;
+
+    /* ── FORM 4 — PRODUCT ACCOUNTABILITY ──────────────── */
+    const paRows = Array.from({length:20},()=>`<tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>`).join('');
+    const form4 = `
+    <div class="cp-page">
+      <div class="cp-banner">FORM 4 – PRODUCT ACCOUNTABILITY LOG
+        <div class="cp-banner-sub">Study ID: ${studyId} &nbsp;|&nbsp; Patient: ${p.name}</div>
+      </div>
+      <table class="cp-table cp-daily">
+        <tr>
+          <th style="width:10%">Date</th><th style="width:13%">Batch No.</th><th style="width:10%">Formula</th>
+          <th style="width:12%">Issued</th><th style="width:12%">Returned</th><th style="width:12%">Net Used</th>
+          <th style="width:14%">Dispenser Sign</th><th>Remarks</th>
+        </tr>
+        ${paRows}
+      </table>
+      <div class="cp-ruled" style="min-height:36pt;margin-top:6pt;">
+        <div class="cp-ruled-hdr">Product Accountability Notes</div>
+      </div>
+      ${footer(5)}
+    </div>`;
+
+    /* ── FORM 5 — FINAL OUTCOME ───────────────────────── */
+    const ecogLabel = p.ecogStatus !== undefined && p.ecogStatus !== '' ? 'Grade ' + p.ecogStatus : '';
+    const ocRows = [
+      ['Weight (kg)',          p.weight||''],
+      ['BMI (kg/m²)',          bmi||''],
+      ['Serum Albumin (g/dL)',p.albumin||''],
+      ['CRP (mg/L)',           p.crp||''],
+      ['ECOG Score',           ecogLabel],
+      ['Oral Intake (%)',      oralIntake||''],
+      ['Grip Strength (kg)',   p.handGrip||''],
+      ['Hemoglobin (g/dL)',    p.hemoglobin||''],
+    ];
+    const form5 = `
+    <div class="cp-page">
+      <div class="cp-banner">FORM 5 – FINAL OUTCOME ASSESSMENT
+        <div class="cp-banner-sub">Study ID: ${studyId} &nbsp;|&nbsp; Patient: ${p.name}</div>
+      </div>
+      <div class="cp-section">Section A – Outcome Comparison</div>
+      <table class="cp-table cp-week" style="margin-bottom:6pt;">
+        <tr><th style="text-align:left;width:28%">Parameter</th><th>Baseline</th><th>Final</th><th>Change (Δ)</th><th>Clinical Note</th></tr>
+        ${ocRows.map(([pr,base])=>`<tr><td style="text-align:left;font-weight:bold;">${pr}</td><td style="font-weight:bold;color:#0e2247;">${base}</td><td></td><td></td><td></td></tr>`).join('')}
+      </table>
+      <div class="cp-section">Section B – Treatment Outcome</div>
+      <table class="cp-table" style="margin-bottom:6pt;">
+        <tr><td class="cp-lbl">RT Completion</td><td class="cp-val">□ RT Completed &nbsp;&nbsp; □ RT Interrupted &nbsp;&nbsp; □ Treatment Ongoing</td></tr>
+        <tr><td class="cp-lbl">Interruption Duration / Reason</td><td class="cp-val cp-blank">— fill on paper —</td></tr>
+        <tr><td class="cp-lbl">Hospital Admission During RT</td><td class="cp-val">□ Yes &nbsp;&nbsp; □ No</td></tr>
+        <tr><td class="cp-lbl">Feeding Tube Required</td><td class="cp-val">□ Yes &nbsp;&nbsp; □ No</td></tr>
+        <tr><td class="cp-lbl">Date of RT Completion</td><td class="cp-val cp-blank">— fill on paper —</td></tr>
+        <tr><td class="cp-lbl">Total Fractions Given</td><td class="cp-val cp-blank">— fill on paper —</td></tr>
+      </table>
+      <div class="cp-section">Section C – Global Clinical Assessment</div>
+      <table class="cp-table" style="margin-bottom:6pt;">
+        <tr><td class="cp-lbl">Overall Clinical Assessment</td><td class="cp-val">□ Improved &nbsp;&nbsp; □ Stable &nbsp;&nbsp; □ Deteriorated</td></tr>
+        <tr><td class="cp-lbl">Overall Nutritional Status</td><td class="cp-val cp-blank">— fill on paper —</td></tr>
+        <tr><td class="cp-lbl">Exit Status</td><td class="cp-val cp-blank">— fill on paper —</td></tr>
+      </table>
+      <div class="cp-ruled" style="min-height:48pt;">
+        <div class="cp-ruled-hdr">Final Assessment Summary (Dietitian)</div>
+      </div>
+      <table class="cp-sig">
+        <tr><td>Dietitian Signature: _____________</td><td>Physician Co-Sign: ______________</td></tr>
+        <tr><td>Date: ___________________________</td><td></td></tr>
+      </table>
+      ${footer(6)}
+    </div>`;
+
+    /* ── FORM 6 — PHYSICIAN FEEDBACK ─────────────────── */
+    const form6 = `
+    <div class="cp-page">
+      <div class="cp-banner">FORM 6 – PHYSICIAN FEEDBACK
+        <div class="cp-banner-sub">Completed by Treating Physician at study end &nbsp;|&nbsp; Study ID: ${studyId}</div>
+      </div>
+      <table class="cp-table" style="margin-bottom:8pt;">
+        ${row('Patient Name', fv(p.name))}
+        ${row('Study ID',     fv(studyId))}
+        ${row('Physician',    fv(p.approvedByName))}
+      </table>
+      <div class="cp-section">Feedback Questions</div>
+      <table class="cp-table" style="margin-bottom:8pt;">
+        ${blk('Was the nutrition monitoring report useful?')}
+        ${blk('Was the formula clinically appropriate?')}
+        ${blk('Did nutritional support impact RT completion?')}
+        ${blk('Would you recommend this program?')}
+        ${blk('Overall satisfaction with the program')}
+      </table>
+      <div class="cp-ruled" style="min-height:60pt;"><div class="cp-ruled-hdr">Physician Comments &amp; Suggestions</div></div>
+      <table class="cp-sig" style="margin-top:6pt;">
+        <tr><td>Name: ___________________________</td><td>Designation: ___________________</td></tr>
+        <tr><td>Department: _____________________</td><td>Date: _________________________</td></tr>
+        <tr><td colspan="2">Signature:</td></tr>
+      </table>
+      ${footer(7)}
+    </div>`;
+
+    /* ── FORM 7 — PATIENT FEEDBACK ────────────────────── */
+    const pfItems = ['Taste &amp; Palatability','Tolerance (GI)','Ease of Preparation','Overall Satisfaction','Willingness to Continue'];
+    const form7 = `
+    <div class="cp-page">
+      <div class="cp-banner">FORM 7 – PATIENT FEEDBACK
+        <div class="cp-banner-sub">Completed by Patient / Caregiver &nbsp;|&nbsp; Study ID: ${studyId}</div>
+      </div>
+      <table class="cp-table" style="margin-bottom:8pt;">
+        ${row('Patient Name', fv(p.name))}
+        ${row('Study ID',     fv(studyId))}
+        ${row('Cancer Site',  fv(p.cancer))}
+      </table>
+      <div class="cp-section">Section A – Product Experience</div>
+      <table class="cp-table cp-tox" style="margin-bottom:8pt;">
+        <tr><th style="text-align:left;width:35%">Parameter</th><th>Excellent</th><th>Good</th><th>Fair</th><th>Poor</th><th>Comments</th></tr>
+        ${pfItems.map(i=>`<tr><td style="text-align:left;">${i}</td><td>□</td><td>□</td><td>□</td><td>□</td><td></td></tr>`).join('')}
+      </table>
+      <div class="cp-section">Section B – Adherence</div>
+      <table class="cp-table" style="margin-bottom:8pt;">
+        ${blk('Did you take formula as advised every day?')}
+        ${blk('Main reason for missing doses (if any)')}
+        ${blk('Did caregivers support formula use?')}
+        ${blk('Would you recommend this to other patients?')}
+      </table>
+      <div class="cp-ruled" style="min-height:52pt;"><div class="cp-ruled-hdr">Patient / Caregiver Open Comments</div></div>
+      <div style="border:1pt solid #222;padding:6pt;font-size:8.5pt;margin-top:4pt;">
+        I confirm the above information is accurate to the best of my knowledge.<br><br>
+        <b>Name:</b> _____________________________
+        &nbsp;&nbsp;<b>Signature:</b> ____________________
+        &nbsp;&nbsp;<b>Date:</b> ___________
+      </div>
+      ${footer(8)}
+    </div>`;
+
+    // ── Inject & print ───────────────────────────────────
+    const doc = document.getElementById('csdPrintDoc');
+    doc.innerHTML = cover + form1 + form2 + form3 + form4 + form5 + form6 + form7;
+    setTimeout(() => window.print(), 200);
+  }
+  window.printCSD = printCSD;
+  </script>
 </body>
 
 </html>

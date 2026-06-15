@@ -98,7 +98,7 @@
       <div class="brand">Gquence · Therapeutic Nutrition</div>
       <div class="pname" id="fName">—</div>
       <div class="pmeta" id="fMeta">—</div>
-      <div class="tt-title">Daily Therapeutic Target</div>
+      <div class="tt-title">Per Serving Target</div>
       <div class="tt-grid">
         <div class="tt-item"><div class="l">Energy</div><div class="v"><span id="fEnergy">—</span> <span class="u">kcal</span></div></div>
         <div class="tt-item"><div class="l">Protein</div><div class="v"><span id="fProtein">—</span> <span class="u">g</span></div></div>
@@ -215,8 +215,8 @@ function renderLabels(){
   const age = _patient.age ? _patient.age + ' yr' : '—';
   document.getElementById('fMeta').innerHTML =
     `<b>${age}</b> &nbsp;·&nbsp; <b>${_patient.sex || '—'}</b> &nbsp;·&nbsp; UHIC: <b>${_patient.uhic || '—'}</b>`;
-  document.getElementById('fEnergy').textContent = num(planVal('dailyCalories'));
-  document.getElementById('fProtein').textContent = num(planVal('dailyProtein'));
+  document.getElementById('fEnergy').textContent = num(planVal('perServingCalories'));
+  document.getElementById('fProtein').textContent = num(planVal('perServingProtein'));
   document.getElementById('fServings').textContent = planVal('servingsPerDay') || '—';
   document.getElementById('fRoute').textContent = planVal('prescribedRoute') || 'Oral Feeding';
 

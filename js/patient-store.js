@@ -32,7 +32,13 @@
         const localPatients = db.getTable('patients', []);
         const apiIds = new Set(apiPatients.map(p => p.id));
         const pendingLocals = localPatients.filter(p => !apiIds.has(p.id));
-        _cache.patients = apiPatients.concat(pendingLocals);
+        // Anything the server already has is confirmed -- clear any stale unsynced flag.
+        const apiConfirmed = apiPatients.map(p => Object.assign(p, { _synced: true }));
+        // Local-only records keep whatever flag they had. Only records explicitly
+        // flagged _synced===false by a failed save get retried by syncPending();
+        // legacy records (flag undefined) are left untouched so we never resurrect
+        // something that was deleted on another device.
+        _cache.patients = apiConfirmed.concat(pendingLocals);
       } else {
         _cache.patients = db.getTable('patients', []);
       }
@@ -57,6 +63,9 @@
     if (typeof manufacturingService !== 'undefined' && manufacturingService.initJobs) inits.push(manufacturingService.initJobs());
     if (typeof mappingService !== 'undefined' && mappingService.initMappings) inits.push(mappingService.initMappings());
     await Promise.all(inits);
+
+    // Retry any record that a previous save failed to push to the server.
+    try { await syncPending(); } catch (e) { console.warn('syncPending failed:', e.message); }
   }
 
   // ── Synchronous getters (use cache) ──────────────────────────────
@@ -101,6 +110,73 @@
       .catch(e => console.warn('API DELETE failed (' + path + '):', e.message));
   }
 
+  // -- Reliable sync (prevents "saved locally but not in DB") ---------
+  // A record is tagged _synced=false until the server confirms it. _syncRecord
+  // POSTs the record and flips the flag on success; syncPending() retries any
+  // record still flagged false. It only ever re-sends records that were never
+  // confirmed -- it never deletes or overwrites server data, so it cannot
+  // resurrect something that was deleted on the server.
+  function _persist(tableKey) {
+    if (tableKey === 'patients') db.setTable('patients', getPatients());
+    else if (tableKey === 'nutrition_plans') db.setTable('nutrition_plans', getPlans());
+  }
+
+  function _syncRecord(path, record, tableKey) {
+    // Exclude the internal _syncPromise handle from the request body.
+    return fetch(_apiBase() + path, { method: 'POST', headers: _headers(), body: JSON.stringify(record, (k, v) => k === '_syncPromise' ? undefined : v), keepalive: true })
+      .then(res => {
+        if (res && res.ok) {
+          record._synced = true;
+          _persist(tableKey);
+          return true;
+        }
+        console.warn('sync rejected (' + path + '), status ' + (res && res.status) + ' -- kept as pending');
+        return false;
+      })
+      .catch(e => { console.warn('sync error (' + path + '): ' + e.message + ' -- kept as pending'); return false; });
+  }
+
+  // Retry every record that was never confirmed by the server. Safe to call
+  // on every page load. Returns the number of records successfully synced.
+  async function syncPending() {
+    let count = 0;
+    for (const p of getPatients()) {
+      if (p && p._synced === false) { if (await _syncRecord('/api/patients', p, 'patients')) count++; }
+    }
+    for (const pl of getPlans()) {
+      if (pl && pl._synced === false) { if (await _syncRecord('/api/nutrition-plans', pl, 'nutrition_plans')) count++; }
+    }
+    if (count) console.log('syncPending: re-synced ' + count + ' previously-unsaved record(s) to the server.');
+    return count;
+  }
+
+  // Patients present on THIS device but not confirmed in the database.
+  // initStore() marks server-confirmed patients _synced=true, so anything
+  // whose flag is not true is local-only (never reached the server).
+  function getUnsyncedPatients() {
+    return getPatients().filter(p => p && p._synced !== true);
+  }
+
+  // Push every local-only patient (and its plans) to the server. Safe and
+  // idempotent — the server upserts by id, so it can't create duplicates.
+  // Returns counts for showing the doctor a result.
+  async function pushUnsyncedToServer() {
+    const unsynced = getUnsyncedPatients();
+    const plans = getPlans();
+    let patientsOk = 0, plansOk = 0;
+    for (const p of unsynced) {
+      const ok = await _syncRecord('/api/patients', p, 'patients');
+      if (ok) {
+        patientsOk++;
+        const its = plans.filter(x => (x.patientId || x.patient_id) === p.id && x._synced !== true);
+        for (const pl of its) {
+          if (await _syncRecord('/api/nutrition-plans', pl, 'nutrition_plans')) plansOk++;
+        }
+      }
+    }
+    return { attempted: unsynced.length, patientsOk, plansOk };
+  }
+
   // ── Patient CRUD ──────────────────────────────────────────────────
 
   function savePatient(patient) {
@@ -124,14 +200,19 @@
     }
     patient.storeId = null;
 
+    // Mark unsynced until the server confirms it (cleared by _syncRecord on success).
+    patient._synced = false;
+
     // Update cache and localStorage immediately (even if cache was not yet initialised)
     const _existingPatients = _cache.patients || db.getTable('patients', []);
     _existingPatients.push(patient);
     _cache.patients = _existingPatients;
     db.setTable('patients', _existingPatients);
 
-    // Sync to server in background
-    _post('/api/patients', patient);
+    // Sync to server; if it fails (or the page redirects before it finishes),
+    // the record stays flagged and syncPending() will retry it on next load.
+    // The promise is exposed so callers can await server confirmation before navigating.
+    patient._syncPromise = _syncRecord('/api/patients', patient, 'patients');
 
     return patient;
   }
@@ -208,9 +289,10 @@
     // Replace if already in cache (e.g. called again after claudeInsights added), else push
     const idx = _existingPlans.findIndex(p => p.id === plan.id);
     if (idx >= 0) _existingPlans[idx] = plan; else _existingPlans.push(plan);
+    plan._synced = false;
     _cache.plans = _existingPlans;
     db.setTable('nutrition_plans', _existingPlans);
-    _post('/api/nutrition-plans', plan);
+    plan._syncPromise = _syncRecord('/api/nutrition-plans', plan, 'nutrition_plans');
   }
 
   function updatePlan(updated) {
@@ -288,5 +370,8 @@
   global.updatePlan = updatePlan;
   global.getLatestPlanForPatient = getLatestPlanForPatient;
   global.createOrUpdatePlan = createOrUpdatePlan;
+  global.syncPending = syncPending;
+  global.getUnsyncedPatients = getUnsyncedPatients;
+  global.pushUnsyncedToServer = pushUnsyncedToServer;
 
 })(window);

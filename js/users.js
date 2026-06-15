@@ -163,12 +163,25 @@
     const idx = users.findIndex(u => u.id === userId);
     if (idx === -1) return { ok: false, error: 'User not found' };
     const newPass = generatePassword();
+
+    // Try the server first and only treat it as success if the server confirms.
+    // This way a duplicate-ID block (409) or any other server error is shown to
+    // the admin instead of silently pretending the reset worked.
+    try {
+      const res = await _put('/api/users/' + userId + '/password', { password: newPass });
+      if (!res || !res.ok) {
+        const err = res ? await res.json().catch(() => ({})) : {};
+        return { ok: false, error: err.error || 'Server could not reset the password.' };
+      }
+    } catch (e) {
+      console.warn('resetUserPassword: server unreachable');
+      return { ok: false, error: 'Server unreachable - password was not reset.' };
+    }
+
+    // Server confirmed -> update the local cache for this one user only.
     users[idx].password = newPass;
     if (_cache.users) _cache.users = users;
     db.setTable('users', users);
-    try {
-      await _put('/api/users/' + userId + '/password', { password: newPass });
-    } catch(e) { console.warn('resetUserPassword: server unreachable'); }
     return { ok: true, password: newPass, user: users[idx] };
   }
 

@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GQUENCE™ – CSD Patient Enrollment</title>
+<style>
+/* ── GLOBAL ─────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: Arial, Helvetica, sans-serif; font-size: 13px; background: #f0f2f5; color: #222; }
+
+/* ── LOGIN SCREEN ───────────────────────────────────────── */
+#loginScreen {
+  display: flex; align-items: center; justify-content: center;
+  min-height: 100vh; background: #1a1a2e;
+}
+.login-box {
+  background: #fff; border-radius: 10px; padding: 40px 36px;
+  width: 360px; text-align: center; box-shadow: 0 8px 32px rgba(0,0,0,.4);
+}
+.login-box h1 { font-size: 24px; letter-spacing: 2px; margin-bottom: 4px; color: #1a1a2e; }
+.login-box p  { font-size: 11px; color: #888; margin-bottom: 28px; }
+.login-box input {
+  width: 100%; padding: 11px 14px; border: 1.5px solid #ccc;
+  border-radius: 6px; font-size: 15px; letter-spacing: 4px;
+  text-align: center; margin-bottom: 14px;
+}
+.login-box input:focus { outline: none; border-color: #1a1a2e; }
+.btn-login {
+  width: 100%; padding: 12px; background: #1a1a2e; color: #fff;
+  border: none; border-radius: 6px; font-size: 14px; font-weight: bold;
+  cursor: pointer; letter-spacing: 1px;
+}
+.btn-login:hover { background: #16213e; }
+.login-err { color: #c0392b; font-size: 12px; margin-top: 8px; display: none; }
+.hint { font-size: 10px; color: #aaa; margin-top: 10px; }
+
+/* ── APP SHELL ──────────────────────────────────────────── */
+#appShell { display: none; }
+
+/* ── TOPBAR ─────────────────────────────────────────────── */
+.topbar {
+  background: #1a1a2e; color: #fff; padding: 12px 28px;
+  display: flex; align-items: center; justify-content: space-between;
+  position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 8px rgba(0,0,0,.3);
+}
+.topbar-brand { font-size: 18px; font-weight: bold; letter-spacing: 2px; }
+.topbar-sub   { font-size: 10px; color: #aac; margin-top: 2px; }
+.btn-logout {
+  background: transparent; border: 1.5px solid #aac; color: #aac;
+  border-radius: 5px; padding: 6px 16px; cursor: pointer; font-size: 12px;
+}
+.btn-logout:hover { background: rgba(255,255,255,.08); }
+
+/* ── CONTENT ────────────────────────────────────────────── */
+.content { max-width: 860px; margin: 28px auto; padding: 0 16px 60px; }
+
+/* ── CARD ───────────────────────────────────────────────── */
+.card {
+  background: #fff; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,.08);
+  margin-bottom: 22px; overflow: hidden;
+}
+.card-header {
+  background: #1a1a2e; color: #fff; padding: 11px 18px;
+  font-size: 12px; font-weight: bold; letter-spacing: 1px;
+  display: flex; align-items: center; gap: 8px;
+}
+.card-header .badge {
+  background: rgba(255,255,255,.18); border-radius: 4px;
+  padding: 2px 8px; font-size: 10px;
+}
+.card-body { padding: 18px 20px; }
+
+/* ── FORM GRID ──────────────────────────────────────────── */
+.grid { display: grid; gap: 14px 20px; }
+.grid-2 { grid-template-columns: 1fr 1fr; }
+.grid-3 { grid-template-columns: 1fr 1fr 1fr; }
+.grid-4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
+.field label {
+  display: block; font-size: 10px; font-weight: bold;
+  color: #555; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 4px;
+}
+.field input, .field select, .field textarea {
+  width: 100%; padding: 8px 10px; border: 1.5px solid #ddd;
+  border-radius: 5px; font-size: 12px; font-family: inherit;
+  transition: border-color .2s;
+}
+.field input:focus, .field select:focus, .field textarea:focus {
+  outline: none; border-color: #1a1a2e;
+}
+.field textarea { resize: vertical; min-height: 60px; }
+
+/* ── SECTION DIVIDER ────────────────────────────────────── */
+.sec-label {
+  font-size: 10px; font-weight: bold; color: #888;
+  text-transform: uppercase; letter-spacing: 1px;
+  border-bottom: 1.5px solid #eee; padding-bottom: 5px;
+  margin: 18px 0 12px; grid-column: 1/-1;
+}
+
+/* ── SCORE BADGES ───────────────────────────────────────── */
+.score-group { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.score-group label { font-weight: normal; font-size: 12px; cursor: pointer; }
+.score-group input[type=radio] { accent-color: #1a1a2e; }
+
+/* ── ACTION BAR ─────────────────────────────────────────── */
+.action-bar {
+  display: flex; gap: 12px; justify-content: flex-end;
+  padding: 18px 20px 20px; border-top: 1px solid #eee;
+  background: #fafafa;
+}
+.btn {
+  padding: 10px 24px; border-radius: 6px; font-size: 13px;
+  font-weight: bold; cursor: pointer; border: none; transition: .2s;
+}
+.btn-primary { background: #1a1a2e; color: #fff; }
+.btn-primary:hover { background: #16213e; }
+.btn-secondary { background: #fff; color: #1a1a2e; border: 1.5px solid #1a1a2e; }
+.btn-secondary:hover { background: #f0f2f5; }
+.btn-print { background: #27ae60; color: #fff; }
+.btn-print:hover { background: #219a52; }
+
+/* ── REQUIRED STAR ──────────────────────────────────────── */
+.req { color: #c0392b; }
+
+/* ── TOAST ──────────────────────────────────────────────── */
+#toast {
+  position: fixed; bottom: 24px; right: 24px; background: #27ae60;
+  color: #fff; padding: 12px 22px; border-radius: 7px; font-size: 13px;
+  box-shadow: 0 4px 16px rgba(0,0,0,.2); display: none; z-index: 999;
+}
+
+/* ════════════════════════════════════════════════════════════
+   PRINT STYLES — only the #printDoc is visible when printing
+   ════════════════════════════════════════════════════════════ */
+@media print {
+  body * { visibility: hidden; }
+  #printDoc, #printDoc * { visibility: visible; }
+  #printDoc {
+    position: absolute; top: 0; left: 0; width: 100%;
+  }
+  @page { size: A4 portrait; margin: 18mm 15mm 20mm 25mm; }
+}
+
+/* ── PRINT DOC ──────────────────────────────────────────── */
+#printDoc {
+  display: none;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 9.5pt;
+  color: #111;
+}
+/* outer border */
+.p-page {
+  border: 2px solid #222;
+  padding: 10pt 12pt 8pt;
+  min-height: 257mm;
+  page-break-after: always;
+  position: relative;
+}
+.p-page:last-child { page-break-after: auto; }
+
+/* header */
+.p-logo { text-align: center; font-size: 20pt; font-weight: bold; letter-spacing: 3px; margin-bottom: 2pt; }
+.p-hr   { border: none; border-top: 2px solid #222; margin: 4pt 0; }
+.p-prog { text-align: center; font-size: 11pt; font-weight: bold; margin-bottom: 2pt; }
+.p-sub  { text-align: center; font-size: 9pt; color: #555; margin-bottom: 12pt; }
+
+/* form banner */
+.p-banner {
+  background: #333; color: #fff; padding: 6pt 10pt;
+  font-size: 11pt; font-weight: bold; margin-bottom: 6pt;
+}
+.p-banner-sub { font-size: 8pt; font-weight: normal; margin-top: 1pt; }
+
+/* section bar */
+.p-section {
+  background: #d0d0d0; padding: 3pt 6pt;
+  font-size: 9pt; font-weight: bold; margin-bottom: 3pt;
+}
+
+/* two-col table */
+.p-table { width: 100%; border-collapse: collapse; margin-bottom: 6pt; }
+.p-table td, .p-table th {
+  border: 0.5pt solid #888; padding: 4pt 5pt; vertical-align: top;
+}
+.p-table th { background: #e8e8e8; font-size: 8.5pt; font-weight: bold; }
+.p-table .lbl { background: #f5f5f5; font-weight: bold; width: 42%; }
+.p-table .val { width: 58%; }
+.p-table .val.filled { font-weight: normal; color: #111; }
+.p-table .val.blank  { color: #bbb; font-size: 8pt; font-style: italic; }
+
+/* data-entry value (pre-filled) */
+.p-val { font-weight: bold; color: #1a1a2e; }
+
+/* score rows */
+.p-score .lbl { width: 45%; }
+.p-score .val { width: 55%; }
+
+/* checkbox grid */
+.p-tox th, .p-tox td { text-align: center; font-size: 8.5pt; }
+.p-tox td:first-child { text-align: left; padding-left: 6pt; }
+
+/* ruled box */
+.p-ruled {
+  border: 1pt solid #222; min-height: 48pt;
+  margin-bottom: 6pt;
+}
+.p-ruled-hdr {
+  background: #d0d0d0; padding: 3pt 6pt;
+  font-size: 8.5pt; font-weight: bold; border-bottom: 0.5pt solid #888;
+}
+.p-ruled-body { min-height: 40pt; }
+
+/* weekly tracking table */
+.p-week th, .p-week td { font-size: 8pt; text-align: center; }
+.p-week td:first-child { text-align: left; font-weight: bold; }
+
+/* daily log — many rows */
+.p-daily th, .p-daily td { font-size: 8pt; height: 14pt; }
+
+/* footer stripe */
+.p-footer {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  background: #e8e8e8; padding: 3pt 8pt;
+  font-size: 7.5pt; color: #555;
+  display: flex; justify-content: space-between; border-top: 1pt solid #aaa;
+}
+
+/* stamp area */
+.p-stamp {
+  border: 1.5pt solid #222; height: 55pt; margin-bottom: 8pt;
+  display: flex; flex-direction: column;
+}
+.p-stamp-hdr { background: #d0d0d0; padding: 3pt 6pt; font-size: 8.5pt; font-weight: bold; border-bottom: 0.5pt solid #888; }
+
+/* sig row */
+.p-sig { width: 100%; border-collapse: collapse; }
+.p-sig td { border: 0.5pt solid #888; padding: 4pt 6pt; font-size: 8.5pt; height: 36pt; vertical-align: top; }
+
+/* intake log */
+.p-intake th, .p-intake td { font-size: 7.5pt; text-align: center; height: 14pt; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════
+     LOGIN SCREEN
+     ═══════════════════════════════════════════════════════ -->
+<div id="loginScreen">
+  <div class="login-box">
+    <h1>GQUENCE™</h1>
+    <p>Oncology Nutrition Support Program<br>Clinical Source Document System</p>
+    <input type="password" id="pinInput" placeholder="Enter Access PIN" maxlength="10"
+           onkeydown="if(event.key==='Enter') doLogin()">
+    <button class="btn-login" onclick="doLogin()">ACCESS CSD SYSTEM</button>
+    <div class="login-err" id="loginErr">Incorrect PIN. Please try again.</div>
+    <div class="hint">Authorised clinical staff only</div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     APP SHELL
+     ═══════════════════════════════════════════════════════ -->
+<div id="appShell">
+  <div class="topbar">
+    <div>
+      <div class="topbar-brand">GQUENCE™</div>
+      <div class="topbar-sub">Oncology Nutrition Support Program — CSD Enrollment</div>
+    </div>
+    <button class="btn-logout" onclick="doLogout()">LOGOUT</button>
+  </div>
+
+  <div class="content">
+
+    <!-- ── COVER / PATIENT DETAILS ─────────────────────── -->
+    <div class="card">
+      <div class="card-header">
+        COVER PAGE — PATIENT IDENTIFICATION
+        <span class="badge">Required to generate print</span>
+      </div>
+      <div class="card-body">
+        <div class="grid grid-2">
+          <div class="field"><label>Study ID <span class="req">*</span></label><input id="studyId" placeholder="e.g. GQ-001"></div>
+          <div class="field"><label>UHID <span class="req">*</span></label><input id="uhid" placeholder="Hospital UHID"></div>
+          <div class="field"><label>Patient Full Name <span class="req">*</span></label><input id="patName" placeholder="Full name"></div>
+          <div class="field"><label>Age / Sex <span class="req">*</span></label><input id="ageSex" placeholder="e.g. 54 / Male"></div>
+          <div class="field"><label>Cancer Site <span class="req">*</span></label><input id="cancerSite" placeholder="e.g. Oral Cavity, Oropharynx"></div>
+          <div class="field"><label>Stage (TNM)</label><input id="stage" placeholder="e.g. T3 N1 M0 – Stage III"></div>
+          <div class="field"><label>Treating Department</label><input id="dept" placeholder="e.g. Radiation Oncology"></div>
+          <div class="field"><label>Date of Enrollment <span class="req">*</span></label><input type="date" id="enrollDate"></div>
+          <div class="field"><label>Treating Physician</label><input id="physician" placeholder="Dr. Name, Designation"></div>
+          <div class="field"><label>Dietitian / Nutritionist</label><input id="dietitian" placeholder="Name"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── FORM 1A — RT DETAILS ──────────────────────── -->
+    <div class="card">
+      <div class="card-header">FORM 1 – BASELINE ASSESSMENT</div>
+      <div class="card-body">
+        <div class="grid grid-3">
+          <div class="sec-label">Section A – Radiotherapy Plan</div>
+          <div class="field"><label>RT Dose (Gy)</label><input id="rtDose" placeholder="e.g. 60"></div>
+          <div class="field"><label>RT Fractions</label><input id="rtFrac" placeholder="e.g. 30"></div>
+          <div class="field"><label>Concurrent Therapy</label><input id="concTx" placeholder="e.g. Cisplatin weekly"></div>
+          <div class="field grid-3" style="grid-column:1/-1"><label>Co-morbidities</label><input id="comorbid" placeholder="e.g. DM Type 2, Hypertension"></div>
+          <div class="field"><label>Date of Baseline</label><input type="date" id="baseDate"></div>
+
+          <div class="sec-label">Section B – Anthropometry</div>
+          <div class="field"><label>Weight (kg)</label><input id="wt" placeholder="e.g. 58.5"></div>
+          <div class="field"><label>Height (cm)</label><input id="ht" placeholder="e.g. 168"></div>
+          <div class="field"><label>BMI (kg/m²)</label><input id="bmi" placeholder="auto or enter"></div>
+          <div class="field"><label>MUAC (cm)</label><input id="muac" placeholder="e.g. 24.2"></div>
+          <div class="field"><label>Hand Grip (kg)</label><input id="grip" placeholder="e.g. 22.5"></div>
+          <div class="field"><label>Weight Loss 3 mths (%)</label><input id="wtLoss" placeholder="e.g. 7.2"></div>
+          <div class="field"><label>Usual Body Weight (kg)</label><input id="ubw" placeholder="e.g. 63"></div>
+
+          <div class="sec-label">Section C – Laboratory</div>
+          <div class="field"><label>Serum Albumin (g/dL)</label><input id="albumin" placeholder="e.g. 3.2"></div>
+          <div class="field"><label>CRP (mg/L)</label><input id="crp" placeholder="e.g. 18.4"></div>
+          <div class="field"><label>Creatinine (mg/dL)</label><input id="creatinine" placeholder="e.g. 0.9"></div>
+          <div class="field"><label>Blood Glucose (mg/dL)</label><input id="glucose" placeholder="e.g. 112"></div>
+          <div class="field"><label>Hemoglobin (g/dL)</label><input id="hb" placeholder="e.g. 10.8"></div>
+          <div class="field"><label>Total Protein (g/dL)</label><input id="tp" placeholder="e.g. 6.1"></div>
+          <div class="field"><label>Date of Labs</label><input type="date" id="labDate"></div>
+
+          <div class="sec-label">Section D – Risk Scores</div>
+          <div class="field">
+            <label>MUST Score</label>
+            <div class="score-group">
+              <label><input type="radio" name="must" value="0 – Low Risk"> 0 Low</label>
+              <label><input type="radio" name="must" value="1 – Medium Risk"> 1 Medium</label>
+              <label><input type="radio" name="must" value="2+ – High Risk"> 2+ High</label>
+            </div>
+          </div>
+          <div class="field">
+            <label>PG-SGA</label>
+            <div class="score-group">
+              <label><input type="radio" name="pgsga" value="A – Well Nourished"> A Well</label>
+              <label><input type="radio" name="pgsga" value="B – Suspected Malnourished"> B Suspect</label>
+              <label><input type="radio" name="pgsga" value="C – Severely Malnourished"> C Severe</label>
+            </div>
+          </div>
+          <div class="field">
+            <label>ECOG Status</label>
+            <div class="score-group">
+              <label><input type="radio" name="ecog" value="0"> 0</label>
+              <label><input type="radio" name="ecog" value="1"> 1</label>
+              <label><input type="radio" name="ecog" value="2"> 2</label>
+              <label><input type="radio" name="ecog" value="3"> 3</label>
+              <label><input type="radio" name="ecog" value="4"> 4</label>
+            </div>
+          </div>
+          <div class="field"><label>SARC-F Score (/10)</label><input id="sarcf" placeholder="e.g. 4"></div>
+
+          <div class="sec-label" style="grid-column:1/-1">Dietitian's Baseline Notes</div>
+          <div class="field" style="grid-column:1/-1">
+            <textarea id="baseNotes" rows="3" placeholder="Clinical impression, key concerns, intervention plan…"></textarea>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── ACTION BAR ──────────────────────────────────── -->
+    <div class="card">
+      <div class="action-bar">
+        <button class="btn btn-secondary" onclick="clearForm()">Clear Form</button>
+        <button class="btn btn-print" onclick="generateAndPrint()">
+          🖨️ Generate &amp; Print CSD
+        </button>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /appShell -->
+
+<!-- ═══════════════════════════════════════════════════════
+     PRINT DOCUMENT (hidden; shown only at print time)
+     ═══════════════════════════════════════════════════════ -->
+<div id="printDoc"></div>
+
+<div id="toast">✓ CSD generated — Print dialog opening…</div>
+
+<script>
+/* ──────────────────────────────────────────────────────────
+   AUTH
+   ────────────────────────────────────────────────────────── */
+const CORRECT_PIN = "GQUENCE2024";
+
+function doLogin() {
+  const pin = document.getElementById("pinInput").value.trim();
+  if (pin === CORRECT_PIN) {
+    document.getElementById("loginScreen").style.display = "none";
+    document.getElementById("appShell").style.display = "block";
+  } else {
+    document.getElementById("loginErr").style.display = "block";
+    document.getElementById("pinInput").value = "";
+  }
+}
+function doLogout() {
+  document.getElementById("appShell").style.display = "none";
+  document.getElementById("loginScreen").style.display = "flex";
+  document.getElementById("pinInput").value = "";
+}
+
+/* ──────────────────────────────────────────────────────────
+   HELPERS
+   ────────────────────────────────────────────────────────── */
+function v(id) {
+  const el = document.getElementById(id);
+  return el ? el.value.trim() : "";
+}
+function radio(name) {
+  const sel = document.querySelector(`input[name="${name}"]:checked`);
+  return sel ? sel.value : "";
+}
+function fmt(id) {
+  const val = v(id);
+  return val
+    ? `<span class="p-val">${val}</span>`
+    : `<span style="color:#aaa;font-style:italic">—</span>`;
+}
+function fmtDate(id) {
+  const val = v(id);
+  if (!val) return `<span style="color:#aaa;font-style:italic">—</span>`;
+  const d = new Date(val);
+  return `<span class="p-val">${d.toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"numeric"})}</span>`;
+}
+function fmtRadio(name) {
+  const val = radio(name);
+  return val
+    ? `<span class="p-val">${val}</span>`
+    : `<span style="color:#aaa;font-style:italic">—</span>`;
+}
+function row(label, valHtml) {
+  return `<tr><td class="lbl">${label}</td><td class="val">${valHtml}</td></tr>`;
+}
+function blankRow(label) {
+  return `<tr><td class="lbl">${label}</td><td class="val blank">— fill on paper —</td></tr>`;
+}
+
+/* auto-calc BMI */
+document.getElementById("wt").addEventListener("input", calcBMI);
+document.getElementById("ht").addEventListener("input", calcBMI);
+function calcBMI() {
+  const wt = parseFloat(v("wt")), ht = parseFloat(v("ht"));
+  if (wt > 0 && ht > 0) {
+    document.getElementById("bmi").value = (wt / ((ht/100) ** 2)).toFixed(1);
+  }
+}
+
+/* ──────────────────────────────────────────────────────────
+   CLEAR
+   ────────────────────────────────────────────────────────── */
+function clearForm() {
+  if (!confirm("Clear all entered data?")) return;
+  document.querySelectorAll("input:not([type=radio]), textarea, select").forEach(el => el.value = "");
+  document.querySelectorAll("input[type=radio]").forEach(el => el.checked = false);
+}
+
+/* ──────────────────────────────────────────────────────────
+   GENERATE PRINT HTML
+   ────────────────────────────────────────────────────────── */
+function generateAndPrint() {
+  // Validate required fields
+  const req = [
+    ["studyId","Study ID"], ["uhid","UHID"],
+    ["patName","Patient Name"], ["ageSex","Age/Sex"],
+    ["cancerSite","Cancer Site"], ["enrollDate","Date of Enrollment"]
+  ];
+  for (const [id, lbl] of req) {
+    if (!v(id)) { alert(`Please fill required field: ${lbl}`); document.getElementById(id).focus(); return; }
+  }
+
+  const doc = document.getElementById("printDoc");
+  doc.innerHTML = buildPrintHTML();
+
+  // Toast + print
+  const toast = document.getElementById("toast");
+  toast.style.display = "block";
+  setTimeout(() => { toast.style.display = "none"; }, 3000);
+  setTimeout(() => window.print(), 400);
+}
+
+function buildPrintHTML() {
+  const sid    = v("studyId");
+  const today  = new Date().toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"numeric"});
+  const footer = (pg) => `<div class="p-footer">
+    <span>Study ID: <b>${sid}</b></span>
+    <span>GQ-CSD-V1.0 &nbsp;|&nbsp; GQUENCE™ Oncology Nutrition Support Program</span>
+    <span>Page ${pg}</span>
+  </div>`;
+
+  /* ── COVER PAGE ── */
+  const cover = `
+  <div class="p-page">
+    <div class="p-logo">GQUENCE™</div>
+    <hr class="p-hr">
+    <div class="p-prog">Oncology Nutrition Support Program</div>
+    <div class="p-sub">Clinical Source Document (CSD) &nbsp;|&nbsp; Version GQ-CSD-V1.0</div>
+
+    <table class="p-table" style="margin-bottom:10pt;">
+      ${row("Study ID",      fmt("studyId"))}
+      ${row("Patient Name",  fmt("patName"))}
+      ${row("UHID",          fmt("uhid"))}
+      ${row("Age / Sex",     fmt("ageSex"))}
+      ${row("Cancer Site",   fmt("cancerSite"))}
+      ${row("Stage (TNM)",   fmt("stage"))}
+      ${row("Treating Department", fmt("dept"))}
+      ${row("Date of Enrollment",  fmtDate("enrollDate"))}
+      ${row("Treating Physician",  fmt("physician"))}
+      ${row("Dietitian / Nutritionist", fmt("dietitian"))}
+    </table>
+
+    <div class="p-stamp">
+      <div class="p-stamp-hdr">Hospital Stamp &amp; Physician Signature</div>
+    </div>
+
+    <div style="text-align:center;font-size:8pt;color:#666;margin-top:6pt;">
+      CONFIDENTIAL — For clinical use only. Not to be reproduced without authorisation.<br>
+      Printed: ${today}
+    </div>
+    ${footer(1)}
+  </div>`;
+
+  /* ── FORM 1 — BASELINE ── */
+  const form1 = `
+  <div class="p-page">
+    <div class="p-banner">FORM 1 – BASELINE ASSESSMENT
+      <div class="p-banner-sub">Completed at enrolment by Treating Dietitian &nbsp;|&nbsp; Study ID: ${sid}</div>
+    </div>
+
+    <div class="p-section">Section A – Patient Details &amp; RT Plan</div>
+    <table class="p-table">
+      ${row("Study ID",          fmt("studyId"))}
+      ${row("UHID",              fmt("uhid"))}
+      ${row("Patient Name",      fmt("patName"))}
+      ${row("Age / Sex",         fmt("ageSex"))}
+      ${row("Cancer Site",       fmt("cancerSite"))}
+      ${row("Stage (TNM)",       fmt("stage"))}
+      ${row("RT Dose (Gy)",      fmt("rtDose"))}
+      ${row("RT Fractions",      fmt("rtFrac"))}
+      ${row("Concurrent Therapy",fmt("concTx"))}
+      ${row("Co-morbidities",    fmt("comorbid"))}
+      ${row("Date of Baseline",  fmtDate("baseDate"))}
+    </table>
+
+    <div class="p-section">Section B – Anthropometry</div>
+    <table class="p-table">
+      ${row("Weight (kg)",            fmt("wt"))}
+      ${row("Height (cm)",            fmt("ht"))}
+      ${row("BMI (kg/m²)",            fmt("bmi"))}
+      ${row("MUAC (cm)",              fmt("muac"))}
+      ${row("Hand Grip Strength (kg)",fmt("grip"))}
+      ${row("Weight Loss – 3 mths (%)", fmt("wtLoss"))}
+      ${row("Usual Body Weight (kg)", fmt("ubw"))}
+    </table>
+
+    <div class="p-section">Section C – Laboratory Assessment</div>
+    <table class="p-table">
+      ${row("Serum Albumin (g/dL)",  fmt("albumin"))}
+      ${row("CRP (mg/L)",            fmt("crp"))}
+      ${row("Serum Creatinine (mg/dL)", fmt("creatinine"))}
+      ${row("Blood Glucose (mg/dL)", fmt("glucose"))}
+      ${row("Hemoglobin (g/dL)",     fmt("hb"))}
+      ${row("Total Protein (g/dL)",  fmt("tp"))}
+      ${row("Date of Labs",          fmtDate("labDate"))}
+    </table>
+
+    <div class="p-section">Section D – Nutritional Risk &amp; Functional Scores</div>
+    <table class="p-table p-score">
+      ${row("MUST Score",         fmtRadio("must"))}
+      ${row("PG-SGA",             fmtRadio("pgsga"))}
+      ${row("ECOG Performance",   fmtRadio("ecog"))}
+      ${row("SARC-F Score (/10)", fmt("sarcf"))}
+    </table>
+
+    <div class="p-ruled">
+      <div class="p-ruled-hdr">Dietitian's Baseline Clinical Notes</div>
+      <div class="p-ruled-body" style="padding:4pt 6pt;font-size:9pt;">
+        ${v("baseNotes") || ""}
+      </div>
+    </div>
+
+    <table class="p-sig">
+      <tr>
+        <td style="width:50%">Dietitian Name: ________________________</td>
+        <td>Signature: _______________________</td>
+      </tr>
+      <tr>
+        <td>Date: __________________________</td>
+        <td>Physician Co-Sign: ______________</td>
+      </tr>
+    </table>
+    ${footer(2)}
+  </div>`;
+
+  /* ── FORM 2 — DAILY MONITORING ── */
+  const intakeRows = Array.from({length:18}, (_,i) => `
+    <tr>
+      <td>${i===0?"Day 1":""}</td>
+      <td></td><td></td><td></td><td></td><td></td>
+    </tr>`).join("");
+
+  const toxItems = ["Mucositis","Dysphagia","Xerostomia","Nausea / Vomiting","Diarrhea","Fatigue","Anorexia"];
+  const toxRows  = toxItems.map(t => `<tr>
+    <td style="text-align:left;padding-left:5pt;">${t}</td>
+    <td>□</td><td>□</td><td>□</td><td>□</td><td>□</td>
+  </tr>`).join("");
+
+  const form2 = `
+  <div class="p-page">
+    <div class="p-banner">FORM 2 – DAILY NUTRITION MONITORING
+      <div class="p-banner-sub">Complete every treatment day &nbsp;|&nbsp; Study ID: ${sid} &nbsp;|&nbsp; Patient: ${v("patName")}</div>
+    </div>
+
+    <div class="p-section">Section A – Daily Intake Record</div>
+    <table class="p-table p-intake" style="margin-bottom:8pt;">
+      <tr>
+        <th style="width:13%">Date</th>
+        <th style="width:13%">Oral Intake %</th>
+        <th style="width:15%">Sachets Rx</th>
+        <th style="width:14%">Sachets Taken</th>
+        <th style="width:14%">Water (mL)</th>
+        <th>Nurse Sign</th>
+      </tr>
+      ${intakeRows}
+    </table>
+
+    <div class="p-section">Section B – Daily Toxicity Assessment (CTCAE v5.0)</div>
+    <table class="p-table p-tox" style="margin-bottom:8pt;">
+      <tr>
+        <th style="text-align:left;padding-left:5pt;width:34%">Toxicity</th>
+        <th>G0</th><th>G1</th><th>G2</th><th>G3</th><th>G4</th>
+      </tr>
+      ${toxRows}
+    </table>
+
+    <div class="p-ruled" style="min-height:52pt;">
+      <div class="p-ruled-hdr">Daily Clinical Notes / Interventions</div>
+    </div>
+    ${footer(3)}
+  </div>`;
+
+  /* ── FORM 3 — WEEKLY REVIEW ── */
+  function weekTable(label, params) {
+    const hdr = `<tr><th style="text-align:left;width:28%">${label}</th><th>Week 1</th><th>Week 2</th><th>Week 3</th><th>Week 4</th></tr>`;
+    const rows = params.map(p => `<tr><td style="text-align:left;font-weight:bold;">${p}</td><td></td><td></td><td></td><td></td></tr>`).join("");
+    return `<table class="p-table p-week" style="margin-bottom:6pt;">${hdr}${rows}</table>`;
+  }
+
+  const form3 = `
+  <div class="p-page">
+    <div class="p-banner">FORM 3 – WEEKLY REVIEW SHEET
+      <div class="p-banner-sub">Complete at end of each week &nbsp;|&nbsp; Study ID: ${sid} &nbsp;|&nbsp; Patient: ${v("patName")}</div>
+    </div>
+
+    <div class="p-section">Section A – Anthropometry Tracking</div>
+    ${weekTable("Parameter", ["Date of Review","Weight (kg)","BMI (kg/m²)","MUAC (cm)","Grip Strength (kg)","Weight Change (kg)"])}
+
+    <div class="p-section">Section B – Laboratory Review</div>
+    ${weekTable("Parameter", ["Date of Labs","Serum Albumin (g/dL)","CRP (mg/L)","Serum Creatinine (mg/dL)","Blood Glucose (mg/dL)","Hemoglobin (g/dL)"])}
+
+    <div class="p-section">Section C – Toxicity Review (Worst Grade This Week)</div>
+    ${weekTable("Toxicity", ["Mucositis","Dysphagia","Xerostomia","Nausea/Vomiting","Diarrhea","Fatigue"])}
+
+    <div class="p-section">Section D – Formula Compliance</div>
+    <table class="p-table" style="margin-bottom:6pt;">
+      ${blankRow("Formula Prescribed (sachets/day)")}
+      ${blankRow("Formula Consumed (sachets/day)")}
+      ${blankRow("Compliance (%)")}
+      ${blankRow("Reason for Non-Compliance (if any)")}
+    </table>
+
+    <div class="p-ruled" style="min-height:44pt;">
+      <div class="p-ruled-hdr">Weekly Dietitian Notes &amp; Plan</div>
+    </div>
+    ${footer(4)}
+  </div>`;
+
+  /* ── FORM 4 — PRODUCT ACCOUNTABILITY ── */
+  const paRows = Array.from({length:20},()=>`<tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>`).join("");
+  const form4 = `
+  <div class="p-page">
+    <div class="p-banner">FORM 4 – PRODUCT ACCOUNTABILITY LOG
+      <div class="p-banner-sub">Complete at each dispense &nbsp;|&nbsp; Study ID: ${sid} &nbsp;|&nbsp; Patient: ${v("patName")}</div>
+    </div>
+    <table class="p-table p-daily">
+      <tr>
+        <th style="width:10%">Date</th>
+        <th style="width:13%">Batch No.</th>
+        <th style="width:10%">Formula Code</th>
+        <th style="width:12%">Qty Issued</th>
+        <th style="width:12%">Qty Returned</th>
+        <th style="width:12%">Net Consumed</th>
+        <th style="width:14%">Dispenser Sign</th>
+        <th>Remarks</th>
+      </tr>
+      ${paRows}
+    </table>
+    <div class="p-ruled" style="min-height:36pt;margin-top:6pt;">
+      <div class="p-ruled-hdr">Product Accountability Notes</div>
+    </div>
+    ${footer(5)}
+  </div>`;
+
+  /* ── FORM 5 — FINAL OUTCOME ── */
+  const ocParams = ["Weight (kg)","BMI (kg/m²)","Serum Albumin (g/dL)","CRP (mg/L)",
+                    "ECOG Score","Oral Intake (%)","Grip Strength (kg)","Hemoglobin (g/dL)"];
+  const ocRows = ocParams.map(p =>
+    `<tr><td style="text-align:left;">${p}</td><td></td><td></td><td></td><td></td></tr>`
+  ).join("");
+
+  const form5 = `
+  <div class="p-page">
+    <div class="p-banner">FORM 5 – FINAL OUTCOME ASSESSMENT
+      <div class="p-banner-sub">Complete at end of RT / study exit &nbsp;|&nbsp; Study ID: ${sid} &nbsp;|&nbsp; Patient: ${v("patName")}</div>
+    </div>
+
+    <div class="p-section">Section A – Outcome Comparison</div>
+    <table class="p-table p-week" style="margin-bottom:6pt;">
+      <tr>
+        <th style="text-align:left;width:28%">Parameter</th>
+        <th>Baseline</th><th>Final Value</th><th>Change (Δ)</th><th>Clinical Note</th>
+      </tr>
+      ${ocRows}
+    </table>
+
+    <div class="p-section">Section B – Treatment Outcome</div>
+    <table class="p-table" style="margin-bottom:6pt;">
+      ${blankRow("RT Completion")}
+      ${blankRow("Interruption Duration / Reason")}
+      ${blankRow("Hospital Admission")}
+      ${blankRow("Feeding Tube Required")}
+      ${blankRow("Date of RT Completion")}
+      ${blankRow("Total Fractions Given")}
+    </table>
+
+    <div class="p-section">Section C – Global Clinical Assessment</div>
+    <table class="p-table" style="margin-bottom:6pt;">
+      ${blankRow("Overall Nutritional Status")}
+      ${blankRow("Nutritional Intervention")}
+      ${blankRow("Exit Status")}
+    </table>
+
+    <div class="p-ruled" style="min-height:48pt;">
+      <div class="p-ruled-hdr">Final Assessment Summary (Dietitian)</div>
+    </div>
+    <table class="p-sig">
+      <tr>
+        <td>Dietitian Signature: _______________</td>
+        <td>Physician Co-Sign: ________________</td>
+      </tr>
+      <tr><td>Date: __________________________</td><td></td></tr>
+    </table>
+    ${footer(6)}
+  </div>`;
+
+  /* ── FORM 6 — PHYSICIAN FEEDBACK ── */
+  const form6 = `
+  <div class="p-page">
+    <div class="p-banner">FORM 6 – PHYSICIAN FEEDBACK
+      <div class="p-banner-sub">Completed by Treating Physician at study end &nbsp;|&nbsp; Study ID: ${sid}</div>
+    </div>
+
+    <table class="p-table" style="margin-bottom:8pt;">
+      ${row("Patient Name", fmt("patName"))}
+      ${row("Study ID",     fmt("studyId"))}
+      ${row("Physician",    fmt("physician"))}
+    </table>
+
+    <div class="p-section">Feedback Questions</div>
+    <table class="p-table" style="margin-bottom:8pt;">
+      ${blankRow("Was the nutrition monitoring report useful?")}
+      ${blankRow("Was the formula clinically appropriate?")}
+      ${blankRow("Did nutritional support impact RT completion?")}
+      ${blankRow("Would you recommend this program?")}
+      ${blankRow("Overall satisfaction with the program")}
+    </table>
+
+    <div class="p-ruled" style="min-height:60pt;">
+      <div class="p-ruled-hdr">Physician Comments &amp; Suggestions</div>
+    </div>
+
+    <table class="p-sig" style="margin-top:6pt;">
+      <tr>
+        <td>Name: ____________________________</td>
+        <td>Designation: ____________________</td>
+      </tr>
+      <tr>
+        <td>Department: ______________________</td>
+        <td>Date: ___________________________</td>
+      </tr>
+      <tr>
+        <td colspan="2">Signature:</td>
+      </tr>
+    </table>
+    ${footer(7)}
+  </div>`;
+
+  /* ── FORM 7 — PATIENT FEEDBACK ── */
+  const pfItems = ["Taste &amp; Palatability","Tolerance (GI)","Ease of Preparation","Overall Satisfaction","Willingness to Continue"];
+  const pfRows  = pfItems.map(p => `<tr>
+    <td style="text-align:left;">${p}</td>
+    <td>□</td><td>□</td><td>□</td><td>□</td><td></td>
+  </tr>`).join("");
+
+  const form7 = `
+  <div class="p-page">
+    <div class="p-banner">FORM 7 – PATIENT FEEDBACK
+      <div class="p-banner-sub">Completed by Patient / Caregiver at study end &nbsp;|&nbsp; Study ID: ${sid}</div>
+    </div>
+
+    <table class="p-table" style="margin-bottom:8pt;">
+      ${row("Patient Name", fmt("patName"))}
+      ${row("Study ID",     fmt("studyId"))}
+      ${row("Cancer Site",  fmt("cancerSite"))}
+    </table>
+
+    <div class="p-section">Section A – Product Experience</div>
+    <table class="p-table p-tox" style="margin-bottom:8pt;">
+      <tr>
+        <th style="text-align:left;width:35%">Parameter</th>
+        <th>Excellent</th><th>Good</th><th>Fair</th><th>Poor</th><th>Comments</th>
+      </tr>
+      ${pfRows}
+    </table>
+
+    <div class="p-section">Section B – Adherence Experience</div>
+    <table class="p-table" style="margin-bottom:8pt;">
+      ${blankRow("Did you take formula as advised every day?")}
+      ${blankRow("Main reason for missing doses (if any)")}
+      ${blankRow("Did caregivers support formula use?")}
+      ${blankRow("Would you recommend this to other patients?")}
+    </table>
+
+    <div class="p-ruled" style="min-height:52pt;">
+      <div class="p-ruled-hdr">Patient / Caregiver Open Comments</div>
+    </div>
+
+    <div style="border:1pt solid #222;padding:6pt;font-size:8.5pt;margin-top:4pt;">
+      I confirm the above information is accurate to the best of my knowledge.<br><br>
+      <b>Name:</b> _____________________________ &nbsp;&nbsp;
+      <b>Signature:</b> ____________________ &nbsp;&nbsp;
+      <b>Date:</b> ___________
+    </div>
+    ${footer(8)}
+  </div>`;
+
+  return cover + form1 + form2 + form3 + form4 + form5 + form6 + form7;
+}
+</script>
+</body>
+</html>
