@@ -18,10 +18,10 @@
     .lbl { width:100mm; height:75mm; box-sizing:border-box; background:#fff; color:#0f172a; padding:3.2mm 4mm; font-family:Arial,Helvetica,sans-serif; border:1px solid #cbd5e1; border-radius:4px; box-shadow:0 4px 14px rgba(0,0,0,.12); margin:10px auto; overflow:hidden; }
     .lbl * { line-height:1.15; }
     .lbl-cap { font-size:11px;color:#64748b;font-weight:700;text-transform:uppercase;letter-spacing:.05em;text-align:center;margin-top:6px; }
-    .lb-brand { font-size:8.5px;font-weight:800;letter-spacing:.12em;color:#0e2247;text-transform:uppercase; }
+    .lb-brand { font-size:8.5px;font-weight:800;letter-spacing:.12em;color:#000000;text-transform:uppercase; }
     .lb-name { font-size:16px;font-weight:800;margin:0.6mm 0 0; }
     .lb-meta { font-size:9.5px;color:#334155;margin-bottom:1mm; }
-    .lb-th { font-size:8px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:#0e2247;border-top:1px solid #e2e8f0;padding-top:1mm;margin-top:0.8mm; }
+    .lb-th { font-size:8px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:#000000;border-top:1px solid #e2e8f0;padding-top:1mm;margin-top:0.8mm; }
     .lb-row { display:flex;gap:2mm;margin-top:1.2mm; }
     .lb-cell { flex:1;background:#f8fafc;border:1px solid #eef2f7;border-radius:3px;padding:1mm 1.5mm;text-align:center; }
     .lb-cell .l { font-size:7.5px;color:#64748b;text-transform:uppercase;letter-spacing:.03em; }
@@ -43,7 +43,7 @@
     /* ---- Box label 100 x 150 mm ---- */
     .lbl3 { width:100mm; height:150mm; box-sizing:border-box; background:#fff; color:#0f172a; padding:5mm; font-family:Arial,Helvetica,sans-serif; border:1px solid #cbd5e1; border-radius:4px; box-shadow:0 4px 14px rgba(0,0,0,.12); margin:10px auto; overflow:hidden; }
     .lbl3 * { line-height:1.2; }
-    .b3-h { font-size:9px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:#0e2247;border-bottom:1px solid #e2e8f0;padding-bottom:1mm;margin:2.5mm 0 1.5mm; }
+    .b3-h { font-size:9px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:#000000;border-bottom:1px solid #e2e8f0;padding-bottom:1mm;margin:2.5mm 0 1.5mm; }
     .b3-h:first-of-type { margin-top:1.5mm; }
     .b3-tbl { width:100%;border-collapse:collapse;font-size:10px; }
     .b3-tbl td { padding:0.9mm 1mm;border-bottom:1px solid #f1f5f9;vertical-align:top; }
@@ -59,20 +59,11 @@
     .b3-foot .reg .r .k { color:#64748b; } .b3-foot .reg .r .vv { font-weight:800; }
     .b3-foot .mfgby { text-align:right;font-size:8px; } .b3-foot .mfgby .t { color:#64748b;text-transform:uppercase;font-size:7.5px; } .b3-foot .mfgby .n { font-weight:800;font-size:9px; }
 
-    @media print {
-      body > *:not(#labelOverlay) { display:none !important; }
-      #labelOverlay { position:static !important; inset:auto; display:block !important; background:#fff; padding:0; margin:0; overflow:visible; }
-      #labelDialog { box-shadow:none; background:#fff; max-width:none; width:auto; padding:0; margin:0; }
-      .lbl-modal-chrome, .lbl-cap { display:none !important; }
-      .lbl, .lbl3 { border:none !important; box-shadow:none !important; margin:0 !important; page-break-after:always; break-after:page; border-radius:0; }
-      /* Print only the set the user chose */
-      body.print-small .lbl3 { display:none !important; }
-      body.print-box   .lbl  { display:none !important; }
-      body.print-small .lbl, body.print-box .lbl3 { display:block !important; }
-    }
+    /* Printing is handled entirely by JS (see _printLabels): it injects a fresh
+       @page size + a static #__printRoot each time, so no @media print rules live
+       here. Keeping rules here previously fought the injected ones and forced the
+       wrong page size/orientation. */
   </style>
-  <!-- dynamic @page size injected before printing -->
-  <style id="dynPrintPage"></style>
 </head>
 <body>
 
@@ -110,6 +101,7 @@
           <th>Age / Gender</th>
           <th>UHID</th>
           <th>Cancer</th>
+          <th>Date</th>
           <th>Status</th>
           <th>Action</th>
         </tr>
@@ -134,9 +126,30 @@
         <label style="font-size:12px;font-weight:600;color:#334155;">Manufacturing Date</label>
         <input id="lblMfgDate" type="date" style="padding:7px 10px;border:1px solid #cbd5e1;border-radius:6px;">
       </div>
+      <div style="display:flex;flex-direction:column;gap:3px;">
+        <label style="font-size:12px;font-weight:600;color:#334155;">Box label size</label>
+        <select id="lblBoxSize" onchange="_toggleBoxCustom()" style="padding:7px 10px;border:1px solid #cbd5e1;border-radius:6px;">
+          <option value="100x150">100 × 150 mm</option>
+          <option value="100x100">100 × 100 mm</option>
+          <option value="100x75">100 × 75 mm</option>
+          <option value="75x100">75 × 100 mm</option>
+          <option value="50x75">50 × 75 mm</option>
+          <option value="custom">Custom…</option>
+        </select>
+      </div>
+      <div id="lblBoxCustom" style="display:none;gap:6px;align-items:flex-end;">
+        <div style="display:flex;flex-direction:column;gap:3px;">
+          <label style="font-size:11px;color:#334155;">W (mm)</label>
+          <input id="lblBoxW" type="number" value="100" min="20" style="width:64px;padding:7px;border:1px solid #cbd5e1;border-radius:6px;">
+        </div>
+        <div style="display:flex;flex-direction:column;gap:3px;">
+          <label style="font-size:11px;color:#334155;">H (mm)</label>
+          <input id="lblBoxH" type="number" value="150" min="20" style="width:64px;padding:7px;border:1px solid #cbd5e1;border-radius:6px;">
+        </div>
+      </div>
       <button class="btn-primary" id="lblGenBtn" onclick="generateLabelBatch()" style="padding:8px 14px;border-radius:6px;">Save Date &amp; Generate Batch</button>
       <button class="btn-secondary" id="lblPrintBtn" onclick="printLabelsSmall()" style="padding:8px 14px;border-radius:6px;" disabled>🖨️ Print Pouch Labels (100×75)</button>
-      <button class="btn-secondary" id="lblPrintBoxBtn" onclick="printBoxLabel()" style="padding:8px 14px;border-radius:6px;" disabled>🖨️ Print Box Label (100×150)</button>
+      <button class="btn-secondary" id="lblPrintBoxBtn" onclick="printBoxLabel()" style="padding:8px 14px;border-radius:6px;" disabled>🖨️ Print Box Label</button>
     </div>
     <div class="lbl-modal-chrome" id="lblBatchInfo" style="font-size:12.5px;color:#0f172a;margin-bottom:6px;"></div>
 
@@ -146,7 +159,7 @@
       <div class="lb-brand">Gquence · Personalized Oncology Nutrition</div>
       <div class="lb-name" id="lf_name">—</div>
       <div class="lb-meta" id="lf_meta">—</div>
-      <div class="lb-th">Per Serving Target</div>
+      <div class="lb-th">Per Serving</div>
       <div class="lb-row">
         <div class="lb-cell"><div class="l">Energy</div><div class="v"><span id="lf_energy">—</span></div><div class="u">kcal</div></div>
         <div class="lb-cell"><div class="l">Protein</div><div class="v"><span id="lf_protein">—</span></div><div class="u">g</div></div>
@@ -371,7 +384,7 @@ function render(){
   tbody.innerHTML='';
 
   if(!me.storeId){
-    tbody.innerHTML = '<tr><td colspan="7" style="padding:20px;color:#94a3b8;font-style:italic;">Loading store assignment...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" style="padding:20px;color:#94a3b8;font-style:italic;">Loading store assignment...</td></tr>';
     const apiBase = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : '';
     fetch(apiBase + '/api/users', { headers: { Authorization: 'Bearer ' + me.token } })
       .then(r => r.json())
@@ -383,11 +396,11 @@ function render(){
           db.setTable('session', session);
           render();
         } else {
-          tbody.innerHTML = '<tr><td colspan="7" style="padding:20px;color:#dc2626;font-weight:600;">This account is not assigned to a store. Please ask the Admin to go to Admin → Mappings and assign a store to your account.</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="8" style="padding:20px;color:#dc2626;font-weight:600;">This account is not assigned to a store. Please ask the Admin to go to Admin → Mappings and assign a store to your account.</td></tr>';
         }
       })
       .catch(() => {
-        tbody.innerHTML = '<tr><td colspan="7" style="padding:20px;color:#dc2626;font-weight:600;">This account is not assigned to a store. Please ask the Admin to go to Admin → Mappings and assign a store to your account.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" style="padding:20px;color:#dc2626;font-weight:600;">This account is not assigned to a store. Please ask the Admin to go to Admin → Mappings and assign a store to your account.</td></tr>';
       });
     return;
   }
@@ -414,7 +427,7 @@ function render(){
       DISPATCHED: 'No dispatched jobs.'
     };
     const msg = emptyLabels[_activeFilter] || 'No jobs.';
-    tbody.innerHTML = `<tr><td colspan="7" style="padding:20px;color:#94a3b8;font-style:italic;">${msg}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8" style="padding:20px;color:#94a3b8;font-style:italic;">${msg}</td></tr>`;
     return;
   }
 
@@ -430,6 +443,7 @@ function render(){
       <td>${p.age ? p.age + ' yr' : '-'} / ${p.sex || '-'}</td>
       <td>${p.uhic || '-'}</td>
       <td>${p.cancer}</td>
+      <td>${(j.createdAt || p.createdDate) ? _lblFmtDate(j.createdAt || p.createdDate) : '-'}</td>
       <td><span class="status ${statusClass(j.status)}">${manufacturingService.WORKFLOW.statusLabel(j.status)}</span></td>
       <td>
         <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-start;">
@@ -464,7 +478,7 @@ function _lblFmtDate(d){ if(!d) return '—'; const s=(typeof d==='string')?d.sl
 function _lblNum(v){ const n=Math.round(parseFloat(v)); return isNaN(n)?'—':n; }
 function _lblNum1(v){ const n=Math.round(parseFloat(v)*10)/10; return isNaN(n)?'—':n; }
 
-function openLabelModal(jobId){
+async function openLabelModal(jobId){
   const job = manufacturingService.getJobs().find(j => j.id === jobId);
   if(!job){ return; }
   const p = getPatientById(job.patientId);
@@ -477,14 +491,28 @@ function openLabelModal(jobId){
          || all.find(s => s.id === me.storeId)          // the logged-in user's store
          || (all.length === 1 ? all[0] : null);         // single-store deployments
   }
-  let plan;
+  // Use the SAME approved/saved plan the patient report uses, so the label's
+  // per-serving values match the report exactly. Only fall back to a fresh
+  // computation if no saved plan can be loaded.
+  let plan = null;
   try {
-    plan = generateNutritionPlan({
-      ...p,
-      weight: parseFloat(p.weight), height: parseFloat(p.height), albumin: parseFloat(p.albumin),
-      weightLossPercent: parseFloat(p.weightLossPercent || 0), giIssues: !!p.giIssues
-    });
-  } catch(e){ alert('Could not compute the plan: ' + e.message); return; }
+    const apiBase = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : '';
+    const res = await fetch(apiBase + '/api/nutrition-plans/patient/' + p.id, { headers: { 'Authorization': 'Bearer ' + (me.token || '') } });
+    if (res.ok) {
+      const plans = await res.json();                                   // ordered by version DESC
+      const latest = Array.isArray(plans) && plans.length ? plans[0] : null;
+      if (latest) plan = latest.finalPlan || latest.engineOutput || latest;
+    }
+  } catch(e){ /* fall back to fresh computation below */ }
+  if (!plan) {
+    try {
+      plan = generateNutritionPlan({
+        ...p,
+        weight: parseFloat(p.weight), height: parseFloat(p.height), albumin: parseFloat(p.albumin),
+        weightLossPercent: parseFloat(p.weightLossPercent || 0), giIssues: !!p.giIssues
+      });
+    } catch(e){ alert('Could not compute the plan: ' + e.message); return; }
+  }
   _lblJob = job; _lblPlan = plan; _lblStore = store; _lblPatient = p;
 
   document.getElementById('lblTitle').textContent = 'Product Labels — ' + (p.name || '');
@@ -501,14 +529,28 @@ function openLabelModal(jobId){
 
 function renderLabelModal(){
   const p = _lblPatient, plan = _lblPlan, job = _lblJob, store = _lblStore;
+  // Per-serving math, identical to the patient report (Patient-Profile):
+  //   energy  = daily batch ÷ servings
+  //   protein = recipe whey protein ÷ servings
+  // Using the same approved plan + formula keeps the label and report in sync.
+  const _r = (plan && plan.recipe && !Array.isArray(plan.recipe)) ? plan.recipe : null;
+  const _servings = plan.servingsPerDay || (_r && _r.servingsPerDay) || 3;
+  const _isDailyBatch = !!(_r && _r.isDailyBatch === true);
+  const _onsKcal = plan.onsCalories != null ? plan.onsCalories : plan.dailyCalories;
+  const _heroKcal = (_r && _r.recipeKcal) ? (_isDailyBatch ? _r.recipeKcal : _r.recipeKcal * _servings) : _onsKcal;
+  const _psEnergy = _isDailyBatch ? Math.round(_heroKcal / _servings)
+                                  : (_r && _r.recipeKcal ? _r.recipeKcal : Math.round(_onsKcal / _servings));
+  const _psProtein = (_r && _r.wheyProtein != null) ? Math.round(_r.wheyProtein / _servings) : plan.perServingProtein;
+  const _dailyProtein = (_r && _r.wheyProtein != null) ? _r.wheyProtein : plan.dailyProtein;
+
   _lblSet('lf_name', p.name || '—');
   document.getElementById('lf_meta').innerHTML = `<b>${p.age ? p.age+' yr' : '—'}</b> · <b>${p.sex || '—'}</b> · UHIC: <b>${p.uhic || '—'}</b>`;
-  _lblSet('lf_energy', _lblNum(plan.perServingCalories));
-  _lblSet('lf_protein', _lblNum(plan.perServingProtein));
+  _lblSet('lf_energy', _lblNum(_psEnergy));
+  _lblSet('lf_protein', _lblNum(_psProtein));
   _lblSet('lf_serv', plan.servingsPerDay || '—');
   _lblSet('lf_route', plan.prescribedRoute || 'Oral Feeding');
-  _lblSet('lb_energy', _lblNum(plan.perServingCalories));
-  _lblSet('lb_protein', _lblNum(plan.perServingProtein));
+  _lblSet('lb_energy', _lblNum(_psEnergy));
+  _lblSet('lb_protein', _lblNum(_psProtein));
   _lblSet('lb_carb', _lblNum1(plan.macroCarbs));
   _lblSet('lb_fat', _lblNum1(plan.macroFat));
   const r = plan.recipe || {};
@@ -530,10 +572,10 @@ function renderLabelModal(){
   _lblSet('x_route', plan.prescribedRoute || 'Oral Feeding');
   _lblSet('x_serv', plan.servingsPerDay || '—');
 
-  _lblSet('x_ps_energy', _lblNum(plan.perServingCalories));
-  _lblSet('x_d_energy', _lblNum(plan.dailyCalories));
-  _lblSet('x_ps_protein', _lblNum(plan.perServingProtein));
-  _lblSet('x_d_protein', _lblNum(plan.dailyProtein));
+  _lblSet('x_ps_energy', _lblNum(_psEnergy));
+  _lblSet('x_d_energy', _lblNum(_heroKcal));
+  _lblSet('x_ps_protein', _lblNum(_psProtein));
+  _lblSet('x_d_protein', _lblNum(_dailyProtein));
   _lblSet('x_ps_carb', _lblNum1(plan.macroCarbs));
   _lblSet('x_d_carb', _lblNum1(plan.dailyCarbs));
   _lblSet('x_ps_fat', _lblNum1(plan.macroFat));
@@ -559,21 +601,82 @@ function renderLabelModal(){
   document.getElementById('x_storeaddr').textContent = (store && (store.address || store.location)) || '';
 }
 
-function _setPrintPage(w, h){
-  document.getElementById('dynPrintPage').textContent = `@media print { @page { size:${w}mm ${h}mm; margin:0; } }`;
+// Robust printing via a dedicated pop-up window. This is the most reliable method
+// in Chrome: a real top-level document honors @page size + orientation (an iframe
+// does not), and there's no modal / display:none toggling that can blank the
+// preview. The labels are copied with their already-rendered values via outerHTML.
+function _labelCss(){
+  // Reuse the page's label styling, dropping any @media print block.
+  const css = (document.querySelector('style') || {}).textContent || '';
+  const i = css.indexOf('@media print');
+  if(i < 0) return css;
+  let depth = 1, k = css.indexOf('{', i) + 1;
+  while(k < css.length && depth > 0){ const c = css[k++]; if(c==='{') depth++; else if(c==='}') depth--; }
+  return css.slice(0, i) + css.slice(k);
 }
-function printLabelsSmall(){
-  _setPrintPage(100, 75);
-  document.body.classList.add('print-small');
-  document.body.classList.remove('print-box');
-  setTimeout(() => { window.print(); setTimeout(() => document.body.classList.remove('print-small'), 800); }, 60);
+// Each label is wrapped in a fixed WxH "page" box. After the pop-up lays out, a
+// small script measures the real content height and, if it's taller than the
+// label, scales it down (transform) so EVERYTHING fits inside ONE label — no
+// spilling onto extra pages and nothing clipped.
+function _printLabels(elementIds, w, h){
+  const els = elementIds.map(id => document.getElementById(id)).filter(Boolean);
+  if(!els.length){ alert('Nothing to print.'); return; }
+
+  const win = window.open('', 'gquenceLabelPrint', 'width=' + Math.max(360, Math.round(w*3.8)) + ',height=760');
+  if(!win){ alert('Please allow pop-ups for this site, then click Print again.'); return; }
+
+  const pages = els.map(el => '<div class="pg"><div class="fit">' + el.outerHTML + '</div></div>').join('');
+  const fitScript =
+    '(function(){' +
+      'var probe=document.createElement("div");probe.style.cssText="position:absolute;left:-9999px;top:0;width:100mm";' +
+      'document.body.appendChild(probe);var pxmm=probe.getBoundingClientRect().width/100;probe.remove();' +
+      'var H=' + h + '*pxmm,W=' + w + '*pxmm;' +
+      'Array.prototype.forEach.call(document.querySelectorAll(".pg"),function(pg){' +
+        'var fit=pg.querySelector(".fit");var r=fit.getBoundingClientRect();' +
+        'var s=Math.min(1,H/r.height,W/r.width);' +
+        'if(s<1&&s>0){fit.style.transformOrigin="top left";fit.style.transform="scale("+s+")";}' +
+      '});' +
+      'setTimeout(function(){window.focus();window.print();},120);' +
+    '})();';
+
+  const doc =
+    '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Labels</title><style>' +
+      _labelCss() +
+      'html,body{margin:0;padding:0;background:#fff;}' +
+      '.pg{width:' + w + 'mm;height:' + h + 'mm;overflow:hidden;position:relative;page-break-after:always;break-after:page;}' +
+      '.pg:last-child{page-break-after:auto;break-after:auto;}' +
+      '.fit{width:' + w + 'mm;}' +
+      '.lbl,.lbl3{margin:0 !important;border:none !important;box-shadow:none !important;border-radius:0;' +
+        'width:' + w + 'mm !important;height:auto !important;overflow:visible !important;}' +
+      '.lbl,.lbl3,.lbl *,.lbl3 *{color:#000 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}' +
+      '@page{size:' + w + 'mm ' + h + 'mm;margin:0;}' +
+    '</style></head><body>' + pages +
+      '<scr' + 'ipt>' + fitScript + '</scr' + 'ipt>' +
+    '</body></html>';
+
+  win.document.open();
+  win.document.write(doc);
+  win.document.close();
+  win.onafterprint = function(){ try { win.close(); } catch(e){} };
 }
-function printBoxLabel(){
-  _setPrintPage(100, 150);
-  document.body.classList.add('print-box');
-  document.body.classList.remove('print-small');
-  setTimeout(() => { window.print(); setTimeout(() => document.body.classList.remove('print-box'), 800); }, 60);
+function _toggleBoxCustom(){
+  const sel = document.getElementById('lblBoxSize');
+  const box = document.getElementById('lblBoxCustom');
+  if(box) box.style.display = (sel && sel.value === 'custom') ? 'flex' : 'none';
 }
+function _boxSize(){
+  const sel = document.getElementById('lblBoxSize');
+  if(!sel) return [100, 150];
+  if(sel.value === 'custom'){
+    const w = parseFloat(document.getElementById('lblBoxW').value) || 100;
+    const h = parseFloat(document.getElementById('lblBoxH').value) || 150;
+    return [w, h];
+  }
+  const p = sel.value.split('x');
+  return [parseFloat(p[0]) || 100, parseFloat(p[1]) || 150];
+}
+function printLabelsSmall(){ _printLabels(['lblFront', 'lblBack'], 100, 75); }
+function printBoxLabel(){ const s = _boxSize(); _printLabels(['lblBox'], s[0], s[1]); }
 
 async function generateLabelBatch(){
   const err = document.getElementById('lblErr'); err.style.display = 'none';

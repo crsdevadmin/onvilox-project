@@ -29,8 +29,20 @@ app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
 app.use(express.json({ limit: '2mb' }));
 
-// Serve frontend static files (HTML, JS, CSS) from the project root
-app.use(express.static(path.join(__dirname, '..')));
+// Serve frontend static files (HTML, JS, CSS) from the project root.
+// HTML, the service worker, and app JS/CSS are served with no-cache so every
+// deploy is picked up automatically — users never need to clear cache. (Static
+// assets that rarely change, like images/fonts, may still be cached by the browser.)
+app.use(express.static(path.join(__dirname, '..'), {
+  etag: true,
+  setHeaders: (res, filePath) => {
+    if (/\.(html|js|css)$/i.test(filePath) || /sw\.js$/i.test(filePath)) {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+    }
+  }
+}));
 
 // Database Connection
 const pool = new Pool({
@@ -1319,13 +1331,17 @@ OUTPUT FORMAT — return ONLY valid JSON, no markdown, no text outside the JSON 
     await pool.query(`
       CREATE TABLE IF NOT EXISTS monitoring_logs (
         id SERIAL PRIMARY KEY,
-        patient_id INTEGER NOT NULL,
+        patient_id TEXT NOT NULL,
         type VARCHAR(10) NOT NULL,
         recorded_at TIMESTAMP DEFAULT NOW(),
-        recorded_by INTEGER,
+        recorded_by TEXT,
         data JSONB NOT NULL
       )
     `);
+    // Patient ids are strings (e.g. 'pat_…'); coerce any legacy INTEGER columns from
+    // an earlier migration to TEXT so monitoring saves don't fail on string ids.
+    await pool.query(`ALTER TABLE monitoring_logs ALTER COLUMN patient_id TYPE TEXT USING patient_id::text`).catch(() => {});
+    await pool.query(`ALTER TABLE monitoring_logs ALTER COLUMN recorded_by TYPE TEXT USING recorded_by::text`).catch(() => {});
   } catch(e) { console.error('monitoring_logs migration:', e.message); }
 })();
 
@@ -1822,11 +1838,16 @@ const cleanRoutes = {
   '/admin/rules':      'admin-rules.html',
   '/coordinator':      'coordinator.html',
 };
+const _noCacheHtml = (res) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+};
 Object.entries(cleanRoutes).forEach(([route, file]) => {
-  app.get(route, (req, res) => res.sendFile(path.join(__dirname, '..', file)));
+  app.get(route, (req, res) => { _noCacheHtml(res); res.sendFile(path.join(__dirname, '..', file)); });
 });
 // Root → login page
-app.get('/', (req, res) => res.sendFile(path.join(__dirname, '..', 'index.html')));
+app.get('/', (req, res) => { _noCacheHtml(res); res.sendFile(path.join(__dirname, '..', 'index.html')); });
 
 // Seed SUPER_ADMIN into DB on startup if not present
 async function seedSuperAdmin() {

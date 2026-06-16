@@ -4,6 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Product Labels - Gquence</title>
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
   <script src="/js/config.js"></script>
   <link rel="stylesheet" href="/css/app.css">
   <style>
@@ -25,11 +27,11 @@
     .label * { line-height: 1.18; }
 
     /* ---- FRONT ---- */
-    .brand { font-size:9px; font-weight:800; letter-spacing:.12em; color:#0e2247; text-transform:uppercase; }
+    .brand { font-size:9px; font-weight:800; letter-spacing:.12em; color:#000000; text-transform:uppercase; }
     .pname { font-size:17px; font-weight:800; margin:1mm 0 0.5mm; }
     .pmeta { font-size:10px; color:#334155; margin-bottom:1.5mm; }
     .pmeta b { color:#0f172a; }
-    .tt-title { font-size:9px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:#0e2247; border-top:1px solid #e2e8f0; padding-top:1.5mm; margin-top:1mm; }
+    .tt-title { font-size:9px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:#000000; border-top:1px solid #e2e8f0; padding-top:1.5mm; margin-top:1mm; }
     .tt-grid { display:grid; grid-template-columns:1fr 1fr; gap:1.5mm 4mm; margin-top:1.5mm; }
     .tt-item .l { font-size:8.5px; color:#64748b; text-transform:uppercase; letter-spacing:.04em; }
     .tt-item .v { font-size:14px; font-weight:800; color:#0f172a; }
@@ -39,7 +41,7 @@
     .back { display:flex; gap:4mm; height:100%; }
     .back-left { flex:1; display:flex; flex-direction:column; }
     .back-right { width:38mm; display:flex; flex-direction:column; justify-content:space-between; border-left:1px solid #e2e8f0; padding-left:3mm; }
-    .sec-h { font-size:8px; font-weight:800; letter-spacing:.05em; text-transform:uppercase; color:#0e2247; margin-bottom:1mm; }
+    .sec-h { font-size:8px; font-weight:800; letter-spacing:.05em; text-transform:uppercase; color:#000000; margin-bottom:1mm; }
     .ps-grid { display:grid; grid-template-columns:1fr 1fr; gap:1mm 3mm; margin-bottom:2mm; }
     .ps-item .l { font-size:7.5px; color:#64748b; text-transform:uppercase; }
     .ps-item .v { font-size:11.5px; font-weight:800; }
@@ -87,6 +89,7 @@
     </div>
     <div id="batchInfo" style="margin-top:12px;font-size:13px;color:#0f172a;"></div>
     <div id="errBox" style="margin-top:10px;color:#dc2626;font-weight:600;"></div>
+    <div id="debugBox" style="margin-top:10px;font-size:11px;color:#475569;background:#f8fafc;padding:8px;border-radius:4px;word-break:break-all;"></div>
   </div>
 </div>
 
@@ -98,7 +101,7 @@
       <div class="brand">Gquence · Therapeutic Nutrition</div>
       <div class="pname" id="fName">—</div>
       <div class="pmeta" id="fMeta">—</div>
-      <div class="tt-title">Per Serving Target</div>
+      <div class="tt-title">Per Serving</div>
       <div class="tt-grid">
         <div class="tt-item"><div class="l">Energy</div><div class="v"><span id="fEnergy">—</span> <span class="u">kcal</span></div></div>
         <div class="tt-item"><div class="l">Protein</div><div class="v"><span id="fProtein">—</span> <span class="u">g</span></div></div>
@@ -179,16 +182,10 @@ initStore().then(() => {
   _store = (storeService.getStoreById ? storeService.getStoreById(_job.storeId) : null)
         || storeService.getStores().find(s => s.id === _job.storeId) || null;
 
-  // Compute the plan (same inputs as the store production view)
+  // Always regenerate fresh — same as Patient-Profile report's ensurePlan().
+  // The stored plan can have stale per-serving values; the engine is the source of truth.
   try {
-    _plan = generateNutritionPlan({
-      ..._patient,
-      weight: parseFloat(_patient.weight),
-      height: parseFloat(_patient.height),
-      albumin: parseFloat(_patient.albumin),
-      weightLossPercent: parseFloat(_patient.weightLossPercent || 0),
-      giIssues: !!_patient.giIssues
-    });
+    _plan = generateNutritionPlan(_patient);
   } catch(e){ showErr('Could not compute the nutrition plan: ' + e.message); return; }
 
   document.getElementById('ctrlInfo').innerHTML =
@@ -215,14 +212,33 @@ function renderLabels(){
   const age = _patient.age ? _patient.age + ' yr' : '—';
   document.getElementById('fMeta').innerHTML =
     `<b>${age}</b> &nbsp;·&nbsp; <b>${_patient.sex || '—'}</b> &nbsp;·&nbsp; UHIC: <b>${_patient.uhic || '—'}</b>`;
-  document.getElementById('fEnergy').textContent = num(planVal('perServingCalories'));
-  document.getElementById('fProtein').textContent = num(planVal('perServingProtein'));
+  // Per-serving values — exact same logic as Patient-Profile report (bind() function).
+  // recipe.recipeKcal and recipe.wheyProtein are DAILY totals when isDailyBatch=true.
+  const recipe = (_plan && _plan.recipe && !Array.isArray(_plan.recipe)) ? _plan.recipe : null;
+  const servPerDay = _plan.servingsPerDay || 3;
+  const isDailyBatch = !!(recipe && recipe.isDailyBatch === true);
+  const onsKcal = _plan.onsCalories != null ? _plan.onsCalories : _plan.dailyCalories;
+  const heroKcal = (recipe && recipe.recipeKcal)
+    ? (isDailyBatch ? recipe.recipeKcal : recipe.recipeKcal * servPerDay)
+    : onsKcal;
+  const actualServingEnergy = isDailyBatch
+    ? Math.round(heroKcal / servPerDay)
+    : (recipe && recipe.recipeKcal ? recipe.recipeKcal : Math.round(onsKcal / servPerDay));
+  const actualServingProtein = (recipe && recipe.wheyProtein != null)
+    ? Math.round(recipe.wheyProtein / servPerDay)
+    : _plan.perServingProtein;
+  document.getElementById('fEnergy').textContent = actualServingEnergy;
+  document.getElementById('fProtein').textContent = actualServingProtein;
   document.getElementById('fServings').textContent = planVal('servingsPerDay') || '—';
   document.getElementById('fRoute').textContent = planVal('prescribedRoute') || 'Oral Feeding';
 
-  // BACK — per serving
-  document.getElementById('bEnergy').textContent = num(planVal('perServingCalories'));
-  document.getElementById('bProtein').textContent = num(planVal('perServingProtein'));
+  // DEBUG — remove once values confirmed correct
+  document.getElementById('debugBox').innerHTML =
+    `recipeKcal=${recipe && recipe.recipeKcal} | wheyPro=${recipe && recipe.wheyProtein} | isDailyBatch=${isDailyBatch} | servPerDay=${servPerDay} | onsKcal=${onsKcal} | heroKcal=${heroKcal} | → Energy=${actualServingEnergy} Protein=${actualServingProtein} | perServingCalories=${_plan.perServingCalories} | perServingProtein=${_plan.perServingProtein} | dailyProtein=${_plan.dailyProtein} | dailyCalories=${_plan.dailyCalories}`;
+
+  // BACK — per serving (actual formula values)
+  document.getElementById('bEnergy').textContent = actualServingEnergy;
+  document.getElementById('bProtein').textContent = actualServingProtein;
   document.getElementById('bCarb').textContent = num1(planVal('macroCarbs'));
   document.getElementById('bFat').textContent = num1(planVal('macroFat'));
 

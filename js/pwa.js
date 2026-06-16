@@ -5,8 +5,33 @@
   const VAPID_KEY = 'BP2E-Ogveb92wrIjjciORv_jDJO82jut8m3QSJM_UrwJbVDJCFZdDzSuQZvahxpu_0gw7B-E_bJktm7VKd-qTEo';
 
   // Register service worker
+  // Auto-update: when a newly deployed version takes control, reload the page once so
+  // every device always runs the latest code — no manual cache clearing required.
+  // Guarded against reload loops; skips the very first install (no existing controller).
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (window.__swReloaded) return;
+    if (!navigator.serviceWorker.controller) return;
+    window.__swReloaded = true;
+    window.location.reload();
+  });
+
   navigator.serviceWorker.register('/sw.js', { scope: '/' }).then(reg => {
     window._swReg = reg;
+    // Detect a new deployed version: when one activates while a page is already
+    // controlled, reload to pick it up. Also poll for updates periodically and when
+    // the tab regains focus, so long-lived store/admin tabs don't stay on old code.
+    reg.addEventListener('updatefound', () => {
+      const nw = reg.installing;
+      if (nw) nw.addEventListener('statechange', () => {
+        if (nw.state === 'activated' && navigator.serviceWorker.controller && !window.__swReloaded) {
+          window.__swReloaded = true;
+          window.location.reload();
+        }
+      });
+    });
+    try { reg.update(); } catch (e) {}
+    setInterval(() => { try { reg.update(); } catch (e) {} }, 60000);
+    window.addEventListener('focus', () => { try { reg.update(); } catch (e) {} });
     // Wait for SW to be active before subscribing
     if (reg.active) {
       _subscribePush(reg);

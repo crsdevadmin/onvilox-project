@@ -4224,11 +4224,21 @@
               const tTotalP = Math.round(totalProtein * 10) / 10;
               const tTotalC = Math.round(totalCarbs * 10) / 10;
               const tTotalF = Math.round(totalFat * 10) / 10;
+              // Protein breakdown: the batch total includes free amino acids (glutamine / BCAA),
+              // which is why it exceeds the formula protein target. Show the split for clarity.
+              const _protOf = (ing) => { if (!ing || !ing.grams) return 0; const lib = getLib(ing.id); return lib.pPerGram > 0 ? Math.round(ing.grams * lib.pPerGram * 10) / 10 : 0; };
+              const _formulaP = _protOf(r.protein);
+              const _gluP = _protOf(r.glutamine);
+              const _bcaaP = _protOf(r.bcaa);
+              const _pParts = [`Formula ${_formulaP}g`];
+              if (_gluP > 0) _pParts.push(`Glutamine ${_gluP}g`);
+              if (_bcaaP > 0) _pParts.push(`BCAA ${_bcaaP}g`);
+              const _proteinBreakdown = _pParts.length > 1 ? ` <span style="color:#94a3b8;">(${_pParts.join(' + ')})</span>` : '';
               const totalsRow = document.createElement('tr');
               totalsRow.innerHTML = `
         <td style="padding:8px 13px; background:#f8fafc; border-top:2px solid #e2e8f0;">
           <div style="font-weight:800; color:#0e2247; font-size:10.5px;">Daily Batch Totals</div>
-          <div style="font-size:9.5px; color:#475569; margin-top:2px;">Powder: <b>${Math.round(totalPowderGrams * 10)/10} g</b> &nbsp;|&nbsp; Protein: <b>${tTotalP}g</b> &nbsp;|&nbsp; Carbs: <b>${tTotalC}g</b> &nbsp;|&nbsp; Fat: <b>${tTotalF}g</b></div>
+          <div style="font-size:9.5px; color:#475569; margin-top:2px;">Powder: <b>${Math.round(totalPowderGrams * 10)/10} g</b> &nbsp;|&nbsp; Protein: <b>${tTotalP}g</b>${_proteinBreakdown} &nbsp;|&nbsp; Carbs: <b>${tTotalC}g</b> &nbsp;|&nbsp; Fat: <b>${tTotalF}g</b></div>
           <div style="font-size:8.5px; color:#94a3b8; margin-top:1px;">Note: Powder weight ≠ macro grams. Each ingredient delivers different protein/carb/fat fractions. Divide into ${srv} equal servings.</div>
         </td>
         <td style="background:#f8fafc; border-top:2px solid #e2e8f0;"></td>
@@ -5554,7 +5564,7 @@ function toggleMonitorForm(type) {
 
 async function saveMonitorLog(type) {
   var p = window.patient;
-  if (!p || !p.id || String(p.id).startsWith('pat_')) return alert('Monitoring is only available for patients saved to the server. Please re-create this patient.');
+  if (!p || !p.id) return alert('Please open a saved patient before adding monitoring entries.');
   var u = (typeof auth !== 'undefined') ? auth.getCurrentUser() : {};
   var token = u && u.token ? 'Bearer ' + u.token : '';
   var apiBase = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : '';
@@ -5591,6 +5601,16 @@ async function saveMonitorLog(type) {
     };
   }
   try {
+    // Ensure the patient row exists on the server (upsert) before logging. Patients
+    // are stored under their own id — including 'pat_' ids — so this is safe and makes
+    // monitoring work without forcing the user to re-create the patient.
+    try {
+      await fetch(apiBase + '/api/patients', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': token },
+        body: JSON.stringify(p)
+      });
+    } catch(_) { /* best effort — the patient may already be on the server */ }
     var res = await fetch(apiBase + '/api/patients/' + p.id + '/monitoring', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': token },
@@ -5610,7 +5630,7 @@ async function saveMonitorLog(type) {
 
 async function loadMonitoringLogs() {
   var p = window.patient;
-  if (!p || !p.id || String(p.id).startsWith('pat_')) return; // localStorage patient — no server record
+  if (!p || !p.id) return;
   var u = (typeof auth !== 'undefined') ? auth.getCurrentUser() : {};
   var token = u && u.token ? 'Bearer ' + u.token : '';
   var apiBase = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : '';

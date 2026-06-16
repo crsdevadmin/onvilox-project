@@ -384,6 +384,7 @@
               };
 
               // Retry up to 3 times in case of transient server error
+              let _insightsSaved = false;
               for (let attempt = 1; attempt <= 3; attempt++) {
                 try {
                   const result = await _patch();
@@ -397,13 +398,18 @@
                     });
                     await _patch(); // Now PATCH with plan in DB
                   }
+                  _insightsSaved = true;
                   break;
                 } catch(e) {
                   console.warn(`PATCH insights attempt ${attempt} error:`, e.message);
                   if (attempt < 3) await new Promise(r => setTimeout(r, 2000 * attempt));
                 }
               }
-              _clearLock(planId);
+              // Only clear the lock if the real insights FAILED to save. On success the
+              // insights PATCH above already replaced the {generating:true} lock with the
+              // actual data — calling _clearLock here would null out the insights we just
+              // saved, so the dashboard would see "no AI" and re-run the analysis forever.
+              if (!_insightsSaved) _clearLock(planId);
             }
           };
 
