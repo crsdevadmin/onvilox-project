@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Clinical Trials — Export Dataset - Gquence</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <link rel="stylesheet" href="/css/app.css">
+  <style>
+    .subnav { display:flex; gap:6px; margin:0 0 14px; flex-wrap:wrap; }
+    .subnav a { padding:7px 14px; border-radius:20px; font-size:13px; text-decoration:none; color:var(--text-2); background:var(--surface-2); }
+    .subnav a.active { background:#0e2247; color:#fff; }
+    .sheet-list { display:flex; gap:12px; flex-wrap:wrap; margin:14px 0; }
+    .sheet-card { flex:1; min-width:170px; background:var(--surface-2); border:1px solid var(--border); border-radius:12px; padding:14px; }
+    .sheet-card .t { font-weight:800; color:var(--text); }
+    .sheet-card .d { font-size:12.5px; color:var(--text-2); margin-top:3px; }
+    .sheet-card .c { font-size:22px; font-weight:800; color:var(--text); margin-top:6px; }
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">Gquence Admin</div>
+  <div class="nav">
+    <a href="/admin">Dashboard</a>
+    <a href="/admin/stores">Stores</a>
+    <a href="/admin/users">Create Users</a>
+    <a href="/admin/mapping">Mapping</a>
+    <a href="/admin/tracking">Tracking</a>
+    <a href="/admin/trials">Clinical Trials</a>
+    <a href="/admin/reports">Reports</a>
+    <a href="/admin/rules">Rule Engine</a>
+    <a href="#" onclick="auth.logout()">Logout</a>
+    <button id="themeToggleBtn" onclick="toggleTheme()" class="btn-secondary btn-sm" style="margin-left: 20px; border-radius: 30px; padding: 6px 14px; cursor: pointer;">🌙 Dark Mode</button>
+  </div>
+</div>
+
+<div class="container page">
+  <div class="card">
+    <div class="subnav">
+      <a href="/admin/trials">Enrollment Log</a>
+      <a href="/admin/trials/cohort">Cohort Dashboard</a>
+      <a href="/admin/trials/outcomes">Weekly Outcomes</a>
+      <a href="/admin/trials/formula">Formula Tracking</a>
+      <a href="/admin/trials/export" class="active">Export Dataset</a>
+    </div>
+
+    <h2 style="margin-bottom:0;">Export Pilot Dataset</h2>
+    <p style="color:var(--text-2);margin-top:4px;">Download the complete pilot dataset as a multi-sheet Excel workbook — ready for analysis or publication.</p>
+
+    <div class="sheet-list" id="sheetList">
+      <div class="sheet-card"><div class="t">Enrollment</div><div class="d">Study ID, UHID, diagnosis, all dates, status, formula version, batch</div><div class="c" id="cEnroll">—</div></div>
+      <div class="sheet-card"><div class="t">Baseline</div><div class="d">Weight, height, BMI, MUAC, albumin, CRP, hemoglobin</div><div class="c" id="cBase">—</div></div>
+      <div class="sheet-card"><div class="t">Weekly</div><div class="d">One row per patient per week (long format)</div><div class="c" id="cWeek">—</div></div>
+      <div class="sheet-card"><div class="t">Final Outcomes</div><div class="d">Last values + change from baseline</div><div class="c" id="cFinal">—</div></div>
+    </div>
+
+    <button class="btn-primary" id="exportBtn" style="border-radius:8px;padding:11px 22px;font-size:15px;cursor:pointer;" onclick="doExport()" disabled>⬇ Export Pilot Dataset (Excel)</button>
+    <div id="exMsg" style="color:var(--text-2);font-size:13px;margin-top:10px;">Loading dataset…</div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="/js/config.js"></script>
+<script src="/js/storage.js"></script>
+<script src="/js/seed.js"></script>
+<script src="/js/auth.js"></script>
+<script src="/js/theme.js"></script>
+
+<script>
+auth.requireRole(['SUPER_ADMIN', 'ADMIN']);
+const me = auth.getCurrentUser();
+const apiBase = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : '';
+let _data = null;
+
+async function load(){
+  try {
+    const res = await fetch(apiBase + '/api/trials/export', { headers: { 'Authorization': 'Bearer ' + (me.token||'') } });
+    if(!res.ok) throw new Error('Server error ' + res.status);
+    _data = await res.json();
+    document.getElementById('cEnroll').textContent = (_data.enrollment||[]).length;
+    document.getElementById('cBase').textContent = (_data.baseline||[]).length;
+    document.getElementById('cWeek').textContent = (_data.weekly||[]).length;
+    document.getElementById('cFinal').textContent = (_data.final||[]).length;
+    const n = (_data.enrollment||[]).length;
+    document.getElementById('exportBtn').disabled = n === 0;
+    document.getElementById('exMsg').textContent = n ? `Ready — ${n} patient${n===1?'':'s'} in the dataset.` : 'No pilot patients yet.';
+  } catch(e){
+    document.getElementById('exMsg').textContent = 'Could not load dataset: ' + e.message;
+  }
+}
+
+function doExport(){
+  if(!_data){ return; }
+  if(typeof XLSX === 'undefined'){ document.getElementById('exMsg').textContent = 'Excel library failed to load. Check your connection and reload.'; return; }
+  try {
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(_data.enrollment || []), 'Enrollment');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(_data.baseline || []), 'Baseline');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(_data.weekly || []), 'Weekly');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(_data.final || []), 'Final Outcomes');
+    const fname = 'GQUENCE_Pilot_Dataset_' + new Date().toISOString().slice(0,10) + '.xlsx';
+    XLSX.writeFile(wb, fname);
+    document.getElementById('exMsg').textContent = 'Exported ' + fname;
+  } catch(e){
+    document.getElementById('exMsg').textContent = 'Export failed: ' + e.message;
+  }
+}
+load();
+</script>
+</body>
+</html>

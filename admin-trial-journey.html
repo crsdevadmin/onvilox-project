@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Clinical Trials — Patient Journey - Gquence</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <link rel="stylesheet" href="/css/app.css">
+  <style>
+    .pj-head { display:flex; flex-wrap:wrap; gap:18px; align-items:baseline; }
+    .pj-head .sid { font-size:22px; font-weight:800; color:var(--text); }
+    .pj-meta { color:var(--text-2); font-size:14px; }
+    .timeline { position:relative; margin:22px 0 4px; padding-left:28px; }
+    .timeline:before { content:''; position:absolute; left:9px; top:6px; bottom:6px; width:2px; background:#e2e8f0; }
+    .tl-item { position:relative; padding:0 0 18px 6px; }
+    .tl-item:before { content:''; position:absolute; left:-23px; top:3px; width:14px; height:14px; border-radius:50%; background:#cbd5e1; border:2px solid #fff; box-shadow:0 0 0 1px #cbd5e1; }
+    .tl-item.done:before { background:#16a34a; box-shadow:0 0 0 1px #16a34a; }
+    .tl-item.pending:before { background:#fff; }
+    .tl-lbl { font-weight:700; color:var(--text); font-size:14px; }
+    .tl-date { font-size:13px; margin-top:1px; }
+    .tl-date.has { color:var(--text); font-weight:600; }
+    .tl-date.no { color:var(--text-2); font-style:italic; }
+    .wk-chips { display:flex; flex-wrap:wrap; gap:6px; margin-top:4px; }
+    .wk-chip { background:#eef2f7; border:1px solid #e2e8f0; border-radius:14px; padding:2px 9px; font-size:11.5px; color:#334155; }
+    .withdrawn-banner { background:#fee2e2; color:#991b1b; border-radius:8px; padding:10px 14px; font-weight:600; margin:12px 0; }
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">Gquence Admin</div>
+  <div class="nav">
+    <a href="/admin">Dashboard</a>
+    <a href="/admin/stores">Stores</a>
+    <a href="/admin/users">Create Users</a>
+    <a href="/admin/mapping">Mapping</a>
+    <a href="/admin/tracking">Tracking</a>
+    <a href="/admin/trials">Clinical Trials</a>
+    <a href="/admin/reports">Reports</a>
+    <a href="/admin/rules">Rule Engine</a>
+    <a href="#" onclick="auth.logout()">Logout</a>
+    <button id="themeToggleBtn" onclick="toggleTheme()" class="btn-secondary btn-sm" style="margin-left: 20px; border-radius: 30px; padding: 6px 14px; cursor: pointer;">🌙 Dark Mode</button>
+  </div>
+</div>
+
+<div class="container page">
+  <div class="card">
+    <a href="/admin/trials" style="font-size:13px;color:var(--text);">&larr; Back to Enrollment Log</a>
+    <div id="pjMsg" style="color:#6b7280;font-size:13px;margin:10px 0;">Loading…</div>
+    <div id="pjContent" style="display:none;">
+      <div class="pj-head">
+        <span class="sid" id="pjStudyId">—</span>
+        <span class="pj-meta" id="pjMeta">—</span>
+      </div>
+      <div id="pjWithdrawn"></div>
+      <h3 style="margin:18px 0 0;">Patient Journey</h3>
+      <p style="color:#6b7280;font-size:13px;margin-top:2px;">Key dates assembled automatically from the patient's workflow.</p>
+      <div class="timeline" id="pjTimeline"></div>
+    </div>
+  </div>
+</div>
+
+<script src="/js/config.js"></script>
+<script src="/js/storage.js"></script>
+<script src="/js/seed.js"></script>
+<script src="/js/auth.js"></script>
+<script src="/js/theme.js"></script>
+
+<script>
+auth.requireRole(['SUPER_ADMIN', 'ADMIN']);
+const me = auth.getCurrentUser();
+const apiBase = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : '';
+const patientId = new URLSearchParams(location.search).get('patient');
+
+function fmtDate(d){
+  if(!d) return null;
+  const dt = new Date(d);
+  if(isNaN(dt.getTime())){
+    const s = String(d).slice(0,10);
+    const m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    return m ? `${m[3]}/${m[2]}/${m[1]}` : s;
+  }
+  return ('0'+dt.getDate()).slice(-2)+'/'+('0'+(dt.getMonth()+1)).slice(-2)+'/'+dt.getFullYear();
+}
+
+async function load(){
+  if(!patientId){ document.getElementById('pjMsg').textContent = 'No patient specified.'; return; }
+  try {
+    const res = await fetch(apiBase + '/api/trials/' + patientId + '/journey', { headers: { 'Authorization': 'Bearer ' + (me.token||'') } });
+    if(!res.ok) throw new Error('Server error ' + res.status);
+    const d = await res.json();
+    render(d);
+    document.getElementById('pjMsg').style.display = 'none';
+    document.getElementById('pjContent').style.display = 'block';
+  } catch(e){
+    document.getElementById('pjMsg').textContent = 'Could not load journey: ' + e.message;
+  }
+}
+
+function render(d){
+  const p = d.patient || {};
+  document.getElementById('pjStudyId').textContent = d.studyId || '—';
+  document.getElementById('pjMeta').innerHTML =
+    `${p.name||'—'} &nbsp;·&nbsp; UHID ${p.uhic||'—'} &nbsp;·&nbsp; ${p.diagnosis||'—'}` +
+    (d.batchNo ? ` &nbsp;·&nbsp; Batch ${d.batchNo}` : '');
+
+  document.getElementById('pjWithdrawn').innerHTML = d.withdrawnAt
+    ? `<div class="withdrawn-banner">Withdrawn on ${fmtDate(d.withdrawnAt)}${d.withdrawnReason ? ' — ' + d.withdrawnReason : ''}</div>` : '';
+
+  const m = d.milestones || {};
+  const steps = [
+    ['Enrollment', m.enrollment],
+    ['Baseline Assessment', m.baseline],
+    ['Report Generated', m.reportGenerated],
+    ['HOD / Doctor Approval', m.hodApproval],
+    ['Manufacturing', m.manufacturing],
+    ['Supplement Dispatch', m.dispatch],
+    ['Supplement Start', m.supplementStart]
+  ];
+  let html = steps.map(s => {
+    const dt = fmtDate(s[1]);
+    return `<div class="tl-item ${dt?'done':'pending'}">
+      <div class="tl-lbl">${s[0]}</div>
+      <div class="tl-date ${dt?'has':'no'}">${dt || 'Pending'}</div>
+    </div>`;
+  }).join('');
+
+  // Weekly reviews
+  const wk = d.weeklyReviews || [];
+  html += `<div class="tl-item ${wk.length?'done':'pending'}">
+    <div class="tl-lbl">Weekly Reviews (${wk.length})</div>
+    ${wk.length ? `<div class="wk-chips">${wk.map((w,i)=>`<span class="wk-chip">W${i+1}: ${fmtDate(w)}</span>`).join('')}</div>`
+                : `<div class="tl-date no">No weekly reviews yet</div>`}
+  </div>`;
+
+  // Final assessment
+  const fin = fmtDate(m.finalAssessment);
+  html += `<div class="tl-item ${fin?'done':'pending'}">
+    <div class="tl-lbl">Final Assessment</div>
+    <div class="tl-date ${fin?'has':'no'}">${fin || 'Pending'}</div>
+  </div>`;
+
+  document.getElementById('pjTimeline').innerHTML = html;
+}
+
+load();
+</script>
+</body>
+</html>

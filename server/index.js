@@ -499,6 +499,356 @@ app.get('/api/patients/:id/monitoring', authenticateToken, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// ───────────────────────── Clinical Trials module ─────────────────────────
+// Pilot settings (target size, definition of "completed", lost-to-follow-up window)
+app.get('/api/pilot-settings', authenticateToken, async (req, res) => {
+  try { const r = await pool.query('SELECT * FROM pilot_settings WHERE id=1'); res.json(r.rows[0] || {}); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+app.put('/api/pilot-settings', authenticateToken, async (req, res) => {
+  const { target_patients, pilot_weeks, lost_threshold_days } = req.body || {};
+  try {
+    await pool.query(
+      `UPDATE pilot_settings SET target_patients=COALESCE($1,target_patients),
+         pilot_weeks=COALESCE($2,pilot_weeks), lost_threshold_days=COALESCE($3,lost_threshold_days) WHERE id=1`,
+      [target_patients, pilot_weeks, lost_threshold_days]);
+    const r = await pool.query('SELECT * FROM pilot_settings WHERE id=1');
+    res.json(r.rows[0]);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Manually flag a patient as Withdrawn (the one trial status that can't be auto-derived)
+app.post('/api/trials/:patientId/withdraw', authenticateToken, async (req, res) => {
+  const { reason } = req.body || {};
+  try {
+    await pool.query(
+      'UPDATE trial_enrollments SET withdrawn_at=NOW(), withdrawn_reason=$2 WHERE patient_id=$1',
+      [req.params.patientId, reason || null]);
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+// Un-withdraw (correction)
+app.post('/api/trials/:patientId/reinstate', authenticateToken, async (req, res) => {
+  try {
+    await pool.query('UPDATE trial_enrollments SET withdrawn_at=NULL, withdrawn_reason=NULL WHERE patient_id=$1', [req.params.patientId]);
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Enrollment Log — auto-enrols pilot patients (those approved into production), assigns
+// Study IDs, and returns each with a fully-derived trial status + key dates.
+app.get('/api/trials', authenticateToken, async (req, res) => {
+  try {
+    const settings = (await pool.query('SELECT * FROM pilot_settings WHERE id=1')).rows[0]
+      || { pilot_weeks: 6, lost_threshold_days: 14, target_patients: 30 };
+
+    // Pilot cohort = patients who have a manufacturing job (i.e. approved into production).
+    const jobsRes = await pool.query('SELECT patient_id, status, history, mfg_date, batch_no, created_at FROM manufacturing_jobs');
+    const jobByPatient = {};
+    jobsRes.rows.forEach(j => {
+      const prev = jobByPatient[j.patient_id];
+      if (!prev || new Date(j.created_at) > new Date(prev.created_at)) jobByPatient[j.patient_id] = j;
+    });
+    const ids = Object.keys(jobByPatient);
+    if (!ids.length) return res.json({ settings, patients: [] });
+
+    const patRes = await pool.query('SELECT id, uhic, name, cancer, created_date FROM patients WHERE id = ANY($1)', [ids]);
+    const patById = {}; patRes.rows.forEach(p => { patById[p.id] = p; });
+
+    const monRes = await pool.query(
+      `SELECT patient_id, COUNT(*)::int AS wk_count, MAX(recorded_at) AS last_at
+         FROM monitoring_logs WHERE type='weekly' AND patient_id = ANY($1) GROUP BY patient_id`, [ids]);
+    const monByPatient = {}; monRes.rows.forEach(m => { monByPatient[m.patient_id] = m; });
+
+    const trialRes = await pool.query('SELECT * FROM trial_enrollments WHERE patient_id = ANY($1)', [ids]);
+    const trialByPatient = {}; trialRes.rows.forEach(t => { trialByPatient[t.patient_id] = t; });
+
+    // created_date is a free-form VARCHAR (could be "6/15/2026", ISO, or junk), so parse
+    // it safely — an unparseable date must not crash the endpoint.
+    const _ts = (v) => { const d = v ? new Date(v) : null; return d && !isNaN(d.getTime()) ? d.getTime() : 0; };
+    const _isoDay = (v) => { const d = v ? new Date(v) : null; return (d && !isNaN(d.getTime()) ? d : new Date()).toISOString().slice(0, 10); };
+
+    // Auto-enrol any pilot patient without a trial record, in created-date order for stable IDs.
+    const maxRes = await pool.query(`SELECT COALESCE(MAX((regexp_replace(study_id,'\\D','','g'))::int),0) AS maxn FROM trial_enrollments`);
+    let nextN = (maxRes.rows[0].maxn || 0) + 1;
+    const missing = ids.filter(id => !trialByPatient[id] && patById[id])
+      .map(id => patById[id])
+      .sort((a, b) => _ts(a.created_date) - _ts(b.created_date));
+    for (const p of missing) {
+      const studyId = 'GQ-' + String(nextN).padStart(3, '0');
+      const enrollDate = _isoDay(p.created_date);
+      try {
+        const ins = await pool.query(
+          `INSERT INTO trial_enrollments (patient_id, study_id, enrollment_date) VALUES ($1,$2,$3)
+             ON CONFLICT (patient_id) DO NOTHING RETURNING *`, [p.id, studyId, enrollDate]);
+        if (ins.rows[0]) { trialByPatient[p.id] = ins.rows[0]; nextN++; }
+        else {
+          const r = await pool.query('SELECT * FROM trial_enrollments WHERE patient_id=$1', [p.id]);
+          if (r.rows[0]) trialByPatient[p.id] = r.rows[0];
+        }
+      } catch (e) { /* skip collisions */ }
+    }
+
+    const now = Date.now();
+    const histDispatch = (job) => {
+      const h = Array.isArray(job.history) ? job.history : [];
+      const d = h.find(e => (e.status || '').toUpperCase() === 'DISPATCHED');
+      return d ? d.at : (job.mfg_date || null);
+    };
+    const isDispatched = (job) => {
+      if ((job.status || '').toUpperCase() === 'DISPATCHED') return true;
+      const h = Array.isArray(job.history) ? job.history : [];
+      return h.some(e => (e.status || '').toUpperCase() === 'DISPATCHED');
+    };
+
+    const patients = ids.map(id => {
+      const p = patById[id], job = jobByPatient[id], t = trialByPatient[id];
+      if (!p || !t) return null;
+      const mon = monByPatient[id] || { wk_count: 0, last_at: null };
+      const wk = mon.wk_count || 0;
+      let status;
+      if (t.withdrawn_at) status = 'Withdrawn';
+      else if (wk >= settings.pilot_weeks) status = 'Completed';
+      else if (isDispatched(job) || wk > 0) {
+        const lastAt = mon.last_at ? new Date(mon.last_at).getTime() : null;
+        status = (wk > 0 && lastAt && (now - lastAt) > settings.lost_threshold_days * 86400000)
+          ? 'Lost to Follow-up' : 'Active';
+      } else status = 'Enrolled';
+      return {
+        studyId: t.study_id, patientId: id,
+        uhic: p.uhic, name: p.name, diagnosis: p.cancer,
+        enrollmentDate: t.enrollment_date,
+        supplementStartDate: histDispatch(job),
+        batchNo: job.batch_no || null,
+        weeklyReviews: wk,
+        withdrawnReason: t.withdrawn_reason || null,
+        status
+      };
+    }).filter(Boolean).sort((a, b) => (a.studyId > b.studyId ? 1 : -1));
+
+    res.json({ settings, patients });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Export Pilot Dataset — assembles the full pilot dataset (4 tables) for Excel export.
+app.get('/api/trials/export', authenticateToken, async (req, res) => {
+  try {
+    const settings = (await pool.query('SELECT * FROM pilot_settings WHERE id=1')).rows[0]
+      || { pilot_weeks: 6, lost_threshold_days: 14 };
+    const jobsRes = await pool.query('SELECT patient_id, status, history, mfg_date, batch_no, created_at FROM manufacturing_jobs');
+    const jobByPatient = {};
+    jobsRes.rows.forEach(j => { const prev = jobByPatient[j.patient_id]; if (!prev || new Date(j.created_at) > new Date(prev.created_at)) jobByPatient[j.patient_id] = j; });
+    const ids = Object.keys(jobByPatient);
+    if (!ids.length) return res.json({ enrollment: [], baseline: [], weekly: [], final: [] });
+
+    const pats = (await pool.query('SELECT id, uhic, name, cancer, sex, age, weight, height, albumin, crp, muac, hemoglobin, created_date FROM patients WHERE id = ANY($1)', [ids])).rows;
+    const patById = {}; pats.forEach(p => { patById[p.id] = p; });
+    const trials = (await pool.query('SELECT * FROM trial_enrollments WHERE patient_id = ANY($1)', [ids])).rows;
+    const trialByPat = {}; trials.forEach(t => { trialByPat[t.patient_id] = t; });
+    const plans = (await pool.query('SELECT patient_id, version FROM nutrition_plans WHERE patient_id = ANY($1) ORDER BY version DESC NULLS LAST', [ids])).rows;
+    const verByPat = {}; plans.forEach(pl => { if (verByPat[pl.patient_id] === undefined) verByPat[pl.patient_id] = pl.version; });
+    const logs = (await pool.query(`SELECT patient_id, recorded_at, data FROM monitoring_logs WHERE type='weekly' AND patient_id = ANY($1) ORDER BY recorded_at ASC`, [ids])).rows;
+    const weeklyByPat = {};
+    logs.forEach(l => { (weeklyByPat[l.patient_id] = weeklyByPat[l.patient_id] || []).push({ recordedAt: l.recorded_at, ...(l.data || {}) }); });
+
+    const _d = (v) => { if (!v) return ''; const d = new Date(v); return isNaN(d.getTime()) ? String(v).slice(0, 10) : d.toISOString().slice(0, 10); };
+    const _num = (v) => (v === null || v === undefined || v === '' || isNaN(parseFloat(v))) ? null : parseFloat(v);
+    const bmi = (w, h) => { const W = _num(w), H = _num(h); return (W && H) ? Math.round(W / Math.pow(H / 100, 2) * 10) / 10 : null; };
+    const histAt = (job, status) => { const h = Array.isArray(job.history) ? job.history : []; const e = h.find(x => (x.status || '').toUpperCase() === status); return e ? e.at : null; };
+    const isDispatched = (job) => (job.status || '').toUpperCase() === 'DISPATCHED' || (Array.isArray(job.history) && job.history.some(e => (e.status || '').toUpperCase() === 'DISPATCHED'));
+    const now = Date.now();
+    const statusOf = (id) => {
+      const t = trialByPat[id], job = jobByPatient[id];
+      const wks = weeklyByPat[id] || [];
+      if (t && t.withdrawn_at) return 'Withdrawn';
+      if (wks.length >= settings.pilot_weeks) return 'Completed';
+      if (isDispatched(job) || wks.length > 0) {
+        const last = wks.length ? new Date(wks[wks.length - 1].recordedAt).getTime() : null;
+        if (wks.length > 0 && last && (now - last) > settings.lost_threshold_days * 86400000) return 'Lost to Follow-up';
+        return 'Active';
+      }
+      return 'Enrolled';
+    };
+
+    const enrollment = [], baseline = [], weekly = [], final = [];
+    ids.forEach(id => {
+      const p = patById[id]; if (!p) return;
+      const t = trialByPat[id], job = jobByPatient[id];
+      const studyId = t ? t.study_id : '';
+      enrollment.push({
+        'Study ID': studyId, 'UHID': p.uhic || '', 'Patient Name': p.name || '', 'Diagnosis': p.cancer || '',
+        'Sex': p.sex || '', 'Age': p.age != null ? p.age : '',
+        'Enrolled Date': _d(t ? t.enrollment_date : p.created_date),
+        'Report/Approval Date': _d(histAt(job, 'APPROVED') || job.created_at),
+        'Manufacturing Date': _d(job.mfg_date),
+        'Dispatch / Start Date': _d(histAt(job, 'DISPATCHED') || job.mfg_date),
+        'Status': statusOf(id), 'Formula Version': verByPat[id] != null ? verByPat[id] : 1, 'Batch No': job.batch_no || ''
+      });
+      baseline.push({
+        'Study ID': studyId, 'Patient Name': p.name || '',
+        'Weight (kg)': _num(p.weight), 'Height (cm)': _num(p.height), 'BMI': bmi(p.weight, p.height),
+        'MUAC (cm)': _num(p.muac), 'Albumin (g/dL)': _num(p.albumin), 'CRP (mg/L)': _num(p.crp), 'Hemoglobin (g/dL)': _num(p.hemoglobin)
+      });
+      const wks = weeklyByPat[id] || [];
+      wks.forEach((w, i) => {
+        weekly.push({
+          'Study ID': studyId, 'Week': w.week != null ? w.week : (i + 1), 'Date': _d(w.recordedAt),
+          'Weight (kg)': _num(w.weight), 'BMI': _num(w.bmi), 'MUAC (cm)': _num(w.muac), 'Hand Grip': _num(w.handGrip),
+          'ECOG': w.ecog != null ? w.ecog : '', 'Albumin (g/dL)': _num(w.albumin), 'CRP (mg/L)': _num(w.crp), 'Glucose': _num(w.glucose)
+        });
+      });
+      const lastW = wks.length ? wks[wks.length - 1] : null;
+      const bW = _num(p.weight), bAlb = _num(p.albumin), bCrp = _num(p.crp);
+      const lW = lastW ? _num(lastW.weight) : null, lAlb = lastW ? _num(lastW.albumin) : null, lCrp = lastW ? _num(lastW.crp) : null;
+      final.push({
+        'Study ID': studyId, 'Patient Name': p.name || '', 'Status': statusOf(id), 'Weeks Completed': wks.length,
+        'Baseline Weight': bW, 'Final Weight': lW, 'Weight Change': (bW != null && lW != null) ? Math.round((lW - bW) * 10) / 10 : null,
+        'Baseline Albumin': bAlb, 'Final Albumin': lAlb, 'Albumin Change': (bAlb != null && lAlb != null) ? Math.round((lAlb - bAlb) * 10) / 10 : null,
+        'Baseline CRP': bCrp, 'Final CRP': lCrp, 'CRP Change': (bCrp != null && lCrp != null) ? Math.round((lCrp - bCrp) * 10) / 10 : null
+      });
+    });
+
+    enrollment.sort((a, b) => String(a['Study ID']).localeCompare(String(b['Study ID'])));
+    baseline.sort((a, b) => String(a['Study ID']).localeCompare(String(b['Study ID'])));
+    weekly.sort((a, b) => String(a['Study ID']).localeCompare(String(b['Study ID'])) || (a['Week'] - b['Week']));
+    final.sort((a, b) => String(a['Study ID']).localeCompare(String(b['Study ID'])));
+
+    res.json({ enrollment, baseline, weekly, final, generatedAt: new Date().toISOString() });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Formula Tracking — which formula version + batch each pilot patient received.
+app.get('/api/trials/formula', authenticateToken, async (req, res) => {
+  try {
+    const jobsRes = await pool.query('SELECT patient_id, status, history, mfg_date, batch_no, created_at FROM manufacturing_jobs');
+    const jobByPatient = {};
+    jobsRes.rows.forEach(j => {
+      const prev = jobByPatient[j.patient_id];
+      if (!prev || new Date(j.created_at) > new Date(prev.created_at)) jobByPatient[j.patient_id] = j;
+    });
+    const ids = Object.keys(jobByPatient);
+    if (!ids.length) return res.json({ patients: [] });
+
+    const pats = (await pool.query('SELECT id, name FROM patients WHERE id = ANY($1)', [ids])).rows;
+    const nameById = {}; pats.forEach(p => { nameById[p.id] = p.name; });
+    const trials = (await pool.query('SELECT patient_id, study_id FROM trial_enrollments WHERE patient_id = ANY($1)', [ids])).rows;
+    const studyByPat = {}; trials.forEach(t => { studyByPat[t.patient_id] = t.study_id; });
+
+    // Latest plan version + recipe per patient.
+    const plans = (await pool.query('SELECT patient_id, version, full_data FROM nutrition_plans WHERE patient_id = ANY($1) ORDER BY version DESC NULLS LAST', [ids])).rows;
+    const planByPat = {};
+    plans.forEach(pl => { if (!planByPat[pl.patient_id]) planByPat[pl.patient_id] = pl; });
+
+    const histDispatch = (job) => {
+      const h = Array.isArray(job.history) ? job.history : [];
+      const d = h.find(e => (e.status || '').toUpperCase() === 'DISPATCHED');
+      return d ? d.at : (job.mfg_date || null);
+    };
+
+    const patients = ids.map(id => {
+      const job = jobByPatient[id];
+      const pl = planByPat[id];
+      const fd = (pl && pl.full_data) || {};
+      const fp = fd.finalPlan || fd;
+      const proteinType = fp.proteinType
+        || (fp.recipe && fp.recipe.protein && fp.recipe.protein.name)
+        || null;
+      return {
+        patientId: id,
+        studyId: studyByPat[id] || null,
+        name: nameById[id] || '—',
+        formulaVersion: pl && pl.version != null ? pl.version : null,
+        proteinType,
+        batchNo: job.batch_no || null,
+        mfgDate: job.mfg_date || null,
+        startDate: histDispatch(job)
+      };
+    }).sort((a, b) => String(a.studyId).localeCompare(String(b.studyId)));
+
+    res.json({ patients });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Weekly Outcomes — weekly monitoring metrics for every pilot patient.
+app.get('/api/trials/outcomes', authenticateToken, async (req, res) => {
+  try {
+    const jobsRes = await pool.query('SELECT DISTINCT patient_id FROM manufacturing_jobs');
+    const ids = jobsRes.rows.map(r => r.patient_id).filter(Boolean);
+    if (!ids.length) return res.json({ patients: [] });
+    const pats = (await pool.query('SELECT id, name FROM patients WHERE id = ANY($1)', [ids])).rows;
+    const nameById = {}; pats.forEach(p => { nameById[p.id] = p.name; });
+    const trials = (await pool.query('SELECT patient_id, study_id FROM trial_enrollments WHERE patient_id = ANY($1)', [ids])).rows;
+    const studyByPat = {}; trials.forEach(t => { studyByPat[t.patient_id] = t.study_id; });
+    const logs = (await pool.query(
+      `SELECT patient_id, recorded_at, data FROM monitoring_logs
+         WHERE type='weekly' AND patient_id = ANY($1) ORDER BY recorded_at ASC`, [ids])).rows;
+    const byPat = {};
+    logs.forEach(l => {
+      const d = l.data || {};
+      (byPat[l.patient_id] = byPat[l.patient_id] || []).push({
+        recordedAt: l.recorded_at,
+        week: d.week != null ? d.week : null,
+        weight: d.weight != null ? d.weight : null,
+        bmi: d.bmi != null ? d.bmi : null,
+        muac: d.muac != null ? d.muac : null,
+        handGrip: d.handGrip != null ? d.handGrip : null,
+        ecog: d.ecog != null ? d.ecog : null,
+        albumin: d.albumin != null ? d.albumin : null,
+        crp: d.crp != null ? d.crp : null,
+        glucose: d.glucose != null ? d.glucose : null
+      });
+    });
+    const patients = ids.map(id => ({
+      patientId: id,
+      studyId: studyByPat[id] || null,
+      name: nameById[id] || '—',
+      weeks: byPat[id] || []
+    })).sort((a, b) => String(a.studyId).localeCompare(String(b.studyId)));
+    res.json({ patients });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Patient Journey — assembles every key date for one patient from existing data.
+app.get('/api/trials/:patientId/journey', authenticateToken, async (req, res) => {
+  const pid = req.params.patientId;
+  try {
+    const pat = (await pool.query('SELECT id, uhic, name, cancer, created_date, created_at FROM patients WHERE id=$1', [pid])).rows[0];
+    if (!pat) return res.status(404).json({ error: 'Patient not found' });
+    const trial = (await pool.query('SELECT * FROM trial_enrollments WHERE patient_id=$1', [pid])).rows[0] || null;
+    const job = (await pool.query('SELECT status, history, mfg_date, batch_no, created_at FROM manufacturing_jobs WHERE patient_id=$1 ORDER BY created_at DESC LIMIT 1', [pid])).rows[0] || null;
+    const planRes = await pool.query('SELECT generated_at FROM nutrition_plans WHERE patient_id=$1 ORDER BY generated_at ASC', [pid]);
+    const weeklyRes = await pool.query(`SELECT recorded_at FROM monitoring_logs WHERE patient_id=$1 AND type='weekly' ORDER BY recorded_at ASC`, [pid]);
+    const settings = (await pool.query('SELECT * FROM pilot_settings WHERE id=1')).rows[0] || { pilot_weeks: 6 };
+
+    const histAt = (status) => {
+      const h = job && Array.isArray(job.history) ? job.history : [];
+      const e = h.find(x => (x.status || '').toUpperCase() === status);
+      return e ? e.at : null;
+    };
+    const weeklyDates = weeklyRes.rows.map(r => r.recorded_at);
+    const baseline = pat.created_date || pat.created_at || null;
+
+    res.json({
+      patient: { id: pat.id, uhic: pat.uhic, name: pat.name, diagnosis: pat.cancer },
+      studyId: trial ? trial.study_id : null,
+      withdrawnAt: trial ? trial.withdrawn_at : null,
+      withdrawnReason: trial ? trial.withdrawn_reason : null,
+      batchNo: job ? job.batch_no : null,
+      milestones: {
+        enrollment:       trial ? trial.enrollment_date : baseline,
+        baseline:         baseline,
+        reportGenerated:  planRes.rows.length ? planRes.rows[0].generated_at : null,
+        hodApproval:      histAt('APPROVED') || (job ? job.created_at : null),
+        manufacturing:    job ? job.mfg_date : null,
+        dispatch:         histAt('DISPATCHED'),
+        supplementStart:  histAt('DISPATCHED') || (job ? job.mfg_date : null),
+        finalAssessment:  weeklyDates.length >= settings.pilot_weeks ? weeklyDates[weeklyDates.length - 1] : null
+      },
+      weeklyReviews: weeklyDates
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // Users: Get All (admin)
 app.get('/api/users', authenticateToken, async (req, res) => {
   try {
@@ -515,14 +865,42 @@ app.get('/api/users', authenticateToken, async (req, res) => {
   }
 });
 
+// ── Hospitals (normalized entity) ─────────────────────────────────────────
+// Find a hospital by name (case-insensitive) or create it; returns its id.
+async function _resolveHospitalId(name){
+  const nm = (name || '').trim();
+  if (!nm) return null;
+  const ex = await pool.query('SELECT id FROM hospitals WHERE LOWER(name)=LOWER($1) LIMIT 1', [nm]);
+  if (ex.rows[0]) return ex.rows[0].id;
+  const hid = 'hosp_' + Date.now() + '_' + Math.floor(Math.random() * 100000);
+  await pool.query('INSERT INTO hospitals (id, name) VALUES ($1,$2) ON CONFLICT (name) DO NOTHING', [hid, nm]);
+  const r = await pool.query('SELECT id FROM hospitals WHERE LOWER(name)=LOWER($1) LIMIT 1', [nm]);
+  return r.rows[0] ? r.rows[0].id : hid;
+}
+app.get('/api/hospitals', authenticateToken, async (req, res) => {
+  try { const r = await pool.query('SELECT id, name, city FROM hospitals ORDER BY name'); res.json(r.rows); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+app.post('/api/hospitals', authenticateToken, async (req, res) => {
+  const { name, city } = req.body || {};
+  if (!name || !String(name).trim()) return res.status(400).json({ error: 'name required' });
+  try {
+    const id = await _resolveHospitalId(name);
+    if (city) await pool.query('UPDATE hospitals SET city=$1 WHERE id=$2', [city, id]);
+    const r = await pool.query('SELECT id, name, city FROM hospitals WHERE id=$1', [id]);
+    res.json(r.rows[0]);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // Users: Create (admin)
 app.post('/api/users', authenticateToken, async (req, res) => {
   const { id, name, email, password, role, hospital_name, store_id, phone } = req.body;
   try {
     const hash = await bcrypt.hash(password, 10);
+    const hospitalId = await _resolveHospitalId(hospital_name);
     const result = await pool.query(
-      'INSERT INTO users (id, name, email, password_hash, role, hospital_name, store_id, phone) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id, name, email, role, hospital_name, store_id, phone',
-      [id || `user_${Date.now()}`, name, email, hash, role, hospital_name, store_id || null, phone || null]
+      'INSERT INTO users (id, name, email, password_hash, role, hospital_name, hospital_id, store_id, phone) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id, name, email, role, hospital_name, hospital_id, store_id, phone',
+      [id || `user_${Date.now()}`, name, email, hash, role, hospital_name, hospitalId, store_id || null, phone || null]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -532,9 +910,15 @@ app.post('/api/users', authenticateToken, async (req, res) => {
 
 // Users: Delete
 app.delete('/api/users/:id', authenticateToken, async (req, res) => {
+  const userId = req.params.id;
   try {
-    await pool.query('DELETE FROM users WHERE id = $1', [req.params.id]);
-    res.json({ success: true });
+    // Patients reference a doctor via assigned_doctor_id / created_by_id (foreign keys
+    // to users). Without clearing these first, Postgres blocks the delete. We null the
+    // links — the PATIENTS are kept (just left unassigned) — then remove the user.
+    const r = await pool.query('UPDATE patients SET assigned_doctor_id = NULL WHERE assigned_doctor_id = $1', [userId]);
+    await pool.query('UPDATE patients SET created_by_id = NULL WHERE created_by_id = $1', [userId]);
+    await pool.query('DELETE FROM users WHERE id = $1', [userId]);
+    res.json({ success: true, patientsUnassigned: r.rowCount || 0 });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -594,9 +978,10 @@ app.post('/api/stores', authenticateToken, async (req, res) => {
   const fssai = req.body.fssai_number || req.body.fssai || null;
   const address = req.body.address || null;
   try {
+    const hospitalId = await _resolveHospitalId(hospital);
     const result = await pool.query(
-      'INSERT INTO stores (id, name, hospital, location, fssai_number, address) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *',
-      [id || `store_${Date.now()}`, name, hospital || '', location || '', fssai, address]
+      'INSERT INTO stores (id, name, hospital, hospital_id, location, fssai_number, address) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *',
+      [id || `store_${Date.now()}`, name, hospital || '', hospitalId, location || '', fssai, address]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -1377,6 +1762,71 @@ OUTPUT FORMAT — return ONLY valid JSON, no markdown, no text outside the JSON 
   } catch(e) { console.error('manufacturing_jobs migration:', e.message); }
 })();
 
+// Clinical Trials module — enrollment records + pilot settings
+(async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS trial_enrollments (
+        patient_id       TEXT PRIMARY KEY,
+        study_id         TEXT UNIQUE NOT NULL,
+        enrollment_date  DATE NOT NULL,
+        cohort           TEXT DEFAULT 'PILOT-1',
+        withdrawn_at     TIMESTAMPTZ,
+        withdrawn_reason TEXT,
+        created_at       TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_trial_enrollments_study ON trial_enrollments(study_id)');
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS pilot_settings (
+        id                  INT PRIMARY KEY DEFAULT 1,
+        target_patients     INT DEFAULT 30,
+        pilot_weeks         INT DEFAULT 6,
+        lost_threshold_days INT DEFAULT 14,
+        CHECK (id = 1)
+      )
+    `);
+    await pool.query(`INSERT INTO pilot_settings (id) VALUES (1) ON CONFLICT (id) DO NOTHING`);
+  } catch(e) { console.error('clinical trials migration:', e.message); }
+})();
+
+// Hospitals as a real entity — normalizes the free-text hospital names on users/stores.
+(async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS hospitals (
+        id         TEXT PRIMARY KEY,
+        name       TEXT UNIQUE NOT NULL,
+        city       TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await pool.query('ALTER TABLE users  ADD COLUMN IF NOT EXISTS hospital_id TEXT');
+    await pool.query('ALTER TABLE stores ADD COLUMN IF NOT EXISTS hospital_id TEXT');
+
+    // One-time backfill: create a hospital per distinct typed name and link users/stores.
+    const names = await pool.query(`
+      SELECT DISTINCT TRIM(hospital_name) AS nm FROM users  WHERE hospital_name IS NOT NULL AND TRIM(hospital_name) <> ''
+      UNION
+      SELECT DISTINCT TRIM(hospital)      AS nm FROM stores WHERE hospital      IS NOT NULL AND TRIM(hospital)      <> ''
+    `);
+    for (const row of names.rows) {
+      const nm = row.nm;
+      let hid;
+      const ex = await pool.query('SELECT id FROM hospitals WHERE LOWER(name)=LOWER($1) LIMIT 1', [nm]);
+      if (ex.rows[0]) hid = ex.rows[0].id;
+      else {
+        hid = 'hosp_' + Date.now() + '_' + Math.floor(Math.random() * 100000);
+        await pool.query('INSERT INTO hospitals (id, name) VALUES ($1,$2) ON CONFLICT (name) DO NOTHING', [hid, nm]);
+        const r2 = await pool.query('SELECT id FROM hospitals WHERE LOWER(name)=LOWER($1) LIMIT 1', [nm]);
+        hid = r2.rows[0] ? r2.rows[0].id : hid;
+      }
+      await pool.query('UPDATE users  SET hospital_id=$1 WHERE hospital_id IS NULL AND LOWER(TRIM(hospital_name))=LOWER($2)', [hid, nm]);
+      await pool.query('UPDATE stores SET hospital_id=$1 WHERE hospital_id IS NULL AND LOWER(TRIM(hospital))=LOWER($2)', [hid, nm]);
+    }
+  } catch(e) { console.error('hospitals migration:', e.message); }
+})();
+
 (async () => {
   try {
     await pool.query(`
@@ -1834,6 +2284,12 @@ const cleanRoutes = {
   '/admin/users':      'admin-users.html',
   '/admin/mapping':    'admin-mapping.html',
   '/admin/tracking':   'admin-tracking.html',
+  '/admin/trials':     'admin-trials.html',
+  '/admin/trials/journey': 'admin-trial-journey.html',
+  '/admin/trials/cohort': 'admin-trial-cohort.html',
+  '/admin/trials/outcomes': 'admin-trial-outcomes.html',
+  '/admin/trials/formula': 'admin-trial-formula.html',
+  '/admin/trials/export': 'admin-trial-export.html',
   '/admin/reports':    'admin-reports.html',
   '/admin/rules':      'admin-rules.html',
   '/coordinator':      'coordinator.html',

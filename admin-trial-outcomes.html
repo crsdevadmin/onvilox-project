@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Clinical Trials — Weekly Outcomes - Gquence</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <link rel="stylesheet" href="/css/app.css">
+  <style>
+    .subnav { display:flex; gap:6px; margin:0 0 14px; flex-wrap:wrap; }
+    .subnav a { padding:7px 14px; border-radius:20px; font-size:13px; text-decoration:none; color:var(--text-2); background:var(--surface-2); }
+    .subnav a.active { background:#0e2247; color:#fff; }
+    .ct-cards { display:flex; gap:12px; flex-wrap:wrap; margin:6px 0 14px; }
+    .ct-card { flex:1; min-width:140px; background:var(--surface-2); border:1px solid var(--border); border-radius:12px; padding:14px; }
+    .ct-card .n { font-size:24px; font-weight:800; color:var(--text); }
+    .ct-card .l { font-size:12px; color:var(--text-2); text-transform:uppercase; letter-spacing:.03em; margin-top:2px; }
+    table.ct { width:100%; border-collapse:collapse; margin-top:6px; }
+    table.ct th, table.ct td { padding:9px 12px; text-align:left; border-bottom:1px solid var(--border); font-size:13.5px; color:var(--text); }
+    table.ct th { color:var(--text-2); font-size:12px; text-transform:uppercase; letter-spacing:.03em; }
+    .chart { display:flex; align-items:flex-end; gap:10px; height:150px; padding:10px 4px 0; border-bottom:2px solid var(--border); overflow-x:auto; margin-top:8px; }
+    .bar-col { display:flex; flex-direction:column; align-items:center; justify-content:flex-end; min-width:48px; height:100%; }
+    .bar { width:30px; background:#16a34a; border-radius:5px 5px 0 0; }
+    .bar-val { font-size:11.5px; font-weight:700; color:var(--text); margin-bottom:3px; }
+    .bar-lbl { font-size:10.5px; color:var(--text-2); margin-top:5px; }
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">Gquence Admin</div>
+  <div class="nav">
+    <a href="/admin">Dashboard</a>
+    <a href="/admin/stores">Stores</a>
+    <a href="/admin/users">Create Users</a>
+    <a href="/admin/mapping">Mapping</a>
+    <a href="/admin/tracking">Tracking</a>
+    <a href="/admin/trials">Clinical Trials</a>
+    <a href="/admin/reports">Reports</a>
+    <a href="/admin/rules">Rule Engine</a>
+    <a href="#" onclick="auth.logout()">Logout</a>
+    <button id="themeToggleBtn" onclick="toggleTheme()" class="btn-secondary btn-sm" style="margin-left: 20px; border-radius: 30px; padding: 6px 14px; cursor: pointer;">🌙 Dark Mode</button>
+  </div>
+</div>
+
+<div class="container page">
+  <div class="card">
+    <div class="subnav">
+      <a href="/admin/trials">Enrollment Log</a>
+      <a href="/admin/trials/cohort">Cohort Dashboard</a>
+      <a href="/admin/trials/outcomes" class="active">Weekly Outcomes</a>
+      <a href="/admin/trials/formula">Formula Tracking</a>
+      <a href="/admin/trials/export">Export Dataset</a>
+    </div>
+
+    <h2 style="margin-bottom:0;">Weekly Outcomes</h2>
+    <p style="color:var(--text-2);margin-top:4px;">Week-by-week monitoring values per patient (weight, BMI, albumin, CRP and more).</p>
+
+    <div id="outMsg" style="color:var(--text-2);font-size:13px;margin:8px 0;">Loading…</div>
+
+    <div id="outContent" style="display:none;">
+      <div class="ct-cards" id="outCards"></div>
+
+      <div style="display:flex;align-items:end;gap:12px;flex-wrap:wrap;margin:6px 0 6px;">
+        <div style="display:flex;flex-direction:column;gap:4px;">
+          <label style="font-size:12px;color:var(--text-2);">Patient</label>
+          <select id="outPatient" onchange="renderPatient()" style="min-width:280px;padding:9px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);"></select>
+        </div>
+      </div>
+
+      <h3 style="margin:14px 0 2px;">Weight Trend (kg)</h3>
+      <div class="chart" id="outChart"></div>
+
+      <h3 style="margin:18px 0 2px;">Weekly Values</h3>
+      <div style="overflow-x:auto;">
+        <table class="ct">
+          <thead>
+            <tr><th>Review</th><th>Date</th><th>Weight</th><th>BMI</th><th>MUAC</th><th>Hand Grip</th><th>ECOG</th><th>Albumin</th><th>CRP</th><th>Glucose</th></tr>
+          </thead>
+          <tbody id="outBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/js/config.js"></script>
+<script src="/js/storage.js"></script>
+<script src="/js/seed.js"></script>
+<script src="/js/auth.js"></script>
+<script src="/js/theme.js"></script>
+
+<script>
+auth.requireRole(['SUPER_ADMIN', 'ADMIN']);
+const me = auth.getCurrentUser();
+const apiBase = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : '';
+let _patients = [];
+
+function val(x){ return (x === null || x === undefined || x === '') ? '—' : x; }
+function fmtDate(d){
+  if(!d) return '—';
+  const dt = new Date(d);
+  if(isNaN(dt.getTime())) return String(d).slice(0,10);
+  return ('0'+dt.getDate()).slice(-2)+'/'+('0'+(dt.getMonth()+1)).slice(-2)+'/'+dt.getFullYear();
+}
+
+async function load(){
+  try {
+    const res = await fetch(apiBase + '/api/trials/outcomes', { headers: { 'Authorization': 'Bearer ' + (me.token||'') } });
+    if(!res.ok) throw new Error('Server error ' + res.status);
+    const data = await res.json();
+    _patients = data.patients || [];
+    document.getElementById('outMsg').style.display = 'none';
+    document.getElementById('outContent').style.display = 'block';
+    renderCards();
+    const sel = document.getElementById('outPatient');
+    sel.innerHTML = _patients.map((p,i) =>
+      `<option value="${i}">${p.studyId ? p.studyId + ' · ' : ''}${p.name || '—'} (${p.weeks.length} review${p.weeks.length===1?'':'s'})</option>`).join('');
+    renderPatient();
+    if(!_patients.length) document.getElementById('outMsg').style.display = 'block', document.getElementById('outMsg').textContent = 'No pilot patients yet.';
+  } catch(e){
+    document.getElementById('outMsg').textContent = 'Could not load outcomes: ' + e.message;
+  }
+}
+
+function renderCards(){
+  const total = _patients.length;
+  const withData = _patients.filter(p => p.weeks.length > 0).length;
+  const reviews = _patients.reduce((s,p) => s + p.weeks.length, 0);
+  const cards = [['Pilot Patients', total], ['With Weekly Data', withData], ['Total Reviews', reviews]];
+  document.getElementById('outCards').innerHTML = cards.map(c =>
+    `<div class="ct-card"><div class="n">${c[1]}</div><div class="l">${c[0]}</div></div>`).join('');
+}
+
+function renderPatient(){
+  const idx = parseInt(document.getElementById('outPatient').value) || 0;
+  const p = _patients[idx];
+  if(!p){ document.getElementById('outBody').innerHTML = ''; document.getElementById('outChart').innerHTML = ''; return; }
+  const weeks = p.weeks;
+
+  // weight trend
+  const weights = weeks.map(w => parseFloat(w.weight)).filter(v => !isNaN(v));
+  const maxW = Math.max(1, ...weights);
+  document.getElementById('outChart').innerHTML = weeks.length ? weeks.map((w,i) => {
+    const wt = parseFloat(w.weight);
+    const h = !isNaN(wt) ? Math.round(wt/maxW*110) : 0;
+    return `<div class="bar-col"><div class="bar-val">${isNaN(wt)?'—':wt}</div><div class="bar" style="height:${h}px"></div><div class="bar-lbl">W${w.week!=null?w.week:(i+1)}</div></div>`;
+  }).join('') : '<div style="color:var(--text-2);padding:20px;">No weekly reviews recorded yet.</div>';
+
+  // table
+  document.getElementById('outBody').innerHTML = weeks.length ? weeks.map((w,i) => `
+    <tr>
+      <td>W${w.week!=null?w.week:(i+1)}</td>
+      <td>${fmtDate(w.recordedAt)}</td>
+      <td>${val(w.weight)}</td>
+      <td>${val(w.bmi)}</td>
+      <td>${val(w.muac)}</td>
+      <td>${val(w.handGrip)}</td>
+      <td>${val(w.ecog)}</td>
+      <td>${val(w.albumin)}</td>
+      <td>${val(w.crp)}</td>
+      <td>${val(w.glucose)}</td>
+    </tr>`).join('') : `<tr><td colspan="10" style="padding:16px;color:var(--text-2);">No weekly reviews recorded for this patient.</td></tr>`;
+}
+
+load();
+</script>
+</body>
+</html>

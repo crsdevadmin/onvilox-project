@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Clinical Trials — Enrollment Log - Gquence</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <link rel="stylesheet" href="/css/app.css">
+  <style>
+    .ct-cards { display:flex; gap:12px; flex-wrap:wrap; margin:14px 0 6px; }
+    .ct-card { flex:1; min-width:130px; background:var(--surface-2); border:1px solid var(--border); border-radius:12px; padding:12px 14px; }
+    .ct-card .n { font-size:24px; font-weight:800; color:var(--text); }
+    .ct-card .l { font-size:12px; color:var(--text-2); text-transform:uppercase; letter-spacing:.03em; }
+    .ct-controls { display:flex; gap:12px; flex-wrap:wrap; align-items:end; margin:14px 0; }
+    table.ct { width:100%; border-collapse:collapse; }
+    table.ct th, table.ct td { padding:10px 12px; text-align:left; border-bottom:1px solid #eef2f7; font-size:13.5px; }
+    table.ct th { color:#6b7280; font-size:12px; text-transform:uppercase; letter-spacing:.03em; }
+    .badge { display:inline-block; padding:3px 10px; border-radius:20px; font-size:11.5px; font-weight:700; }
+    .b-enrolled { background:#e0e7ff; color:#3730a3; }
+    .b-active { background:#dcfce7; color:#166534; }
+    .b-completed { background:#dbeafe; color:#1e40af; }
+    .b-lost { background:#fef9c3; color:#854d0e; }
+    .b-withdrawn { background:#fee2e2; color:#991b1b; }
+    .linkbtn { background:none; border:none; color:#b91c1c; cursor:pointer; font-size:12px; text-decoration:underline; padding:0; }
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">Gquence Admin</div>
+  <div class="nav">
+    <a href="/admin">Dashboard</a>
+    <a href="/admin/stores">Stores</a>
+    <a href="/admin/users">Create Users</a>
+    <a href="/admin/mapping">Mapping</a>
+    <a href="/admin/tracking">Tracking</a>
+    <a href="/admin/trials">Clinical Trials</a>
+    <a href="/admin/reports">Reports</a>
+    <a href="/admin/rules">Rule Engine</a>
+    <a href="#" onclick="auth.logout()">Logout</a>
+    <button id="themeToggleBtn" onclick="toggleTheme()" class="btn-secondary btn-sm" style="margin-left: 20px; border-radius: 30px; padding: 6px 14px; cursor: pointer;">🌙 Dark Mode</button>
+  </div>
+</div>
+
+<div class="container page">
+  <div class="card">
+    <div style="display:flex;gap:6px;margin:0 0 14px;flex-wrap:wrap;">
+      <a href="/admin/trials" style="padding:7px 14px;border-radius:20px;font-size:13px;text-decoration:none;color:#fff;background:#0e2247;">Enrollment Log</a>
+      <a href="/admin/trials/cohort" style="padding:7px 14px;border-radius:20px;font-size:13px;text-decoration:none;color:var(--text-2);background:var(--surface-2);">Cohort Dashboard</a>
+      <a href="/admin/trials/outcomes" style="padding:7px 14px;border-radius:20px;font-size:13px;text-decoration:none;color:var(--text-2);background:var(--surface-2);">Weekly Outcomes</a>
+      <a href="/admin/trials/formula" style="padding:7px 14px;border-radius:20px;font-size:13px;text-decoration:none;color:var(--text-2);background:var(--surface-2);">Formula Tracking</a>
+      <a href="/admin/trials/export" style="padding:7px 14px;border-radius:20px;font-size:13px;text-decoration:none;color:var(--text-2);background:var(--surface-2);">Export Dataset</a>
+    </div>
+    <h2 style="margin-bottom:0;">Clinical Trials — Enrollment Log</h2>
+    <p style="color:#6b7280;margin-top:4px;">Master list of pilot patients. Study IDs are assigned automatically; status is derived from workflow events.</p>
+
+    <div class="ct-cards" id="ctCards"></div>
+
+    <div class="ct-controls">
+      <div style="flex:1;min-width:220px;">
+        <label style="display:block;color:#6b7280;font-size:13px;margin-bottom:6px;">Search (Study ID / Name / UHID)</label>
+        <input id="qSearch" placeholder="Type to filter…" style="width:100%;padding:10px;border:1px solid #e5e7eb;border-radius:10px;">
+      </div>
+      <div style="min-width:200px;">
+        <label style="display:block;color:#6b7280;font-size:13px;margin-bottom:6px;">Status</label>
+        <select id="qStatus" style="width:100%;padding:10px;border:1px solid #e5e7eb;border-radius:10px;">
+          <option value="">All statuses</option>
+          <option>Enrolled</option>
+          <option>Active</option>
+          <option>Completed</option>
+          <option>Lost to Follow-up</option>
+          <option>Withdrawn</option>
+        </select>
+      </div>
+    </div>
+
+    <div id="ctMsg" style="color:#6b7280;font-size:13px;margin:8px 0;">Loading…</div>
+
+    <div style="overflow-x:auto;">
+      <table class="ct">
+        <thead>
+          <tr>
+            <th>Study ID</th><th>UHID</th><th>Patient Name</th><th>Diagnosis</th>
+            <th>Enrolled Date</th><th>Supplement Start</th><th>Weekly Reviews</th><th>Status</th><th></th>
+          </tr>
+        </thead>
+        <tbody id="ctBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script src="/js/config.js"></script>
+<script src="/js/storage.js"></script>
+<script src="/js/seed.js"></script>
+<script src="/js/auth.js"></script>
+<script src="/js/theme.js"></script>
+
+<script>
+auth.requireRole(['SUPER_ADMIN', 'ADMIN']);
+const me = auth.getCurrentUser();
+const apiBase = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : '';
+let _rows = [];
+
+function fmtDate(d){
+  if(!d) return '—';
+  const s = String(d).slice(0,10);
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : s;
+}
+function badge(status){
+  const map = { 'Enrolled':'b-enrolled', 'Active':'b-active', 'Completed':'b-completed', 'Lost to Follow-up':'b-lost', 'Withdrawn':'b-withdrawn' };
+  return `<span class="badge ${map[status]||'b-enrolled'}">${status}</span>`;
+}
+
+async function load(){
+  try {
+    const res = await fetch(apiBase + '/api/trials', { headers: { 'Authorization': 'Bearer ' + (me.token || '') } });
+    if(!res.ok) throw new Error('Server error ' + res.status);
+    const data = await res.json();
+    _rows = data.patients || [];
+    renderCards(data.settings || {}, _rows);
+    render();
+    document.getElementById('ctMsg').textContent = _rows.length ? '' : 'No pilot patients yet. Patients appear here once they are approved into production.';
+  } catch(e){
+    document.getElementById('ctMsg').textContent = 'Could not load enrollment log: ' + e.message;
+  }
+}
+
+function renderCards(settings, rows){
+  const count = s => rows.filter(r => r.status === s).length;
+  const cards = [
+    ['Target', settings.target_patients != null ? settings.target_patients : 30],
+    ['Enrolled (total)', rows.length],
+    ['Active', count('Active')],
+    ['Completed', count('Completed')],
+    ['Lost to F/U', count('Lost to Follow-up')],
+    ['Withdrawn', count('Withdrawn')]
+  ];
+  document.getElementById('ctCards').innerHTML = cards.map(c =>
+    `<div class="ct-card"><div class="n">${c[1]}</div><div class="l">${c[0]}</div></div>`).join('');
+}
+
+function render(){
+  const q = (document.getElementById('qSearch').value || '').toLowerCase().trim();
+  const st = document.getElementById('qStatus').value;
+  const rows = _rows.filter(r => {
+    if(st && r.status !== st) return false;
+    if(q){
+      const hay = `${r.studyId} ${r.name||''} ${r.uhic||''}`.toLowerCase();
+      if(!hay.includes(q)) return false;
+    }
+    return true;
+  });
+  document.getElementById('ctBody').innerHTML = rows.length ? rows.map(r => `
+    <tr>
+      <td style="font-weight:700;"><a href="/admin/trials/journey?patient=${encodeURIComponent(r.patientId)}" style="color:var(--text);text-decoration:underline;">${r.studyId}</a></td>
+      <td>${r.uhic || '—'}</td>
+      <td>${r.name || '—'}</td>
+      <td>${r.diagnosis || '—'}</td>
+      <td>${fmtDate(r.enrollmentDate)}</td>
+      <td>${fmtDate(r.supplementStartDate)}</td>
+      <td>${r.weeklyReviews || 0}</td>
+      <td>${badge(r.status)}${r.withdrawnReason ? `<div style="font-size:10px;color:#94a3b8;">${r.withdrawnReason}</div>` : ''}</td>
+      <td>${r.status === 'Withdrawn'
+            ? `<button class="linkbtn" style="color:#166534;" onclick="reinstate('${r.patientId}')">Reinstate</button>`
+            : `<button class="linkbtn" onclick="withdraw('${r.patientId}','${(r.name||'').replace(/'/g,'')}')">Withdraw</button>`}</td>
+    </tr>`).join('') : `<tr><td colspan="9" style="padding:18px;color:#94a3b8;">No matching patients.</td></tr>`;
+}
+
+async function withdraw(patientId, name){
+  const reason = prompt('Mark "' + name + '" as Withdrawn from the pilot.\nEnter a reason (optional):');
+  if(reason === null) return; // cancelled
+  try {
+    const res = await fetch(apiBase + '/api/trials/' + patientId + '/withdraw', {
+      method: 'POST', headers: { 'Content-Type':'application/json', 'Authorization':'Bearer ' + (me.token||'') },
+      body: JSON.stringify({ reason: reason || null })
+    });
+    if(!res.ok) throw new Error('Server error');
+    load();
+  } catch(e){ alert('Could not update: ' + e.message); }
+}
+async function reinstate(patientId){
+  if(!confirm('Reinstate this patient into the pilot?')) return;
+  try {
+    const res = await fetch(apiBase + '/api/trials/' + patientId + '/reinstate', {
+      method: 'POST', headers: { 'Authorization':'Bearer ' + (me.token||'') }
+    });
+    if(!res.ok) throw new Error('Server error');
+    load();
+  } catch(e){ alert('Could not update: ' + e.message); }
+}
+
+document.getElementById('qSearch').addEventListener('input', render);
+document.getElementById('qStatus').addEventListener('change', render);
+load();
+</script>
+</body>
+</html>

@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Clinical Trials — Formula Tracking - Gquence</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <link rel="stylesheet" href="/css/app.css">
+  <style>
+    .subnav { display:flex; gap:6px; margin:0 0 14px; flex-wrap:wrap; }
+    .subnav a { padding:7px 14px; border-radius:20px; font-size:13px; text-decoration:none; color:var(--text-2); background:var(--surface-2); }
+    .subnav a.active { background:#0e2247; color:#fff; }
+    table.ct { width:100%; border-collapse:collapse; margin-top:6px; }
+    table.ct th, table.ct td { padding:10px 12px; text-align:left; border-bottom:1px solid var(--border); font-size:13.5px; color:var(--text); }
+    table.ct th { color:var(--text-2); font-size:12px; text-transform:uppercase; letter-spacing:.03em; }
+    .vchip { display:inline-block; padding:3px 10px; border-radius:20px; font-size:12px; font-weight:700; background:var(--surface-2); border:1px solid var(--border); color:var(--text); }
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">Gquence Admin</div>
+  <div class="nav">
+    <a href="/admin">Dashboard</a>
+    <a href="/admin/stores">Stores</a>
+    <a href="/admin/users">Create Users</a>
+    <a href="/admin/mapping">Mapping</a>
+    <a href="/admin/tracking">Tracking</a>
+    <a href="/admin/trials">Clinical Trials</a>
+    <a href="/admin/reports">Reports</a>
+    <a href="/admin/rules">Rule Engine</a>
+    <a href="#" onclick="auth.logout()">Logout</a>
+    <button id="themeToggleBtn" onclick="toggleTheme()" class="btn-secondary btn-sm" style="margin-left: 20px; border-radius: 30px; padding: 6px 14px; cursor: pointer;">🌙 Dark Mode</button>
+  </div>
+</div>
+
+<div class="container page">
+  <div class="card">
+    <div class="subnav">
+      <a href="/admin/trials">Enrollment Log</a>
+      <a href="/admin/trials/cohort">Cohort Dashboard</a>
+      <a href="/admin/trials/outcomes">Weekly Outcomes</a>
+      <a href="/admin/trials/formula" class="active">Formula Tracking</a>
+      <a href="/admin/trials/export">Export Dataset</a>
+    </div>
+
+    <h2 style="margin-bottom:0;">Formula Tracking</h2>
+    <p style="color:var(--text-2);margin-top:4px;">Which formula version and batch each patient received — your audit trail for reformulations.</p>
+
+    <div id="fMsg" style="color:var(--text-2);font-size:13px;margin:8px 0;">Loading…</div>
+
+    <div style="overflow-x:auto;">
+      <table class="ct">
+        <thead>
+          <tr><th>Study ID</th><th>Patient</th><th>Formula Version</th><th>Protein Type</th><th>Batch No</th><th>Mfg Date</th><th>Supplement Start</th></tr>
+        </thead>
+        <tbody id="fBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script src="/js/config.js"></script>
+<script src="/js/storage.js"></script>
+<script src="/js/seed.js"></script>
+<script src="/js/auth.js"></script>
+<script src="/js/theme.js"></script>
+
+<script>
+auth.requireRole(['SUPER_ADMIN', 'ADMIN']);
+const me = auth.getCurrentUser();
+const apiBase = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : '';
+
+function val(x){ return (x === null || x === undefined || x === '') ? '—' : x; }
+function fmtDate(d){
+  if(!d) return '—';
+  const dt = new Date(d);
+  if(isNaN(dt.getTime())) return String(d).slice(0,10);
+  return ('0'+dt.getDate()).slice(-2)+'/'+('0'+(dt.getMonth()+1)).slice(-2)+'/'+dt.getFullYear();
+}
+
+async function load(){
+  try {
+    const res = await fetch(apiBase + '/api/trials/formula', { headers: { 'Authorization': 'Bearer ' + (me.token||'') } });
+    if(!res.ok) throw new Error('Server error ' + res.status);
+    const data = await res.json();
+    const rows = data.patients || [];
+    document.getElementById('fMsg').textContent = rows.length ? '' : 'No pilot patients yet.';
+    document.getElementById('fBody').innerHTML = rows.length ? rows.map(r => `
+      <tr>
+        <td style="font-weight:700;">${val(r.studyId)}</td>
+        <td>${val(r.name)}</td>
+        <td><span class="vchip">v${r.formulaVersion != null ? r.formulaVersion : 1}</span></td>
+        <td>${val(r.proteinType)}</td>
+        <td>${val(r.batchNo)}</td>
+        <td>${fmtDate(r.mfgDate)}</td>
+        <td>${fmtDate(r.startDate)}</td>
+      </tr>`).join('') : `<tr><td colspan="7" style="padding:16px;color:var(--text-2);">No data.</td></tr>`;
+  } catch(e){
+    document.getElementById('fMsg').textContent = 'Could not load formula tracking: ' + e.message;
+  }
+}
+load();
+</script>
+</body>
+</html>

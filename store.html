@@ -643,8 +643,11 @@ function _printLabels(elementIds, w, h){
     '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Labels</title><style>' +
       _labelCss() +
       'html,body{margin:0;padding:0;background:#fff;}' +
-      '.pg{width:' + w + 'mm;height:' + h + 'mm;overflow:hidden;position:relative;page-break-after:always;break-after:page;}' +
-      '.pg:last-child{page-break-after:auto;break-after:auto;}' +
+      '.pg{width:' + w + 'mm;height:' + h + 'mm;overflow:hidden;}' +
+      // Force a page break BEFORE every label after the first. Chrome honors
+      // break-before on a sibling far more reliably than break-after, and it leaves
+      // no trailing blank page — so the pouch always prints front + back as 2 pages.
+      '.pg + .pg{page-break-before:always;break-before:page;}' +
       '.fit{width:' + w + 'mm;}' +
       '.lbl,.lbl3{margin:0 !important;border:none !important;box-shadow:none !important;border-radius:0;' +
         'width:' + w + 'mm !important;height:auto !important;overflow:visible !important;}' +

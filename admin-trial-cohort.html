@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Clinical Trials — Cohort Dashboard - Gquence</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <link rel="stylesheet" href="/css/app.css">
+  <style>
+    .subnav { display:flex; gap:6px; margin:0 0 14px; flex-wrap:wrap; }
+    .subnav a { padding:7px 14px; border-radius:20px; font-size:13px; text-decoration:none; color:#334155; background:#eef2f7; }
+    .subnav a.active { background:#0e2247; color:#fff; }
+    .ct-cards { display:flex; gap:12px; flex-wrap:wrap; margin:6px 0 4px; }
+    .ct-card { flex:1; min-width:120px; background:var(--surface-2); border:1px solid var(--border); border-radius:12px; padding:14px; }
+    .ct-card .n { font-size:26px; font-weight:800; color:var(--text); }
+    .ct-card .l { font-size:12px; color:var(--text-2); text-transform:uppercase; letter-spacing:.03em; margin-top:2px; }
+    .progwrap { margin:16px 0 6px; }
+    .progbar { height:14px; background:#eef2f7; border-radius:10px; overflow:hidden; }
+    .progfill { height:100%; background:#16a34a; border-radius:10px; transition:width .3s; }
+    .chart { display:flex; align-items:flex-end; gap:10px; height:200px; padding:10px 4px 0; border-bottom:2px solid #e2e8f0; overflow-x:auto; }
+    .bar-col { display:flex; flex-direction:column; align-items:center; justify-content:flex-end; min-width:46px; height:100%; }
+    .bar { width:30px; background:#3b82f6; border-radius:5px 5px 0 0; }
+    .bar-val { font-size:12px; font-weight:700; color:var(--text); margin-bottom:3px; }
+    .bar-lbl { font-size:10.5px; color:var(--text-2); margin-top:5px; text-align:center; white-space:nowrap; }
+    table.ct { width:100%; border-collapse:collapse; margin-top:8px; }
+    table.ct th, table.ct td { padding:8px 12px; text-align:left; border-bottom:1px solid #eef2f7; font-size:13.5px; }
+    table.ct th { color:#6b7280; font-size:12px; text-transform:uppercase; letter-spacing:.03em; }
+    .seg { display:inline-flex; border:1px solid var(--border); border-radius:8px; overflow:hidden; }
+    .seg button { border:none; background:var(--surface-2); color:var(--text); padding:6px 14px; cursor:pointer; font-size:13px; }
+    .seg button.on { background:#0e2247; color:#fff; }
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">Gquence Admin</div>
+  <div class="nav">
+    <a href="/admin">Dashboard</a>
+    <a href="/admin/stores">Stores</a>
+    <a href="/admin/users">Create Users</a>
+    <a href="/admin/mapping">Mapping</a>
+    <a href="/admin/tracking">Tracking</a>
+    <a href="/admin/trials">Clinical Trials</a>
+    <a href="/admin/reports">Reports</a>
+    <a href="/admin/rules">Rule Engine</a>
+    <a href="#" onclick="auth.logout()">Logout</a>
+    <button id="themeToggleBtn" onclick="toggleTheme()" class="btn-secondary btn-sm" style="margin-left: 20px; border-radius: 30px; padding: 6px 14px; cursor: pointer;">🌙 Dark Mode</button>
+  </div>
+</div>
+
+<div class="container page">
+  <div class="card">
+    <div class="subnav">
+      <a href="/admin/trials">Enrollment Log</a>
+      <a href="/admin/trials/cohort" class="active">Cohort Dashboard</a>
+      <a href="/admin/trials/outcomes">Weekly Outcomes</a>
+      <a href="/admin/trials/formula">Formula Tracking</a>
+      <a href="/admin/trials/export">Export Dataset</a>
+    </div>
+
+    <h2 style="margin-bottom:0;">Cohort Dashboard</h2>
+    <p style="color:#6b7280;margin-top:4px;">Pilot progress and enrollment trend.</p>
+
+    <div id="cohMsg" style="color:#6b7280;font-size:13px;margin:8px 0;">Loading…</div>
+
+    <div id="cohContent" style="display:none;">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:14px 0 4px;">
+        <h3 style="margin:0;">Pilot Status</h3>
+        <button class="btn-secondary btn-sm" style="border-radius:8px;padding:6px 12px;cursor:pointer;" onclick="toggleSettings()">⚙ Edit pilot settings</button>
+      </div>
+
+      <div id="cohSettings" style="display:none;background:var(--surface-2);border:1px solid var(--border);border-radius:12px;padding:14px;margin:6px 0 10px;">
+        <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:end;">
+          <div style="display:flex;flex-direction:column;gap:4px;">
+            <label style="font-size:12px;color:var(--text-2);">Target patients</label>
+            <input id="setTarget" type="number" min="1" style="width:110px;padding:8px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);">
+          </div>
+          <div style="display:flex;flex-direction:column;gap:4px;">
+            <label style="font-size:12px;color:var(--text-2);">Pilot length (weekly reviews = Completed)</label>
+            <input id="setWeeks" type="number" min="1" style="width:110px;padding:8px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);">
+          </div>
+          <div style="display:flex;flex-direction:column;gap:4px;">
+            <label style="font-size:12px;color:var(--text-2);">Lost-to-follow-up after (days)</label>
+            <input id="setLost" type="number" min="1" style="width:110px;padding:8px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);">
+          </div>
+          <button class="btn-primary" style="border-radius:8px;padding:8px 16px;cursor:pointer;" onclick="saveSettings()">Save</button>
+          <button class="btn-secondary" style="border-radius:8px;padding:8px 16px;cursor:pointer;" onclick="toggleSettings()">Cancel</button>
+        </div>
+        <div id="setMsg" style="font-size:12.5px;color:var(--text-2);margin-top:8px;"></div>
+      </div>
+
+      <div class="ct-cards" id="cohCards"></div>
+      <div class="progwrap">
+        <div style="display:flex;justify-content:space-between;font-size:13px;color:#475569;margin-bottom:4px;">
+          <span>Enrollment progress</span><span id="cohProgLbl">—</span>
+        </div>
+        <div class="progbar"><div class="progfill" id="cohProgFill" style="width:0%"></div></div>
+      </div>
+
+      <h3 style="margin:22px 0 6px;">Enrollment Trend</h3>
+      <div class="seg" style="margin-bottom:12px;">
+        <button id="segDay" class="on" onclick="setGroup('day')">By Day</button>
+        <button id="segWeek" onclick="setGroup('week')">By Week</button>
+      </div>
+      <div class="chart" id="cohChart"></div>
+      <table class="ct">
+        <thead><tr><th id="thBucket">Date</th><th>New Patients</th><th>Cumulative</th></tr></thead>
+        <tbody id="cohTrendBody"></tbody>
+        <tfoot><tr><td style="font-weight:800;">Total</td><td style="font-weight:800;" id="cohTotal">0</td><td></td></tr></tfoot>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script src="/js/config.js"></script>
+<script src="/js/storage.js"></script>
+<script src="/js/seed.js"></script>
+<script src="/js/auth.js"></script>
+<script src="/js/theme.js"></script>
+
+<script>
+auth.requireRole(['SUPER_ADMIN', 'ADMIN']);
+const me = auth.getCurrentUser();
+const apiBase = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : '';
+let _rows = [], _settings = {}, _group = 'day';
+
+function isoDay(d){ const dt = new Date(d); return isNaN(dt.getTime()) ? null : dt.toISOString().slice(0,10); }
+function fmtDay(s){ const m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/); return m ? `${m[3]}/${m[2]}/${m[1]}` : s; }
+function weekKey(s){
+  // ISO week start (Monday) for grouping
+  const dt = new Date(s + 'T00:00:00');
+  const day = (dt.getDay() + 6) % 7; // 0=Mon
+  dt.setDate(dt.getDate() - day);
+  return dt.toISOString().slice(0,10);
+}
+
+async function load(){
+  try {
+    const res = await fetch(apiBase + '/api/trials', { headers: { 'Authorization': 'Bearer ' + (me.token||'') } });
+    if(!res.ok) throw new Error('Server error ' + res.status);
+    const data = await res.json();
+    _rows = data.patients || [];
+    _settings = data.settings || {};
+    document.getElementById('cohMsg').style.display = 'none';
+    document.getElementById('cohContent').style.display = 'block';
+    renderCards();
+    renderTrend();
+  } catch(e){
+    document.getElementById('cohMsg').textContent = 'Could not load cohort data: ' + e.message;
+  }
+}
+
+function renderCards(){
+  const count = s => _rows.filter(r => r.status === s).length;
+  const target = _settings.target_patients != null ? _settings.target_patients : 30;
+  const enrolled = _rows.length;
+  const cards = [
+    ['Target', target], ['Enrolled', enrolled], ['Active', count('Active')],
+    ['Completed', count('Completed')], ['Lost to F/U', count('Lost to Follow-up')], ['Withdrawn', count('Withdrawn')]
+  ];
+  document.getElementById('cohCards').innerHTML = cards.map(c =>
+    `<div class="ct-card"><div class="n">${c[1]}</div><div class="l">${c[0]}</div></div>`).join('');
+  const pct = target > 0 ? Math.min(100, Math.round(enrolled/target*100)) : 0;
+  document.getElementById('cohProgFill').style.width = pct + '%';
+  document.getElementById('cohProgLbl').textContent = `${enrolled} / ${target} (${pct}%)`;
+}
+
+function toggleSettings(){
+  const el = document.getElementById('cohSettings');
+  const showing = el.style.display !== 'none';
+  if(showing){ el.style.display = 'none'; return; }
+  document.getElementById('setTarget').value = _settings.target_patients != null ? _settings.target_patients : 30;
+  document.getElementById('setWeeks').value  = _settings.pilot_weeks != null ? _settings.pilot_weeks : 6;
+  document.getElementById('setLost').value   = _settings.lost_threshold_days != null ? _settings.lost_threshold_days : 14;
+  document.getElementById('setMsg').textContent = '';
+  el.style.display = 'block';
+}
+
+async function saveSettings(){
+  const body = {
+    target_patients: parseInt(document.getElementById('setTarget').value) || undefined,
+    pilot_weeks: parseInt(document.getElementById('setWeeks').value) || undefined,
+    lost_threshold_days: parseInt(document.getElementById('setLost').value) || undefined
+  };
+  const msg = document.getElementById('setMsg');
+  msg.textContent = 'Saving…';
+  try {
+    const res = await fetch(apiBase + '/api/pilot-settings', {
+      method: 'PUT', headers: { 'Content-Type':'application/json', 'Authorization':'Bearer ' + (me.token||'') },
+      body: JSON.stringify(body)
+    });
+    if(!res.ok) throw new Error('Server error ' + res.status);
+    _settings = await res.json();
+    msg.textContent = 'Saved.';
+    renderCards(); renderTrend();
+    setTimeout(() => { document.getElementById('cohSettings').style.display = 'none'; }, 700);
+  } catch(e){ msg.textContent = 'Could not save: ' + e.message; }
+}
+
+function setGroup(g){
+  _group = g;
+  document.getElementById('segDay').classList.toggle('on', g==='day');
+  document.getElementById('segWeek').classList.toggle('on', g==='week');
+  document.getElementById('thBucket').textContent = g==='week' ? 'Week of' : 'Date';
+  renderTrend();
+}
+
+function renderTrend(){
+  const counts = {};
+  _rows.forEach(r => {
+    const day = isoDay(r.enrollmentDate);
+    if(!day) return;
+    const key = _group === 'week' ? weekKey(day) : day;
+    counts[key] = (counts[key] || 0) + 1;
+  });
+  const keys = Object.keys(counts).sort();
+  const max = Math.max(1, ...keys.map(k => counts[k]));
+  // chart
+  document.getElementById('cohChart').innerHTML = keys.length ? keys.map(k => {
+    const h = Math.round(counts[k]/max*150);
+    return `<div class="bar-col"><div class="bar-val">${counts[k]}</div><div class="bar" style="height:${h}px"></div><div class="bar-lbl">${fmtDay(k)}</div></div>`;
+  }).join('') : '<div style="color:#94a3b8;padding:20px;">No enrollment data yet.</div>';
+  // table
+  let cum = 0;
+  document.getElementById('cohTrendBody').innerHTML = keys.map(k => {
+    cum += counts[k];
+    return `<tr><td>${fmtDay(k)}${_group==='week'?' (wk)':''}</td><td>${counts[k]}</td><td>${cum}</td></tr>`;
+  }).join('');
+  document.getElementById('cohTotal').textContent = _rows.length;
+}
+
+load();
+</script>
+</body>
+</html>
