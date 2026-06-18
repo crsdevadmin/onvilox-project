@@ -9,21 +9,19 @@
 
 <div class="topbar">
   <div class="logo">Gquence Admin</div>
-  <div class="nav">
+  <div class="nav" role="navigation" aria-label="Main navigation">
     <a href="/admin">Dashboard</a>
     <a href="/admin/stores">Stores</a>
     <a href="/admin/users">Create Users</a>
     <a href="/admin/mapping">Mapping</a>
-    <a href="/admin/tracking">Tracking</a>
     <a href="/admin/trials">Clinical Trials</a>
-    <a href="/admin/reports">Reports</a>
     <a href="/admin/rules">Rule Engine</a>
     <a href="#" onclick="auth.logout()">Logout</a>
     <button id="themeToggleBtn" onclick="toggleTheme()" class="btn-secondary btn-sm" style="margin-left: 20px; border-radius: 30px; padding: 6px 14px; cursor: pointer;">🌙 Dark Mode</button>
   </div>
 </div>
 
-<div class="container page">
+<div class="container page" role="main">
 
   <div class="card">
     <h2>Tracking</h2>
@@ -31,27 +29,34 @@
 
     <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:end;margin-top:12px;">
       <div style="flex:1;min-width:220px;">
-        <label style="display:block;color:#6b7280;font-size:13px;margin-bottom:6px;">Search (Patient / UHIC)</label>
-        <input id="qSearch" placeholder="Type patient name or UHIC" style="width:100%;padding:10px;border:1px solid #e5e7eb;border-radius:10px;">
+        <label style="display:block;color:var(--text-2);font-size:13px;margin-bottom:6px;">Search (Patient / UHIC)</label>
+        <input id="qSearch" placeholder="Type patient name or UHIC" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:10px;background:var(--surface);color:var(--text);">
       </div>
 
-      <div style="min-width:220px;">
-        <label style="display:block;color:#6b7280;font-size:13px;margin-bottom:6px;">Doctor</label>
-        <select id="qDoctor" style="width:100%;padding:10px;border:1px solid #e5e7eb;border-radius:10px;">
+      <div style="min-width:180px;">
+        <label style="display:block;color:var(--text-2);font-size:13px;margin-bottom:6px;">Hospital</label>
+        <select id="qHospital" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:10px;background:var(--surface);color:var(--text);">
+          <option value="">All Hospitals</option>
+        </select>
+      </div>
+
+      <div style="min-width:180px;">
+        <label style="display:block;color:var(--text-2);font-size:13px;margin-bottom:6px;">Doctor</label>
+        <select id="qDoctor" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:10px;background:var(--surface);color:var(--text);">
           <option value="">All Doctors</option>
         </select>
       </div>
 
-      <div style="min-width:220px;">
-        <label style="display:block;color:#6b7280;font-size:13px;margin-bottom:6px;">Store</label>
-        <select id="qStore" style="width:100%;padding:10px;border:1px solid #e5e7eb;border-radius:10px;">
+      <div style="min-width:180px;">
+        <label style="display:block;color:var(--text-2);font-size:13px;margin-bottom:6px;">Store</label>
+        <select id="qStore" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:10px;background:var(--surface);color:var(--text);">
           <option value="">All Stores</option>
         </select>
       </div>
 
-      <div style="min-width:220px;">
-        <label style="display:block;color:#6b7280;font-size:13px;margin-bottom:6px;">Job Status</label>
-        <select id="qStatus" style="width:100%;padding:10px;border:1px solid #e5e7eb;border-radius:10px;">
+      <div style="min-width:180px;">
+        <label style="display:block;color:var(--text-2);font-size:13px;margin-bottom:6px;">Job Status</label>
+        <select id="qStatus" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:10px;background:var(--surface);color:var(--text);">
           <option value="">All</option>
           <option value="APPROVED">APPROVED</option>
           <option value="PROCESSING">PROCESSING</option>
@@ -62,19 +67,22 @@
       </div>
     </div>
 
-    <div style="margin-top:14px;color:#6b7280;font-size:13px;" id="meta"></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;">
+      <div style="color:var(--text-2);font-size:13px;" id="meta"></div>
+      <button id="syncBtn" onclick="syncJobs()" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--surface-2);color:var(--text);font-size:13px;cursor:pointer;">⟳ Sync Jobs</button>
+    </div>
 
     <div style="overflow:auto;margin-top:10px;">
       <table>
         <thead>
           <tr>
-            <th>Patient</th>
-            <th>UHIC</th>
-            <th>Doctor</th>
-            <th>Store</th>
-            <th>Patient Status</th>
-            <th>Job Status</th>
-            <th>Last Update</th>
+            <th data-sort="0">Patient</th>
+            <th data-sort="1">UHIC</th>
+            <th data-sort="2">Doctor</th>
+            <th data-sort="3">Store</th>
+            <th data-sort="4">Patient Status</th>
+            <th data-sort="5">Job Status</th>
+            <th data-sort="6" data-type="date">Last Update</th>
             <th>Action</th>
           </tr>
         </thead>
@@ -116,10 +124,11 @@
 <script>
 auth.requireRole(['SUPER_ADMIN', 'ADMIN']);
 
-const elSearch = document.getElementById('qSearch');
-const elDoctor = document.getElementById('qDoctor');
-const elStore = document.getElementById('qStore');
-const elStatus = document.getElementById('qStatus');
+const elSearch   = document.getElementById('qSearch');
+const elHospital = document.getElementById('qHospital');
+const elDoctor   = document.getElementById('qDoctor');
+const elStore    = document.getElementById('qStore');
+const elStatus   = document.getElementById('qStatus');
 
 let __qrCurrentLink = '';
 
@@ -137,15 +146,14 @@ function getBaseUrlForQr(){
 function buildQrLink(patientId){
   const base = getBaseUrlForQr();
   if(base){
-    return `${base}/patient-qr.html?id=${encodeURIComponent(patientId)}`;
+    return base + '/patient-qr.html?id=' + encodeURIComponent(patientId);
   }
-  // Static file mode: keep the path relative so it opens from the same folder
-  return `./patient-qr.html?id=${encodeURIComponent(patientId)}`;
+  return './patient-qr.html?id=' + encodeURIComponent(patientId);
 }
 
 function showQr(patientId){
   const p = getPatientById(patientId);
-  document.getElementById('qrTitle').innerText = p ? `QR for ${p.name}` : 'Patient QR';
+  document.getElementById('qrTitle').innerText = p ? 'QR for ' + p.name : 'Patient QR';
   const link = buildQrLink(patientId);
   __qrCurrentLink = link;
   const box = document.getElementById('qrBox');
@@ -153,7 +161,7 @@ function showQr(patientId){
   new QRCode(box, { text: link, width: 220, height: 220 });
   const isFile = (window.location.origin === 'null');
   if(isFile && !localStorage.getItem('onvilox_public_base_url')){
-    document.getElementById('qrHint').innerText = 'Tip: phone scan needs hosting. For demo, click Open / Copy link. To enable scan: set localStorage key onvilox_public_base_url to your hosted URL (or http://<laptop-ip>:8000).';
+    document.getElementById('qrHint').innerText = 'Tip: phone scan needs hosting. For demo, click Open / Copy link.';
   }else{
     document.getElementById('qrHint').innerText = 'Scan to view patient report';
   }
@@ -167,24 +175,44 @@ async function copyQrLink(){
 }
 function openQrLink(){ if(__qrCurrentLink) window.open(__qrCurrentLink,'_blank','noopener'); }
 
-function fillFilters(){
-  const doctors = userService.getUsersByRole('DOCTOR');
-  doctors.sort((a,b)=>(a.name||'').localeCompare(b.name||''));
-  doctors.forEach(d=>{
-    const opt = document.createElement('option');
-    opt.value = d.id;
-    opt.textContent = d.name + (d.username ? ` (${d.username})` : '');
-    elDoctor.appendChild(opt);
-  });
+function doctorHospital(d){ return d.hospital_name || d.hospitalName || ''; }
 
-  const stores = storeService.getStores();
-  stores.sort((a,b)=>(a.name||'').localeCompare(b.name||''));
-  stores.forEach(s=>{
-    const opt = document.createElement('option');
-    opt.value = s.id;
-    opt.textContent = s.name;
-    elStore.appendChild(opt);
-  });
+function fillFilters(){
+  const selectedHospital = elHospital.value;
+  const selectedDoctor   = elDoctor.value;
+  const selectedStore    = elStore.value;
+
+  const allDoctors = userService.getUsersByRole('DOCTOR');
+  const allStores  = storeService.getStores();
+  const hospitals  = [...new Set([
+    ...allDoctors.map(function(d){ return doctorHospital(d); }),
+    ...allStores.map(function(s){ return s.hospital || ''; })
+  ].filter(Boolean))].sort(function(a,b){ return a.localeCompare(b); });
+
+  const prevHosp = elHospital.value;
+  elHospital.innerHTML = '<option value="">All Hospitals</option>' +
+    hospitals.map(function(h){
+      return '<option value="' + h.replace(/"/g,'&quot;') + '"' + (h===prevHosp?' selected':'') + '>' + h + '</option>';
+    }).join('');
+
+  const scopeDoctors = selectedHospital
+    ? allDoctors.filter(function(d){ return doctorHospital(d) === selectedHospital; })
+    : allDoctors;
+  scopeDoctors.sort(function(a,b){ return (a.name||'').localeCompare(b.name||''); });
+  elDoctor.innerHTML = '<option value="">All Doctors</option>' +
+    scopeDoctors.map(function(d){
+      const label = d.name + (d.username ? ' (' + d.username + ')' : '');
+      return '<option value="' + d.id + '"' + (d.id===selectedDoctor?' selected':'') + '>' + label + '</option>';
+    }).join('');
+
+  const scopeStores = selectedHospital
+    ? allStores.filter(function(s){ return (s.hospital || '') === selectedHospital; })
+    : allStores;
+  scopeStores.sort(function(a,b){ return (a.name||'').localeCompare(b.name||''); });
+  elStore.innerHTML = '<option value="">All Stores</option>' +
+    scopeStores.map(function(s){
+      return '<option value="' + s.id + '"' + (s.id===selectedStore?' selected':'') + '>' + s.name + '</option>';
+    }).join('');
 }
 
 function fmtDate(iso){
@@ -193,100 +221,159 @@ function fmtDate(iso){
 }
 
 function render(){
-  const q = (elSearch.value || '').trim().toLowerCase();
-  const doctorId = elDoctor.value || '';
-  const storeId = elStore.value || '';
-  const jobStatus = elStatus.value || '';
+  const q          = (elSearch.value || '').trim().toLowerCase();
+  const hospital   = elHospital.value || '';
+  const doctorId   = elDoctor.value || '';
+  const storeId    = elStore.value || '';
+  const jobStatus  = elStatus.value || '';
 
   const patients = getPatients();
   const jobs = manufacturingService.getJobs();
 
-  // quick lookup
   const jobByPatient = {};
-  jobs.forEach(j=> { jobByPatient[j.patientId] = j; });
+  jobs.forEach(function(j){ jobByPatient[j.patientId] = j; });
 
-  let rows = patients.map(p=>{
-    const j = jobByPatient[p.id] || null;
+  let rows = patients.map(function(p){
+    const j   = jobByPatient[p.id] || null;
     const doc = p.assignedDoctorId ? userService.getUserById(p.assignedDoctorId) : null;
-    const st = p.storeId ? storeService.getStoreById(p.storeId) : null;
-    return { p, j, doc, st };
+    const st  = p.storeId ? storeService.getStoreById(p.storeId) : null;
+    return { p: p, j: j, doc: doc, st: st };
   });
 
-  // filters
   if(q){
-    rows = rows.filter(r=>{
-      const name = (r.p.name || '').toLowerCase();
-      const uhic = (r.p.uhic || '').toLowerCase();
-      return name.includes(q) || uhic.includes(q);
+    rows = rows.filter(function(r){
+      return (r.p.name||'').toLowerCase().includes(q) || (r.p.uhic||'').toLowerCase().includes(q);
+    });
+  }
+  if(hospital){
+    rows = rows.filter(function(r){
+      const docHosp = r.doc ? doctorHospital(r.doc) : '';
+      const stHosp  = r.st  ? (r.st.hospital || '') : '';
+      return docHosp === hospital || stHosp === hospital;
     });
   }
   if(doctorId){
-    rows = rows.filter(r => (r.p.assignedDoctorId || '') === doctorId);
+    rows = rows.filter(function(r){ return (r.p.assignedDoctorId || '') === doctorId; });
   }
   if(storeId){
-    rows = rows.filter(r => (r.p.storeId || '') === storeId);
+    rows = rows.filter(function(r){ return (r.p.storeId || '') === storeId; });
   }
   if(jobStatus){
-    rows = rows.filter(r => (r.j && r.j.status === jobStatus));
+    rows = rows.filter(function(r){ return r.j && r.j.status === jobStatus; });
   }
 
-  // sort latest updated first (job updatedAt else patient updatedAt/createdAt)
-  rows.sort((a,b)=>{
+  rows.sort(function(a,b){
     const ta = (a.j && a.j.updatedAt) || a.p.updatedAt || a.p.createdAt || '';
     const tb = (b.j && b.j.updatedAt) || b.p.updatedAt || b.p.createdAt || '';
     return (tb||'').localeCompare(ta||'');
   });
 
-  document.getElementById('meta').innerText = `Showing ${rows.length} of ${patients.length} patients`;
+  document.getElementById('meta').innerText = 'Showing ' + rows.length + ' of ' + patients.length + ' patients';
 
   const tbody = document.getElementById('rows');
   tbody.innerHTML = '';
 
-  rows.forEach(r=>{
-    const p = r.p;
-    const j = r.j;
+  rows.forEach(function(r){
+    const p   = r.p;
+    const j   = r.j;
     const doc = r.doc;
-    const st = r.st;
+    const st  = r.st;
+
+    const patStatus = (p.status || 'CREATED').toLowerCase().replace(/\s+/g,'_');
+    const jobSt     = j ? String(j.status||'').toLowerCase().replace(/\s+/g,'_').replace(/\s+/g,'_') : '';
+
+    // warn if APPROVED but no job in DB (store manager won't see this patient)
+    const noJobWarn = (!j && p.status === 'APPROVED')
+      ? ' <span title="No manufacturing job found — click Sync Jobs to fix" style="color:#d97706;font-size:11px;cursor:help;">⚠ no job</span>'
+      : '';
 
     const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td><button class="linklike" onclick="showQr('${p.id}');event.stopPropagation();">${p.name}</button></td>
-      <td>${p.uhic || '-'}</td>
-      <td>${doc ? doc.name : '-'}</td>
-      <td>${st ? st.name : '-'}</td>
-      <td><span class="status ${(p.status||'CREATED').toLowerCase()}">${p.status || 'CREATED'}</span></td>
-      <td>${j ? `<span class="status ${String(j.status||'').toLowerCase()}">${j.status}</span>` : '-'}</td>
-      <td>${fmtDate((j && j.updatedAt) || p.updatedAt || p.createdAt)}</td>
-      <td>
-        <a class="btn-secondary" href="/patients/profile?id=${encodeURIComponent(p.id)}" target="_blank" rel="noopener" style="padding: 6px 10px; border-radius: 6px; display:inline-flex; align-items:center; justify-content:center;" title="Open Profile">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M8.636 3.5a.5.5 0 0 0-.5-.5H1.5A1.5 1.5 0 0 0 0 4.5v10A1.5 1.5 0 0 0 1.5 16h10a1.5 1.5 0 0 0 1.5-1.5V7.864a.5.5 0 0 0-1 0V14.5a.5.5 0 0 1-.5.5h-10a.5.5 0 0 1-.5-.5v-10a.5.5 0 0 1 .5-.5h6.636a.5.5 0 0 0 .5-.5z"/><path fill-rule="evenodd" d="M16 .5a.5.5 0 0 0-.5-.5h-5a.5.5 0 0 0 0 1h3.793L6.146 9.146a.5.5 0 1 0 .708.708L15 1.707V5.5a.5.5 0 0 0 1 0v-5z"/></svg>
-        </a>
-      </td>
-    `;
+    tr.innerHTML =
+      '<td><button class="linklike" onclick="showQr(\'' + p.id + '\');event.stopPropagation();">' + p.name + '</button></td>' +
+      '<td>' + (p.uhic || '-') + '</td>' +
+      '<td>' + (doc ? doc.name : '-') + '</td>' +
+      '<td>' + (st  ? st.name  : '-') + '</td>' +
+      '<td><span class="status ' + patStatus + '">' + (p.status || 'CREATED') + '</span>' + noJobWarn + '</td>' +
+      '<td>' + (j ? '<span class="status ' + jobSt + '">' + j.status + '</span>' : '-') + '</td>' +
+      '<td>' + fmtDate((j && j.updatedAt) || p.updatedAt || p.createdAt) + '</td>' +
+      '<td><a class="btn-secondary" href="/patients/profile?id=' + encodeURIComponent(p.id) + '" target="_blank" rel="noopener" style="padding:6px 10px;border-radius:6px;display:inline-flex;align-items:center;justify-content:center;" title="Open Profile">' +
+        '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M8.636 3.5a.5.5 0 0 0-.5-.5H1.5A1.5 1.5 0 0 0 0 4.5v10A1.5 1.5 0 0 0 1.5 16h10a1.5 1.5 0 0 0 1.5-1.5V7.864a.5.5 0 0 0-1 0V14.5a.5.5 0 0 1-.5.5h-10a.5.5 0 0 1-.5-.5v-10a.5.5 0 0 1 .5-.5h6.636a.5.5 0 0 0 .5-.5z"/><path fill-rule="evenodd" d="M16 .5a.5.5 0 0 0-.5-.5h-5a.5.5 0 0 0 0 1h3.793L6.146 9.146a.5.5 0 1 0 .708.708L15 1.707V5.5a.5.5 0 0 0 1 0v-5z"/></svg>' +
+      '</a></td>';
     tbody.appendChild(tr);
 
-    // optional history row
     if(j && j.history && j.history.length){
       const hist = document.createElement('tr');
-      hist.innerHTML = `
-        <td colspan="8" style="background:#f9fafb;">
-          <div style="display:flex;gap:10px;flex-wrap:wrap;color:#374151;font-size:13px;">
-            ${j.history.slice().reverse().slice(0,6).map(h=>`<span class="status ${String(h.status||'').toLowerCase()}">${h.status}</span><span style="color:#6b7280;">${fmtDate(h.at)}</span>`).join('<span style="color:#d1d5db;">|</span>')}
-          </div>
-        </td>
-      `;
+      hist.className = 'dt-subrow';
+      hist.innerHTML =
+        '<td colspan="8" style="background:var(--surface-2);">' +
+          '<div style="display:flex;gap:10px;flex-wrap:wrap;color:var(--text);font-size:13px;">' +
+            j.history.slice().reverse().slice(0,6).map(function(h){
+              return '<span class="status ' + String(h.status||'').toLowerCase().replace(/\s+/g,'_') + '">' + h.status + '</span>' +
+                     '<span style="color:var(--text-2);">' + fmtDate(h.at) + '</span>';
+            }).join('<span style="color:var(--border);">|</span>') +
+          '</div>' +
+        '</td>';
       tbody.appendChild(hist);
     }
   });
 }
 
-initStore().then(() => { fillFilters(); render(); });
-[elSearch, elDoctor, elStore, elStatus].forEach(el=>{
-  el.addEventListener('input', render);
-  el.addEventListener('change', render);
+async function syncJobs(){
+  const btn = document.getElementById('syncBtn');
+  if(btn){ btn.disabled=true; btn.textContent='Syncing…'; }
+  try {
+    const apiBase = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : '';
+    const me2 = auth.getCurrentUser();
+    const res = await fetch(apiBase + '/api/manufacturing-jobs/sync', {
+      method: 'POST',
+      headers: { 'Content-Type':'application/json', 'Authorization': 'Bearer ' + (me2.token||'') }
+    });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error || 'Server error');
+    let msg;
+    if(data.created){
+      msg = '✅ Synced: ' + data.created + ' new job(s) created.';
+      if(data.skipped && data.skipped.length) msg += ' ' + data.skipped.length + ' still missing store mapping.';
+    } else {
+      msg = '✓ All jobs up to date.';
+      if(data.skipped && data.skipped.length){
+        msg += ' ' + data.skipped.length + ' patient(s) missing store mapping: ' + data.skipped.map(function(s){ return s.patient; }).join(', ');
+      }
+    }
+    document.getElementById('meta').textContent = msg;
+    if(typeof manufacturingService !== 'undefined' && manufacturingService.initJobs){
+      await manufacturingService.initJobs();
+    }
+    renderAndRefresh();
+  } catch(e){
+    document.getElementById('meta').textContent = '❌ Sync failed: ' + e.message;
+  } finally {
+    if(btn){ btn.disabled=false; btn.textContent='⟳ Sync Jobs'; }
+  }
+}
+
+let _trackDt;
+function renderAndRefresh(){ render(); if(_trackDt) _trackDt.refresh(); }
+
+function _dbg(msg){ var m=document.getElementById('meta'); if(m) m.textContent=msg; console.log('[tracking] '+msg); }
+_dbg('Starting…');
+initStore().then(async function(){
+  _dbg('Data loaded. Patients in cache: ' + (typeof getPatients==='function' ? getPatients().length : 'getPatients missing'));
+  try { if (typeof userService !== 'undefined' && userService.initUsers) await userService.initUsers(); } catch(e){ _dbg('initUsers error: '+e.message); }
+  try { if (typeof storeService !== 'undefined' && storeService.initStores) await storeService.initStores(); } catch(e){ _dbg('initStores error: '+e.message); }
+  try { fillFilters(); } catch(e){ _dbg('fillFilters error: '+e.message); }
+  try { render(); } catch(e){ _dbg('render error: '+e.message); console.error(e); }
+  try { if (typeof DataTable !== 'undefined') _trackDt = new DataTable('rows', { pageSize: 25 }); } catch(e){ console.error('DataTable init failed:', e); }
+}).catch(function(e){ _dbg('initStore error: '+e.message); console.error(e); });
+
+elHospital.addEventListener('change', function(){ fillFilters(); renderAndRefresh(); });
+[elSearch, elDoctor, elStore, elStatus].forEach(function(el){
+  el.addEventListener('input', renderAndRefresh);
+  el.addEventListener('change', renderAndRefresh);
 });
 </script>
 
 <script src="/js/theme.js"></script>
+<script src="/js/table-utils.js"></script>
 </body>
 </html>

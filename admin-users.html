@@ -542,10 +542,10 @@ async function deleteUserUI(userId, username){
 
 
 (async () => {
-  await userService.initUsers();
-  await storeService.initStores();
-  onRoleChange();
-  renderUsersTable();
+  try { await userService.initUsers(); } catch(e){ console.error('initUsers failed:', e); }
+  try { await storeService.initStores(); } catch(e){ console.error('initStores failed:', e); }
+  try { onRoleChange(); } catch(e){ console.error('onRoleChange failed:', e); }
+  try { renderUsersTable(); } catch(e){ console.error('renderUsersTable failed:', e); }
 })();
 </script>
 

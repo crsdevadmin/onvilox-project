@@ -158,6 +158,9 @@ app.get('/api/patients', authenticateToken, async (req, res) => {
       if (r.reduced_food_intake != null) p.reducedFoodIntake = r.reduced_food_intake;
       if (r.weight != null) p.weight = r.weight;
       if (r.status != null) p.status = r.status;
+      // Ensure assigned doctor is always present under the camelCase key the frontend uses
+      if (!p.assignedDoctorId && r.assigned_doctor_id) p.assignedDoctorId = r.assigned_doctor_id;
+      if (!p.id && r.id) p.id = r.id;
       return p;
     });
     res.json(patients);
@@ -767,6 +770,28 @@ app.get('/api/trials/formula', authenticateToken, async (req, res) => {
 
     res.json({ patients });
   } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+
+// ── Doctor ID migration — reassign patients from old localStorage doctor ID to DB doctor ID
+app.post('/api/admin/migrate-doctor-id', authenticateToken, async (req, res) => {
+  if (!['ADMIN','SUPER_ADMIN'].includes(req.user && req.user.role)) return res.status(403).json({ error: 'Admin only' });
+  try {
+    const { oldId, newId } = req.body;
+    if (!oldId || !newId) return res.status(400).json({ error: 'oldId and newId required' });
+    // Update assigned_doctor_id column
+    const r1 = await pool.query(
+      'UPDATE patients SET assigned_doctor_id=$1 WHERE assigned_doctor_id=$2',
+      [newId, oldId]
+    );
+    // Update inside full_data JSONB
+    const r2 = await pool.query(
+      `UPDATE patients SET full_data = jsonb_set(full_data, '{assignedDoctorId}', to_jsonb($1::text))
+       WHERE full_data->>'assignedDoctorId' = $2`,
+      [newId, oldId]
+    );
+    res.json({ ok: true, columnUpdated: r1.rowCount, jsonbUpdated: r2.rowCount });
+  } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
 // Weekly Outcomes — weekly monitoring metrics for every pilot patient.
@@ -2311,17 +2336,14 @@ async function seedSuperAdmin() {
     // Remove old admin@onvilox.com if it exists
     await pool.query("DELETE FROM users WHERE email = $1 AND role = 'SUPER_ADMIN'", ['admin@onvilox.com']);
 
-    const existing = await pool.query("SELECT id FROM users WHERE email = $1", ['admin@gquence.in']);
-    if (existing.rows.length === 0) {
-      const hash = await bcrypt.hash('admin2026', 10);
-      await pool.query(
-        `INSERT INTO users (id, name, email, password_hash, role, created_at)
-         VALUES ($1, $2, $3, $4, $5, NOW())
-         ON CONFLICT (id) DO UPDATE SET email=$3, password_hash=$4`,
-        ['superadmin_001', 'System Admin', 'admin@gquence.in', hash, 'SUPER_ADMIN']
-      );
-      console.log('SUPER_ADMIN seeded: admin@gquence.in');
-    }
+    const hash = await bcrypt.hash('admin2026', 10);
+    await pool.query(
+      `INSERT INTO users (id, name, email, password_hash, role, created_at)
+       VALUES ($1, $2, $3, $4, $5, NOW())
+       ON CONFLICT (id) DO UPDATE SET email=$3, password_hash=$4, role=$5`,
+      ['superadmin_001', 'System Admin', 'admin@gquence.in', hash, 'SUPER_ADMIN']
+    );
+    console.log('SUPER_ADMIN ensured: admin@gquence.in');
   } catch(e) {
     console.warn('seedSuperAdmin error:', e.message);
   }

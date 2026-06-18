@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Clinical Trials — Patient View - Gquence</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <link rel="stylesheet" href="/css/app.css">
+  <style>
+    /* header */
+    .pt-hero { display:flex; flex-wrap:wrap; gap:10px; align-items:baseline; margin:6px 0 4px; }
+    .pt-sid  { font-size:26px; font-weight:900; color:var(--text); }
+    .pt-name { font-size:16px; color:var(--text-2); }
+    .badge { display:inline-block; padding:3px 10px; border-radius:20px; font-size:12px; font-weight:700; }
+    .b-enrolled  { background:#e0e7ff; color:#3730a3; }
+    .b-active    { background:#dcfce7; color:#166534; }
+    .b-completed { background:#dbeafe; color:#1e40af; }
+    .b-lost      { background:#fef9c3; color:#854d0e; }
+    .b-withdrawn { background:#fee2e2; color:#991b1b; }
+
+    /* section cards */
+    .section { background:var(--surface-2); border:1px solid var(--border); border-radius:14px; padding:18px 20px; margin-top:16px; }
+    .section-title { font-size:15px; font-weight:800; color:var(--text); margin:0 0 14px; }
+
+    /* meta chips row */
+    .meta-chips { display:flex; gap:8px; flex-wrap:wrap; margin:6px 0 16px; }
+    .meta-chip  { background:var(--surface-2); border:1px solid var(--border); border-radius:8px; padding:6px 12px; font-size:13px; color:var(--text-2); }
+    .meta-chip strong { color:var(--text); }
+
+    /* timeline */
+    .timeline { position:relative; padding-left:28px; }
+    .timeline:before { content:''; position:absolute; left:9px; top:6px; bottom:6px; width:2px; background:var(--border); }
+    .tl-item { position:relative; padding:0 0 16px 6px; }
+    .tl-item:before { content:''; position:absolute; left:-23px; top:3px; width:14px; height:14px; border-radius:50%; background:var(--border); border:2px solid var(--surface); box-shadow:0 0 0 1px var(--border); }
+    .tl-item.done:before { background:#16a34a; box-shadow:0 0 0 1px #16a34a; border-color:var(--surface); }
+    .tl-lbl  { font-weight:700; color:var(--text); font-size:14px; }
+    .tl-date.has { font-size:13px; color:var(--text); font-weight:600; margin-top:1px; }
+    .tl-date.no  { font-size:13px; color:var(--text-2); font-style:italic; margin-top:1px; }
+    .wk-chips { display:flex; flex-wrap:wrap; gap:6px; margin-top:4px; }
+    .wk-chip  { background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:2px 9px; font-size:11.5px; color:var(--text-2); }
+
+    /* withdrawn banner */
+    .withdrawn-banner { background:#fee2e2; color:#991b1b; border-radius:8px; padding:10px 14px; font-weight:600; margin:0 0 12px; }
+
+    /* outcome charts */
+    .charts-row { display:flex; gap:16px; flex-wrap:wrap; margin-top:4px; }
+    .chart-legend { display:flex; gap:14px; font-size:12px; color:var(--text-2); margin-bottom:6px; flex-wrap:wrap; }
+
+    /* outcomes table */
+    table.ct { width:100%; border-collapse:collapse; margin-top:8px; }
+    table.ct th, table.ct td { padding:9px 12px; text-align:left; border-bottom:1px solid var(--border); font-size:13px; color:var(--text); }
+    table.ct th { color:var(--text-2); font-size:11.5px; text-transform:uppercase; letter-spacing:.03em; }
+
+    /* formula */
+    .formula-grid { display:flex; gap:12px; flex-wrap:wrap; margin-top:4px; }
+    .f-cell { flex:1; min-width:130px; }
+    .f-label { font-size:12px; color:var(--text-2); text-transform:uppercase; letter-spacing:.03em; margin-bottom:3px; }
+    .f-val   { font-size:16px; font-weight:700; color:var(--text); }
+    .vchip   { display:inline-block; padding:3px 10px; border-radius:20px; font-size:13px; font-weight:700; background:var(--surface); border:1px solid var(--border); color:var(--text); }
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">Gquence Admin</div>
+  <div class="nav" role="navigation" aria-label="Main navigation">
+    <a href="/admin">Dashboard</a>
+    <a href="/admin/stores">Stores</a>
+    <a href="/admin/users">Create Users</a>
+    <a href="/admin/mapping">Mapping</a>
+    <a href="/admin/trials">Clinical Trials</a>
+    <a href="/admin/rules">Rule Engine</a>
+    <a href="#" onclick="auth.logout()">Logout</a>
+    <button id="themeToggleBtn" onclick="toggleTheme()" class="btn-secondary btn-sm" style="margin-left:20px;border-radius:30px;padding:6px 14px;cursor:pointer;">🌙 Dark Mode</button>
+  </div>
+</div>
+
+<div class="container page" role="main">
+
+  <!-- back link + loading -->
+  <div style="display:flex;align-items:center;gap:14px;margin-bottom:6px;">
+    <a id="backLink" href="/admin/trials" style="font-size:13px;color:var(--text-2);">&larr; Enrollment Log</a>
+  </div>
+  <div id="ptMsg" style="color:var(--text-2);font-size:13px;padding:20px 0;">Loading patient…</div>
+
+  <!-- main content (hidden until loaded) -->
+  <div id="ptMain" style="display:none;">
+
+    <!-- hero header -->
+    <div class="pt-hero">
+      <span class="pt-sid" id="ptStudyId">—</span>
+      <span class="pt-name" id="ptName">—</span>
+      <span id="ptBadge"></span>
+    </div>
+
+    <!-- meta chips -->
+    <div class="meta-chips" id="ptMeta"></div>
+
+    <!-- withdrawn banner -->
+    <div id="ptWithdrawn"></div>
+
+    <!-- ── Section 1: Journey ───────────────────────────── -->
+    <div class="section">
+      <div class="section-title">Patient Journey</div>
+      <div class="timeline" id="ptTimeline"></div>
+    </div>
+
+    <!-- ── Section 2: Weekly Outcomes ─────────────────── -->
+    <div class="section">
+      <div class="section-title">Weekly Outcomes</div>
+      <div id="outEmpty" style="color:var(--text-2);font-size:13px;display:none;">No weekly reviews recorded yet.</div>
+      <div id="outHasData" style="display:none;">
+        <div class="chart-legend">
+          <span><span style="display:inline-block;width:18px;height:2px;background:#2563eb;vertical-align:middle;margin-right:4px;"></span>This patient</span>
+          <span><span style="display:inline-block;width:18px;height:0;border-top:2px dashed #94a3b8;vertical-align:middle;margin-right:4px;"></span>Cohort average</span>
+        </div>
+        <div class="charts-row" id="ptCharts"></div>
+        <h4 style="margin:18px 0 4px;font-size:14px;color:var(--text);">Weekly Values</h4>
+        <div style="overflow-x:auto;">
+          <table class="ct">
+            <thead>
+              <tr><th>Review</th><th>Date</th><th>Weight</th><th>BMI</th><th>MUAC</th><th>Hand Grip</th><th>ECOG</th><th>Albumin</th><th>CRP</th><th>Glucose</th></tr>
+            </thead>
+            <tbody id="ptOutTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Section 3: Formula ──────────────────────────── -->
+    <div class="section">
+      <div class="section-title">Formula</div>
+      <div id="ptFormula"></div>
+    </div>
+
+  </div><!-- /ptMain -->
+</div>
+
+<script src="/js/config.js"></script>
+<script src="/js/storage.js"></script>
+<script src="/js/seed.js"></script>
+<script src="/js/auth.js"></script>
+<script src="/js/theme.js"></script>
+
+<script>
+auth.requireRole(['SUPER_ADMIN', 'ADMIN']);
+const me = auth.getCurrentUser();
+const apiBase = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : '';
+const patientId = new URLSearchParams(location.search).get('patient');
+
+// ── helpers ────────────────────────────────────────────────
+function val(x){ return (x === null || x === undefined || x === '') ? '—' : x; }
+function fmtDate(d){
+  if(!d) return null;
+  const dt = new Date(d);
+  if(isNaN(dt.getTime())){
+    const s = String(d).slice(0,10);
+    const m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    return m ? `${m[3]}/${m[2]}/${m[1]}` : s;
+  }
+  return ('0'+dt.getDate()).slice(-2)+'/'+('0'+(dt.getMonth()+1)).slice(-2)+'/'+dt.getFullYear();
+}
+function fmtOrDash(d){ return fmtDate(d) || '—'; }
+function badgeHtml(status){
+  const map = { 'Enrolled':'b-enrolled','Active':'b-active','Completed':'b-completed','Lost to Follow-up':'b-lost','Withdrawn':'b-withdrawn' };
+  return `<span class="badge ${map[status]||'b-enrolled'}">${status||'Enrolled'}</span>`;
+}
+
+// ── SVG line chart (dependency-free) ───────────────────────
+function lineChart(title, unit, pts, cohortPts, color){
+  const W=300, H=160, padL=34, padR=10, padT=12, padB=22;
+  const all = pts.concat(cohortPts||[]).map(p=>p.y).filter(v=>v!=null&&!isNaN(v));
+  if(!all.length) return `<div style="min-width:260px;"><div style="font-size:12.5px;font-weight:700;color:var(--text);">${title} <span style="font-weight:400;color:var(--text-2);">(${unit})</span></div><div style="color:var(--text-2);font-size:12px;padding:8px 0;">No data.</div></div>`;
+  let mn=Math.min(...all), mx=Math.max(...all);
+  if(mn===mx){ mn-=1; mx+=1; }
+  const n = Math.max(pts.length, (cohortPts||[]).length, 1);
+  const xOf = i => padL + (n<=1 ? (W-padL-padR)/2 : (i/(n-1))*(W-padL-padR));
+  const yOf = v => padT + (1-(v-mn)/(mx-mn))*(H-padT-padB);
+  const draw = (series, col, dash) => {
+    const pairs = series.map((p,i)=>(p.y==null||isNaN(p.y))?null:[xOf(i),yOf(p.y)]).filter(Boolean);
+    if(!pairs.length) return '';
+    const line = pairs.length>1 ? `<polyline points="${pairs.map(a=>a[0]+','+a[1]).join(' ')}" fill="none" stroke="${col}" stroke-width="2"${dash?' stroke-dasharray="4 3"':''}></polyline>` : '';
+    const dots = pairs.map(a=>`<circle cx="${a[0]}" cy="${a[1]}" r="2.5" fill="${col}"></circle>`).join('');
+    return line+dots;
+  };
+  const xlabels = pts.map((p,i)=>`<text x="${xOf(i)}" y="${H-6}" text-anchor="middle" font-size="9" fill="var(--text-2)">${p.x}</text>`).join('');
+  return `<div style="min-width:260px;flex:1;">
+    <div style="font-size:12.5px;font-weight:700;color:var(--text);">${title} <span style="font-weight:400;color:var(--text-2);">(${unit})</span></div>
+    <svg viewBox="0 0 ${W} ${H}" width="100%" style="max-width:360px;display:block;">
+      <line x1="${padL}" y1="${padT}" x2="${padL}" y2="${H-padB}" stroke="var(--border)"></line>
+      <line x1="${padL}" y1="${H-padB}" x2="${W-padR}" y2="${H-padB}" stroke="var(--border)"></line>
+      <text x="2" y="${yOf(mx)+3}" font-size="9" fill="var(--text-2)">${Math.round(mx*10)/10}</text>
+      <text x="2" y="${yOf(mn)+3}" font-size="9" fill="var(--text-2)">${Math.round(mn*10)/10}</text>
+      ${xlabels}
+      ${cohortPts ? draw(cohortPts,'#94a3b8',true) : ''}
+      ${draw(pts, color, false)}
+    </svg>
+  </div>`;
+}
+
+// ── main load ──────────────────────────────────────────────
+async function load(){
+  if(!patientId){
+    document.getElementById('ptMsg').textContent = 'No patient specified. Add ?patient=ID to the URL.';
+    return;
+  }
+
+  try {
+    const hdr = { 'Authorization': 'Bearer ' + (me.token||'') };
+    const [jRes, oRes, fRes] = await Promise.all([
+      fetch(apiBase + '/api/trials/' + patientId + '/journey', { headers: hdr }),
+      fetch(apiBase + '/api/trials/outcomes', { headers: hdr }),
+      fetch(apiBase + '/api/trials/formula',  { headers: hdr })
+    ]);
+    if(!jRes.ok) throw new Error('Journey: server error ' + jRes.status);
+
+    const journey  = await jRes.json();
+    const outData  = oRes.ok  ? await oRes.json()  : { patients: [] };
+    const fData    = fRes.ok  ? await fRes.json()   : { patients: [] };
+
+    render(journey, outData.patients || [], fData.patients || []);
+    document.getElementById('ptMsg').style.display = 'none';
+    document.getElementById('ptMain').style.display = 'block';
+  } catch(e){
+    document.getElementById('ptMsg').textContent = 'Could not load patient: ' + e.message;
+  }
+}
+
+function render(journey, allOutcomes, allFormula){
+  const p    = journey.patient || {};
+  const sid  = journey.studyId || '—';
+  const m    = journey.milestones || {};
+  const wkDates = journey.weeklyReviews || [];
+
+  // ── hero ──
+  document.getElementById('ptStudyId').textContent = sid;
+  document.getElementById('ptName').innerHTML = `${p.name||'—'} &nbsp;<span style="font-size:14px;color:var(--text-2);">· UHID ${p.uhic||'—'}</span>`;
+  document.getElementById('ptBadge').innerHTML = badgeHtml(journey.status);
+
+  // ── meta chips ──
+  const chips = [
+    ['Diagnosis', p.diagnosis || '—'],
+    ['Doctor', p.doctor || p.doctorName || '—'],
+    ['Hospital', p.hospital || '—'],
+    ['Store', p.store || '—'],
+    ['Enrolled', fmtOrDash(m.enrollment)]
+  ];
+  document.getElementById('ptMeta').innerHTML = chips.map(c =>
+    `<div class="meta-chip"><span class="f-label">${c[0]}</span><br><strong>${c[1]}</strong></div>`).join('');
+
+  // ── withdrawn banner ──
+  document.getElementById('ptWithdrawn').innerHTML = journey.withdrawnAt
+    ? `<div class="withdrawn-banner">Withdrawn on ${fmtDate(journey.withdrawnAt)}${journey.withdrawnReason ? ' — ' + journey.withdrawnReason : ''}</div>` : '';
+
+  // ── timeline ──
+  const steps = [
+    ['Enrollment',              m.enrollment],
+    ['Baseline Assessment',     m.baseline],
+    ['Report Generated',        m.reportGenerated],
+    ['HOD / Doctor Approval',   m.hodApproval],
+    ['Manufacturing',           m.manufacturing],
+    ['Supplement Dispatch',     m.dispatch],
+    ['Supplement Start',        m.supplementStart]
+  ];
+  let tlHtml = steps.map(s => {
+    const dt = fmtDate(s[1]);
+    return `<div class="tl-item ${dt?'done':''}">
+      <div class="tl-lbl">${s[0]}</div>
+      <div class="tl-date ${dt?'has':'no'}">${dt || 'Pending'}</div>
+    </div>`;
+  }).join('');
+
+  tlHtml += `<div class="tl-item ${wkDates.length?'done':''}">
+    <div class="tl-lbl">Weekly Reviews (${wkDates.length})</div>
+    ${wkDates.length
+      ? `<div class="wk-chips">${wkDates.map((w,i)=>`<span class="wk-chip">W${i+1}: ${fmtOrDash(w)}</span>`).join('')}</div>`
+      : `<div class="tl-date no">No weekly reviews yet</div>`}
+  </div>`;
+
+  const fin = fmtDate(m.finalAssessment);
+  tlHtml += `<div class="tl-item ${fin?'done':''}">
+    <div class="tl-lbl">Final Assessment</div>
+    <div class="tl-date ${fin?'has':'no'}">${fin || 'Pending'}</div>
+  </div>`;
+
+  document.getElementById('ptTimeline').innerHTML = tlHtml;
+
+  // ── outcomes ──
+  // match by studyId (most reliable cross-endpoint key)
+  const outPat = allOutcomes.find(op =>
+    op.studyId === sid ||
+    (op.patientId && op.patientId === patientId) ||
+    (op.name && p.name && op.name === p.name)
+  );
+  const weeks = outPat ? (outPat.weeks || []) : [];
+
+  if(!weeks.length){
+    document.getElementById('outEmpty').style.display = 'block';
+  } else {
+    document.getElementById('outHasData').style.display = 'block';
+
+    // cohort mean helper
+    const maxWk = allOutcomes.reduce((mx,op)=>Math.max(mx,(op.weeks||[]).length),0);
+    const cohortMean = (metric, n) => {
+      const s = [];
+      for(let i=0;i<n;i++){
+        const vals = allOutcomes.map(op=>(op.weeks||[])[i]?parseFloat(op.weeks[i][metric]):NaN).filter(v=>!isNaN(v));
+        s.push({ x:'W'+(i+1), y: vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : null });
+      }
+      return s;
+    };
+    const series = metric => weeks.map((w,i)=>({ x:'W'+(w.week!=null?w.week:(i+1)), y:(w[metric]!=null&&w[metric]!=='')?parseFloat(w[metric]):null }));
+
+    document.getElementById('ptCharts').innerHTML =
+      lineChart('Weight',  'kg',   series('weight'),  cohortMean('weight', maxWk),  '#2563eb') +
+      lineChart('Albumin', 'g/dL', series('albumin'), cohortMean('albumin', maxWk), '#16a34a') +
+      lineChart('CRP',     'mg/L', series('crp'),     cohortMean('crp', maxWk),     '#dc2626');
+
+    document.getElementById('ptOutTable').innerHTML = weeks.map((w,i)=>`
+      <tr>
+        <td>W${w.week!=null?w.week:(i+1)}</td>
+        <td>${fmtOrDash(w.recordedAt)}</td>
+        <td>${val(w.weight)}</td>
+        <td>${val(w.bmi)}</td>
+        <td>${val(w.muac)}</td>
+        <td>${val(w.handGrip)}</td>
+        <td>${val(w.ecog)}</td>
+        <td>${val(w.albumin)}</td>
+        <td>${val(w.crp)}</td>
+        <td>${val(w.glucose)}</td>
+      </tr>`).join('');
+  }
+
+  // ── formula ──
+  const fRow = allFormula.find(r =>
+    r.studyId === sid ||
+    (r.patientId && r.patientId === patientId) ||
+    (r.name && p.name && r.name === p.name)
+  );
+  if(fRow){
+    document.getElementById('ptFormula').innerHTML = `
+      <div class="formula-grid">
+        <div class="f-cell"><div class="f-label">Version</div><div class="f-val"><span class="vchip">v${fRow.formulaVersion != null ? fRow.formulaVersion : 1}</span></div></div>
+        <div class="f-cell"><div class="f-label">Protein Type</div><div class="f-val">${val(fRow.proteinType)}</div></div>
+        <div class="f-cell"><div class="f-label">Batch No</div><div class="f-val">${val(fRow.batchNo)}</div></div>
+        <div class="f-cell"><div class="f-label">Mfg Date</div><div class="f-val">${fmtOrDash(fRow.mfgDate)}</div></div>
+        <div class="f-cell"><div class="f-label">Supplement Start</div><div class="f-val">${fmtOrDash(fRow.startDate)}</div></div>
+      </div>`;
+  } else {
+    document.getElementById('ptFormula').innerHTML = '<p style="color:var(--text-2);font-size:13px;margin:0;">No formula record found for this patient.</p>';
+  }
+
+  // update page title
+  document.title = `${sid} — ${p.name||'Patient'} · Gquence`;
+}
+
+load();
+</script>
+</body>
+</html>

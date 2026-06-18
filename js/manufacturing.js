@@ -128,7 +128,12 @@
   }
 
   function getJobsForStore(storeId) {
-    return getJobs().filter(j => (j.storeId || j.store_id) === storeId);
+    if (!storeId) return [];
+    const sid = String(storeId);
+    return getJobs().filter(j => {
+      const jid = j.storeId || j.store_id;
+      return jid != null && String(jid) === sid;
+    });
   }
 
   function getJobByPatient(patientId) {

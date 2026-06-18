@@ -10,38 +10,35 @@
     .subnav a { padding:7px 14px; border-radius:20px; font-size:13px; text-decoration:none; color:var(--text-2); background:var(--surface-2); }
     .subnav a.active { background:#0e2247; color:#fff; }
     .ct-cards { display:flex; gap:12px; flex-wrap:wrap; margin:6px 0 14px; }
-    .ct-card { flex:1; min-width:140px; background:var(--surface-2); border:1px solid var(--border); border-radius:12px; padding:14px; }
+    .ct-card { flex:1; min-width:130px; background:var(--surface-2); border:1px solid var(--border); border-radius:12px; padding:14px; }
     .ct-card .n { font-size:24px; font-weight:800; color:var(--text); }
     .ct-card .l { font-size:12px; color:var(--text-2); text-transform:uppercase; letter-spacing:.03em; margin-top:2px; }
     table.ct { width:100%; border-collapse:collapse; margin-top:6px; }
-    table.ct th, table.ct td { padding:9px 12px; text-align:left; border-bottom:1px solid var(--border); font-size:13.5px; color:var(--text); }
-    table.ct th { color:var(--text-2); font-size:12px; text-transform:uppercase; letter-spacing:.03em; }
-    .chart { display:flex; align-items:flex-end; gap:10px; height:150px; padding:10px 4px 0; border-bottom:2px solid var(--border); overflow-x:auto; margin-top:8px; }
-    .bar-col { display:flex; flex-direction:column; align-items:center; justify-content:flex-end; min-width:48px; height:100%; }
-    .bar { width:30px; background:#16a34a; border-radius:5px 5px 0 0; }
-    .bar-val { font-size:11.5px; font-weight:700; color:var(--text); margin-bottom:3px; }
-    .bar-lbl { font-size:10.5px; color:var(--text-2); margin-top:5px; }
+    table.ct th, table.ct td { padding:9px 12px; text-align:left; border-bottom:1px solid var(--border); font-size:13px; color:var(--text); }
+    table.ct th { color:var(--text-2); font-size:11.5px; text-transform:uppercase; letter-spacing:.03em; }
+    .pct-bar { display:flex; align-items:center; gap:7px; }
+    .pct-track { flex:1; height:6px; background:var(--border); border-radius:3px; min-width:50px; }
+    .pct-fill { height:100%; border-radius:3px; }
+    .good { color:#16a34a; } .warn { color:#d97706; } .bad { color:#dc2626; }
   </style>
 </head>
 <body>
 
 <div class="topbar">
   <div class="logo">Gquence Admin</div>
-  <div class="nav">
+  <div class="nav" role="navigation" aria-label="Main navigation">
     <a href="/admin">Dashboard</a>
     <a href="/admin/stores">Stores</a>
     <a href="/admin/users">Create Users</a>
     <a href="/admin/mapping">Mapping</a>
-    <a href="/admin/tracking">Tracking</a>
     <a href="/admin/trials">Clinical Trials</a>
-    <a href="/admin/reports">Reports</a>
     <a href="/admin/rules">Rule Engine</a>
     <a href="#" onclick="auth.logout()">Logout</a>
-    <button id="themeToggleBtn" onclick="toggleTheme()" class="btn-secondary btn-sm" style="margin-left: 20px; border-radius: 30px; padding: 6px 14px; cursor: pointer;">🌙 Dark Mode</button>
+    <button id="themeToggleBtn" onclick="toggleTheme()" class="btn-secondary btn-sm" style="margin-left:20px;border-radius:30px;padding:6px 14px;cursor:pointer;">🌙 Dark Mode</button>
   </div>
 </div>
 
-<div class="container page">
+<div class="container page" role="main">
   <div class="card">
     <div class="subnav">
       <a href="/admin/trials">Enrollment Log</a>
@@ -52,28 +49,58 @@
     </div>
 
     <h2 style="margin-bottom:0;">Weekly Outcomes</h2>
-    <p style="color:var(--text-2);margin-top:4px;">Week-by-week monitoring values per patient (weight, BMI, albumin, CRP and more).</p>
+    <p style="color:var(--text-2);margin-top:4px;">Week-by-week monitoring — clinical values, oral intake %, and supplement compliance per patient.</p>
 
-    <div id="outMsg" style="color:var(--text-2);font-size:13px;margin:8px 0;">Loading…</div>
+    <div id="outMsg" style="font-size:13px;margin:8px 0;color:var(--text-2);"></div>
+    <div id="outSkeleton">
+      <div class="skeleton-row"><div class="skeleton" style="width:80px;"></div><div class="skeleton" style="width:120px;"></div><div class="skeleton" style="width:140px;flex:1;"></div></div>
+      <div class="skeleton-row"><div class="skeleton" style="width:60px;"></div><div class="skeleton" style="width:100px;"></div><div class="skeleton" style="width:110px;flex:1;"></div></div>
+      <div class="skeleton-row"><div class="skeleton" style="width:70px;"></div><div class="skeleton" style="width:130px;"></div><div class="skeleton" style="width:90px;flex:1;"></div></div>
+    </div>
 
     <div id="outContent" style="display:none;">
       <div class="ct-cards" id="outCards"></div>
 
-      <div style="display:flex;align-items:end;gap:12px;flex-wrap:wrap;margin:6px 0 6px;">
+      <div style="display:flex;align-items:end;gap:12px;flex-wrap:wrap;margin:6px 0;">
+        <div style="display:flex;flex-direction:column;gap:4px;">
+          <label style="font-size:12px;color:var(--text-2);">Hospital</label>
+          <select id="outHospital" onchange="onOutFilter()" style="min-width:160px;padding:9px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);"><option value="">All hospitals</option></select>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px;">
+          <label style="font-size:12px;color:var(--text-2);">Doctor</label>
+          <select id="outDoctor" onchange="onOutFilter()" style="min-width:160px;padding:9px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);"><option value="">All doctors</option></select>
+        </div>
         <div style="display:flex;flex-direction:column;gap:4px;">
           <label style="font-size:12px;color:var(--text-2);">Patient</label>
-          <select id="outPatient" onchange="renderPatient()" style="min-width:280px;padding:9px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);"></select>
+          <select id="outPatient" onchange="renderPatient()" style="min-width:260px;padding:9px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);"></select>
         </div>
       </div>
 
-      <h3 style="margin:14px 0 2px;">Weight Trend (kg)</h3>
-      <div class="chart" id="outChart"></div>
+      <div style="display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin:16px 0 4px;">
+        <h3 style="margin:0;">Outcome Trends</h3>
+        <div style="display:flex;gap:14px;font-size:12px;color:var(--text-2);">
+          <span><span style="display:inline-block;width:18px;height:2px;background:#2563eb;vertical-align:middle;margin-right:4px;"></span>This patient</span>
+          <span><span style="display:inline-block;width:18px;border-top:2px dashed #94a3b8;vertical-align:middle;margin-right:4px;"></span>Cohort avg</span>
+        </div>
+      </div>
+      <div id="outCharts" style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:10px;"></div>
 
-      <h3 style="margin:18px 0 2px;">Weekly Values</h3>
+      <h3 style="margin:18px 0 6px;">Weekly Values</h3>
       <div style="overflow-x:auto;">
         <table class="ct">
           <thead>
-            <tr><th>Review</th><th>Date</th><th>Weight</th><th>BMI</th><th>MUAC</th><th>Hand Grip</th><th>ECOG</th><th>Albumin</th><th>CRP</th><th>Glucose</th></tr>
+            <tr>
+              <th>Wk</th><th>Date</th>
+              <th>Weight<br><span style="font-weight:400;text-transform:none;">(kg)</span></th>
+              <th>BMI</th><th>MUAC<br><span style="font-weight:400;text-transform:none;">(cm)</span></th>
+              <th>Grip<br><span style="font-weight:400;text-transform:none;">(kg)</span></th>
+              <th>ECOG</th>
+              <th>Albumin<br><span style="font-weight:400;text-transform:none;">(g/dL)</span></th>
+              <th>CRP<br><span style="font-weight:400;text-transform:none;">(mg/L)</span></th>
+              <th>Glucose<br><span style="font-weight:400;text-transform:none;">(mg/dL)</span></th>
+              <th>Oral Intake %</th>
+              <th>Supp Compliance %</th>
+            </tr>
           </thead>
           <tbody id="outBody"></tbody>
         </table>
@@ -87,6 +114,7 @@
 <script src="/js/seed.js"></script>
 <script src="/js/auth.js"></script>
 <script src="/js/theme.js"></script>
+<script src="/js/table-utils.js"></script>
 
 <script>
 auth.requireRole(['SUPER_ADMIN', 'ADMIN']);
@@ -94,73 +122,201 @@ const me = auth.getCurrentUser();
 const apiBase = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : '';
 let _patients = [];
 
+// ── helpers ───────────────────────────────────────────────────────────────
+function uniqSorted(arr){ return [...new Set(arr.filter(Boolean))].sort(function(a,b){ return String(a).localeCompare(String(b)); }); }
 function val(x){ return (x === null || x === undefined || x === '') ? '—' : x; }
+function fmt1(v){ return (v === null || v === undefined) ? '—' : Number(v).toFixed(1); }
 function fmtDate(d){
   if(!d) return '—';
-  const dt = new Date(d);
+  var dt = new Date(d);
   if(isNaN(dt.getTime())) return String(d).slice(0,10);
   return ('0'+dt.getDate()).slice(-2)+'/'+('0'+(dt.getMonth()+1)).slice(-2)+'/'+dt.getFullYear();
 }
 
+// colour-coded percentage cell with mini bar
+function pctCell(v, goodThresh, warnThresh){
+  // goodThresh = green if >= this, warnThresh = yellow if >=, else red
+  if(v === null || v === undefined) return '<td style="color:var(--text-2);">—</td>';
+  var pct = Math.min(100, Math.max(0, v));
+  var cls = pct >= goodThresh ? 'good' : (pct >= warnThresh ? 'warn' : 'bad');
+  var barCol = pct >= goodThresh ? '#16a34a' : (pct >= warnThresh ? '#d97706' : '#dc2626');
+  return '<td><div class="pct-bar"><span class="' + cls + '" style="font-weight:700;min-width:36px;">' + pct + '%</span>' +
+    '<div class="pct-track"><div class="pct-fill" style="width:' + pct + '%;background:' + barCol + ';"></div></div></div></td>';
+}
+
+// ── filter helpers ────────────────────────────────────────────────────────
+function outPopFilters(){
+  var h = document.getElementById('outHospital').value;
+  var hospitals = uniqSorted(_patients.map(function(p){ return p.hospital||''; }).filter(Boolean));
+  document.getElementById('outHospital').innerHTML = '<option value="">All hospitals</option>' +
+    hospitals.map(function(x){ return '<option'+(x===h?' selected':'')+'>'+x+'</option>'; }).join('');
+  var scope = h ? _patients.filter(function(p){ return (p.hospital||'')===h; }) : _patients;
+  var prevD = document.getElementById('outDoctor').value;
+  var doctors = uniqSorted(scope.map(function(p){ return p.doctor||''; }).filter(Boolean));
+  document.getElementById('outDoctor').innerHTML = '<option value="">All doctors</option>' +
+    doctors.map(function(x){ return '<option'+(x===prevD?' selected':'')+'>'+x+'</option>'; }).join('');
+}
+function getOutFiltered(){
+  var h = document.getElementById('outHospital').value;
+  var d = document.getElementById('outDoctor').value;
+  return _patients.filter(function(p){ return (!h||(p.hospital||'')===h) && (!d||(p.doctor||'')===d); });
+}
+function onOutFilter(){ outPopFilters(); rebuildPatientSelect(getOutFiltered()); renderPatient(); }
+
+function rebuildPatientSelect(list){
+  var sel = document.getElementById('outPatient');
+  var prev = sel.value;
+  sel.innerHTML = list.map(function(p,i){
+    return '<option value="'+(p.patientId||i)+'">'+(p.studyId?p.studyId+' · ':'')+
+      (p.name||'—')+' ('+p.weeks.length+' review'+(p.weeks.length===1?'':'s')+')</option>';
+  }).join('');
+  if([].slice.call(sel.options).some(function(o){ return o.value===prev; })) sel.value = prev;
+}
+
+// ── summary cards ─────────────────────────────────────────────────────────
+function renderCards(){
+  var all = _patients;
+  var total = all.length;
+  var withReviews = all.filter(function(p){ return p.weeks.length > 0; }).length;
+
+  // average last-week intake % and compliance %
+  var intakeVals = [], compVals = [];
+  all.forEach(function(p){
+    if(!p.weeks.length) return;
+    var last = p.weeks[p.weeks.length-1];
+    if(last.oralIntake !== null && last.oralIntake !== undefined) intakeVals.push(last.oralIntake);
+    if(last.compliance !== null && last.compliance !== undefined) compVals.push(last.compliance);
+  });
+  var avgIntake = intakeVals.length ? Math.round(intakeVals.reduce(function(s,v){ return s+v; },0)/intakeVals.length) : null;
+  var avgComp   = compVals.length   ? Math.round(compVals.reduce(function(s,v){ return s+v; },0)/compVals.length)   : null;
+
+  document.getElementById('outCards').innerHTML =
+    card(total,       'Total Patients') +
+    card(withReviews, 'With Reviews') +
+    card(avgIntake !== null ? avgIntake+'%' : '—', 'Avg Oral Intake') +
+    card(avgComp   !== null ? avgComp+'%'   : '—', 'Avg Supp Compliance');
+}
+function card(n,l){ return '<div class="ct-card"><div class="n">'+n+'</div><div class="l">'+l+'</div></div>'; }
+
+// ── SVG line chart ─────────────────────────────────────────────────────────
+function lineChart(title, unit, patVals, cohortVals){
+  var W=220, H=120, PAD=28, BPAD=22;
+  var allVals = patVals.concat(cohortVals).filter(function(v){ return v!==null && v!==undefined; });
+  if(!allVals.length) return '<div style="width:'+W+'px;background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-size:12px;color:var(--text-2);">'+title+'<br>No data</div>';
+  var mn = Math.min.apply(null,allVals), mx = Math.max.apply(null,allVals);
+  if(mn===mx){ mn = mn-1; mx = mx+1; }
+  var gW = W - PAD*2, gH = H - BPAD;
+  function px(i,arr){ return PAD + (arr.length < 2 ? gW/2 : i/(arr.length-1)*gW); }
+  function py(v){ return gH - ((v-mn)/(mx-mn))*gH + 4; }
+  function polyline(vals, stroke, dash){
+    var pts = vals.map(function(v,i){ return v===null?null:px(i,vals)+','+py(v); }).filter(Boolean).join(' ');
+    return pts ? '<polyline points="'+pts+'" fill="none" stroke="'+stroke+'" stroke-width="2"'+(dash?' stroke-dasharray="4 3"':'')+' stroke-linejoin="round"/>' : '';
+  }
+  // dots for patient line
+  var dots = patVals.map(function(v,i){
+    if(v===null) return '';
+    return '<circle cx="'+px(i,patVals)+'" cy="'+py(v)+'" r="3" fill="#2563eb"/>';
+  }).join('');
+  return '<div style="display:inline-block;">' +
+    '<svg width="'+W+'" height="'+(H+20)+'" xmlns="http://www.w3.org/2000/svg">' +
+      '<text x="'+W/2+'" y="13" text-anchor="middle" fill="var(--text-2)" font-size="11">'+title+(unit?' ('+unit+')':'')+' </text>' +
+      '<line x1="'+PAD+'" y1="'+(gH+4)+'" x2="'+(W-PAD)+'" y2="'+(gH+4)+'" stroke="var(--border)" stroke-width="1"/>' +
+      '<text x="'+PAD+'" y="'+(H+16)+'" fill="var(--text-2)" font-size="9" text-anchor="middle">W1</text>' +
+      '<text x="'+(W-PAD)+'" y="'+(H+16)+'" fill="var(--text-2)" font-size="9" text-anchor="middle">W'+patVals.length+'</text>' +
+      '<text x="'+(PAD-4)+'" y="'+(py(mn)+4)+'" fill="var(--text-2)" font-size="9" text-anchor="end">'+Math.round(mn)+'</text>' +
+      '<text x="'+(PAD-4)+'" y="'+(py(mx)+4)+'" fill="var(--text-2)" font-size="9" text-anchor="end">'+Math.round(mx)+'</text>' +
+      polyline(cohortVals, '#94a3b8', true) +
+      polyline(patVals, '#2563eb', false) +
+      dots +
+    '</svg></div>';
+}
+
+// ── render patient section ─────────────────────────────────────────────────
+function renderPatient(){
+  var filtered = getOutFiltered();
+  var sel = document.getElementById('outPatient');
+  var pid = sel.value;
+  var pat = filtered.find(function(p){ return p.patientId === pid; }) || filtered[0];
+  if(!pat){ document.getElementById('outCharts').innerHTML=''; document.getElementById('outBody').innerHTML=''; return; }
+
+  var weeks = pat.weeks;
+
+  // cohort means per week slot
+  var maxW = Math.max.apply(null, filtered.map(function(p){ return p.weeks.length; }).concat([0]));
+  function cohortMean(metric){
+    var means = [];
+    for(var i=0;i<maxW;i++){
+      var vals = filtered.map(function(p){ return p.weeks[i] ? p.weeks[i][metric] : null; }).filter(function(v){ return v!==null&&v!==undefined; });
+      means.push(vals.length ? vals.reduce(function(s,v){return s+v;},0)/vals.length : null);
+    }
+    return means;
+  }
+
+  function extract(metric){ return weeks.map(function(w){ return w[metric] !== undefined ? w[metric] : null; }); }
+
+  // charts
+  var charts = [
+    lineChart('Weight','kg', extract('weight'), cohortMean('weight')),
+    lineChart('Albumin','g/dL', extract('albumin'), cohortMean('albumin')),
+    lineChart('CRP','mg/L', extract('crp'), cohortMean('crp')),
+    lineChart('BMI','', extract('bmi'), cohortMean('bmi')),
+    lineChart('Oral Intake','%', extract('oralIntake'), cohortMean('oralIntake')),
+    lineChart('Supp Compliance','%', extract('compliance'), cohortMean('compliance'))
+  ];
+  document.getElementById('outCharts').innerHTML = charts.join('');
+
+  // table
+  if(!weeks.length){
+    document.getElementById('outBody').innerHTML = '<tr><td colspan="12" style="padding:16px;color:var(--text-2);">No weekly reviews recorded yet.</td></tr>';
+    return;
+  }
+  document.getElementById('outBody').innerHTML = weeks.map(function(w, i){
+    return '<tr>' +
+      '<td style="font-weight:700;">W'+(w.week !== null && w.week !== undefined ? w.week : (i+1))+'</td>' +
+      '<td>'+fmtDate(w.recordedAt)+'</td>' +
+      '<td>'+fmt1(w.weight)+'</td>' +
+      '<td>'+fmt1(w.bmi)+'</td>' +
+      '<td>'+fmt1(w.muac)+'</td>' +
+      '<td>'+val(w.handGrip)+'</td>' +
+      '<td>'+val(w.ecog)+'</td>' +
+      '<td>'+fmt1(w.albumin)+'</td>' +
+      '<td>'+fmt1(w.crp)+'</td>' +
+      '<td>'+val(w.glucose)+'</td>' +
+      pctCell(w.oralIntake, 75, 50) +
+      pctCell(w.compliance, 80, 60) +
+    '</tr>';
+  }).join('');
+}
+
+// ── load ──────────────────────────────────────────────────────────────────
 async function load(){
   try {
-    const res = await fetch(apiBase + '/api/trials/outcomes', { headers: { 'Authorization': 'Bearer ' + (me.token||'') } });
-    if(!res.ok) throw new Error('Server error ' + res.status);
-    const data = await res.json();
-    _patients = data.patients || [];
-    document.getElementById('outMsg').style.display = 'none';
-    document.getElementById('outContent').style.display = 'block';
+    var hdr = { 'Authorization': 'Bearer ' + (me.token||'') };
+    var results = await Promise.all([
+      fetch(apiBase + '/api/trials/outcomes', { headers: hdr }),
+      fetch(apiBase + '/api/trials', { headers: hdr })
+    ]);
+    var outRes = results[0], enrRes = results[1];
+    if(!outRes.ok) throw new Error('Server error ' + outRes.status);
+    var data   = await outRes.json();
+    var enroll = enrRes.ok ? (await enrRes.json()).patients || [] : [];
+    var meta = {};
+    enroll.forEach(function(r){ meta[r.patientId] = { hospital: r.hospital||'', doctor: r.doctor||'' }; });
+    _patients = (data.patients || []).map(function(p){ return Object.assign({}, p, meta[p.patientId]||{}); });
+    document.getElementById('outMsg').textContent = '';
+    if(!_patients.length){
+      document.getElementById('outMsg').textContent = 'No pilot patients with monitoring data yet.';
+      return;
+    }
+    document.getElementById('outContent').style.display = '';
     renderCards();
-    const sel = document.getElementById('outPatient');
-    sel.innerHTML = _patients.map((p,i) =>
-      `<option value="${i}">${p.studyId ? p.studyId + ' · ' : ''}${p.name || '—'} (${p.weeks.length} review${p.weeks.length===1?'':'s'})</option>`).join('');
+    outPopFilters();
+    rebuildPatientSelect(getOutFiltered());
     renderPatient();
-    if(!_patients.length) document.getElementById('outMsg').style.display = 'block', document.getElementById('outMsg').textContent = 'No pilot patients yet.';
   } catch(e){
     document.getElementById('outMsg').textContent = 'Could not load outcomes: ' + e.message;
   }
 }
-
-function renderCards(){
-  const total = _patients.length;
-  const withData = _patients.filter(p => p.weeks.length > 0).length;
-  const reviews = _patients.reduce((s,p) => s + p.weeks.length, 0);
-  const cards = [['Pilot Patients', total], ['With Weekly Data', withData], ['Total Reviews', reviews]];
-  document.getElementById('outCards').innerHTML = cards.map(c =>
-    `<div class="ct-card"><div class="n">${c[1]}</div><div class="l">${c[0]}</div></div>`).join('');
-}
-
-function renderPatient(){
-  const idx = parseInt(document.getElementById('outPatient').value) || 0;
-  const p = _patients[idx];
-  if(!p){ document.getElementById('outBody').innerHTML = ''; document.getElementById('outChart').innerHTML = ''; return; }
-  const weeks = p.weeks;
-
-  // weight trend
-  const weights = weeks.map(w => parseFloat(w.weight)).filter(v => !isNaN(v));
-  const maxW = Math.max(1, ...weights);
-  document.getElementById('outChart').innerHTML = weeks.length ? weeks.map((w,i) => {
-    const wt = parseFloat(w.weight);
-    const h = !isNaN(wt) ? Math.round(wt/maxW*110) : 0;
-    return `<div class="bar-col"><div class="bar-val">${isNaN(wt)?'—':wt}</div><div class="bar" style="height:${h}px"></div><div class="bar-lbl">W${w.week!=null?w.week:(i+1)}</div></div>`;
-  }).join('') : '<div style="color:var(--text-2);padding:20px;">No weekly reviews recorded yet.</div>';
-
-  // table
-  document.getElementById('outBody').innerHTML = weeks.length ? weeks.map((w,i) => `
-    <tr>
-      <td>W${w.week!=null?w.week:(i+1)}</td>
-      <td>${fmtDate(w.recordedAt)}</td>
-      <td>${val(w.weight)}</td>
-      <td>${val(w.bmi)}</td>
-      <td>${val(w.muac)}</td>
-      <td>${val(w.handGrip)}</td>
-      <td>${val(w.ecog)}</td>
-      <td>${val(w.albumin)}</td>
-      <td>${val(w.crp)}</td>
-      <td>${val(w.glucose)}</td>
-    </tr>`).join('') : `<tr><td colspan="10" style="padding:16px;color:var(--text-2);">No weekly reviews recorded for this patient.</td></tr>`;
-}
-
 load();
 </script>
 </body>

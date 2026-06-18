@@ -7,23 +7,23 @@
   <link rel="stylesheet" href="/css/app.css">
   <style>
     .subnav { display:flex; gap:6px; margin:0 0 14px; flex-wrap:wrap; }
-    .subnav a { padding:7px 14px; border-radius:20px; font-size:13px; text-decoration:none; color:#334155; background:#eef2f7; }
+    .subnav a { padding:7px 14px; border-radius:20px; font-size:13px; text-decoration:none; color:var(--text-2); background:var(--surface-2); }
     .subnav a.active { background:#0e2247; color:#fff; }
     .ct-cards { display:flex; gap:12px; flex-wrap:wrap; margin:6px 0 4px; }
     .ct-card { flex:1; min-width:120px; background:var(--surface-2); border:1px solid var(--border); border-radius:12px; padding:14px; }
     .ct-card .n { font-size:26px; font-weight:800; color:var(--text); }
     .ct-card .l { font-size:12px; color:var(--text-2); text-transform:uppercase; letter-spacing:.03em; margin-top:2px; }
     .progwrap { margin:16px 0 6px; }
-    .progbar { height:14px; background:#eef2f7; border-radius:10px; overflow:hidden; }
+    .progbar { height:14px; background:var(--surface-2); border-radius:10px; overflow:hidden; }
     .progfill { height:100%; background:#16a34a; border-radius:10px; transition:width .3s; }
-    .chart { display:flex; align-items:flex-end; gap:10px; height:200px; padding:10px 4px 0; border-bottom:2px solid #e2e8f0; overflow-x:auto; }
+    .chart { display:flex; align-items:flex-end; gap:10px; height:200px; padding:10px 4px 0; border-bottom:2px solid var(--border); overflow-x:auto; }
     .bar-col { display:flex; flex-direction:column; align-items:center; justify-content:flex-end; min-width:46px; height:100%; }
     .bar { width:30px; background:#3b82f6; border-radius:5px 5px 0 0; }
     .bar-val { font-size:12px; font-weight:700; color:var(--text); margin-bottom:3px; }
     .bar-lbl { font-size:10.5px; color:var(--text-2); margin-top:5px; text-align:center; white-space:nowrap; }
     table.ct { width:100%; border-collapse:collapse; margin-top:8px; }
-    table.ct th, table.ct td { padding:8px 12px; text-align:left; border-bottom:1px solid #eef2f7; font-size:13.5px; }
-    table.ct th { color:#6b7280; font-size:12px; text-transform:uppercase; letter-spacing:.03em; }
+    table.ct th, table.ct td { padding:8px 12px; text-align:left; border-bottom:1px solid var(--border); font-size:13px; color:var(--text); }
+    table.ct th { color:var(--text-2); font-size:12px; text-transform:uppercase; letter-spacing:.03em; }
     .seg { display:inline-flex; border:1px solid var(--border); border-radius:8px; overflow:hidden; }
     .seg button { border:none; background:var(--surface-2); color:var(--text); padding:6px 14px; cursor:pointer; font-size:13px; }
     .seg button.on { background:#0e2247; color:#fff; }
@@ -33,21 +33,19 @@
 
 <div class="topbar">
   <div class="logo">Gquence Admin</div>
-  <div class="nav">
+  <div class="nav" role="navigation" aria-label="Main navigation">
     <a href="/admin">Dashboard</a>
     <a href="/admin/stores">Stores</a>
     <a href="/admin/users">Create Users</a>
     <a href="/admin/mapping">Mapping</a>
-    <a href="/admin/tracking">Tracking</a>
     <a href="/admin/trials">Clinical Trials</a>
-    <a href="/admin/reports">Reports</a>
     <a href="/admin/rules">Rule Engine</a>
     <a href="#" onclick="auth.logout()">Logout</a>
-    <button id="themeToggleBtn" onclick="toggleTheme()" class="btn-secondary btn-sm" style="margin-left: 20px; border-radius: 30px; padding: 6px 14px; cursor: pointer;">🌙 Dark Mode</button>
+    <button id="themeToggleBtn" onclick="toggleTheme()" class="btn-secondary btn-sm" style="margin-left:20px;border-radius:30px;padding:6px 14px;cursor:pointer;">Dark Mode</button>
   </div>
 </div>
 
-<div class="container page">
+<div class="container page" role="main">
   <div class="card">
     <div class="subnav">
       <a href="/admin/trials">Enrollment Log</a>
@@ -58,14 +56,32 @@
     </div>
 
     <h2 style="margin-bottom:0;">Cohort Dashboard</h2>
-    <p style="color:#6b7280;margin-top:4px;">Pilot progress and enrollment trend.</p>
+    <p style="color:var(--text-2);margin-top:4px;">Pilot progress and enrollment trend.</p>
 
-    <div id="cohMsg" style="color:#6b7280;font-size:13px;margin:8px 0;">Loading…</div>
+    <div id="cohMsg" style="color:var(--text-2);font-size:13px;margin:8px 0;"></div>
+    <div id="cohSkeleton">
+      <div class="skeleton-row"><div class="skeleton" style="width:80px;"></div><div class="skeleton" style="width:120px;"></div><div class="skeleton" style="width:140px;flex:1;"></div></div>
+      <div class="skeleton-row"><div class="skeleton" style="width:60px;"></div><div class="skeleton" style="width:100px;"></div><div class="skeleton" style="width:110px;flex:1;"></div></div>
+      <div class="skeleton-row"><div class="skeleton" style="width:70px;"></div><div class="skeleton" style="width:130px;"></div><div class="skeleton" style="width:90px;flex:1;"></div></div>
+    </div>
 
     <div id="cohContent" style="display:none;">
+
+      <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:end;margin:0 0 14px;">
+        <div style="min-width:180px;">
+          <label style="display:block;color:var(--text-2);font-size:12px;margin-bottom:5px;">Hospital</label>
+          <select id="fHospital" onchange="onFilter()" style="width:100%;padding:9px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);"><option value="">All hospitals</option></select>
+        </div>
+        <div style="min-width:180px;">
+          <label style="display:block;color:var(--text-2);font-size:12px;margin-bottom:5px;">Doctor</label>
+          <select id="fDoctor" onchange="onFilter()" style="width:100%;padding:9px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);"><option value="">All doctors</option></select>
+        </div>
+        <div style="align-self:flex-end;font-size:13px;color:var(--text-2);" id="cohFilterMeta"></div>
+      </div>
+
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:14px 0 4px;">
         <h3 style="margin:0;">Pilot Status</h3>
-        <button class="btn-secondary btn-sm" style="border-radius:8px;padding:6px 12px;cursor:pointer;" onclick="toggleSettings()">⚙ Edit pilot settings</button>
+        <button class="btn-secondary btn-sm" style="border-radius:8px;padding:6px 12px;cursor:pointer;" onclick="toggleSettings()">Edit pilot settings</button>
       </div>
 
       <div id="cohSettings" style="display:none;background:var(--surface-2);border:1px solid var(--border);border-radius:12px;padding:14px;margin:6px 0 10px;">
@@ -75,11 +91,11 @@
             <input id="setTarget" type="number" min="1" style="width:110px;padding:8px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);">
           </div>
           <div style="display:flex;flex-direction:column;gap:4px;">
-            <label style="font-size:12px;color:var(--text-2);">Pilot length (weekly reviews = Completed)</label>
+            <label style="font-size:12px;color:var(--text-2);">Pilot length (weekly reviews)</label>
             <input id="setWeeks" type="number" min="1" style="width:110px;padding:8px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);">
           </div>
           <div style="display:flex;flex-direction:column;gap:4px;">
-            <label style="font-size:12px;color:var(--text-2);">Lost-to-follow-up after (days)</label>
+            <label style="font-size:12px;color:var(--text-2);">Lost after (days)</label>
             <input id="setLost" type="number" min="1" style="width:110px;padding:8px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);">
           </div>
           <button class="btn-primary" style="border-radius:8px;padding:8px 16px;cursor:pointer;" onclick="saveSettings()">Save</button>
@@ -90,8 +106,8 @@
 
       <div class="ct-cards" id="cohCards"></div>
       <div class="progwrap">
-        <div style="display:flex;justify-content:space-between;font-size:13px;color:#475569;margin-bottom:4px;">
-          <span>Enrollment progress</span><span id="cohProgLbl">—</span>
+        <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--text-2);margin-bottom:4px;">
+          <span>Enrollment progress</span><span id="cohProgLbl">-</span>
         </div>
         <div class="progbar"><div class="progfill" id="cohProgFill" style="width:0%"></div></div>
       </div>
@@ -107,6 +123,40 @@
         <tbody id="cohTrendBody"></tbody>
         <tfoot><tr><td style="font-weight:800;">Total</td><td style="font-weight:800;" id="cohTotal">0</td><td></td></tr></tfoot>
       </table>
+
+      <h3 style="margin:24px 0 6px;">Status Distribution</h3>
+      <div style="display:flex;gap:24px;align-items:center;flex-wrap:wrap;">
+        <div id="cohDonut"></div>
+        <div id="cohLegend" style="min-width:200px;display:flex;flex-direction:column;gap:7px;"></div>
+      </div>
+
+      <h3 style="margin:24px 0 6px;">Enrollment by Hospital</h3>
+      <div id="cohByHospital"></div>
+      <h3 style="margin:24px 0 6px;">Enrollment by Doctor</h3>
+      <div id="cohByDoctor"></div>
+
+      <h3 style="margin:28px 0 6px;">Per-Site Comparison</h3>
+      <p style="color:var(--text-2);font-size:13px;margin:-2px 0 12px;">Enrollment, completion and mean outcomes across hospitals.</p>
+      <div id="siteMsg" style="color:var(--text-2);font-size:13px;display:none;"></div>
+      <div style="overflow-x:auto;margin-bottom:20px;"><div id="siteChart"></div></div>
+      <div style="overflow-x:auto;">
+        <table class="ct" id="siteTable">
+          <thead>
+            <tr>
+              <th data-sort="0">Hospital</th>
+              <th data-sort="1" data-type="num">Enrolled</th>
+              <th data-sort="2" data-type="num">Active</th>
+              <th data-sort="3" data-type="num">Completed</th>
+              <th data-sort="4" data-type="num">Lost/Withdrawn</th>
+              <th data-sort="5" data-type="num">Completion %</th>
+              <th data-sort="6" data-type="num">Mean Weight (kg)</th>
+              <th data-sort="7" data-type="num">Mean Albumin (g/dL)</th>
+              <th data-sort="8" data-type="num">Mean CRP (mg/L)</th>
+            </tr>
+          </thead>
+          <tbody id="siteBody"></tbody>
+        </table>
+      </div>
     </div>
   </div>
 </div>
@@ -116,118 +166,288 @@
 <script src="/js/seed.js"></script>
 <script src="/js/auth.js"></script>
 <script src="/js/theme.js"></script>
-
+<script src="/js/table-utils.js"></script>
 <script>
 auth.requireRole(['SUPER_ADMIN', 'ADMIN']);
 const me = auth.getCurrentUser();
 const apiBase = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : '';
-let _rows = [], _settings = {}, _group = 'day';
+let _rows = [], _settings = {}, _group = 'day', _outByPat = {}, _siteDt;
 
-function isoDay(d){ const dt = new Date(d); return isNaN(dt.getTime()) ? null : dt.toISOString().slice(0,10); }
-function fmtDay(s){ const m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/); return m ? `${m[3]}/${m[2]}/${m[1]}` : s; }
+function uniq(arr){ return [...new Set(arr.filter(Boolean))].sort(function(a,b){ return String(a).localeCompare(String(b)); }); }
+
+function populateFilters(){
+  var h = document.getElementById('fHospital').value;
+  var hospitals = uniq(_rows.map(function(r){ return r.hospital; }));
+  document.getElementById('fHospital').innerHTML = '<option value="">All hospitals</option>' +
+    hospitals.map(function(x){ return '<option value="'+x+'"'+(x===h?' selected':'')+'>'+x+'</option>'; }).join('');
+  var scope = h ? _rows.filter(function(r){ return r.hospital===h; }) : _rows;
+  var prevD = document.getElementById('fDoctor').value;
+  var doctors = uniq(scope.map(function(r){ return r.doctor; }));
+  document.getElementById('fDoctor').innerHTML = '<option value="">All doctors</option>' +
+    doctors.map(function(x){ return '<option value="'+x+'"'+(x===prevD?' selected':'')+'>'+x+'</option>'; }).join('');
+}
+
+function getFiltered(){
+  var h = document.getElementById('fHospital').value;
+  var d = document.getElementById('fDoctor').value;
+  return _rows.filter(function(r){ return (!h||r.hospital===h)&&(!d||r.doctor===d); });
+}
+
+function onFilter(){
+  populateFilters();
+  var f = getFiltered();
+  document.getElementById('cohFilterMeta').textContent =
+    f.length < _rows.length ? 'Showing '+f.length+' of '+_rows.length+' patients' : '';
+  renderCards(f); renderTrend(f); renderBreakdowns(f); renderSiteComparison(f);
+}
+
+function isoDay(d){ var dt=new Date(d); return isNaN(dt.getTime())?null:dt.toISOString().slice(0,10); }
+function fmtDay(s){ var m=s.match(/^(\d{4})-(\d{2})-(\d{2})$/); return m?m[3]+'/'+m[2]+'/'+m[1]:s; }
 function weekKey(s){
-  // ISO week start (Monday) for grouping
-  const dt = new Date(s + 'T00:00:00');
-  const day = (dt.getDay() + 6) % 7; // 0=Mon
-  dt.setDate(dt.getDate() - day);
+  var dt=new Date(s+'T00:00:00');
+  var day=(dt.getDay()+6)%7;
+  dt.setDate(dt.getDate()-day);
   return dt.toISOString().slice(0,10);
 }
 
-async function load(){
-  try {
-    const res = await fetch(apiBase + '/api/trials', { headers: { 'Authorization': 'Bearer ' + (me.token||'') } });
-    if(!res.ok) throw new Error('Server error ' + res.status);
-    const data = await res.json();
-    _rows = data.patients || [];
-    _settings = data.settings || {};
-    document.getElementById('cohMsg').style.display = 'none';
-    document.getElementById('cohContent').style.display = 'block';
-    renderCards();
-    renderTrend();
-  } catch(e){
-    document.getElementById('cohMsg').textContent = 'Could not load cohort data: ' + e.message;
+function toggleSettings(){
+  var el = document.getElementById('cohSettings');
+  var show = el.style.display==='none';
+  el.style.display = show?'':'none';
+  if(show){
+    document.getElementById('setTarget').value = _settings.target_patients||30;
+    document.getElementById('setWeeks').value  = _settings.pilot_weeks||6;
+    document.getElementById('setLost').value   = _settings.lost_threshold_days||14;
   }
 }
 
-function renderCards(){
-  const count = s => _rows.filter(r => r.status === s).length;
-  const target = _settings.target_patients != null ? _settings.target_patients : 30;
-  const enrolled = _rows.length;
-  const cards = [
-    ['Target', target], ['Enrolled', enrolled], ['Active', count('Active')],
-    ['Completed', count('Completed')], ['Lost to F/U', count('Lost to Follow-up')], ['Withdrawn', count('Withdrawn')]
-  ];
-  document.getElementById('cohCards').innerHTML = cards.map(c =>
-    `<div class="ct-card"><div class="n">${c[1]}</div><div class="l">${c[0]}</div></div>`).join('');
-  const pct = target > 0 ? Math.min(100, Math.round(enrolled/target*100)) : 0;
-  document.getElementById('cohProgFill').style.width = pct + '%';
-  document.getElementById('cohProgLbl').textContent = `${enrolled} / ${target} (${pct}%)`;
-}
-
-function toggleSettings(){
-  const el = document.getElementById('cohSettings');
-  const showing = el.style.display !== 'none';
-  if(showing){ el.style.display = 'none'; return; }
-  document.getElementById('setTarget').value = _settings.target_patients != null ? _settings.target_patients : 30;
-  document.getElementById('setWeeks').value  = _settings.pilot_weeks != null ? _settings.pilot_weeks : 6;
-  document.getElementById('setLost').value   = _settings.lost_threshold_days != null ? _settings.lost_threshold_days : 14;
-  document.getElementById('setMsg').textContent = '';
-  el.style.display = 'block';
-}
-
 async function saveSettings(){
-  const body = {
-    target_patients: parseInt(document.getElementById('setTarget').value) || undefined,
-    pilot_weeks: parseInt(document.getElementById('setWeeks').value) || undefined,
-    lost_threshold_days: parseInt(document.getElementById('setLost').value) || undefined
+  var body = {
+    target_patients:     parseInt(document.getElementById('setTarget').value)||30,
+    pilot_weeks:         parseInt(document.getElementById('setWeeks').value)||6,
+    lost_threshold_days: parseInt(document.getElementById('setLost').value)||14
   };
-  const msg = document.getElementById('setMsg');
-  msg.textContent = 'Saving…';
+  document.getElementById('setMsg').textContent = 'Saving…';
   try {
-    const res = await fetch(apiBase + '/api/pilot-settings', {
-      method: 'PUT', headers: { 'Content-Type':'application/json', 'Authorization':'Bearer ' + (me.token||'') },
+    var res = await fetch(apiBase+'/api/trials/settings', {
+      method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+(me.token||'')},
       body: JSON.stringify(body)
     });
-    if(!res.ok) throw new Error('Server error ' + res.status);
-    _settings = await res.json();
-    msg.textContent = 'Saved.';
-    renderCards(); renderTrend();
-    setTimeout(() => { document.getElementById('cohSettings').style.display = 'none'; }, 700);
-  } catch(e){ msg.textContent = 'Could not save: ' + e.message; }
+    if(!res.ok) throw new Error('Server error');
+    _settings = body;
+    document.getElementById('setMsg').textContent = 'Saved.';
+    toggleSettings();
+    var f = getFiltered();
+    renderCards(f);
+  } catch(e){ document.getElementById('setMsg').textContent = 'Error: '+e.message; }
 }
 
 function setGroup(g){
-  _group = g;
+  _group=g;
   document.getElementById('segDay').classList.toggle('on', g==='day');
   document.getElementById('segWeek').classList.toggle('on', g==='week');
   document.getElementById('thBucket').textContent = g==='week' ? 'Week of' : 'Date';
-  renderTrend();
+  renderTrend(getFiltered());
 }
 
-function renderTrend(){
-  const counts = {};
-  _rows.forEach(r => {
-    const day = isoDay(r.enrollmentDate);
-    if(!day) return;
-    const key = _group === 'week' ? weekKey(day) : day;
-    counts[key] = (counts[key] || 0) + 1;
-  });
-  const keys = Object.keys(counts).sort();
-  const max = Math.max(1, ...keys.map(k => counts[k]));
-  // chart
-  document.getElementById('cohChart').innerHTML = keys.length ? keys.map(k => {
-    const h = Math.round(counts[k]/max*150);
-    return `<div class="bar-col"><div class="bar-val">${counts[k]}</div><div class="bar" style="height:${h}px"></div><div class="bar-lbl">${fmtDay(k)}</div></div>`;
-  }).join('') : '<div style="color:#94a3b8;padding:20px;">No enrollment data yet.</div>';
-  // table
-  let cum = 0;
-  document.getElementById('cohTrendBody').innerHTML = keys.map(k => {
-    cum += counts[k];
-    return `<tr><td>${fmtDay(k)}${_group==='week'?' (wk)':''}</td><td>${counts[k]}</td><td>${cum}</td></tr>`;
+// ── renderCards ──────────────────────────────────────────────────────────
+function renderCards(rows){
+  var count = function(s){ return rows.filter(function(r){ return r.status===s; }).length; };
+  var target = _settings.target_patients!=null ? _settings.target_patients : 30;
+  var enrolled = rows.length;
+  var cards=[['Target',target],['Enrolled',enrolled],['Active',count('Active')],['Completed',count('Completed')],['Lost to F/U',count('Lost to Follow-up')],['Withdrawn',count('Withdrawn')]];
+  document.getElementById('cohCards').innerHTML = cards.map(function(c){
+    return '<div class="ct-card"><div class="n">'+c[1]+'</div><div class="l">'+c[0]+'</div></div>';
   }).join('');
-  document.getElementById('cohTotal').textContent = _rows.length;
+  var pct = target>0 ? Math.min(100, Math.round(enrolled/target*100)) : 0;
+  document.getElementById('cohProgFill').style.width = pct+'%';
+  document.getElementById('cohProgLbl').textContent = enrolled+' / '+target+' ('+pct+'%)';
 }
 
+// ── renderTrend ──────────────────────────────────────────────────────────
+function renderTrend(rows){
+  var counts={};
+  rows.forEach(function(r){
+    var day=isoDay(r.enrollmentDate);
+    if(!day) return;
+    var key = _group==='week' ? weekKey(day) : day;
+    counts[key]=(counts[key]||0)+1;
+  });
+  var keys=Object.keys(counts).sort();
+  var max=Math.max.apply(null,[1].concat(keys.map(function(k){ return counts[k]; })));
+  if(!keys.length){
+    document.getElementById('cohChart').innerHTML='<div style="color:var(--text-2);padding:20px;">No enrollment data yet.</div>';
+    document.getElementById('cohTrendBody').innerHTML='';
+    document.getElementById('cohTotal').textContent='0';
+    return;
+  }
+  document.getElementById('cohChart').innerHTML=keys.map(function(k){
+    var h=Math.round(counts[k]/max*150);
+    return '<div class="bar-col"><div class="bar-val">'+counts[k]+'</div><div class="bar" style="height:'+h+'px"></div><div class="bar-lbl">'+fmtDay(k)+'</div></div>';
+  }).join('');
+  var cum=0;
+  document.getElementById('cohTrendBody').innerHTML=keys.map(function(k){
+    cum+=counts[k];
+    return '<tr><td>'+fmtDay(k)+(_group==='week'?' (wk)':'')+'</td><td>'+counts[k]+'</td><td>'+cum+'</td></tr>';
+  }).join('');
+  document.getElementById('cohTotal').textContent=rows.length;
+}
+
+// ── renderBreakdowns ─────────────────────────────────────────────────────
+var STATUS_COLORS={'Enrolled':'#6366f1','Active':'#16a34a','Completed':'#2563eb','Lost to Follow-up':'#d97706','Withdrawn':'#dc2626'};
+
+function renderBreakdowns(rows){
+  var order=['Enrolled','Active','Completed','Lost to Follow-up','Withdrawn'];
+  var segs=order.map(function(s){ return {label:s, count:rows.filter(function(r){ return r.status===s; }).length, color:STATUS_COLORS[s]}; });
+  var total=segs.reduce(function(a,b){ return a+b.count; },0);
+  var R=60, C=2*Math.PI*R, cx=80, cy=80, sw=24;
+  var off=0;
+  var arcs=total ? segs.filter(function(s){ return s.count>0; }).map(function(s){
+    var len=s.count/total*C;
+    var c='<circle cx="'+cx+'" cy="'+cy+'" r="'+R+'" fill="none" stroke="'+s.color+'" stroke-width="'+sw+'" stroke-dasharray="'+len+' '+(C-len)+'" stroke-dashoffset="'+(-off)+'" transform="rotate(-90 '+cx+' '+cy+')"></circle>';
+    off+=len; return c;
+  }).join('') : '<circle cx="'+cx+'" cy="'+cy+'" r="'+R+'" fill="none" stroke="var(--border)" stroke-width="'+sw+'"></circle>';
+  document.getElementById('cohDonut').innerHTML=
+    '<svg viewBox="0 0 160 160" width="170" height="170">'+arcs+
+    '<text x="'+cx+'" y="'+(cy-2)+'" text-anchor="middle" font-size="28" font-weight="800" fill="var(--text)">'+total+'</text>'+
+    '<text x="'+cx+'" y="'+(cy+18)+'" text-anchor="middle" font-size="11" fill="var(--text-2)">patients</text></svg>';
+  document.getElementById('cohLegend').innerHTML=segs.map(function(s){
+    return '<div style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text);">'+
+      '<span style="width:12px;height:12px;border-radius:3px;background:'+s.color+';display:inline-block;"></span>'+
+      s.label+'<b style="margin-left:auto;">'+s.count+'</b></div>';
+  }).join('');
+  document.getElementById('cohByHospital').innerHTML=barList(countBy(rows,'hospital'));
+  document.getElementById('cohByDoctor').innerHTML=barList(countBy(rows,'doctor'));
+}
+
+function countBy(rows,key){
+  var m={};
+  rows.forEach(function(r){ var k=(r[key]&&String(r[key]).trim())||'Unassigned'; m[k]=(m[k]||0)+1; });
+  return m;
+}
+function barList(map){
+  var entries=Object.entries(map).sort(function(a,b){ return b[1]-a[1]; });
+  if(!entries.length) return '<div class="empty-state" style="padding:20px 0;"><div class="es-sub">No data.</div></div>';
+  var max=Math.max.apply(null,[1].concat(entries.map(function(e){ return e[1]; })));
+  return entries.map(function(e){
+    return '<div style="display:flex;align-items:center;gap:10px;margin:5px 0;">'+
+      '<div style="width:150px;font-size:13px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+e[0]+'</div>'+
+      '<div style="flex:1;background:var(--surface-2);border-radius:6px;overflow:hidden;"><div style="height:18px;width:'+Math.round(e[1]/max*100)+'%;min-width:2px;background:#3b82f6;border-radius:6px;"></div></div>'+
+      '<div style="width:32px;text-align:right;font-weight:700;color:var(--text);">'+e[1]+'</div></div>';
+  }).join('');
+}
+
+// ── renderSiteComparison ─────────────────────────────────────────────────
+function meanOf(vals){ var v=vals.filter(function(x){ return x!==null&&x!==undefined; }); return v.length ? v.reduce(function(a,b){return a+b;},0)/v.length : null; }
+function fmt1(v){ return v===null||v===undefined ? '—' : Number(v).toFixed(1); }
+
+function renderSiteComparison(rows){
+  var sites={};
+  rows.forEach(function(r){
+    var h=(r.hospital&&r.hospital.trim())||'Unassigned';
+    if(!sites[h]) sites[h]={name:h, enrolled:0, active:0, completed:0, lostWithdrawn:0, weights:[], albumins:[], crps:[]};
+    var s=sites[h];
+    s.enrolled++;
+    if(r.status==='Active') s.active++;
+    if(r.status==='Completed') s.completed++;
+    if(r.status==='Lost to Follow-up'||r.status==='Withdrawn') s.lostWithdrawn++;
+    // pull last week's values from outcomes
+    var weeks = _outByPat[r.patientId]||[];
+    if(weeks.length){
+      var last=weeks[weeks.length-1];
+      if(last.weight!=null) s.weights.push(last.weight);
+      if(last.albumin!=null) s.albumins.push(last.albumin);
+      if(last.crp!=null) s.crps.push(last.crp);
+    }
+  });
+
+  var names=Object.keys(sites).sort();
+  if(!names.length){
+    document.getElementById('siteMsg').style.display='block';
+    document.getElementById('siteMsg').textContent='No site data yet.';
+    document.getElementById('siteBody').innerHTML='';
+    return;
+  }
+  document.getElementById('siteMsg').style.display='none';
+
+  // grouped bar chart: Enrolled (indigo) / Completed (blue) / Active (green)
+  var maxEnr=Math.max.apply(null,[1].concat(names.map(function(n){ return sites[n].enrolled; })));
+  var BH=100, BW=28, GAP=8, GRP=70;
+  var svgW=Math.max(400, names.length*(GRP+20)+40);
+  var bars=names.map(function(name, i){
+    var s=sites[name];
+    var x=24+i*(GRP+12);
+    function bar(val, col, offset){
+      var h=Math.round(val/maxEnr*BH);
+      return '<rect x="'+(x+offset)+'" y="'+(BH-h+20)+'" width="'+BW+'" height="'+h+'" rx="3" fill="'+col+'"/>' +
+        '<text x="'+(x+offset+BW/2)+'" y="'+(BH-h+16)+'" text-anchor="middle" font-size="10" fill="var(--text)" font-weight="700">'+val+'</text>';
+    }
+    var label=name.length>12?name.slice(0,11)+'…':name;
+    return bar(s.enrolled,'#6366f1',0)+bar(s.completed,'#2563eb',BW+GAP)+bar(s.active,'#16a34a',(BW+GAP)*2)+
+      '<text x="'+(x+GRP/2-6)+'" y="'+(BH+36)+'" text-anchor="middle" font-size="10" fill="var(--text-2)">'+label+'</text>';
+  }).join('');
+  var legend='<rect x="10" y="'+(BH+50)+'" width="10" height="10" rx="2" fill="#6366f1"/><text x="24" y="'+(BH+60)+'" font-size="10" fill="var(--text-2)">Enrolled</text>'+
+    '<rect x="80" y="'+(BH+50)+'" width="10" height="10" rx="2" fill="#2563eb"/><text x="94" y="'+(BH+60)+'" font-size="10" fill="var(--text-2)">Completed</text>'+
+    '<rect x="165" y="'+(BH+50)+'" width="10" height="10" rx="2" fill="#16a34a"/><text x="179" y="'+(BH+60)+'" font-size="10" fill="var(--text-2)">Active</text>';
+  document.getElementById('siteChart').innerHTML='<svg width="'+svgW+'" height="'+(BH+80)+'" xmlns="http://www.w3.org/2000/svg">'+bars+legend+'</svg>';
+
+  // table rows
+  document.getElementById('siteBody').innerHTML=names.map(function(name){
+    var s=sites[name];
+    var compPct=s.enrolled>0?Math.round(s.completed/s.enrolled*100):0;
+    var mw=meanOf(s.weights), ma=meanOf(s.albumins), mc=meanOf(s.crps);
+    return '<tr>'+
+      '<td style="font-weight:700;">'+name+'</td>'+
+      '<td>'+s.enrolled+'</td>'+
+      '<td>'+s.active+'</td>'+
+      '<td>'+s.completed+'</td>'+
+      '<td>'+s.lostWithdrawn+'</td>'+
+      '<td><div style="display:flex;align-items:center;gap:8px;">'+
+        '<span style="font-weight:700;min-width:36px;">'+compPct+'%</span>'+
+        '<div style="flex:1;height:6px;background:var(--border);border-radius:3px;min-width:50px;"><div style="height:100%;width:'+compPct+'%;background:#2563eb;border-radius:3px;"></div></div>'+
+      '</div></td>'+
+      '<td>'+fmt1(mw)+'</td>'+
+      '<td>'+fmt1(ma)+'</td>'+
+      '<td>'+fmt1(mc)+'</td>'+
+    '</tr>';
+  }).join('');
+
+  if(!_siteDt){ _siteDt=new DataTable('siteBody',{pageSize:20}); }
+  else { _siteDt.refresh(); }
+}
+
+// ── load ─────────────────────────────────────────────────────────────────
+async function load(){
+  try {
+    var hdr={'Authorization':'Bearer '+(me.token||'')};
+    var results = await Promise.all([
+      fetch(apiBase+'/api/trials',{headers:hdr}),
+      fetch(apiBase+'/api/trials/outcomes',{headers:hdr})
+    ]);
+    var trialsRes=results[0], outRes=results[1];
+    if(!trialsRes.ok) throw new Error('Server error '+trialsRes.status);
+    var data = await trialsRes.json();
+    _rows = data.patients||[];
+    _settings = data.settings||{};
+    _outByPat = {};
+    if(outRes.ok){
+      var od = await outRes.json();
+      (od.patients||[]).forEach(function(p){ _outByPat[p.patientId]=p.weeks||[]; });
+    }
+    document.getElementById('cohSkeleton').style.display='none';
+    if(!_rows.length){
+      document.getElementById('cohMsg').innerHTML='<div class="empty-state"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg><div class="es-title">No pilot patients yet</div><div class="es-sub">Patients appear here once approved into production.</div></div>';
+      return;
+    }
+    document.getElementById('cohContent').style.display='block';
+    populateFilters();
+    var f=getFiltered();
+    renderCards(f); renderTrend(f); renderBreakdowns(f); renderSiteComparison(f);
+  } catch(e){
+    document.getElementById('cohSkeleton').style.display='none';
+    document.getElementById('cohMsg').innerHTML='<div class="empty-state"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><div class="es-title" style="color:#dc2626;">Failed to load</div><div class="es-sub">'+e.message+'</div></div>';
+  }
+}
 load();
 </script>
 </body>
