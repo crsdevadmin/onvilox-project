@@ -244,6 +244,8 @@ app.get('/api/patients/:id', authenticateToken, async (req, res) => {
     if (row.reduced_food_intake != null) patientData.reducedFoodIntake = row.reduced_food_intake;
     if (row.weight != null) patientData.weight = row.weight;
     if (row.usual_weight != null) patientData.usualWeight = row.usual_weight;
+    if (row.height != null) patientData.height = row.height;
+    if (row.sex    != null) patientData.sex    = row.sex;
     if (row.albumin != null) patientData.albumin = row.albumin;
     if (row.crp != null) patientData.crp = row.crp;
     if (row.creatinine != null) patientData.creatinine = row.creatinine;
@@ -480,6 +482,210 @@ app.patch('/api/nutrition-plans/:id/insights', authenticateToken, async (req, re
 });
 
 // Patient Monitoring Logs
+// ── Weekly Prescription calculation ───────────────────────────────────────
+// ── Weekly Recipe Ingredient Calculator ───────────────────────────────────
+// Derives a deterministic ingredient breakdown from supplement kcal + protein targets.
+// Glutamine (16 g) is a clinical adjunct added on top of suppKcal — consistent with
+// how the initial prescription handles it.
+function calcWeeklyRecipe(suppKcal, suppProtein, formulation) {
+  if (!suppKcal || !suppProtein || suppKcal <= 0 || suppProtein <= 0) return null;
+
+  const isHydrolyzed = formulation === 'Hydrolyzed';
+  const isDiabetic   = formulation === 'Diabetic';
+  const isAntiInflam = formulation === 'Anti-inflammatory';
+
+  // Protein source
+  const pPerGram  = isHydrolyzed ? 0.85 : 0.90;
+  const protName  = isHydrolyzed ? 'Hydrolyzed Whey Protein' : 'Whey Protein Isolate (90%)';
+  const protId    = isHydrolyzed ? 'whey_hydrolyzed' : 'whey_isolate';
+  const protGrams = Math.round(suppProtein / pPerGram);
+  const protDeliv = Math.round(protGrams * pPerGram * 10) / 10;
+  const protRationale = isHydrolyzed
+    ? 'Hydrolyzed peptides for rapid absorption and reduced osmotic load in patients with GI toxicity.'
+    : 'High Leucine content to stimulate muscle protein synthesis during treatment.';
+
+  // Macro targets from suppKcal (standard oncology ratios)
+  // Diabetic: lower carbs (25 %), more fat (57 %)   Standard/other: 37 % C / 45 % F
+  const fatPct  = isDiabetic ? 0.57 : 0.45;
+  const carbPct = isDiabetic ? 0.25 : 0.37;
+
+  // MCT Powder (70 % fat, 30 % carb carrier)
+  const fatGrams = suppKcal * fatPct / 9;
+  const mctGrams = Math.max(0, Math.round(fatGrams / 0.70));
+  const mctFat   = Math.round(mctGrams * 0.70 * 10) / 10;
+  const mctCarbs = Math.round(mctGrams * 0.30 * 10) / 10;
+
+  // Omega-3 Powder (higher dose for anti-inflammatory)
+  const omega3Grams    = isAntiInflam ? 6 : 3.9;
+  const omega3Fat      = Math.round(omega3Grams * 0.5 * 10) / 10;
+  const omega3Carbs    = Math.round(omega3Grams * 0.5 * 10) / 10;
+  const omega3Rationale = isAntiInflam
+    ? 'High EPA/DHA (6 g/day) to downregulate pro-inflammatory cytokines and stabilize lean mass.'
+    : 'Anti-inflammatory / EPA support.';
+
+  // Carb source (palatinose for diabetic, maltodextrin otherwise)
+  const carbGramsTotal   = suppKcal * carbPct / 4;
+  const carbSourceGrams  = Math.max(0, Math.round((carbGramsTotal - mctCarbs - omega3Carbs) * 10) / 10);
+  const carbName         = isDiabetic ? 'Palatinose (Slow Release)' : 'Maltodextrin (DE 19)';
+  const carbId           = isDiabetic ? 'palatinose' : 'maltodextrin';
+  const carbRationale    = isDiabetic
+    ? 'Slow-release carbohydrate to maintain stable blood glucose levels in diabetic oncology patients.'
+    : 'Complex carbohydrate with low osmolality for sustained energy release and GI comfort.';
+
+  // Glutamine — fixed clinical adjunct (mucosal protection, not counted in suppKcal)
+  const glutGrams = 16;
+
+  // Batch totals
+  const totalPowder  = Math.round((protGrams + carbSourceGrams + mctGrams + omega3Grams + glutGrams) * 10) / 10;
+  const totalProtein = Math.round((protDeliv + glutGrams) * 10) / 10; // glutamine = 1 g protein/g
+  const totalCarbs   = Math.round((mctCarbs + omega3Carbs + carbSourceGrams) * 10) / 10;
+  const totalFat     = Math.round((mctFat + omega3Fat) * 10) / 10;
+
+  return {
+    servingsPerDay: 3,
+    ingredients: [
+      { id: protId, name: protName, grams: protGrams, deliveredProtein: protDeliv,
+        rationale: protRationale,
+        contrib: { protein: protDeliv, carbs: Math.round(protGrams*0.02*10)/10, fat: Math.round(protGrams*0.01*10)/10 } },
+      { id: carbId, name: carbName, grams: carbSourceGrams, rationale: carbRationale,
+        contrib: { protein: 0, carbs: carbSourceGrams, fat: 0 } },
+      { id: 'mct_powder', name: 'MCT Powder (70%)', grams: mctGrams,
+        rationale: 'Metabolic energy without glycemic load',
+        contrib: { protein: 0, carbs: mctCarbs, fat: mctFat } },
+      { id: 'omega3_powder', name: 'Omega-3 Powder', grams: omega3Grams,
+        rationale: omega3Rationale,
+        contrib: { protein: 0, carbs: omega3Carbs, fat: omega3Fat } },
+      { id: 'glutamine', name: 'L-Glutamine powder', grams: glutGrams,
+        rationale: 'Mucosal protection.',
+        contrib: { protein: glutGrams, carbs: 0, fat: 0 } }
+    ],
+    totals: { powder: totalPowder, protein: totalProtein, carbs: totalCarbs, fat: totalFat },
+    proteinBreakdown: `Formula ${protDeliv}g + Glutamine ${glutGrams}g`
+  };
+}
+
+function calcWeeklyRxTargets(baseline, mon) {
+  const fd = baseline || {};
+
+  // ── STATIC — always from patient's saved baseline record, never re-entered ─
+  const height      = fd.height              || null;   // patient.height (cm)
+  const sex         = fd.sex                 || 'M';    // patient.sex
+  const weightBasis = fd.weightBasisOverride || 'ibw';  // patient.weightBasisOverride
+  const giIssues    = fd.giIssues            || false;  // patient.giIssues (hydrolyzed?)
+
+  // ── DYNAMIC — from weekly monitoring; fall back to last saved baseline value ─
+  const weight  = mon.weight     != null ? mon.weight     : (fd.weight      || null);
+  const ecog    = parseInt(mon.ecog != null ? mon.ecog    : (fd.ecogStatus  || '0'), 10);
+  const albumin = mon.albumin    != null ? mon.albumin    : (fd.albumin     || null);
+  const crp     = mon.crp        != null ? mon.crp        : (fd.crp         || null);
+  const glucose = mon.glucose    != null ? mon.glucose    : (fd.bloodSugar  || null);
+
+  // ── Feeding route — preserved from initial plan ──
+  // Read from finalPlan.feedingMethod first, then patient-level fields
+  const _fp0 = fd.finalPlan || fd.engineOutput || {};
+  const feedingRoute = _fp0.feedingMethod || _fp0.prescribedRoute
+                    || fd.prescribedRoute  || fd.feedingMethod || '';
+  // Tube feed / enteral / parenteral patients have 0% oral intake —
+  // the supplement IS the full feeding; do not split off a diet portion.
+  const isTubeFeed = /enteral|tube|ng[- ]?tube|peg|jej|parenteral|tpn/i.test(feedingRoute);
+
+  // oralIntake from monitoring is 0–100 %; baseline stores reducedFoodIntake (deficit %)
+  // Tube-feed patients always get oralPct = 0 (full replacement formula)
+  const oralPct = isTubeFeed ? 0
+    : (mon.oralIntake != null
+        ? mon.oralIntake
+        : (fd.reducedFoodIntake != null ? 100 - fd.reducedFoodIntake : 60));
+
+  if (!weight) return null; // need at least weight
+
+  // IBW (Hamwi) — use saved value from finalPlan first (same number doctor approved),
+  // recalculate from height only as a fallback.
+  let calcWeight = weight;
+  let ibw = null;
+  let bsa = null;
+  if (_fp0.ibw) {
+    // Authoritative: saved IBW from the initial plan
+    ibw = Math.round(_fp0.ibw * 10) / 10;
+    calcWeight = weightBasis === 'ibw' ? ibw : weight;
+    if (height) bsa = Math.round(Math.sqrt(height * weight / 3600) * 100) / 100;
+  } else if (height) {
+    // Fallback: recalculate Hamwi from stored height
+    const heightIn = height / 2.54;
+    const isFemale = sex && (sex.toLowerCase() === 'female' || sex.toLowerCase() === 'f');
+    ibw = isFemale
+      ? Math.max(30, 45.5 + 2.2 * (heightIn - 60))
+      : Math.max(30, 48   + 2.7 * (heightIn - 60));
+    ibw = Math.round(ibw * 10) / 10;
+    calcWeight = weightBasis === 'ibw' ? ibw : weight;
+    bsa = Math.round(Math.sqrt(height * weight / 3600) * 100) / 100;
+  }
+
+  // ── Read base kcal/kg and protein/kg from the patient's saved initial prescription ──
+  // Try finalPlan first, then engineOutput, then top-level fd fields.
+  const fp = fd.finalPlan || fd.engineOutput || {};
+
+  // kcal/kg: stored value → derive from baseEnergy/calcWeight → cachexia default
+  const _fpKcalPerKg = fp.kcalPerKg
+    || (fp.baseEnergy && fp.calcWeight ? Math.round(fp.baseEnergy / fp.calcWeight) : null)
+    || fd.kcalPerKg
+    || null;
+  const baseKcalPerKg = _fpKcalPerKg || 35;  // 35 = oncology high-risk default (cachexia/MUST≥2)
+
+  // protein/kg: stored value → derive from totalDailyProtein/calcWeight → stored dailyProtein/calcWeight → default
+  const _fpProtPerKg = fp.proteinPerKg
+    || (fp.totalDailyProtein && fp.calcWeight ? Math.round(fp.totalDailyProtein / fp.calcWeight * 10) / 10 : null)
+    || (fp.dailyProtein && fp.calcWeight      ? Math.round((fp.dailyProtein / fp.calcWeight) * 2 * 10) / 10 : null)
+    || fd.proteinPerKg
+    || null;
+  const baseProteinPerKg = _fpProtPerKg || 1.4;
+
+  // ECOG adjustment: step down if status has deteriorated from baseline
+  const baseEcog = parseInt(fd.ecogStatus || '0', 10);
+  let kcalPerKg = baseKcalPerKg;
+  if      (ecog >= 3 && baseEcog < 3) kcalPerKg = Math.max(25, baseKcalPerKg - 7);
+  else if (ecog >= 2 && baseEcog < 2) kcalPerKg = Math.max(28, baseKcalPerKg - 4);
+
+  const totalKcal = Math.round(calcWeight * kcalPerKg);
+
+  // Protein: albumin-driven, floored at the initial plan's protein/kg
+  const proteinPerKg = (!albumin || albumin >= 3.5)
+    ? baseProteinPerKg
+    : albumin >= 2.5
+      ? Math.max(baseProteinPerKg, 1.7)
+      : Math.max(baseProteinPerKg, 2.0);
+  const totalProtein = Math.round(calcWeight * proteinPerKg); // whole number to match initial prescription
+
+  // Supplement portion
+  const oralKcal    = Math.round(totalKcal    * (oralPct / 100));
+  const suppKcal    = Math.max(0, totalKcal   - oralKcal);
+  const suppProtein = Math.max(0, Math.round((totalProtein * (1 - oralPct / 100)) * 10) / 10);
+
+  // Formulation flags
+  const isAntiInflam = crp     != null && crp     >= 10;
+  const isDiabetic   = glucose != null && glucose >  200;
+  const isHydrolyzed = giIssues; // set at baseline, persists unless doctor changes it
+  const formulation  = isDiabetic ? 'Diabetic'
+                     : isAntiInflam ? 'Anti-inflammatory'
+                     : isHydrolyzed ? 'Hydrolyzed'
+                     : 'Standard';
+
+  const flags = [];
+  if (albumin && albumin < 3.5) flags.push(`Low albumin (${albumin} g/dL) → protein target increased to ${proteinPerKg} g/kg`);
+  if (isAntiInflam) flags.push(`High CRP (${crp} mg/L) → anti-inflammatory formulation`);
+  if (isDiabetic)   flags.push(`High glucose (${glucose} mg/dL) → diabetic formulation`);
+  if (ecog >= 3)    flags.push(`ECOG ${ecog} → reduced calorie target (${kcalPerKg} kcal/kg)`);
+
+  const recipe = calcWeeklyRecipe(suppKcal, suppProtein, formulation);
+
+  return { calcWeight: Math.round(calcWeight*10)/10, ibw: ibw ? Math.round(ibw*10)/10 : null, bsa,
+           totalKcal, kcalPerKg, totalProtein, proteinPerKg,
+           oralKcal, suppKcal, suppProtein, formulation, flags,
+           ecog, albumin, crp, glucose, oralPct, weight, height,
+           baseKcalPerKg, baseProteinPerKg,
+           feedingRoute, isTubeFeed,
+           recipe };
+}
+
 app.post('/api/patients/:id/monitoring', authenticateToken, async (req, res) => {
   const { type, data } = req.body;
   if (!type || !data) return res.status(400).json({ error: 'type and data required' });
@@ -488,8 +694,225 @@ app.post('/api/patients/:id/monitoring', authenticateToken, async (req, res) => 
       `INSERT INTO monitoring_logs (patient_id, type, recorded_by, data) VALUES ($1, $2, $3, $4) RETURNING *`,
       [req.params.id, type, req.user.id, JSON.stringify(data)]
     );
-    res.json(result.rows[0]);
+    const log = result.rows[0];
+
+    // Auto-generate weekly prescription when type='weekly'
+    let weeklyRx = null;
+    if (type === 'weekly') {
+      try {
+        const patRow = await pool.query('SELECT full_data, name, height, sex FROM patients WHERE id=$1', [req.params.id]);
+        const baseline = patRow.rows[0] ? (patRow.rows[0].full_data || {}) : {};
+        // Dedicated columns override stale full_data blob (same merge as GET /api/patients/:id)
+        if (patRow.rows[0] && patRow.rows[0].height != null) baseline.height = patRow.rows[0].height;
+        if (patRow.rows[0] && patRow.rows[0].sex    != null) baseline.sex    = patRow.rows[0].sex;
+        // Pull finalPlan from nutrition_plans (it's NOT in patients.full_data)
+        const planRow = await pool.query(
+          'SELECT final_plan, engine_output FROM nutrition_plans WHERE patient_id=$1 ORDER BY version DESC LIMIT 1',
+          [req.params.id]
+        );
+        if (planRow.rowCount) {
+          baseline.finalPlan   = planRow.rows[0].final_plan   || baseline.finalPlan;
+          baseline.engineOutput = planRow.rows[0].engine_output || baseline.engineOutput;
+        }
+        const targets  = calcWeeklyRxTargets(baseline, data);
+        if (targets) {
+          // Batch code: StudyID-Wn-YYMM (fall back to patientId prefix)
+          const enr = await pool.query('SELECT study_id FROM trial_enrollments WHERE patient_id=$1', [req.params.id]);
+          const studyId = enr.rows[0] ? enr.rows[0].study_id : req.params.id.slice(0,6).toUpperCase();
+          const now = new Date();
+          const yymm = String(now.getFullYear()).slice(2) + String(now.getMonth()+1).padStart(2,'0');
+          const weekNo = data.week || 1;
+          const batchCode = `${studyId}-W${weekNo}-${yymm}`;
+
+          // Baseline snapshot for delta comparison (uses correct patient field names)
+          const baselineSnap = {
+            weight:     baseline.weight                                       || null,
+            albumin:    baseline.albumin                                      || null,
+            crp:        baseline.crp                                          || null,
+            ecog:       baseline.ecogStatus                                   || 0,
+            oralIntake: baseline.reducedFoodIntake != null
+                          ? 100 - baseline.reducedFoodIntake : null
+          };
+
+          const rxRes = await pool.query(
+            `INSERT INTO weekly_prescriptions
+               (patient_id, week_number, monitoring_log_id, batch_code,
+                clinical_params, targets, baseline_snapshot, status, created_by)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,'PENDING_REVIEW',$8)
+             ON CONFLICT (patient_id, week_number) DO UPDATE
+               SET clinical_params=$5, targets=$6, batch_code=$4,
+                   monitoring_log_id=$3, status='PENDING_REVIEW', updated_at=NOW()
+             RETURNING *`,
+            [req.params.id, weekNo, log.id, batchCode,
+             JSON.stringify(data), JSON.stringify(targets),
+             JSON.stringify(baselineSnap), req.user.id]
+          );
+          weeklyRx = rxRes.rows[0];
+        }
+      } catch(rxErr) { console.error('weekly_rx auto-gen:', rxErr.message); }
+    }
+
+    res.json({ ...log, weeklyRx });
   } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Generate prescription from an existing monitoring log (for entries saved before the feature)
+app.post('/api/patients/:id/generate-weekly-rx', authenticateToken, async (req, res) => {
+  const { monitoringLogId, weekNumber } = req.body;
+  if (!monitoringLogId) return res.status(400).json({ error: 'monitoringLogId required' });
+  try {
+    const logRow = await pool.query('SELECT * FROM monitoring_logs WHERE id=$1 AND patient_id=$2', [monitoringLogId, req.params.id]);
+    if (!logRow.rowCount) return res.status(404).json({ error: 'Monitoring log not found' });
+    const data = logRow.rows[0].data || {};
+
+    const patRow = await pool.query('SELECT full_data, height, sex FROM patients WHERE id=$1', [req.params.id]);
+    const baseline = patRow.rows[0] ? (patRow.rows[0].full_data || {}) : {};
+    // Dedicated columns override stale full_data blob (same merge as GET /api/patients/:id)
+    if (patRow.rows[0] && patRow.rows[0].height != null) baseline.height = patRow.rows[0].height;
+    if (patRow.rows[0] && patRow.rows[0].sex    != null) baseline.sex    = patRow.rows[0].sex;
+    // Pull finalPlan from nutrition_plans (it's NOT in patients.full_data)
+    const planRow2 = await pool.query(
+      'SELECT final_plan, engine_output FROM nutrition_plans WHERE patient_id=$1 ORDER BY version DESC LIMIT 1',
+      [req.params.id]
+    );
+    if (planRow2.rowCount) {
+      baseline.finalPlan    = planRow2.rows[0].final_plan    || baseline.finalPlan;
+      baseline.engineOutput = planRow2.rows[0].engine_output || baseline.engineOutput;
+    }
+    const targets  = calcWeeklyRxTargets(baseline, data);
+    if (!targets) return res.status(422).json({ error: 'Cannot calculate — patient weight missing from profile or monitoring entry' });
+
+    const enr = await pool.query('SELECT study_id FROM trial_enrollments WHERE patient_id=$1', [req.params.id]);
+    const studyId = enr.rows[0] ? enr.rows[0].study_id : req.params.id.slice(0,6).toUpperCase();
+    const now = new Date();
+    const yymm = String(now.getFullYear()).slice(2) + String(now.getMonth()+1).padStart(2,'0');
+    const weekNo = weekNumber || data.week || 1;
+    const batchCode = `${studyId}-W${weekNo}-${yymm}`;
+
+    const baselineSnap = {
+      weight:     baseline.weight    || null,
+      albumin:    baseline.albumin   || null,
+      crp:        baseline.crp       || null,
+      ecog:       baseline.ecogStatus || 0,
+      oralIntake: baseline.reducedFoodIntake != null ? 100 - baseline.reducedFoodIntake : null
+    };
+
+    // Always regenerate when the doctor explicitly clicks "Generate Rx" —
+    // even if previously APPROVED. Reset manufacturing job so the store
+    // does not print stale labels until the doctor re-approves.
+    const existing = await pool.query(
+      'SELECT * FROM weekly_prescriptions WHERE patient_id=$1 AND week_number=$2',
+      [req.params.id, weekNo]
+    );
+    if (existing.rowCount && existing.rows[0].status === 'APPROVED') {
+      // Reset the manufacturing job so store cannot print until re-approved
+      await pool.query(
+        `UPDATE manufacturing_jobs SET status='APPROVED', batch_no=NULL,
+          mfg_date=NULL, exp_date=NULL, updated_at=NOW()
+         WHERE id=$1`,
+        ['wxjob_' + req.params.id + '_w' + weekNo]
+      ).catch(() => {}); // job may not exist yet — ignore error
+    }
+
+    const rxRes = await pool.query(
+      `INSERT INTO weekly_prescriptions
+         (patient_id, week_number, monitoring_log_id, batch_code,
+          clinical_params, targets, baseline_snapshot, status, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,'PENDING_REVIEW',$8)
+       ON CONFLICT (patient_id, week_number) DO UPDATE
+         SET clinical_params=$5, targets=$6, batch_code=$4,
+             monitoring_log_id=$3, status='PENDING_REVIEW', updated_at=NOW()
+       RETURNING *`,
+      [req.params.id, weekNo, monitoringLogId, batchCode,
+       JSON.stringify(data), JSON.stringify(targets),
+       JSON.stringify(baselineSnap), req.user.id]
+    );
+    res.json(rxRes.rows[0]);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Weekly prescriptions — list for a patient
+app.get('/api/patients/:id/weekly-prescriptions', authenticateToken, async (req, res) => {
+  try {
+    const r = await pool.query(
+      `SELECT * FROM weekly_prescriptions WHERE patient_id=$1 ORDER BY week_number ASC`,
+      [req.params.id]
+    );
+    res.json(r.rows);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Doctor adjusts targets (still PENDING_REVIEW)
+app.put('/api/weekly-prescriptions/:id', authenticateToken, async (req, res) => {
+  const { targets, notes } = req.body;
+  // Recompute ingredient recipe from updated targets so store always gets fresh breakdown
+  const updatedTargets = Object.assign({}, targets);
+  if (updatedTargets.suppKcal && updatedTargets.suppProtein) {
+    updatedTargets.recipe = calcWeeklyRecipe(
+      updatedTargets.suppKcal, updatedTargets.suppProtein, updatedTargets.formulation || 'Standard'
+    );
+  }
+  try {
+    const r = await pool.query(
+      `UPDATE weekly_prescriptions SET targets=$1, notes=$2, updated_at=NOW()
+       WHERE id=$3 RETURNING *`,
+      [JSON.stringify(updatedTargets), notes || null, req.params.id]
+    );
+    if (!r.rowCount) return res.status(404).json({ error: 'Not found' });
+    res.json(r.rows[0]);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Doctor approves → status APPROVED → creates manufacturing job
+app.post('/api/weekly-prescriptions/:id/approve', authenticateToken, async (req, res) => {
+  try {
+    const rxRes = await pool.query('SELECT * FROM weekly_prescriptions WHERE id=$1', [req.params.id]);
+    if (!rxRes.rowCount) return res.status(404).json({ error: 'Not found' });
+    const rx = rxRes.rows[0];
+
+    // Mark approved
+    await pool.query(
+      `UPDATE weekly_prescriptions SET status='APPROVED', approved_at=NOW(), approved_by=$1, updated_at=NOW() WHERE id=$2`,
+      [req.user.id, rx.id]
+    );
+
+    // Get store_id for this patient from their original manufacturing job
+    const jobRow = await pool.query(
+      `SELECT store_id, doctor_id FROM manufacturing_jobs WHERE patient_id=$1 ORDER BY created_at ASC LIMIT 1`,
+      [rx.patient_id]
+    );
+    const storeId  = jobRow.rows[0] ? jobRow.rows[0].store_id  : null;
+    const doctorId = jobRow.rows[0] ? jobRow.rows[0].doctor_id : req.user.id;
+
+    // Insert as manufacturing job with weekly batch code
+    const jobId = 'wxjob_' + rx.patient_id + '_w' + rx.week_number;
+    await pool.query(
+      `INSERT INTO manufacturing_jobs (id, patient_id, store_id, doctor_id, status, batch_no, history)
+       VALUES ($1,$2,$3,$4,'APPROVED',$5,$6)
+       ON CONFLICT (id) DO UPDATE SET status='APPROVED', batch_no=$5, updated_at=NOW()`,
+      [jobId, rx.patient_id, storeId, doctorId, rx.batch_code,
+       JSON.stringify([{ status:'APPROVED', at: new Date().toISOString(), note: `Week ${rx.week_number} prescription` }])]
+    );
+
+    res.json({ success: true, batchCode: rx.batch_code, jobId });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Admin: all weekly prescriptions across all patients
+app.get('/api/weekly-prescriptions', authenticateToken, async (req, res) => {
+  const role = req.user && req.user.role;
+  if (!['ADMIN','SUPER_ADMIN'].includes(role)) return res.status(403).json({ error: 'Admin only' });
+  try {
+    const r = await pool.query(
+      `SELECT wp.*, p.name AS patient_name,
+              te.study_id
+       FROM weekly_prescriptions wp
+       LEFT JOIN patients p ON p.id = wp.patient_id
+       LEFT JOIN trial_enrollments te ON te.patient_id = wp.patient_id
+       ORDER BY wp.patient_id, wp.week_number ASC`
+    );
+    res.json(r.rows);
+  } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
 app.get('/api/patients/:id/monitoring', authenticateToken, async (req, res) => {
@@ -499,6 +922,31 @@ app.get('/api/patients/:id/monitoring', authenticateToken, async (req, res) => {
       [req.params.id]
     );
     res.json(result.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Edit an existing monitoring log entry (doctor correction)
+app.put('/api/monitoring/:logId', authenticateToken, async (req, res) => {
+  const { data } = req.body;
+  if (!data) return res.status(400).json({ error: 'data required' });
+  try {
+    const result = await pool.query(
+      `UPDATE monitoring_logs SET data=$1, recorded_by=$2 WHERE id=$3 RETURNING *`,
+      [JSON.stringify(data), req.user.id, req.params.logId]
+    );
+    if (!result.rowCount) return res.status(404).json({ error: 'Log not found' });
+    res.json(result.rows[0]);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/monitoring/:logId', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `DELETE FROM monitoring_logs WHERE id=$1 RETURNING id`,
+      [req.params.logId]
+    );
+    if (!result.rowCount) return res.status(404).json({ error: 'Log not found' });
+    res.json({ deleted: req.params.logId });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -820,14 +1268,39 @@ app.get('/api/trials/outcomes', authenticateToken, async (req, res) => {
         ecog: d.ecog != null ? d.ecog : null,
         albumin: d.albumin != null ? d.albumin : null,
         crp: d.crp != null ? d.crp : null,
-        glucose: d.glucose != null ? d.glucose : null
+        glucose: d.glucose != null ? d.glucose : null,
+        oralIntake: d.oralIntake != null ? d.oralIntake : null,
+        compliance: d.compliance != null ? d.compliance : null
       });
     });
+    // Daily logs
+    const dailyLogs = (await pool.query(
+      `SELECT patient_id, recorded_at, data FROM monitoring_logs
+         WHERE type='daily' AND patient_id = ANY($1) ORDER BY recorded_at ASC`, [ids])).rows;
+    const dayByPat = {};
+    dailyLogs.forEach(l => {
+      const d = l.data || {};
+      (dayByPat[l.patient_id] = dayByPat[l.patient_id] || []).push({
+        recordedAt: l.recorded_at,
+        date: d.date || null,
+        oralIntake: d.oralIntake != null ? d.oralIntake : null,
+        suppPrescribed: d.suppPrescribed || null,
+        suppConsumed: d.suppConsumed != null ? d.suppConsumed : null,
+        nausea: d.nausea || null,
+        vomiting: d.vomiting || null,
+        mucositis: d.mucositis || null,
+        bowel: d.bowel || null,
+        hydration: d.hydration || null,
+        notes: d.notes || null
+      });
+    });
+
     const patients = ids.map(id => ({
       patientId: id,
       studyId: studyByPat[id] || null,
       name: nameById[id] || '—',
-      weeks: byPat[id] || []
+      weeks: byPat[id] || [],
+      days: dayByPat[id] || []
     })).sort((a, b) => String(a.studyId).localeCompare(String(b.studyId)));
     res.json({ patients });
   } catch (e) { res.status(500).json({ error: e.message }); }
@@ -850,12 +1323,28 @@ app.get('/api/trials/:patientId/journey', authenticateToken, async (req, res) =>
       const e = h.find(x => (x.status || '').toUpperCase() === status);
       return e ? e.at : null;
     };
+    const isDispatched = (j) => {
+      if (!j) return false;
+      if ((j.status || '').toUpperCase() === 'DISPATCHED') return true;
+      const h = Array.isArray(j.history) ? j.history : [];
+      return h.some(e => (e.status || '').toUpperCase() === 'DISPATCHED');
+    };
     const weeklyDates = weeklyRes.rows.map(r => r.recorded_at);
     const baseline = pat.created_date || pat.created_at || null;
+    const wk = weeklyDates.length;
+    const lostThreshold = (settings.lost_threshold_days || 14) * 86400000;
+    let trialStatus;
+    if (trial && trial.withdrawn_at) trialStatus = 'Withdrawn';
+    else if (wk >= (settings.pilot_weeks || 6)) trialStatus = 'Completed';
+    else if (isDispatched(job) || wk > 0) {
+      const lastAt = weeklyDates.length ? new Date(weeklyDates[weeklyDates.length - 1]).getTime() : null;
+      trialStatus = (wk > 0 && lastAt && (Date.now() - lastAt) > lostThreshold) ? 'Lost to Follow-up' : 'Active';
+    } else trialStatus = 'Enrolled';
 
     res.json({
       patient: { id: pat.id, uhic: pat.uhic, name: pat.name, diagnosis: pat.cancer },
       studyId: trial ? trial.study_id : null,
+      trialStatus,
       withdrawnAt: trial ? trial.withdrawn_at : null,
       withdrawnReason: trial ? trial.withdrawn_reason : null,
       batchNo: job ? job.batch_no : null,
@@ -1787,6 +2276,34 @@ OUTPUT FORMAT — return ONLY valid JSON, no markdown, no text outside the JSON 
   } catch(e) { console.error('manufacturing_jobs migration:', e.message); }
 })();
 
+// Weekly prescriptions table
+(async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS weekly_prescriptions (
+        id                  SERIAL PRIMARY KEY,
+        patient_id          TEXT NOT NULL,
+        week_number         INT  NOT NULL,
+        monitoring_log_id   INT,
+        batch_code          TEXT UNIQUE,
+        clinical_params     JSONB,
+        targets             JSONB,
+        baseline_snapshot   JSONB,
+        notes               TEXT,
+        status              TEXT NOT NULL DEFAULT 'PENDING_REVIEW',
+        created_by          TEXT,
+        approved_by         TEXT,
+        approved_at         TIMESTAMPTZ,
+        created_at          TIMESTAMPTZ DEFAULT NOW(),
+        updated_at          TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(patient_id, week_number)
+      )
+    `);
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_weekly_rx_patient ON weekly_prescriptions(patient_id)');
+    console.log('weekly_prescriptions table ready');
+  } catch(e) { console.error('weekly_prescriptions migration:', e.message); }
+})();
+
 // Clinical Trials module — enrollment records + pilot settings
 (async () => {
   try {
@@ -2310,7 +2827,8 @@ const cleanRoutes = {
   '/admin/mapping':    'admin-mapping.html',
   '/admin/tracking':   'admin-tracking.html',
   '/admin/trials':     'admin-trials.html',
-  '/admin/trials/journey': 'admin-trial-journey.html',
+  '/admin/trials/journey':  'admin-trial-journey.html',
+  '/admin/trials/patient':  'admin-trial-patient.html',
   '/admin/trials/cohort': 'admin-trial-cohort.html',
   '/admin/trials/outcomes': 'admin-trial-outcomes.html',
   '/admin/trials/formula': 'admin-trial-formula.html',

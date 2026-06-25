@@ -14,9 +14,7 @@
     <a href="/admin/stores">Stores</a>
     <a href="/admin/users">Create Users</a>
     <a href="/admin/mapping">Mapping</a>
-    <a href="/admin/tracking">Tracking</a>
     <a href="/admin/trials">Clinical Trials</a>
-    <a href="/admin/reports">Reports</a>
     <a href="/admin/rules">Rule Engine</a>
     <a href="#" onclick="auth.logout()">Logout</a>
     <button id="themeToggleBtn" onclick="toggleTheme()" class="btn-secondary btn-sm" style="margin-left: 20px; border-radius: 30px; padding: 6px 14px; cursor: pointer;">🌙 Dark Mode</button>
@@ -55,10 +53,4 @@ initStore().then(() => {
   document.getElementById('rpPatients').innerText = patients.length;
   document.getElementById('rpPending').innerText = patients.filter(p => p.status === 'CREATED').length;
   document.getElementById('rpProcessing').innerText = jobs.filter(j => j.status === 'PROCESSING').length;
-  document.getElementById('rpDelivered').innerText = jobs.filter(j => j.status === 'DELIVERED').length;
-});
-</script>
-
-<script src="/js/theme.js"></script>
-</body>
-</html>
+  document.getElementById('rpDelivered').i

@@ -132,6 +132,25 @@
       <div id="ptFormula"></div>
     </div>
 
+    <!-- ── Section 4: Weekly Prescriptions ───────────────────── -->
+    <div class="section">
+      <div class="section-title">Weekly Prescriptions</div>
+      <p style="color:var(--text-2);font-size:13px;margin:0 0 10px;">Auto-generated each week from monitoring data. Each has a unique batch code sent to the store.</p>
+      <div id="ptWxRxEmpty" style="color:var(--text-2);font-size:13px;">No weekly prescriptions yet.</div>
+      <div id="ptWxRxTable" style="overflow-x:auto;display:none;">
+        <table class="ct">
+          <thead>
+            <tr>
+              <th>Week</th><th>Batch Code</th><th>Kcal/day</th><th>Protein (g)</th>
+              <th>Supp Kcal</th><th>Supp Protein</th><th>Formulation</th>
+              <th>Calc. Weight</th><th>Status</th><th>Approved At</th>
+            </tr>
+          </thead>
+          <tbody id="ptWxRxBody"></tbody>
+        </table>
+      </div>
+    </div>
+
   </div><!-- /ptMain -->
 </div>
 
@@ -206,18 +225,20 @@ async function load(){
 
   try {
     const hdr = { 'Authorization': 'Bearer ' + (me.token||'') };
-    const [jRes, oRes, fRes] = await Promise.all([
+    const [jRes, oRes, fRes, rxRes] = await Promise.all([
       fetch(apiBase + '/api/trials/' + patientId + '/journey', { headers: hdr }),
       fetch(apiBase + '/api/trials/outcomes', { headers: hdr }),
-      fetch(apiBase + '/api/trials/formula',  { headers: hdr })
+      fetch(apiBase + '/api/trials/formula',  { headers: hdr }),
+      fetch(apiBase + '/api/patients/' + patientId + '/weekly-prescriptions', { headers: hdr })
     ]);
     if(!jRes.ok) throw new Error('Journey: server error ' + jRes.status);
 
     const journey  = await jRes.json();
     const outData  = oRes.ok  ? await oRes.json()  : { patients: [] };
     const fData    = fRes.ok  ? await fRes.json()   : { patients: [] };
+    const rxList   = rxRes.ok ? await rxRes.json()  : [];
 
-    render(journey, outData.patients || [], fData.patients || []);
+    render(journey, outData.patients || [], fData.patients || [], rxList);
     document.getElementById('ptMsg').style.display = 'none';
     document.getElementById('ptMain').style.display = 'block';
   } catch(e){
@@ -225,7 +246,7 @@ async function load(){
   }
 }
 
-function render(journey, allOutcomes, allFormula){
+function render(journey, allOutcomes, allFormula, rxList){
   const p    = journey.patient || {};
   const sid  = journey.studyId || '—';
   const m    = journey.milestones || {};
@@ -351,6 +372,37 @@ function render(journey, allOutcomes, allFormula){
 
   // update page title
   document.title = `${sid} — ${p.name||'Patient'} · Gquence`;
+
+  // ── Weekly Prescriptions ──
+  rxList = rxList || [];
+  if(!rxList.length){
+    document.getElementById('ptWxRxEmpty').style.display = '';
+    document.getElementById('ptWxRxTable').style.display = 'none';
+  } else {
+    document.getElementById('ptWxRxEmpty').style.display = 'none';
+    document.getElementById('ptWxRxTable').style.display = '';
+    const STATUS_STYLE = {
+      APPROVED:       'background:#dcfce7;color:#166534;',
+      PENDING_REVIEW: 'background:#fef9c3;color:#854d0e;'
+    };
+    function fmtTs(d){ if(!d) return '—'; var dt=new Date(d); return ('0'+dt.getDate()).slice(-2)+'/'+('0'+(dt.getMonth()+1)).slice(-2)+'/'+dt.getFullYear(); }
+    document.getElementById('ptWxRxBody').innerHTML = rxList.map(rx => {
+      const t = rx.targets || {};
+      const st = rx.status || 'PENDING_REVIEW';
+      return `<tr>
+        <td style="font-weight:700;">W${rx.week_number}</td>
+        <td style="font-weight:800;color:#b91c1c;">${rx.batch_code||'—'}</td>
+        <td>${t.totalKcal||'—'} kcal</td>
+        <td>${t.totalProtein||'—'} g</td>
+        <td>${t.suppKcal||'—'} kcal</td>
+        <td>${t.suppProtein||'—'} g</td>
+        <td>${t.formulation||'—'}</td>
+        <td>${t.calcWeight||'—'} kg</td>
+        <td><span style="font-size:11px;font-weight:700;padding:2px 9px;border-radius:20px;${STATUS_STYLE[st]||''}">${st}</span></td>
+        <td>${fmtTs(rx.approved_at)}</td>
+      </tr>`;
+    }).join('');
+  }
 }
 
 load();

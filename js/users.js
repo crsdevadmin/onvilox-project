@@ -31,7 +31,12 @@
     try {
       const res = await fetch(_apiBase() + '/api/users', { headers: _headers() });
       if (res.ok) {
-        _cache.users = await res.json();
+        const serverUsers = await res.json();
+        // Preserve plain-text passwords stored locally (server never returns them)
+        const localUsers = db.getTable('users', []);
+        const localPassMap = {};
+        localUsers.forEach(u => { if (u.password) localPassMap[u.id] = u.password; });
+        _cache.users = serverUsers.map(u => localPassMap[u.id] ? Object.assign({}, u, { password: localPassMap[u.id] }) : u);
         db.setTable('users', _cache.users);
       }
     } catch(e) {

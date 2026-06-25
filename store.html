@@ -83,6 +83,25 @@
     <button onclick="testPushNotification()" style="background:#0e2247;color:#fff;border:none;border-radius:6px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;">Send Test Notification</button>
   </div>
 
+  <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;">
+    <div style="flex:1;min-width:110px;background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:14px 18px;">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-2);">Open</div>
+      <div id="kpiOpen" style="font-size:28px;font-weight:800;color:#0e2247;margin-top:4px;">—</div>
+    </div>
+    <div style="flex:1;min-width:110px;background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:14px 18px;">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-2);">Processing</div>
+      <div id="kpiProcessing" style="font-size:28px;font-weight:800;color:#0891b2;margin-top:4px;">—</div>
+    </div>
+    <div style="flex:1;min-width:110px;background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:14px 18px;">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-2);">Pending Approval</div>
+      <div id="kpiPending" style="font-size:28px;font-weight:800;color:#d97706;margin-top:4px;">—</div>
+    </div>
+    <div style="flex:1;min-width:110px;background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:14px 18px;">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-2);">Dispatched</div>
+      <div id="kpiDispatched" style="font-size:28px;font-weight:800;color:#16a34a;margin-top:4px;">—</div>
+    </div>
+  </div>
+
   <div class="card">
     <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px;">
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
@@ -408,6 +427,13 @@ function render(){
   let jobs = manufacturingService.getJobsForStore(me.storeId);
   jobs.sort((a,b)=> (b.updatedAt||'').localeCompare(a.updatedAt||''));
 
+  // KPI counts
+  const _kpi = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+  _kpi('kpiOpen',       jobs.filter(j => (j.status||'APPROVED').toUpperCase() === 'APPROVED').length);
+  _kpi('kpiProcessing', jobs.filter(j => (j.status||'').toUpperCase() === 'PROCESSING').length);
+  _kpi('kpiPending',    jobs.filter(j => manufacturingService.WORKFLOW.isPending(j.status)).length);
+  _kpi('kpiDispatched', jobs.filter(j => (j.status||'').toUpperCase() === 'DISPATCHED').length);
+
   // Apply filter
   if (_activeFilter === 'PENDING' || _activeFilter === 'NEEDS_APPROVAL') {
     jobs = jobs.filter(j => manufacturingService.WORKFLOW.isPending(j.status));
@@ -462,17 +488,21 @@ function render(){
   });
 }
 
-// Print Labels becomes available once production has started (Processing onward).
+// Print Labels: available once processing starts (initial jobs), or immediately for weekly Rx jobs (APPROVED).
 function printLabelBtn(j) {
   const s = (j.status || '').toUpperCase();
-  if (s === 'PROCESSING' || s === 'PENDING_DISPATCH' || s === 'DISPATCHED') {
+  const isWeekly = j.id && j.id.startsWith('wxjob_');
+  if (isWeekly && s === 'APPROVED') {
+    return `<button class="btn-secondary" style="padding:6px 12px;font-size:12px;border-radius:6px;" onclick="event.stopPropagation(); openLabelModal('${j.id}')">🏷️ Print Labels</button>`;
+  }
+  if (!isWeekly && (s === 'PROCESSING' || s === 'PENDING_DISPATCH' || s === 'DISPATCHED')) {
     return `<button class="btn-secondary" style="padding:6px 12px;font-size:12px;border-radius:6px;" onclick="event.stopPropagation(); openLabelModal('${j.id}')">🏷️ Print Labels</button>`;
   }
   return '';
 }
 
 // ===== Label modal =====
-let _lblJob = null, _lblPlan = null, _lblStore = null, _lblPatient = null;
+let _lblJob = null, _lblPlan = null, _lblStore = null, _lblPatient = null, _lblWeeklyRx = null;
 function _lblSet(id, v){ const el = document.getElementById(id); if (el) el.textContent = v; }
 function _lblFmtDate(d){ if(!d) return '—'; const s=(typeof d==='string')?d.slice(0,10):new Date(d).toISOString().slice(0,10); const m=s.match(/^(\d{4})-(\d{2})-(\d{2})$/); return m?`${m[3]}/${m[2]}/${m[1]}`:s; }
 function _lblNum(v){ const n=Math.round(parseFloat(v)); return isNaN(n)?'—':n; }
@@ -483,39 +513,93 @@ async function openLabelModal(jobId){
   if(!job){ return; }
   const p = getPatientById(job.patientId);
   if(!p){ alert('Patient not found.'); return; }
-  if(typeof generateNutritionPlan !== 'function'){ alert('Nutrition engine not loaded — please refresh.'); return; }
+
   let store = null;
   if (typeof storeService !== 'undefined') {
     const all = storeService.getStores() || [];
-    store = all.find(s => s.id === job.storeId)        // the job's store
-         || all.find(s => s.id === me.storeId)          // the logged-in user's store
-         || (all.length === 1 ? all[0] : null);         // single-store deployments
+    store = all.find(s => s.id === job.storeId)
+         || all.find(s => s.id === me.storeId)
+         || (all.length === 1 ? all[0] : null);
   }
-  // Use the SAME approved/saved plan the patient report uses, so the label's
-  // per-serving values match the report exactly. Only fall back to a fresh
-  // computation if no saved plan can be loaded.
+
+  _lblWeeklyRx = null;
   let plan = null;
-  try {
-    const apiBase = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : '';
-    const res = await fetch(apiBase + '/api/nutrition-plans/patient/' + p.id, { headers: { 'Authorization': 'Bearer ' + (me.token || '') } });
-    if (res.ok) {
-      const plans = await res.json();                                   // ordered by version DESC
-      const latest = Array.isArray(plans) && plans.length ? plans[0] : null;
-      if (latest) plan = latest.finalPlan || latest.engineOutput || latest;
-    }
-  } catch(e){ /* fall back to fresh computation below */ }
-  if (!plan) {
+  const apiBase = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : '';
+  const isWeeklyJob = job.id && job.id.startsWith('wxjob_');
+
+  if (isWeeklyJob) {
+    // ── Weekly Rx job: build plan from the weekly prescription data ──
+    const weekMatch = job.id.match(/_w(\d+)$/);
+    const weekNum = weekMatch ? parseInt(weekMatch[1]) : null;
     try {
-      plan = generateNutritionPlan({
-        ...p,
-        weight: parseFloat(p.weight), height: parseFloat(p.height), albumin: parseFloat(p.albumin),
-        weightLossPercent: parseFloat(p.weightLossPercent || 0), giIssues: !!p.giIssues
-      });
-    } catch(e){ alert('Could not compute the plan: ' + e.message); return; }
+      const res = await fetch(apiBase + '/api/patients/' + p.id + '/weekly-prescriptions',
+        { headers: { 'Authorization': 'Bearer ' + (me.token || '') } });
+      if (res.ok) {
+        const rxList = await res.json();
+        const rx = rxList.find(r => r.week_number === weekNum) || rxList[rxList.length - 1] || null;
+        if (rx && rx.targets) {
+          _lblWeeklyRx = rx;
+          const t = rx.targets || {}, r = t.recipe || {};
+          const srv = r.servingsPerDay || 3;
+          plan = {
+            servingsPerDay: srv,
+            prescribedRoute: t.feedingRoute || p.prescribedRoute || 'Oral Feeding',
+            onsCalories: t.suppKcal, dailyCalories: t.suppKcal,
+            dailyProtein: t.suppProtein,
+            perServingProtein: t.suppProtein ? Math.round(t.suppProtein / srv * 10) / 10 : null,
+            macroCarbs: r.totals ? Math.round((r.totals.carbs || 0) / srv * 10) / 10 : null,
+            macroFat:   r.totals ? Math.round((r.totals.fat   || 0) / srv * 10) / 10 : null,
+            dailyCarbs: r.totals ? r.totals.carbs : null,
+            dailyFat:   r.totals ? r.totals.fat   : null,
+            proteinType: t.formulation || 'Weekly Custom',
+            recipe: {
+              isDailyBatch: true,
+              recipeKcal: t.suppKcal,
+              wheyProtein: t.suppProtein,
+              recipeProtein: t.suppProtein,
+              servingsPerDay: srv,
+              ingredients: r.ingredients || [],
+              totals: r.totals || null
+            }
+          };
+          // Use approved_at as mfg date if the job doesn't have one yet
+          if (!job.mfgDate && rx.approved_at) {
+            job.mfgDate = rx.approved_at;
+            const exp = new Date(rx.approved_at); exp.setMonth(exp.getMonth() + 18);
+            job.expDate = exp.toISOString();
+          }
+        }
+      }
+    } catch(e){ console.error('Weekly Rx label fetch:', e); }
+    if (!plan) { alert('Could not load weekly prescription data.'); return; }
+  } else {
+    // ── Initial plan job: use the saved/approved plan ──
+    if(typeof generateNutritionPlan !== 'function'){ alert('Nutrition engine not loaded — please refresh.'); return; }
+    try {
+      const res = await fetch(apiBase + '/api/nutrition-plans/patient/' + p.id,
+        { headers: { 'Authorization': 'Bearer ' + (me.token || '') } });
+      if (res.ok) {
+        const plans = await res.json();
+        const latest = Array.isArray(plans) && plans.length ? plans[0] : null;
+        if (latest) plan = latest.finalPlan || latest.engineOutput || latest;
+      }
+    } catch(e){ /* fall back */ }
+    if (!plan) {
+      try {
+        plan = generateNutritionPlan({
+          ...p,
+          weight: parseFloat(p.weight), height: parseFloat(p.height), albumin: parseFloat(p.albumin),
+          weightLossPercent: parseFloat(p.weightLossPercent || 0), giIssues: !!p.giIssues
+        });
+      } catch(e){ alert('Could not compute the plan: ' + e.message); return; }
+    }
   }
+
   _lblJob = job; _lblPlan = plan; _lblStore = store; _lblPatient = p;
 
-  document.getElementById('lblTitle').textContent = 'Product Labels — ' + (p.name || '');
+  document.getElementById('lblTitle').textContent = (_lblWeeklyRx
+    ? `Week ${_lblWeeklyRx.week_number} Labels — ${p.name || ''}`
+    : `Product Labels — ${p.name || ''}`);
   const today = new Date().toISOString().slice(0,10);
   document.getElementById('lblMfgDate').value = job.mfgDate ? String(job.mfgDate).slice(0,10) : today;
   document.getElementById('lblErr').style.display = 'none';
@@ -544,7 +628,9 @@ function renderLabelModal(){
   const _dailyProtein = (_r && _r.wheyProtein != null) ? _r.wheyProtein : plan.dailyProtein;
 
   _lblSet('lf_name', p.name || '—');
-  document.getElementById('lf_meta').innerHTML = `<b>${p.age ? p.age+' yr' : '—'}</b> · <b>${p.sex || '—'}</b> · UHIC: <b>${p.uhic || '—'}</b>`;
+  document.getElementById('lf_meta').innerHTML =
+    (_lblWeeklyRx ? `<b>Week ${_lblWeeklyRx.week_number}</b> &nbsp;&middot;&nbsp; ` : '')
+    + `<b>${p.age ? p.age+' yr' : '—'}</b> &nbsp;&middot;&nbsp; <b>${p.sex || '—'}</b> &nbsp;&middot;&nbsp; UHIC: <b>${p.uhic || '—'}</b>`;
   _lblSet('lf_energy', _lblNum(_psEnergy));
   _lblSet('lf_protein', _lblNum(_psProtein));
   _lblSet('lf_serv', plan.servingsPerDay || '—');
@@ -554,7 +640,11 @@ function renderLabelModal(){
   _lblSet('lb_carb', _lblNum1(plan.macroCarbs));
   _lblSet('lb_fat', _lblNum1(plan.macroFat));
   const r = plan.recipe || {};
-  const names = [r.protein, r.carb, r.fat, r.omega, r.bcaa, r.glutamine].filter(Boolean).map(x => x.name).filter(Boolean);
+  // Weekly Rx uses r.ingredients[]; initial plan uses named r.protein / r.carb / etc.
+  const _ingArr = (r.ingredients && Array.isArray(r.ingredients) && r.ingredients.length)
+    ? r.ingredients
+    : [r.protein, r.carb, r.fat, r.omega, r.bcaa, r.glutamine].filter(Boolean);
+  const names = _ingArr.map(x => x.name).filter(Boolean);
   document.getElementById('lb_formula').innerHTML = names.length ? names.map(n => '• ' + n).join('<br>') : '—';
   _lblSet('lb_fssai', (store && (store.fssai_number || store.fssai)) || '—');
   _lblSet('lb_batch', job.batchNo || '— (generate)');
@@ -564,7 +654,7 @@ function renderLabelModal(){
   document.getElementById('lb_storeaddr').textContent = (store && (store.address || store.location)) || '';
 
   // ---- Box label (100 x 150 mm) ----
-  _lblSet('x_name', p.name || '—');
+  _lblSet('x_name', _lblWeeklyRx ? `${p.name || '—'} — Week ${_lblWeeklyRx.week_number}` : (p.name || '—'));
   _lblSet('x_uhic', p.uhic || '—');
   _lblSet('x_agesex', `${p.age ? p.age + ' yr' : '—'} / ${p.sex || '—'}`);
   _lblSet('x_cancer', p.cancer || '—');
@@ -582,7 +672,9 @@ function renderLabelModal(){
   _lblSet('x_d_fat', _lblNum1(plan.dailyFat));
   _lblSet('x_ptype', plan.proteinType || '—');
 
-  const comps = [r.protein, r.carb, r.fat, r.omega, r.bcaa, r.glutamine].filter(Boolean);
+  const comps = (r.ingredients && Array.isArray(r.ingredients) && r.ingredients.length)
+    ? r.ingredients
+    : [r.protein, r.carb, r.fat, r.omega, r.bcaa, r.glutamine].filter(Boolean);
   const specBody = document.getElementById('x_spec');
   specBody.innerHTML = comps.length
     ? comps.map(c => {
@@ -636,7 +728,7 @@ function _printLabels(elementIds, w, h){
         'var s=Math.min(1,H/r.height,W/r.width);' +
         'if(s<1&&s>0){fit.style.transformOrigin="top left";fit.style.transform="scale("+s+")";}' +
       '});' +
-      'setTimeout(function(){window.focus();window.print();},120);' +
+      'setTimeout(function(){window.focus();window.print();},600);' +
     '})();';
 
   const doc =

@@ -14,9 +14,7 @@
     <a href="/admin/stores">Stores</a>
     <a href="/admin/users">Create Users</a>
     <a href="/admin/mapping">Mapping</a>
-    <a href="/admin/tracking">Tracking</a>
     <a href="/admin/trials">Clinical Trials</a>
-    <a href="/admin/reports">Reports</a>
     <a href="/admin/rules">Rule Engine</a>
     <a href="#" onclick="auth.logout()">Logout</a>
     <button id="themeToggleBtn" onclick="toggleTheme()" class="btn-secondary btn-sm" style="margin-left: 20px; border-radius: 30px; padding: 6px 14px; cursor: pointer;">🌙 Dark Mode</button>
@@ -489,6 +487,7 @@ function renderUsersTable(){
       <td>${u.hospitalName || '-'}</td>
       <td>
         <div class="action-row" style="gap:8px;">
+          <button class="btn-sm" style="${u.password ? 'background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;' : 'opacity:0.4;cursor:default;'}" onclick="copyPass('${u.id}',this)" title="${u.password ? 'Copy password' : 'No password stored — use Reset Pass first'}">Copy Pass</button>
           <button class="btn-warning btn-sm" onclick="resetPasswordUI('${u.id}')">Reset Pass</button>
           <button class="btn-sm" style="background:var(--danger-glass);color:var(--danger);border:1px solid rgba(239, 68, 68, 0.3);" onclick="deleteUserUI('${u.id}', '${u.username}')">Delete</button>
         </div>
@@ -517,6 +516,7 @@ function fallbackCopy(txt, done){
 }
 
 async function resetPasswordUI(userId){
+  if(!confirm('Reset password for this user? They will need the new password to log in.')) return;
   const res = await userService.resetUserPassword(userId);
   if(!res.ok){
     alert(res.error || 'Unable to reset password');
@@ -540,6 +540,17 @@ async function deleteUserUI(userId, username){
   }
 }
 
+
+function copyPass(userId, btn) {
+  const u = userService.getUserById(userId);
+  if (!u || !u.password) { alert('Password not available. Use Reset Pass to generate a new one.'); return; }
+  navigator.clipboard.writeText(u.password).then(() => {
+    btn.textContent = 'Copied!';
+    setTimeout(() => { btn.textContent = 'Copy Pass'; }, 1500);
+  }).catch(() => {
+    prompt('Copy this password:', u.password);
+  });
+}
 
 (async () => {
   try { await userService.initUsers(); } catch(e){ console.error('initUsers failed:', e); }

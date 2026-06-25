@@ -364,9 +364,7 @@
     <a href="/admin/stores">Stores</a>
     <a href="/admin/users">Create Users</a>
     <a href="/admin/mapping">Mapping</a>
-    <a href="/admin/tracking">Tracking</a>
     <a href="/admin/trials">Clinical Trials</a>
-    <a href="/admin/reports">Reports</a>
     <a href="/admin/rules" style="color:var(--violet);font-weight:800;">Rule Engine</a>
     <a href="#" onclick="auth.logout()">Logout</a>
   </div>
@@ -988,32 +986,4 @@
     if (!rule) return;
     if (!confirm(`Deactivate rule "${rule.rule_name}"? It will no longer apply to new patients.`)) return;
     await fetch(`${apiBase}/api/engine-rules/${ruleId}`, {
-      method:'PUT', headers:headers(),
-      body:JSON.stringify({ status:'inactive', ruleName:rule.rule_name, conditionDescription:rule.condition_description, targetField:rule.target_field, operator:rule.operator, value:rule.value, reason:rule.reason })
-    });
-    await loadAll();
-  }
-
-  async function deleteRule(ruleId) {
-    if (!confirm('Permanently delete this rule?')) return;
-    await fetch(`${apiBase}/api/engine-rules/${ruleId}`, { method:'DELETE', headers:headers() });
-    await loadAll();
-  }
-
-  // Close modal on backdrop click
-  document.getElementById('promoteModal').addEventListener('click', function(e) {
-    if (e.target === this) closeModal();
-  });
-
-  // Init
-  window.addEventListener('DOMContentLoaded', async () => {
-    if (typeof auth !== 'undefined') {
-      const u = auth.getCurrentUser();
-      if (!u) { window.location.href='/login'; return; }
-      if (u.role !== 'ADMIN' && u.role !== 'SUPER_ADMIN') { alert('Admin access only.'); window.location.href='/login'; return; }
-    }
-    await loadAll();
-  });
-</script>
-</body>
-</html>
+      

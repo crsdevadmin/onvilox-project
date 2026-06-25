@@ -25,9 +25,7 @@
     <a href="/admin/stores">Stores</a>
     <a href="/admin/users">Create Users</a>
     <a href="/admin/mapping">Mapping</a>
-    <a href="/admin/tracking">Tracking</a>
     <a href="/admin/trials">Clinical Trials</a>
-    <a href="/admin/reports">Reports</a>
     <a href="/admin/rules">Rule Engine</a>
     <a href="#" onclick="auth.logout()">Logout</a>
     <button id="themeToggleBtn" onclick="toggleTheme()" class="btn-secondary btn-sm" style="margin-left: 20px; border-radius: 30px; padding: 6px 14px; cursor: pointer;">🌙 Dark Mode</button>
@@ -39,7 +37,7 @@
     <div class="subnav">
       <a href="/admin/trials">Enrollment Log</a>
       <a href="/admin/trials/cohort">Cohort Dashboard</a>
-      <a href="/admin/trials/outcomes">Weekly Outcomes</a>
+      <a href="/admin/trials/outcomes">Monitoring</a>
       <a href="/admin/trials/formula">Formula Tracking</a>
       <a href="/admin/trials/export" class="active">Export Dataset</a>
     </div>
@@ -101,11 +99,4 @@ function doExport(){
     const fname = 'GQUENCE_Pilot_Dataset_' + new Date().toISOString().slice(0,10) + '.xlsx';
     XLSX.writeFile(wb, fname);
     document.getElementById('exMsg').textContent = 'Exported ' + fname;
-  } catch(e){
-    document.getElementById('exMsg').textContent = 'Export failed: ' + e.message;
-  }
-}
-load();
-</script>
-</body>
-</html>
+  } catc

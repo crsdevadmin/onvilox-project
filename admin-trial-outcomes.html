@@ -43,13 +43,18 @@
     <div class="subnav">
       <a href="/admin/trials">Enrollment Log</a>
       <a href="/admin/trials/cohort">Cohort Dashboard</a>
-      <a href="/admin/trials/outcomes" class="active">Weekly Outcomes</a>
+      <a href="/admin/trials/outcomes" class="active">Monitoring</a>
       <a href="/admin/trials/formula">Formula Tracking</a>
       <a href="/admin/trials/export">Export Dataset</a>
     </div>
 
-    <h2 style="margin-bottom:0;">Weekly Outcomes</h2>
-    <p style="color:var(--text-2);margin-top:4px;">Week-by-week monitoring — clinical values, oral intake %, and supplement compliance per patient.</p>
+    <h2 style="margin-bottom:0;">Patient Monitoring</h2>
+    <p style="color:var(--text-2);margin-top:4px;">Clinical values, oral intake % and supplement compliance — weekly and daily views.</p>
+
+    <div style="display:flex;gap:6px;margin:12px 0 4px;">
+      <button id="tabWeekly" onclick="switchTab('weekly')" style="padding:7px 18px;border-radius:20px;font-size:13px;font-weight:700;border:none;cursor:pointer;background:#0e2247;color:#fff;">Weekly</button>
+      <button id="tabDaily"  onclick="switchTab('daily')"  style="padding:7px 18px;border-radius:20px;font-size:13px;font-weight:700;border:none;cursor:pointer;background:var(--surface-2);color:var(--text-2);">Daily</button>
+    </div>
 
     <div id="outMsg" style="font-size:13px;margin:8px 0;color:var(--text-2);"></div>
     <div id="outSkeleton">
@@ -76,7 +81,7 @@
         </div>
       </div>
 
-      <div style="display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin:16px 0 4px;">
+      <div id="wkTrendsHead" style="display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin:16px 0 4px;">
         <h3 style="margin:0;">Outcome Trends</h3>
         <div style="display:flex;gap:14px;font-size:12px;color:var(--text-2);">
           <span><span style="display:inline-block;width:18px;height:2px;background:#2563eb;vertical-align:middle;margin-right:4px;"></span>This patient</span>
@@ -85,8 +90,8 @@
       </div>
       <div id="outCharts" style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:10px;"></div>
 
-      <h3 style="margin:18px 0 6px;">Weekly Values</h3>
-      <div style="overflow-x:auto;">
+      <h3 id="wkTableHead" style="margin:18px 0 6px;">Weekly Values</h3>
+      <div id="wkTableWrap" style="overflow-x:auto;">
         <table class="ct">
           <thead>
             <tr>
@@ -105,6 +110,31 @@
           <tbody id="outBody"></tbody>
         </table>
       </div>
+
+      <!-- ── Daily view ───────────────────────────────────────────── -->
+      <div id="dailySection" style="display:none;">
+        <h3 style="margin:18px 0 6px;">Daily Monitoring</h3>
+        <div id="dailyCards" class="ct-cards"></div>
+        <div style="overflow-x:auto;">
+          <table class="ct">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Oral Intake %</th>
+                <th>Supp Consumed %</th>
+                <th>Nausea</th>
+                <th>Vomiting</th>
+                <th>Mucositis</th>
+                <th>Bowel</th>
+                <th>Hydration</th>
+                <th>Notes</th>
+              </tr>
+            </thead>
+            <tbody id="dailyBody"></tbody>
+          </table>
+        </div>
+      </div>
+
     </div>
   </div>
 </div>
@@ -168,7 +198,7 @@ function rebuildPatientSelect(list){
   var prev = sel.value;
   sel.innerHTML = list.map(function(p,i){
     return '<option value="'+(p.patientId||i)+'">'+(p.studyId?p.studyId+' · ':'')+
-      (p.name||'—')+' ('+p.weeks.length+' review'+(p.weeks.length===1?'':'s')+')</option>';
+      (p.name||'—')+' ('+p.weeks.length+'w / '+(p.days||[]).length+'d)</option>';
   }).join('');
   if([].slice.call(sel.options).some(function(o){ return o.value===prev; })) sel.value = prev;
 }
@@ -177,9 +207,28 @@ function rebuildPatientSelect(list){
 function renderCards(){
   var all = _patients;
   var total = all.length;
-  var withReviews = all.filter(function(p){ return p.weeks.length > 0; }).length;
+  var withWeekly = all.filter(function(p){ return p.weeks.length > 0; }).length;
+  var withDaily  = all.filter(function(p){ return (p.days||[]).length > 0; }).length;
 
-  // average last-week intake % and compliance %
+  if(_activeTab === 'daily'){
+    var iVals = [], cVals = [];
+    all.forEach(function(p){
+      (p.days||[]).forEach(function(d){
+        if(d.oralIntake  != null) iVals.push(d.oralIntake);
+        if(d.suppConsumed != null) cVals.push(d.suppConsumed);
+      });
+    });
+    var avgI = iVals.length ? Math.round(iVals.reduce(function(s,v){return s+v;},0)/iVals.length) : null;
+    var avgC = cVals.length ? Math.round(cVals.reduce(function(s,v){return s+v;},0)/cVals.length) : null;
+    document.getElementById('outCards').innerHTML =
+      card(total,    'Total Patients') +
+      card(withDaily,'With Daily Logs') +
+      card(avgI !== null ? avgI+'%' : '—', 'Avg Oral Intake') +
+      card(avgC !== null ? avgC+'%' : '—', 'Avg Supp Consumed');
+    return;
+  }
+
+  // Weekly cards
   var intakeVals = [], compVals = [];
   all.forEach(function(p){
     if(!p.weeks.length) return;
@@ -192,7 +241,7 @@ function renderCards(){
 
   document.getElementById('outCards').innerHTML =
     card(total,       'Total Patients') +
-    card(withReviews, 'With Reviews') +
+    card(withWeekly,  'Weekly Reviews') +
     card(avgIntake !== null ? avgIntake+'%' : '—', 'Avg Oral Intake') +
     card(avgComp   !== null ? avgComp+'%'   : '—', 'Avg Supp Compliance');
 }
@@ -238,6 +287,7 @@ function renderPatient(){
   var pid = sel.value;
   var pat = filtered.find(function(p){ return p.patientId === pid; }) || filtered[0];
   if(!pat){ document.getElementById('outCharts').innerHTML=''; document.getElementById('outBody').innerHTML=''; return; }
+  if(_activeTab === 'daily'){ renderDaily(); return; }
 
   var weeks = pat.weeks;
 
@@ -288,6 +338,65 @@ function renderPatient(){
   }).join('');
 }
 
+// ── tab switching ─────────────────────────────────────────────────────────
+var _activeTab = 'weekly';
+function switchTab(tab){
+  _activeTab = tab;
+  var weekly = tab === 'weekly';
+  document.getElementById('tabWeekly').style.background = weekly ? '#0e2247' : 'var(--surface-2)';
+  document.getElementById('tabWeekly').style.color      = weekly ? '#fff'    : 'var(--text-2)';
+  document.getElementById('tabDaily').style.background  = weekly ? 'var(--surface-2)' : '#0e2247';
+  document.getElementById('tabDaily').style.color       = weekly ? 'var(--text-2)'    : '#fff';
+  // weekly-only elements
+  document.getElementById('wkTrendsHead').style.display = weekly ? '' : 'none';
+  document.getElementById('outCharts').style.display    = weekly ? '' : 'none';
+  document.getElementById('wkTableHead').style.display  = weekly ? '' : 'none';
+  document.getElementById('wkTableWrap').style.display  = weekly ? '' : 'none';
+  // daily section
+  document.getElementById('dailySection').style.display = weekly ? 'none' : '';
+  renderCards();
+  if(!weekly) renderDaily();
+}
+
+// ── daily render ──────────────────────────────────────────────────────────
+function renderDaily(){
+  var filtered = getOutFiltered();
+  var sel = document.getElementById('outPatient');
+  var pid = sel.value;
+  var pat = filtered.find(function(p){ return p.patientId === pid; }) || filtered[0];
+  if(!pat){ document.getElementById('dailyBody').innerHTML=''; document.getElementById('dailyCards').innerHTML=''; return; }
+  var days = pat.days || [];
+
+  // cards
+  var totalDays = days.length;
+  var iVals = days.map(function(d){ return d.oralIntake; }).filter(function(v){ return v!==null&&v!==undefined; });
+  var cVals  = days.map(function(d){ return d.suppConsumed; }).filter(function(v){ return v!==null&&v!==undefined; });
+  var avgI = iVals.length ? Math.round(iVals.reduce(function(s,v){return s+v;},0)/iVals.length) : null;
+  var avgC = cVals.length  ? Math.round(cVals.reduce(function(s,v){return s+v;},0)/cVals.length)  : null;
+  document.getElementById('dailyCards').innerHTML =
+    card(totalDays, 'Daily Entries') +
+    card(avgI !== null ? avgI+'%' : '—', 'Avg Oral Intake') +
+    card(avgC !== null ? avgC+'%' : '—', 'Avg Supp Consumed');
+
+  if(!days.length){
+    document.getElementById('dailyBody').innerHTML = '<tr><td colspan="9" style="padding:16px;color:var(--text-2);">No daily entries recorded yet.</td></tr>';
+    return;
+  }
+  document.getElementById('dailyBody').innerHTML = days.map(function(d){
+    return '<tr>' +
+      '<td style="font-weight:600;">' + fmtDate(d.date || d.recordedAt) + '</td>' +
+      pctCell(d.oralIntake,  75, 50) +
+      pctCell(d.suppConsumed, 80, 60) +
+      '<td>' + val(d.nausea)     + '</td>' +
+      '<td>' + val(d.vomiting)   + '</td>' +
+      '<td>' + val(d.mucositis)  + '</td>' +
+      '<td>' + val(d.bowel)      + '</td>' +
+      '<td>' + val(d.hydration)  + '</td>' +
+      '<td style="color:var(--text-2);font-size:12px;">' + val(d.notes) + '</td>' +
+    '</tr>';
+  }).join('');
+}
+
 // ── load ──────────────────────────────────────────────────────────────────
 async function load(){
   try {
@@ -304,6 +413,7 @@ async function load(){
     enroll.forEach(function(r){ meta[r.patientId] = { hospital: r.hospital||'', doctor: r.doctor||'' }; });
     _patients = (data.patients || []).map(function(p){ return Object.assign({}, p, meta[p.patientId]||{}); });
     document.getElementById('outMsg').textContent = '';
+    document.getElementById('outSkeleton').style.display = 'none';
     if(!_patients.length){
       document.getElementById('outMsg').textContent = 'No pilot patients with monitoring data yet.';
       return;
@@ -314,6 +424,7 @@ async function load(){
     rebuildPatientSelect(getOutFiltered());
     renderPatient();
   } catch(e){
+    document.getElementById('outSkeleton').style.display = 'none';
     document.getElementById('outMsg').textContent = 'Could not load outcomes: ' + e.message;
   }
 }

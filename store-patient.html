@@ -54,6 +54,12 @@
   </div>
 </div>
 
+<div class="card" id="weeklyRxCard">
+  <h3>Weekly Prescriptions</h3>
+  <div id="weeklyRxBody"><em style="color:#94a3b8">Loading weekly prescriptions…</em></div>
+  <div id="rxLog" style="background:#fef3c7;border:1px solid #d97706;border-radius:4px;padding:6px;font-size:11px;font-family:monospace;white-space:pre-wrap;margin-top:8px">HTML deployed ✓ — JS starting…</div>
+</div>
+
 <div class="card">
   <h3 id="statusCardTitle">Update Production Status</h3>
   <div id="statusActions" style="display:flex;gap:12px;flex-wrap:wrap;">
@@ -101,6 +107,90 @@ if(!patient){
   window.location.href='/store';
   return;
 }
+
+// Load weekly prescriptions inline — patient.id is in scope right here
+(async function loadWeeklyRx() {
+  const wrap = document.getElementById('weeklyRxBody');
+  if (!wrap) return;
+  const patientId = patient.id;
+  console.log('[weeklyRx] IIFE started, patientId=', patientId);
+  if (!patientId) { wrap.innerHTML = '<em style="color:#ef4444">patient.id undefined</em>'; return; }
+  wrap.innerHTML = `<em style="color:#94a3b8">Loading…</em>`;
+  const u = auth.getCurrentUser();
+  const token = u ? u.token : null;
+  const apiBase = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : '';
+  try {
+    const res = await fetch(`${apiBase}/api/patients/${patientId}/weekly-prescriptions`, {
+      headers: { Authorization: 'Bearer ' + token }
+    });
+    if (!res.ok) { const t = await res.text(); throw new Error(`HTTP ${res.status}: ${t}`); }
+    const rxList = await res.json();
+    console.log('[weeklyRx] API returned', rxList.length, 'records:', rxList);
+    if (!rxList.length) {
+      wrap.innerHTML = `<em style="color:#94a3b8">No weekly Rx for ${patientId}</em>`;
+      return;
+    }
+    rxList.sort((a, b) => b.week_number - a.week_number);
+    const badge = s => {
+      const map = { APPROVED:'background:#dcfce7;color:#15803d', PENDING_REVIEW:'background:#fef9c3;color:#92400e', REJECTED:'background:#fee2e2;color:#b91c1c' };
+      return `<span style="padding:2px 8px;border-radius:12px;font-size:12px;font-weight:600;${map[s]||'background:#f1f5f9;color:#475569'}">${s.replace('_',' ')}</span>`;
+    };
+    let html = '';
+    rxList.forEach(rx => {
+      const t = rx.targets || {}, r = t.recipe || {};
+      const srv = r.servingsPerDay || 3;
+      const perSrvKcal = t.suppKcal   ? Math.round(t.suppKcal / srv) : '—';
+      const perSrvProt = t.suppProtein ? Math.round(t.suppProtein / srv * 10) / 10 : '—';
+      const tmk = ((r.totals ? r.totals.protein||0 : 0)*4)+((r.totals ? r.totals.carbs||0 : 0)*4)+((r.totals ? r.totals.fat||0 : 0)*9);
+      const ratio = tmk > 0 ? (function(){ var p=Math.round((r.totals.protein||0)*4/tmk*100),c=Math.round((r.totals.carbs||0)*4/tmk*100); return p+'% / '+c+'% / '+(100-p-c)+'%'; })() : '—';
+      const border = rx.status==='APPROVED'?'2px solid #16a34a':'1px solid #e2e8f0';
+      const bg     = rx.status==='APPROVED'?'#f0fdf4':'#f8fafc';
+      let ingRows = '';
+      (r.ingredients||[]).forEach(function(ing) {
+        const pg = Math.round(ing.grams/srv*10)/10;
+        const pd = ing.deliveredProtein!=null?'<span style="font-size:10px;color:#64748b;display:block;">('+Math.round(ing.deliveredProtein/srv*10)/10+'g protein)</span>':'';
+        ingRows += '<tr><td style="padding:5px 8px">'+ing.name+'</td><td style="padding:5px 8px;text-align:right;font-weight:600">'+ing.grams+' g</td><td style="padding:5px 8px;text-align:right;color:#475569">'+pg+' g'+pd+'</td></tr>';
+      });
+      if (r.totals) ingRows += '<tr style="border-top:1px solid #cbd5e1;font-weight:700;background:#f8fafc"><td style="padding:5px 8px">Daily Batch Total</td><td style="padding:5px 8px;text-align:right">'+r.totals.powder+' g</td><td style="padding:5px 8px;text-align:right;color:#64748b">'+Math.round(r.totals.powder/srv*10)/10+' g/serving</td></tr>';
+      html += '<div style="border:'+border+';background:'+bg+';border-radius:10px;padding:16px;margin-bottom:14px">'
+        +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap">'
+        +'<strong>Week '+rx.week_number+'</strong>'
+        +'<span style="color:#64748b;font-size:13px">'+(rx.batch_code||'')+'</span>'
+        +badge(rx.status)
+        +(rx.approved_at?'<span style="font-size:12px;color:#64748b">Approved '+new Date(rx.approved_at).toLocaleDateString()+'</span>':'')
+        +'</div>'
+        +'<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px">'
+        +[['ENERGY',t.suppKcal||'—','kcal supp'],['PROTEIN',t.suppProtein||'—','g formula'],['SERVINGS',srv,'per day'],['FORMULATION',t.formulation||'—','']].map(function(a){ return '<div style="background:#1e293b;color:#fff;border-radius:8px;padding:8px 14px;text-align:center;min-width:80px"><div style="font-size:10px;opacity:.7">'+a[0]+'</div><div style="font-size:16px;font-weight:700">'+a[1]+'</div><div style="font-size:9px;opacity:.6">'+a[2]+'</div></div>'; }).join('')
+        +'</div>'
+        +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">'
+        +'<div style="flex:1;min-width:90px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:7px 10px;text-align:center"><div style="font-size:10px;color:#64748b">Per Serving Energy</div><div style="font-size:15px;font-weight:800;color:#15803d">'+perSrvKcal+(t.suppKcal?' kcal':'')+'</div></div>'
+        +'<div style="flex:1;min-width:90px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:7px 10px;text-align:center"><div style="font-size:10px;color:#64748b">Per Serving Protein</div><div style="font-size:15px;font-weight:800;color:#1d4ed8">'+perSrvProt+(t.suppProtein?' g':'')+'</div></div>'
+        +'<div style="flex:1;min-width:90px;background:#fef9c3;border:1px solid #fde68a;border-radius:8px;padding:7px 10px;text-align:center"><div style="font-size:10px;color:#64748b">Frequency</div><div style="font-size:15px;font-weight:800;color:#92400e">'+srv+' /day</div></div>'
+        +'<div style="flex:1;min-width:90px;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:8px;padding:7px 10px;text-align:center"><div style="font-size:10px;color:#64748b">Macro (P/C/F)</div><div style="font-size:13px;font-weight:800;color:#4c1d95">'+ratio+'</div></div>'
+        +'</div>'
+        +(ingRows?'<div style="font-weight:600;margin-bottom:5px;font-size:13px">Daily Batch (÷ '+srv+' servings)</div><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#f1f5f9"><th style="padding:4px 8px;text-align:left">Ingredient</th><th style="padding:4px 8px;text-align:right">Daily</th><th style="padding:4px 8px;text-align:right">Per Serving</th></tr></thead><tbody>'+ingRows+'</tbody></table>':'')
+        +(rx.notes?'<div style="margin-top:8px;padding:7px;background:#fffbeb;border-radius:6px;font-size:13px"><strong>Notes:</strong> '+rx.notes+'</div>':'')
+        +'</div>';
+    });
+    wrap.innerHTML = html;
+    console.log('[weeklyRx] Rendered', rxList.length, 'records for patient', patientId);
+    // STICKY: if anything clears weeklyRxBody, immediately restore the content
+    var _sticky = html;
+    var _restoring = false;
+    new MutationObserver(function() {
+      if (_restoring) return;
+      if (wrap.innerHTML !== _sticky) {
+        console.warn('[weeklyRx] Content was cleared — restoring. Cleared to:', wrap.innerHTML.slice(0, 60));
+        _restoring = true;
+        wrap.innerHTML = _sticky;
+        _restoring = false;
+      }
+    }).observe(wrap, { childList: true, subtree: true, characterData: true });
+  } catch(e) {
+    console.error('[weeklyRx] Error:', e);
+    wrap.innerHTML = '<em style="color:#ef4444">Error: '+e.message+'</em>';
+  }
+})();
 
 function getUserName(id){
   const u = userService.getUsers().find(x => x.id === id);
@@ -219,6 +309,8 @@ window.rejectStep = rejectStep;
 
 bind();
 
+// Weekly prescriptions loaded above (async IIFE near patient.id declaration)
+
 // Nutrition plan for manufacturing view (same engine as doctor)
 const plan = generateNutritionPlan({
   ...patient,
@@ -241,6 +333,27 @@ document.getElementById('viewReportBtn').onclick = function(){
   location.href='/patients/profile?id=' + encodeURIComponent(patient.id) + '&view=store';
 };
 }); // end initStore().then
+
+window._loadWeeklyRx = function() {}; // stub — loading now done inline above
+
+// Debug: poll weeklyRxBody every 300ms and log changes
+(function(){
+  var log = document.getElementById('rxLog');
+  var wrap = document.getElementById('weeklyRxBody');
+  if (!log) { return; }
+  log.textContent = 'JS running. wrap=' + (wrap ? 'found' : 'MISSING') + '\n';
+  if (!wrap) return;
+  var prev = '';
+  var t0 = Date.now();
+  setInterval(function(){
+    var cur = wrap.innerHTML.slice(0, 80);
+    if (cur !== prev) {
+      var ms = Date.now() - t0;
+      log.textContent += ms + 'ms: "' + cur.replace(/</g, '<').replace(/>/g, '>') + '"\n';
+      prev = cur;
+    }
+  }, 300);
+})();
 </script>
 
 <script src="/js/theme.js"></script>
