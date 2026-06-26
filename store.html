@@ -488,17 +488,9 @@ function render(){
   });
 }
 
-// Print Labels: available once processing starts (initial jobs), or immediately for weekly Rx jobs (APPROVED).
+// Print Labels: always available regardless of status
 function printLabelBtn(j) {
-  const s = (j.status || '').toUpperCase();
-  const isWeekly = j.id && j.id.startsWith('wxjob_');
-  if (isWeekly && s === 'APPROVED') {
-    return `<button class="btn-secondary" style="padding:6px 12px;font-size:12px;border-radius:6px;" onclick="event.stopPropagation(); openLabelModal('${j.id}')">🏷️ Print Labels</button>`;
-  }
-  if (!isWeekly && (s === 'PROCESSING' || s === 'PENDING_DISPATCH' || s === 'DISPATCHED')) {
-    return `<button class="btn-secondary" style="padding:6px 12px;font-size:12px;border-radius:6px;" onclick="event.stopPropagation(); openLabelModal('${j.id}')">🏷️ Print Labels</button>`;
-  }
-  return '';
+  return `<button class="btn-secondary" style="padding:6px 12px;font-size:12px;border-radius:6px;" onclick="event.stopPropagation(); openLabelModal('${j.id}')">🏷️ Print Labels</button>`;
 }
 
 // ===== Label modal =====
@@ -509,7 +501,7 @@ function _lblNum(v){ const n=Math.round(parseFloat(v)); return isNaN(n)?'—':n;
 function _lblNum1(v){ const n=Math.round(parseFloat(v)*10)/10; return isNaN(n)?'—':n; }
 
 async function openLabelModal(jobId){
-  const job = manufacturingService.getJobs().find(j => j.id === jobId);
+  const job = manufacturingService.getJobs().find(j => j.id == jobId); // == handles number/string mismatch from DB
   if(!job){ return; }
   const p = getPatientById(job.patientId);
   if(!p){ alert('Patient not found.'); return; }
@@ -525,7 +517,7 @@ async function openLabelModal(jobId){
   _lblWeeklyRx = null;
   let plan = null;
   const apiBase = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : '';
-  const isWeeklyJob = job.id && job.id.startsWith('wxjob_');
+  const isWeeklyJob = job.id && String(job.id).startsWith('wxjob_');
 
   if (isWeeklyJob) {
     // ── Weekly Rx job: build plan from the weekly prescription data ──
@@ -581,17 +573,25 @@ async function openLabelModal(jobId){
       if (res.ok) {
         const plans = await res.json();
         const latest = Array.isArray(plans) && plans.length ? plans[0] : null;
-        if (latest) plan = latest.finalPlan || latest.engineOutput || latest;
+        if (latest) plan = latest.finalPlan || latest.final_plan || latest.engineOutput || latest.engine_output || latest;
       }
     } catch(e){ /* fall back */ }
     if (!plan) {
       try {
+        // Handle both camelCase (local) and snake_case (DB API) patient field names
         plan = generateNutritionPlan({
           ...p,
-          weight: parseFloat(p.weight), height: parseFloat(p.height), albumin: parseFloat(p.albumin),
-          weightLossPercent: parseFloat(p.weightLossPercent || 0), giIssues: !!p.giIssues
+          weight: parseFloat(p.weight || 0),
+          height: parseFloat(p.height || 0),
+          albumin: parseFloat(p.albumin || 0),
+          weightLossPercent: parseFloat(p.weightLossPercent || p.weight_loss_percent || 0),
+          feedingMethod: p.feedingMethod || p.feeding_method || '',
+          giIssues: !!(p.giIssues || p.gi_issues),
+          cancer: p.cancer || p.cancer_type || '',
+          regimen: p.regimen || '',
+          sex: p.sex || p.gender || ''
         });
-      } catch(e){ alert('Could not compute the plan: ' + e.message); return; }
+      } catch(e){ console.error('generateNutritionPlan failed:', e); plan = {}; /* open modal with blank plan rather than blocking */ }
     }
   }
 
@@ -605,8 +605,9 @@ async function openLabelModal(jobId){
   document.getElementById('lblErr').style.display = 'none';
   document.getElementById('lblBatchInfo').textContent = '';
   renderLabelModal();
-  document.getElementById('lblPrintBtn').disabled = !job.batchNo;
-  document.getElementById('lblPrintBoxBtn').disabled = !job.batchNo;
+  // Always enable print buttons — batch will be auto-assigned on first print if not yet done
+  document.getElementById('lblPrintBtn').disabled = false;
+  document.getElementById('lblPrintBoxBtn').disabled = false;
   if(job.batchNo) showLblBatchInfo();
   document.getElementById('labelOverlay').style.display = 'flex';
 }
@@ -770,8 +771,20 @@ function _boxSize(){
   const p = sel.value.split('x');
   return [parseFloat(p[0]) || 100, parseFloat(p[1]) || 150];
 }
-function printLabelsSmall(){ _printLabels(['lblFront', 'lblBack'], 100, 75); }
-function printBoxLabel(){ const s = _boxSize(); _printLabels(['lblBox'], s[0], s[1]); }
+async function _ensureBatchThenPrint(printFn){
+  if(_lblJob && !_lblJob.batchNo){
+    // Auto-generate batch before printing; if server rejects, still allow print with "—" batch
+    const mfg = document.getElementById('lblMfgDate').value || new Date().toISOString().slice(0,10);
+    document.getElementById('lblMfgDate').value = mfg;
+    await generateLabelBatch();
+    // Clear any error — we'll still print even without a batch number
+    const err = document.getElementById('lblErr');
+    if(err) err.style.display = 'none';
+  }
+  printFn();
+}
+function printLabelsSmall(){ _ensureBatchThenPrint(() => _printLabels(['lblFront', 'lblBack'], 100, 75)); }
+function printBoxLabel(){ _ensureBatchThenPrint(() => { const s = _boxSize(); _printLabels(['lblBox'], s[0], s[1]); }); }
 
 async function generateLabelBatch(){
   const err = document.getElementById('lblErr'); err.style.display = 'none';
@@ -808,7 +821,7 @@ async function requestStep(jobId, next) {
 
 // Approver approves a pending request → job advances to the real state.
 async function approveStep(jobId) {
-  const job = manufacturingService.getJobs().find(j => j.id === jobId);
+  const job = manufacturingService.getJobs().find(j => j.id == jobId); // == handles number/string mismatch from DB
   if (!job) return;
   const p = manufacturingService.WORKFLOW.pending[(job.status || '').toUpperCase()];
   if (!p) return;
@@ -818,7 +831,7 @@ async function approveStep(jobId) {
 
 // Approver rejects a pending request → job reverts to the previous state.
 async function rejectStep(jobId) {
-  const job = manufacturingService.getJobs().find(j => j.id === jobId);
+  const job = manufacturingService.getJobs().find(j => j.id == jobId); // == handles number/string mismatch from DB
   if (!job) return;
   const W = manufacturingService.WORKFLOW;
   const p = W.pending[(job.status || '').toUpperCase()];
@@ -1054,42 +1067,4 @@ function _updateNotifStatus() {
     el.textContent = '🔔 Notifications: Enabled';
     el.style.color = '#16a34a';
   } else if (Notification.permission === 'denied') {
-    el.textContent = '🔕 Notifications: Blocked — go to browser settings to enable';
-    el.style.color = '#dc2626';
-  } else {
-    el.textContent = '🔔 Notifications: Not yet enabled — tap to allow';
-    el.style.color = '#d97706';
-    el.style.cursor = 'pointer';
-    el.onclick = () => Notification.requestPermission().then(() => _updateNotifStatus());
-  }
-}
-
-// When the app is open, the service worker hands push messages to the page
-// (instead of showing a duplicate OS notification) so we can play the custom
-// chime + in-page toast. 'Approval Needed' alerts use the urgent 'pending' sound.
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.addEventListener('message', (e) => {
-    const msg = e.data || {};
-    if (msg.type !== 'push') return;
-    const d = msg.data || {};
-    const kind = /approval needed|awaiting/i.test((d.title || '') + ' ' + (d.body || '')) ? 'pending' : 'info';
-    _showNotification(d.title || 'Update', d.body || '', kind);
-    render();
-  });
-}
-
-// Start polling after page loads
-initStore().then(() => {
-  render();
-  _initNotifications();
-  _updateNotifStatus();
-  _pollJobs(); // seed known job IDs (no notification on first load)
-  setInterval(_pollJobs, 30000); // check every 30 seconds
-});
-
-</script>
-
-<script src="/js/theme.js"></script>
-<script src="/js/pwa.js"></script>
-</body>
-</html>
+    el.textContent = '🔕 Notifications: Blocked
