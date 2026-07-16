@@ -60,7 +60,7 @@
       if (!res.ok) return { ok: false, error: data.error || 'Server error assigning batch' };
       // update local cache
       const jobs = getJobs();
-      const job = jobs.find(j => j.id === jobId);
+      const job = jobs.find(j => j.id == jobId); // == handles number/string mismatch from DB
       if (job) { job.batchNo = data.batch_no; job.mfgDate = data.mfg_date; job.expDate = data.exp_date; }
       return { ok: true, batchNo: data.batch_no, mfgDate: data.mfg_date, expDate: data.exp_date };
     } catch (e) {
@@ -101,7 +101,7 @@
 
   async function updateJobStatus(jobId, status, actor) {
     const jobs = getJobs();
-    const job = jobs.find(j => j.id === jobId);
+    const job = jobs.find(j => j.id == jobId); // == handles number/string mismatch from DB
     if (!job) return null;
     job.status = status;
     job.updatedAt = new Date().toISOString();

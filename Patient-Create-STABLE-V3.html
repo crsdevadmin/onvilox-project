@@ -655,6 +655,20 @@
         <label>Additional Notes</label>
         <textarea id="notes" placeholder="Clinical notes..." rows="2"></textarea>
       </div>
+      <!-- Formula Rate Overrides -->
+      <div style="grid-column:1 / -1;margin-top:6px;padding:12px 14px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;">
+        <div style="font-size:10px;font-weight:800;color:#1e40af;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:10px;">Formula Rate Overrides <span style="font-weight:400;color:#64748b;text-transform:none;">(optional — leave blank to use auto-calculated values from rule engine)</span></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="form-group" style="margin:0;">
+            <label style="font-size:11px;font-weight:700;color:#0e2247;">Kcal / kg / day</label>
+            <input type="number" id="kcalPerKg" step="0.5" min="20" max="50" placeholder="e.g. 35 (auto if blank)" style="width:100%;font-size:14px;font-weight:700;padding:8px 10px;border:2px solid #3b82f6;border-radius:6px;box-sizing:border-box;">
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label style="font-size:11px;font-weight:700;color:#0e2247;">Protein / kg / day</label>
+            <input type="number" id="proteinPerKg" step="0.1" min="0.5" max="3" placeholder="e.g. 1.8 (auto if blank)" style="width:100%;font-size:14px;font-weight:700;padding:8px 10px;border:2px solid #3b82f6;border-radius:6px;box-sizing:border-box;">
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -875,7 +889,9 @@ async function submitPatient(){
     toxXerostomia: parseInt(document.getElementById('toxXerostomia').value) || 0,
     toxNausea: parseInt(document.getElementById('toxNausea').value) || 0,
     toxDiarrhea: parseInt(document.getElementById('toxDiarrhea').value) || 0,
-    lastUpdate: new Date().toISOString()
+    lastUpdate: new Date().toISOString(),
+    kcalPerKg:    parseFloat(document.getElementById('kcalPerKg').value)    || null,
+    proteinPerKg: parseFloat(document.getElementById('proteinPerKg').value) || null
   };
 
   try {

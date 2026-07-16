@@ -21,6 +21,15 @@
     .b-lost { background:#fef9c3; color:#854d0e; }
     .b-withdrawn { background:#fee2e2; color:#991b1b; }
     .linkbtn { background:none; border:none; color:#b91c1c; cursor:pointer; font-size:12px; text-decoration:underline; padding:0; }
+    table.ct tbody tr.ct-row { cursor:pointer; transition:background .12s; }
+    table.ct tbody tr.ct-row:hover { background:#f1f5fb; outline:2px solid #c7d7f5; outline-offset:-1px; }
+    table.ct tbody tr.ct-row:hover td { color:#0e2247 !important; }
+    table.ct tbody tr.ct-row:hover td:first-child { border-left:3px solid #3b82f6; }
+    .health-badge { display:inline-flex; align-items:center; gap:4px; padding:3px 9px; border-radius:20px; font-size:11.5px; font-weight:700; white-space:nowrap; }
+    .hb-up   { background:#dcfce7; color:#166534; }
+    .hb-down { background:#fee2e2; color:#991b1b; }
+    .hb-stable { background:#fef9c3; color:#854d0e; }
+    .hb-none { background:#f1f5f9; color:#94a3b8; }
   </style>
 </head>
 <body>
@@ -78,7 +87,9 @@
         <thead>
           <tr>
             <th>Study ID</th><th>UHID</th><th>Patient Name</th><th>Diagnosis</th>
-            <th>Enrolled Date</th><th>Supplement Start</th><th>Weekly Reviews</th><th>Status</th><th></th>
+            <th>Enrolled Date</th><th>Supplement Start</th><th>Weekly Reviews</th>
+            <th>Weight Trend</th><th>Health</th>
+            <th>Status</th><th></th>
           </tr>
         </thead>
         <tbody id="ctBody"></tbody>
@@ -94,10 +105,12 @@
 <script src="/js/theme.js"></script>
 
 <script>
-auth.requireRole(['SUPER_ADMIN', 'ADMIN']);
+auth.requireRole(['SUPER_ADMIN', 'ADMIN', 'DOCTOR']);
+(function(){ var u=auth.getCurrentUser(); if(u&&u.role==="DOCTOR"){ ["/admin/stores","/admin/users","/admin/mapping","/admin/rules"].forEach(function(h){ var el=document.querySelector(".nav a[href=\""+h+"\"]"); if(el) el.style.display="none"; }); var dash=document.querySelector(".nav a[href=\"/admin\"]"); if(dash){ dash.href="/dashboard"; dash.textContent="Dashboard"; } } })();
 const me = auth.getCurrentUser();
 const apiBase = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : '';
 let _rows = [];
+let _weeklyMap = {}; // patientId → weeks[]
 
 function fmtDate(d){
   if(!d) return '—';
@@ -110,12 +123,54 @@ function badge(status){
   return `<span class="badge ${map[status]||'b-enrolled'}">${status}</span>`;
 }
 
+// ── Sparkline SVG ──────────────────────────────────────────────────────────
+function sparkline(weeks){
+  if(!weeks || !weeks.length) return '<span style="color:#cbd5e1;font-size:12px;">—</span>';
+  const vals = weeks.map(w => parseFloat(w.weight)).filter(v => !isNaN(v));
+  if(vals.length < 2) return '<span style="color:#94a3b8;font-size:11px;">' + (vals.length ? vals[0]+'kg' : '—') + '</span>';
+  const W=90, H=30, PAD=4;
+  const mn = Math.min(...vals), mx = Math.max(...vals);
+  const rng = mx - mn || 1;
+  const gW = W - PAD*2, gH = H - PAD*2;
+  const px = (i) => PAD + (i / (vals.length-1)) * gW;
+  const py = (v) => PAD + gH - ((v-mn)/rng)*gH;
+  const pts = vals.map((v,i) => `${px(i)},${py(v)}`).join(' ');
+  const trend = vals[vals.length-1] - vals[0];
+  const lineCol = trend >= 0.3 ? '#16a34a' : trend <= -0.3 ? '#dc2626' : '#f59e0b';
+  const lastX = px(vals.length-1), lastY = py(vals[vals.length-1]);
+  return `<svg width="${W}" height="${H}" style="display:block;" xmlns="http://www.w3.org/2000/svg">
+    <polyline points="${pts}" fill="none" stroke="${lineCol}" stroke-width="2" stroke-linejoin="round"/>
+    <circle cx="${lastX}" cy="${lastY}" r="3" fill="${lineCol}"/>
+  </svg>`;
+}
+
+// ── Health badge ───────────────────────────────────────────────────────────
+function healthBadge(weeks){
+  if(!weeks || !weeks.length) return '<span class="health-badge hb-none">— No data</span>';
+  const vals = weeks.map(w => parseFloat(w.weight)).filter(v => !isNaN(v));
+  if(vals.length < 2) return '<span class="health-badge hb-none">— 1 entry</span>';
+  const chg = vals[vals.length-1] - vals[0];
+  const pct = Math.abs(Math.round(chg/vals[0]*100));
+  if(chg >= 0.3)  return `<span class="health-badge hb-up">↑ +${Math.abs(chg).toFixed(1)}kg</span>`;
+  if(chg <= -0.3) return `<span class="health-badge hb-down">↓ −${Math.abs(chg).toFixed(1)}kg</span>`;
+  return `<span class="health-badge hb-stable">→ Stable</span>`;
+}
+
 async function load(){
   try {
-    const res = await fetch(apiBase + '/api/trials', { headers: { 'Authorization': 'Bearer ' + (me.token || '') } });
-    if(!res.ok) throw new Error('Server error ' + res.status);
-    const data = await res.json();
+    const hdr = { 'Authorization': 'Bearer ' + (me.token || '') };
+    const [enrRes, outRes] = await Promise.all([
+      fetch(apiBase + '/api/trials', { headers: hdr }),
+      fetch(apiBase + '/api/trials/outcomes', { headers: hdr })
+    ]);
+    if(!enrRes.ok) throw new Error('Server error ' + enrRes.status);
+    const data = await enrRes.json();
     _rows = data.patients || [];
+    // build weekly map from outcomes
+    if(outRes.ok){
+      const outData = await outRes.json();
+      (outData.patients || []).forEach(p => { _weeklyMap[p.patientId] = p.weeks || []; });
+    }
     renderCards(data.settings || {}, _rows);
     render();
     document.getElementById('ctMsg').textContent = _rows.length ? '' : 'No pilot patients yet. Patients appear here once they are approved into production.';
@@ -138,53 +193,9 @@ function renderCards(settings, rows){
     `<div class="ct-card"><div class="n">${c[1]}</div><div class="l">${c[0]}</div></div>`).join('');
 }
 
-/* ── Status modal ─────────────────────────────────────────────────────── */
-(function(){
-  const BADGE_STYLE = {
-    'Enrolled':          'background:#e0e7ff;color:#3730a3;',
-    'Active':            'background:#dcfce7;color:#166534;',
-    'Completed':         'background:#dbeafe;color:#1e40af;',
-    'Lost to Follow-up': 'background:#fef9c3;color:#854d0e;',
-    'Withdrawn':         'background:#fee2e2;color:#991b1b;'
-  };
-  // inject modal HTML once
-  const overlay = document.createElement('div');
-  overlay.id = 'statusOverlay';
-  overlay.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;align-items:center;justify-content:center;';
-  overlay.innerHTML = `
-    <div style="background:var(--surface,#fff);border-radius:14px;padding:28px 32px;max-width:440px;width:90%;box-shadow:0 8px 40px rgba(0,0,0,.18);position:relative;">
-      <button onclick="document.getElementById('statusOverlay').style.display='none'"
-        style="position:absolute;top:12px;right:16px;background:none;border:none;font-size:20px;cursor:pointer;color:#94a3b8;">✕</button>
-      <div id="statusModalBody"></div>
-    </div>`;
-  document.body.appendChild(overlay);
-  overlay.addEventListener('click', function(e){ if(e.target===overlay) overlay.style.display='none'; });
-
-  window.showStudyStatus = function(patientId){
-    const r = _rows.find(x => x.patientId === patientId);
-    if(!r){ return; }
-    const bStyle = BADGE_STYLE[r.status] || 'background:#f1f5f9;color:#475569;';
-    document.getElementById('statusModalBody').innerHTML = `
-      <div style="font-size:20px;font-weight:800;color:var(--text,#0e2247);margin-bottom:4px;">${r.studyId||'—'}</div>
-      <div style="font-size:13px;color:#64748b;margin-bottom:14px;">${r.name||'—'} &nbsp;·&nbsp; UHID ${r.uhic||'—'}</div>
-      <div style="margin-bottom:10px;">
-        <span style="display:inline-block;padding:4px 14px;border-radius:20px;font-size:13px;font-weight:700;${bStyle}">${r.status||'—'}</span>
-        ${r.withdrawnReason ? `<div style="font-size:11px;color:#94a3b8;margin-top:4px;">${r.withdrawnReason}</div>` : ''}
-      </div>
-      <table style="width:100%;font-size:13px;border-collapse:collapse;">
-        <tr><td style="padding:5px 0;color:#64748b;width:160px;">Diagnosis</td><td style="font-weight:600;">${r.diagnosis||'—'}</td></tr>
-        <tr><td style="padding:5px 0;color:#64748b;">Enrolled</td><td style="font-weight:600;">${fmtDate(r.enrollmentDate)}</td></tr>
-        <tr><td style="padding:5px 0;color:#64748b;">Supplement Start</td><td style="font-weight:600;">${fmtDate(r.supplementStartDate)}</td></tr>
-        <tr><td style="padding:5px 0;color:#64748b;">Weekly Reviews</td><td style="font-weight:600;">${r.weeklyReviews||0}</td></tr>
-        ${r.batchNo ? `<tr><td style="padding:5px 0;color:#64748b;">Batch No.</td><td style="font-weight:600;">${r.batchNo}</td></tr>` : ''}
-      </table>
-      <div style="margin-top:16px;">
-        <a href="/admin/trials/journey?patient=${encodeURIComponent(patientId)}" style="font-size:12px;color:#3b82f6;text-decoration:underline;margin-right:14px;">View full journey →</a>
-        <a href="/admin/trials/patient?patient=${encodeURIComponent(patientId)}" style="font-size:12px;color:#b91c1c;text-decoration:underline;">View prescriptions →</a>
-      </div>`;
-    overlay.style.display = 'flex';
-  };
-})();
+function goToJourney(patientId){
+  window.location.href = '/admin/trials/journey?patient=' + encodeURIComponent(patientId);
+}
 
 function render(){
   const q = (document.getElementById('qSearch').value || '').toLowerCase().trim();
@@ -197,27 +208,31 @@ function render(){
     }
     return true;
   });
-  document.getElementById('ctBody').innerHTML = rows.length ? rows.map(r => `
-    <tr>
-      <td style="font-weight:700;">
-        <button onclick="showStudyStatus('${r.patientId}')" style="background:none;border:none;padding:0;color:#b91c1c;font-weight:700;font-size:13.5px;cursor:pointer;text-decoration:underline;">${r.studyId}</button>
-      </td>
+  document.getElementById('ctBody').innerHTML = rows.length ? rows.map(r => {
+    const weeks = _weeklyMap[r.patientId] || [];
+    const safeName = (r.name||'').replace(/'/g, '');
+    const pid = r.patientId;
+    return `<tr class="ct-row" onclick="goToJourney('${pid}')">
+      <td style="font-weight:700;color:#b91c1c;">${r.studyId||'—'}</td>
       <td>${r.uhic || '—'}</td>
-      <td>${r.name || '—'}</td>
+      <td style="font-weight:600;">${r.name || '—'}</td>
       <td>${r.diagnosis || '—'}</td>
       <td>${fmtDate(r.enrollmentDate)}</td>
       <td>${fmtDate(r.supplementStartDate)}</td>
-      <td>${r.weeklyReviews || 0}</td>
+      <td style="text-align:center;">${r.weeklyReviews || 0}</td>
+      <td>${sparkline(weeks)}</td>
+      <td>${healthBadge(weeks)}</td>
       <td>${badge(r.status)}${r.withdrawnReason ? `<div style="font-size:10px;color:#94a3b8;">${r.withdrawnReason}</div>` : ''}</td>
-      <td>${r.status === 'Withdrawn'
-            ? `<button class="linkbtn" style="color:#166534;" onclick="reinstate('${r.patientId}')">Reinstate</button>`
-            : `<button class="linkbtn" onclick="withdraw('${r.patientId}','${(r.name||'').replace(/'/g,'')}')">Withdraw</button>`}</td>
-    </tr>`).join('') : `<tr><td colspan="9" style="padding:18px;color:#94a3b8;">No matching patients.</td></tr>`;
+      <td onclick="event.stopPropagation()">${r.status === 'Withdrawn'
+            ? `<button class="linkbtn" style="color:#166534;" onclick="reinstate('${pid}')">Reinstate</button>`
+            : `<button class="linkbtn" onclick="withdraw('${pid}','${safeName}')">Withdraw</button>`}</td>
+    </tr>`;
+  }).join('') : `<tr><td colspan="11" style="padding:18px;color:#94a3b8;">No matching patients.</td></tr>`;
 }
 
 async function withdraw(patientId, name){
   const reason = prompt('Mark "' + name + '" as Withdrawn from the pilot.\nEnter a reason (optional):');
-  if(reason === null) return; // cancelled
+  if(reason === null) return;
   try {
     const res = await fetch(apiBase + '/api/trials/' + patientId + '/withdraw', {
       method: 'POST', headers: { 'Content-Type':'application/json', 'Authorization':'Bearer ' + (me.token||'') },

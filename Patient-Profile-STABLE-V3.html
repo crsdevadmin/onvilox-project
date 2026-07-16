@@ -646,6 +646,19 @@
 
 <body>
 
+  <!-- Weekly monitoring overdue notification toast -->
+  <div id="weeklyDueBanner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:99999;background:#ea580c;color:#fff;padding:13px 20px;align-items:center;gap:12px;box-shadow:0 4px 18px rgba(0,0,0,0.18);animation:slideDownToast .35s cubic-bezier(.22,.68,0,1.2) both;">
+    <span style="font-size:18px;flex-shrink:0;">⏰</span>
+    <span class="wb-msg" style="font-size:13.5px;font-weight:700;flex:1;letter-spacing:0.01em;"></span>
+    <button onclick="document.getElementById('weeklyDueBanner').style.display='none'" style="background:rgba(255,255,255,0.2);border:none;color:#fff;font-size:18px;line-height:1;cursor:pointer;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">✕</button>
+  </div>
+  <style>
+    @keyframes slideDownToast {
+      from { transform: translateY(-100%); opacity: 0; }
+      to   { transform: translateY(0);     opacity: 1; }
+    }
+  </style>
+
   <!-- INTERACTIVE CLAUDE AI ASSISTANT -->
   <div class="ai-chat-launcher" onclick="toggleChat()">
     <svg viewBox="0 0 24 24">
@@ -714,7 +727,7 @@
         </div>
 
         <!-- PATIENT SUMMARY (Micro Grid) -->
-        <div class="rs">
+        <div class="rs" id="sectionPatientProfile">
           <div class="rs-title">Patient Profile</div>
           <div style="display:grid; grid-template-columns: 1fr 1fr 2fr; gap:6px;">
             <!-- Column 1: Name + Age/Sex -->
@@ -748,7 +761,7 @@
         </div>
 
         <!-- CLINICAL DETAILS -->
-        <div class="rs">
+        <div class="rs" id="sectionClinicalDetails">
           <div class="rs-title">Clinical Assessment</div>
 
           <div class="rrisk">
@@ -937,12 +950,13 @@
                 <div style="font-size:13px; font-weight:700;" id="rtSubSiteDisplay">—</div>
               </div>
             </div>
-            <div style="display:grid; grid-template-columns:repeat(5,1fr); gap:8px; border-top:1px solid rgba(255,255,255,0.1); padding-top:10px;">
+            <div style="display:grid; grid-template-columns:repeat(6,1fr); gap:8px; border-top:1px solid rgba(255,255,255,0.1); padding-top:10px;">
               <div><div style="font-size:8px; color:rgba(255,255,255,0.45); margin-bottom:2px;">Technique</div><div style="font-size:11px; font-weight:700;" id="rtTechniqueDisplay">—</div></div>
               <div><div style="font-size:8px; color:rgba(255,255,255,0.45); margin-bottom:2px;">Total Dose</div><div style="font-size:11px; font-weight:700;" id="rtDoseDisplay">—</div></div>
               <div><div style="font-size:8px; color:rgba(255,255,255,0.45); margin-bottom:2px;">Fractions</div><div style="font-size:11px; font-weight:700;" id="rtFractionsDisplay">—</div></div>
               <div><div style="font-size:8px; color:rgba(255,255,255,0.45); margin-bottom:2px;">Radiation Week</div><div style="font-size:11px; font-weight:700;" id="rtWeekDisplay">—</div></div>
               <div><div style="font-size:8px; color:rgba(255,255,255,0.45); margin-bottom:2px;">Concurrent</div><div style="font-size:11px; font-weight:700;" id="rtConcurrentDisplay">—</div></div>
+              <div><div style="font-size:8px; color:rgba(255,255,255,0.45); margin-bottom:2px;">TNM Stage</div><div style="font-size:11px; font-weight:700;" id="rtTnmDisplay">—</div></div>
             </div>
           </div>
           <div style="display:grid; grid-template-columns:3fr 2fr; gap:8px; margin-top:8px;">
@@ -962,6 +976,12 @@
         <!-- NUTRITION RX -->
         <div class="rs" id="sectionPrescription">
           <div class="rs-title" id="pPrescriptionTitle">Prescription Target</div>
+
+          <!-- STALE PLAN WARNING: feeding method changed but plan not regenerated -->
+          <div id="stalePlanBanner" style="display:none; background:#fef3c7; border:1px solid #f59e0b; border-radius:8px; padding:10px 14px; margin-bottom:10px; font-size:12.5px; font-weight:600; color:#92400e;">
+            ⚠️ <b>Feeding method has changed to Tube/Enteral but this prescription was calculated for Oral Feeding.</b>
+            Click <b>"💾 Update Plan &amp; AI Audit"</b> to recalculate — the formula dose will change to full enteral replacement (100% of daily target).
+          </div>
 
           <!-- CACHEXIA ALERT -->
           <div class="rf full alert-amber" id="cachexiaAlertBox" style="display:none; margin-bottom:10px;">
@@ -1318,7 +1338,7 @@
           </table>
         </div>
         <!-- STORE VIEW: Weekly Prescription Panel (outside monitoringSection so it stays visible) -->
-        <div id="storeWeeklyRxPanel" class="rs" style="display:none;margin-top:20px;">
+        <div id="storeWeeklyRxPanel" style="display:none;margin-top:20px;padding:0 34px;">
           <div class="rs-title">Weekly Prescription (Approved)</div>
           <div id="storeWeeklyRxBody"><em style="color:#94a3b8">Loading…</em></div>
         </div>
@@ -1381,6 +1401,7 @@
 
           <!-- WEEKLY TAB: FORM 4 -->
           <div id="monPanelWeekly" style="display:none;">
+
             <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:14px 16px; margin-bottom:14px;">
               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
                 <div style="font-size:11px; font-weight:800; color:var(--text); text-transform:uppercase; letter-spacing:0.08em;" id="monWFormTitle">Add Weekly Entry</div>
@@ -1388,6 +1409,7 @@
               </div>
               <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px;">
                 <div><label style="font-size:10px;font-weight:700;color:#000;display:block;margin-bottom:3px;">Week Number</label><input type="number" id="monW_week" min="1" placeholder="e.g. 3" style="width:100%;font-size:12px;padding:6px 8px;border:1px solid #cbd5e1;border-radius:5px;box-sizing:border-box;"></div>
+                <div><label style="font-size:10px;font-weight:700;color:#000;display:block;margin-bottom:3px;">Date</label><input type="date" id="monW_date" style="width:100%;font-size:12px;padding:6px 8px;border:1px solid #cbd5e1;border-radius:5px;box-sizing:border-box;"></div>
                 <div><label style="font-size:10px;font-weight:700;color:#000;display:block;margin-bottom:3px;">Weight (kg)</label><input type="number" id="monW_weight" step="0.1" placeholder="e.g. 58.5" oninput="calcWeeklyBMI()" style="width:100%;font-size:12px;padding:6px 8px;border:1px solid #cbd5e1;border-radius:5px;box-sizing:border-box;"></div>
                 <div><label style="font-size:10px;font-weight:700;color:#000;display:block;margin-bottom:3px;">BMI - Auto</label><input type="number" id="monW_bmi" step="0.1" readonly placeholder="Auto" style="width:100%;font-size:12px;padding:6px 8px;border:1px solid #cbd5e1;border-radius:5px;background:#f1f5f9;box-sizing:border-box;"></div>
                 <div><label style="font-size:10px;font-weight:700;color:#000;display:block;margin-bottom:3px;">MUAC (cm)</label><input type="number" id="monW_muac" step="0.1" placeholder="e.g. 24.0" style="width:100%;font-size:12px;padding:6px 8px;border:1px solid #cbd5e1;border-radius:5px;box-sizing:border-box;"></div>
@@ -1396,10 +1418,26 @@
                 <div><label style="font-size:10px;font-weight:700;color:#000;display:block;margin-bottom:3px;">Albumin (g/dL)</label><input type="number" id="monW_albumin" step="0.1" placeholder="e.g. 3.8" style="width:100%;font-size:12px;padding:6px 8px;border:1px solid #cbd5e1;border-radius:5px;box-sizing:border-box;"></div>
                 <div><label style="font-size:10px;font-weight:700;color:#000;display:block;margin-bottom:3px;">CRP (mg/L)</label><input type="number" id="monW_crp" step="0.1" placeholder="e.g. 5.2" style="width:100%;font-size:12px;padding:6px 8px;border:1px solid #cbd5e1;border-radius:5px;box-sizing:border-box;"></div>
                 <div><label style="font-size:10px;font-weight:700;color:#000;display:block;margin-bottom:3px;">Blood Glucose (mg/dL)</label><input type="number" id="monW_glucose" step="1" placeholder="e.g. 110" style="width:100%;font-size:12px;padding:6px 8px;border:1px solid #cbd5e1;border-radius:5px;box-sizing:border-box;"></div>
+                <div><label style="font-size:10px;font-weight:700;color:#e11d48;display:block;margin-bottom:3px;">Creatinine (mg/dL) <span style="font-weight:400;color:#94a3b8;">Renal</span></label><input type="number" id="monW_creatinine" step="0.1" placeholder="e.g. 1.1" style="width:100%;font-size:12px;padding:6px 8px;border:1px solid #fca5a5;border-radius:5px;box-sizing:border-box;"></div>
+                <div><label style="font-size:10px;font-weight:700;color:#e11d48;display:block;margin-bottom:3px;">Urea (mg/dL) <span style="font-weight:400;color:#94a3b8;">Renal</span></label><input type="number" id="monW_urea" step="1" placeholder="e.g. 40" style="width:100%;font-size:12px;padding:6px 8px;border:1px solid #fca5a5;border-radius:5px;box-sizing:border-box;"></div>
                 <div><label style="font-size:10px;font-weight:700;color:#000;display:block;margin-bottom:3px;">Oral Intake % <span style="font-weight:400;color:#94a3b8;">(0–100)</span></label><input type="number" id="monW_oralIntake" min="0" max="100" step="1" placeholder="e.g. 75" style="width:100%;font-size:12px;padding:6px 8px;border:1px solid #cbd5e1;border-radius:5px;box-sizing:border-box;"></div>
                 <div><label style="font-size:10px;font-weight:700;color:#000;display:block;margin-bottom:3px;">Supp Compliance % <span style="font-weight:400;color:#94a3b8;">(0–100)</span></label><input type="number" id="monW_compliance" min="0" max="100" step="1" placeholder="e.g. 80" style="width:100%;font-size:12px;padding:6px 8px;border:1px solid #cbd5e1;border-radius:5px;box-sizing:border-box;"></div>
                 <div><label style="font-size:10px;font-weight:700;color:#000;display:block;margin-bottom:3px;">Treatment Interruptions</label><select id="monW_interruptions" style="width:100%;font-size:12px;padding:6px 8px;border:1px solid #cbd5e1;border-radius:5px;box-sizing:border-box;"><option value="None">None</option><option value="Dose Delay">Dose Delay</option><option value="Dose Reduction">Dose Reduction</option><option value="RT Interruption">RT Interruption</option><option value="Treatment Held">Treatment Held</option><option value="Hospitalisation">Hospitalisation</option></select></div>
                 <div style="grid-column:1 / -1;"><label style="font-size:10px;font-weight:700;color:#000;display:block;margin-bottom:3px;">Remarks</label><input type="text" id="monW_notes" placeholder="Clinical observations for the week..." style="width:100%;font-size:12px;padding:6px 8px;border:1px solid #cbd5e1;border-radius:5px;box-sizing:border-box;"></div>
+              </div>
+              <!-- Formula rate overrides — doctor can adjust before generating Rx -->
+              <div style="margin-top:12px;padding:10px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;">
+                <div style="font-size:10px;font-weight:800;color:#1e40af;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;">Formula Rates <span style="font-weight:400;color:#64748b;text-transform:none;">(from rule engine — override if clinically needed)</span></div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                  <div>
+                    <label style="font-size:10px;font-weight:700;color:#0e2247;display:block;margin-bottom:3px;">Kcal / kg / day</label>
+                    <input type="number" id="monW_kcalPerKg" step="0.5" placeholder="e.g. 35" style="width:100%;font-size:14px;font-weight:700;padding:6px 8px;border:2px solid #3b82f6;border-radius:5px;box-sizing:border-box;">
+                  </div>
+                  <div>
+                    <label style="font-size:10px;font-weight:700;color:#0e2247;display:block;margin-bottom:3px;">Protein / kg / day</label>
+                    <input type="number" id="monW_proteinPerKg" step="0.1" placeholder="e.g. 1.8" style="width:100%;font-size:14px;font-weight:700;padding:6px 8px;border:2px solid #3b82f6;border-radius:5px;box-sizing:border-box;">
+                  </div>
+                </div>
               </div>
               <div style="margin-top:12px; text-align:right;"><button onclick="saveMonitorLog('weekly')" id="monWSaveBtn" style="background:#0e2247;color:#fff;border:none;border-radius:6px;padding:8px 20px;font-size:12px;font-weight:700;cursor:pointer;">Save Weekly Entry</button></div>
             </div>
@@ -1427,17 +1465,38 @@
                 </span>
               </div>
 
+              <!-- Rate fields — from formula grid, doctor can override -->
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;padding:10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;">
+                <div>
+                  <label style="font-size:10px;font-weight:700;color:#0e2247;display:block;margin-bottom:3px;">Kcal / kg / day <span style="font-weight:400;color:#94a3b8;">(formula grid default)</span></label>
+                  <input id="wxRx_kcalPerKg" type="number" step="0.5" style="width:100%;font-size:14px;font-weight:700;padding:6px 8px;border:2px solid #3b82f6;border-radius:5px;box-sizing:border-box;"
+                    oninput="(function(v){ var cw=parseFloat(document.getElementById('wxRx_calcWeight').value)||0; if(cw>0&&v>0){ var t=_wxRxTargets||{}; var oralPct=t.oralPct!=null?t.oralPct:0; var total=Math.round(cw*v); var supp=Math.max(0,Math.round(total*(1-oralPct/100))); document.getElementById('wxRx_totalKcal').value=total; document.getElementById('wxRx_suppKcal').value=supp; } updateWxRxTrace(); })(parseFloat(this.value)||0)">
+                </div>
+                <div>
+                  <label style="font-size:10px;font-weight:700;color:#0e2247;display:block;margin-bottom:3px;">Protein / kg / day <span style="font-weight:400;color:#94a3b8;">(formula grid default)</span></label>
+                  <input id="wxRx_proteinPerKg" type="number" step="0.1" style="width:100%;font-size:14px;font-weight:700;padding:6px 8px;border:2px solid #3b82f6;border-radius:5px;box-sizing:border-box;"
+                    oninput="(function(v){ var cw=parseFloat(document.getElementById('wxRx_calcWeight').value)||0; if(cw>0&&v>0){ var t=_wxRxTargets||{}; var oralPct=t.oralPct!=null?t.oralPct:0; var total=Math.round(cw*v*10)/10; var supp=Math.max(0,Math.round(total*(1-oralPct/100)*10)/10); document.getElementById('wxRx_totalProtein').value=total; document.getElementById('wxRx_suppProtein').value=supp; } updateWxRxTrace(); })(parseFloat(this.value)||0)">
+                </div>
+              </div>
+
+              <!-- Calculation Trace -->
+              <div id="wxRxCalcTrace" style="background:#0e2247;color:#fff;border-radius:8px;padding:10px 14px;margin-bottom:10px;font-size:12px;line-height:1.7;display:none;">
+                <div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,255,255,0.5);margin-bottom:6px;">Calculation Trace</div>
+                <div id="wxRxTraceKcal" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;"></div>
+                <div id="wxRxTraceProtein" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:4px;"></div>
+              </div>
+
               <!-- Editable targets -->
               <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;">
                 <div>
                   <label style="font-size:10px;font-weight:700;color:#64748b;display:block;margin-bottom:3px;">Total Kcal / day</label>
                   <input id="wxRx_totalKcal" type="number" step="10" style="width:100%;font-size:13px;font-weight:700;padding:6px 8px;border:1px solid #cbd5e1;border-radius:5px;box-sizing:border-box;"
-                    oninput="(function(v){ var t=_wxRxTargets||{}; var oralPct=t.oralPct!=null?t.oralPct:60; var supp=Math.max(0,Math.round(v*(1-oralPct/100))); document.getElementById('wxRx_suppKcal').value=supp||''; })(parseFloat(this.value)||0)">
+                    oninput="(function(v){ var t=_wxRxTargets||{}; var oralPct=t.oralPct!=null?t.oralPct:0; var supp=Math.max(0,Math.round(v*(1-oralPct/100))); document.getElementById('wxRx_suppKcal').value=supp||''; })(parseFloat(this.value)||0)">
                 </div>
                 <div>
                   <label style="font-size:10px;font-weight:700;color:#64748b;display:block;margin-bottom:3px;">Total Protein (g/day)</label>
                   <input id="wxRx_totalProtein" type="number" step="0.5" style="width:100%;font-size:13px;font-weight:700;padding:6px 8px;border:1px solid #cbd5e1;border-radius:5px;box-sizing:border-box;"
-                    oninput="(function(v){ var t=_wxRxTargets||{}; var oralPct=t.oralPct!=null?t.oralPct:60; var supp=Math.max(0,Math.round((v*(1-oralPct/100))*10)/10); document.getElementById('wxRx_suppProtein').value=supp||''; })(parseFloat(this.value)||0)">
+                    oninput="(function(v){ var t=_wxRxTargets||{}; var oralPct=t.oralPct!=null?t.oralPct:0; var supp=Math.max(0,Math.round((v*(1-oralPct/100))*10)/10); document.getElementById('wxRx_suppProtein').value=supp||''; })(parseFloat(this.value)||0)">
                 </div>
                 <div>
                   <label style="font-size:10px;font-weight:700;color:#64748b;display:block;margin-bottom:3px;">Formulation</label>
@@ -1462,6 +1521,13 @@
                   <input id="wxRx_calcWeight" type="number" step="0.1" style="width:100%;font-size:12px;padding:6px 8px;border:1px solid #cbd5e1;border-radius:5px;box-sizing:border-box;">
                 </div>
               </div>
+
+              <!-- Full Replacement shortcut — shown when suppKcal < totalKcal (enteral/no oral intake) -->
+              <div id="wxRxFullReplBtn" style="display:none;margin-bottom:10px;padding:10px 14px;background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;">
+                <span style="font-size:11.5px;font-weight:700;color:#92400e;">⚠️ Patient has no oral intake (enteral/tube feeding)?</span>
+                <button onclick="wxRxSetFullReplacement()" style="margin-left:10px;background:#b45309;color:#fff;border:none;border-radius:5px;padding:5px 14px;font-size:11px;font-weight:700;cursor:pointer;">Set Full Enteral Replacement →</button>
+              </div>
+
               <div style="margin-bottom:10px;">
                 <label style="font-size:10px;font-weight:700;color:#64748b;display:block;margin-bottom:3px;">Doctor Notes / Adjustments</label>
                 <input id="wxRx_notes" type="text" placeholder="Any adjustment rationale…" style="width:100%;font-size:12px;padding:6px 8px;border:1px solid #cbd5e1;border-radius:5px;box-sizing:border-box;">
@@ -1488,7 +1554,7 @@
                     </div>
                     <div>
                       <div style="font-size:9px;color:rgba(255,255,255,.5);margin-bottom:2px;">Route</div>
-                      <div style="font-size:13px;font-weight:800;color:#86efac;margin-top:4px;line-height:1.3;">Oral Feeding</div>
+                      <div style="font-size:13px;font-weight:800;color:#86efac;margin-top:4px;line-height:1.3;" id="wxRxHeroRoute">—</div>
                     </div>
                   </div>
                   <div style="margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.1);font-size:10.5px;color:rgba(255,255,255,.7);" id="wxRxHeroSummary"></div>
@@ -1577,6 +1643,7 @@
                 <thead>
                   <tr style="background:#0e2247;text-align:left;position:sticky;top:0;z-index:2;">
                     <th style="padding:6px 8px;font-weight:700;color:#fff;border:1px solid #1e3a5f;">Week</th>
+                    <th style="padding:6px 8px;font-weight:700;color:#fff;border:1px solid #1e3a5f;">Date</th>
                     <th style="padding:6px 8px;font-weight:700;color:#fff;border:1px solid #1e3a5f;">Weight</th>
                     <th style="padding:6px 8px;font-weight:700;color:#fff;border:1px solid #1e3a5f;">BMI</th>
                     <th style="padding:6px 8px;font-weight:700;color:#fff;border:1px solid #1e3a5f;">MUAC</th>
@@ -1587,13 +1654,15 @@
                     <th style="padding:6px 8px;font-weight:700;color:#fff;border:1px solid #1e3a5f;">Albumin</th>
                     <th style="padding:6px 8px;font-weight:700;color:#fff;border:1px solid #1e3a5f;">CRP</th>
                     <th style="padding:6px 8px;font-weight:700;color:#fff;border:1px solid #1e3a5f;">Glucose</th>
+                    <th style="padding:6px 8px;font-weight:700;color:#e11d48;border:1px solid #1e3a5f;">Creatinine</th>
+                    <th style="padding:6px 8px;font-weight:700;color:#e11d48;border:1px solid #1e3a5f;">Urea</th>
                     <th style="padding:6px 8px;font-weight:700;color:#fff;border:1px solid #1e3a5f;">Interruptions</th>
                     <th style="padding:6px 8px;font-weight:700;color:#fff;border:1px solid #1e3a5f;">Remarks</th>
                     <th style="padding:6px 8px;font-weight:700;color:#fff;border:1px solid #1e3a5f;">Prescription</th>
                   </tr>
                 </thead>
                 <tbody id="monTableWeekly">
-                  <tr><td colspan="14" style="padding:12px;text-align:center;color:#94a3b8;font-style:italic;">No weekly entries yet.</td></tr>
+                  <tr><td colspan="17" style="padding:12px;text-align:center;color:#94a3b8;font-style:italic;">No weekly entries yet.</td></tr>
                 </tbody>
               </table>
             </div>
@@ -2525,11 +2594,13 @@
               /* Hide all .rs sections by default in store mode */
               #reportDoc .rs { display:none !important; }
               /* Show only the production-relevant sections (higher specificity to win over the hide rule) */
+              #reportDoc #sectionPatientProfile,
+              #reportDoc #sectionClinicalDetails,
               #reportDoc #sectionPrescription,
               #reportDoc #sectionServings,
               #reportDoc #sectionProduction,
-              #reportDoc #micronutrientSection,
-              #reportDoc #storeWeeklyRxPanel { display:block !important; }
+              #reportDoc #micronutrientSection { display:block !important; }
+              /* storeWeeklyRxPanel has no class="rs" so the hide rule won't touch it — JS shows it explicitly */
               /* Hide global UI elements not needed by store */
               #editPatientSection, .rpt-actions-bar, .ai-chat-launcher,
               #safetyAlertsBlock, #clinicalProtocolsContainer,
@@ -2561,6 +2632,7 @@
                 if (!res.ok) throw new Error('HTTP ' + res.status);
                 var rxList = await res.json();
                 var approved = rxList.filter(function(rx) { return rx.status === 'APPROVED'; });
+                panel.style.display = 'block';  // make panel visible — no class="rs" so store CSS hide rule won't fight this
                 if (!approved.length) {
                   wrap.innerHTML = '<em style="color:#94a3b8">No approved weekly prescriptions yet.</em>';
                   return;
@@ -2570,7 +2642,21 @@
                 approved.sort(function(a,b){ return b.week_number - a.week_number; });
                 var html = '';
                 approved.forEach(function(rx, idx) {
-                  var t = rx.targets || {}, r = t.recipe || {};
+                  var t = Object.assign({}, rx.targets || {}), r = t.recipe || {};
+                  // For enteral/parenteral patients, fix stale supplement values from old oral plan
+                  // Respect t.oralPct if it's explicitly > 0 (partial oral — do NOT override to 100% ONS)
+                  var stFeedM = (window.patient && window.patient.feedingMethod || '').toLowerCase();
+                  var stIsNonOral = (t.oralPct != null && t.oralPct > 0)
+                    ? false
+                    : ((stFeedM.includes('enteral') || stFeedM.includes('parenteral')) && !stFeedM.includes('combination oral'));
+                  if (stIsNonOral) {
+                    if (t.totalKcal)    t.suppKcal    = t.totalKcal;
+                    if (t.totalProtein) t.suppProtein = t.totalProtein;
+                    t.feedingRoute = (window.patient && window.patient.feedingMethod) || t.feedingRoute;
+                    if (typeof calcWxRecipe === 'function' && t.suppKcal && t.suppProtein) {
+                      r = calcWxRecipe(t.suppKcal, t.suppProtein, t.formulation || 'Standard') || r;
+                    }
+                  }
                   var srv = r.servingsPerDay || 3;
                   var perSrvKcal = t.suppKcal   ? Math.round(t.suppKcal / srv) : '—';
                   var perSrvProt = t.suppProtein ? (Math.round(t.suppProtein / srv * 10) / 10) + ' g' : '—';
@@ -3296,8 +3382,13 @@
             const method = document.getElementById('epFeeding').value;
             const panel = document.getElementById('editIntakePanel');
             if (!panel) return;
-            // Show only if "Oral Feeding (Normal Diet)"
-            panel.style.display = (method === 'Oral Feeding (Normal Diet)') ? 'block' : 'none';
+            const isOral = (method === 'Oral Feeding (Normal Diet)');
+            panel.style.display = isOral ? 'block' : 'none';
+            // When switching to non-oral feeding, auto-set intake to 0% (no oral component)
+            if (!isOral) {
+              const intakeEl = document.getElementById('epFoodIntake');
+              if (intakeEl) intakeEl.value = '0';
+            }
           }
 
           window.epCalcRadiationWeek = function epCalcRadiationWeek() {
@@ -3456,7 +3547,38 @@
 
           async function savePatientEditsAndAudit() {
             if (savePatientEdits()) {
-               await generateClaudeInsight();
+              // Enrich window.patient with the most recent monitoring labs before plan
+              // generation. This covers the case where labs (e.g. urea) were only entered
+              // in a monitoring entry and not in the patient profile form.
+              try {
+                const monRes = await fetch(`/api/patients/${patient.id}/monitoring`, { headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') } });
+                if (monRes.ok) {
+                  const logs = await monRes.json();
+                  // Sort descending by recorded_at and pick the most recent weekly/labs entry
+                  const sorted = (Array.isArray(logs) ? logs : (logs.logs || logs.data || []))
+                    .filter(l => l.data)
+                    .sort((a, b) => new Date(b.recorded_at || b.createdAt || 0) - new Date(a.recorded_at || a.createdAt || 0));
+                  if (sorted.length > 0) {
+                    const d = sorted[0].data;
+                    // Lab fields: [patient key, monitoring key]
+                    const labMap = [
+                      ['urea','urea'], ['creatinine','creatinine'], ['albumin','albumin'],
+                      ['crp','crp'], ['hemoglobin','hemoglobin'], ['sodium','sodium'],
+                      ['potassium','potassium'], ['alt','alt'], ['ast','ast'],
+                      ['bilirubin','bilirubin'], ['tsh','tsh'], ['hba1c','hba1c'],
+                      ['bloodSugar','bloodSugar'], ['weight','weight'],
+                    ];
+                    for (const [pk, mk] of labMap) {
+                      const v = parseFloat(d[mk] || d[pk]);
+                      if (v > 0 && (!patient[pk] || patient[pk] === 0)) {
+                        patient[pk] = v;
+                        window.patient[pk] = v;
+                      }
+                    }
+                  }
+                }
+              } catch(e) { /* non-fatal — proceed with whatever patient data we have */ }
+              await generateClaudeInsight();
             }
           }
 
@@ -3830,6 +3952,7 @@
               g('rtFractionsDisplay', (patient.fractionsCompleted != null && patient.numberOfFractions) ? patient.fractionsCompleted + ' / ' + patient.numberOfFractions : null);
               g('rtWeekDisplay', patient.radiationWeek ? 'Week ' + patient.radiationWeek : null);
               g('rtConcurrentDisplay', patient.concurrentTherapy);
+              g('rtTnmDisplay', patient.tnmStage);
               var toxColor = function(grade) { var gv = parseInt(grade)||0; return gv===0?'#10b981':gv===1?'#f59e0b':gv===2?'#f97316':'#ef4444'; };
               [['rtToxMucositis',patient.toxMucositis],['rtToxDysphagia',patient.toxDysphagia],['rtToxXerostomia',patient.toxXerostomia],['rtToxNausea',patient.toxNausea],['rtToxDiarrhea',patient.toxDiarrhea]].forEach(function(pair){
                 var el = document.getElementById(pair[0]); if(!el) return;
@@ -3972,6 +4095,18 @@
 
 
 
+
+            // ── Stale plan warning ──────────────────────────────────────────────────
+            // If the patient's current feeding method is non-oral but the saved plan
+            // still shows oral route, warn the doctor to regenerate.
+            (function(){
+              const savedRoute  = (fp.prescribedRoute || '').toLowerCase();
+              const currentFeed = (patient.feedingMethod || '').toLowerCase();
+              const savedIsOral  = savedRoute.includes('oral') && !savedRoute.includes('enteral') && !savedRoute.includes('parenteral');
+              const currentIsNonOral = currentFeed.includes('enteral') || currentFeed.includes('parenteral');
+              const banner = document.getElementById('stalePlanBanner');
+              if (banner) banner.style.display = (savedIsOral && currentIsNonOral) ? 'block' : 'none';
+            })();
 
             // totalDailyCalories = full 24h target (e.g. 1890 kcal)
             // onsCalories / dailyCalories = formula contribution only (e.g. 851 kcal)
@@ -5768,12 +5903,13 @@ function renderMonitorTables() {
     }).join('');
   }
   if (weekly.length === 0) {
-    wtBody.innerHTML = '<tr><td colspan="14" style="padding:12px;text-align:center;color:#94a3b8;font-style:italic;">No weekly entries yet.</td></tr>';
+    wtBody.innerHTML = '<tr><td colspan="17" style="padding:12px;text-align:center;color:#94a3b8;font-style:italic;">No weekly entries yet.</td></tr>';
   } else {
     wtBody.innerHTML = weekly.map(function(row, i) {
       var d = row.data, prev = weekly[i+1] ? weekly[i+1].data : null;
       return '<tr style="background:' + (i===0?'#f0f9ff':'') + '">' +
         '<td style="padding:6px 8px;border:1px solid #e2e8f0;font-weight:700;color:#0f172a;">' + (d.week ? 'Week '+d.week : '—') + (i===0?' <span style="background:#e0f2fe;color:#0369a1;font-size:9px;padding:1px 5px;border-radius:3px;">NEW</span>':'') + '</td>' +
+        (function(){ var ds = d.date || (row.recorded_at ? new Date(row.recorded_at).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}) : null); return td(ds); })() +
         td(d.weight!=null ? d.weight+' kg' : null) +
         td(d.bmi!=null ? d.bmi+' kg/m²' : null) +
         td(d.muac!=null ? d.muac+' cm' : null) +
@@ -5784,6 +5920,8 @@ function renderMonitorTables() {
         td(d.albumin!=null ? d.albumin+' g/dL' : null) +
         td(d.crp!=null ? d.crp+' mg/L' : null) +
         td(d.glucose!=null ? d.glucose+' mg/dL' : null) +
+        (d.creatinine!=null ? '<td style="padding:6px 8px;border:1px solid #e2e8f0;color:' + (d.creatinine>=1.3?'#dc2626':'#0f172a') + ';font-weight:' + (d.creatinine>=1.3?'700':'400') + ';">' + d.creatinine + ' mg/dL' + (d.creatinine>=1.3?' ⚠️':'') + '</td>' : td(null)) +
+        (d.urea!=null ? '<td style="padding:6px 8px;border:1px solid #e2e8f0;color:' + (d.urea>=50?'#dc2626':'#0f172a') + ';font-weight:' + (d.urea>=50?'700':'400') + ';">' + d.urea + ' mg/dL' + (d.urea>=50?' ⚠️':'') + '</td>' : td(null)) +
         td(d.interruptions) +
         '<td style="padding:6px 8px;border:1px solid #e2e8f0;color:#64748b;">' + (d.notes||'—') + '</td>' +
         (function() {
@@ -5793,9 +5931,15 @@ function renderMonitorTables() {
           if (!existingRx) {
             rxBtn = '<button onclick="generateRxFromLog(' + row.id + ',' + weekNo + ')" style="font-size:10px;background:#0e2247;color:#fff;border:none;border-radius:4px;padding:3px 8px;cursor:pointer;margin-right:3px;">Generate Rx</button>';
           } else if (existingRx.status === 'APPROVED') {
-            rxBtn = '<span style="font-size:10px;background:#dcfce7;color:#15803d;border-radius:4px;padding:3px 8px;font-weight:700;margin-right:3px;">✓ Approved</span>';
+            var rt = existingRx.targets || {};
+            rxBtn = '<div style="display:inline-flex;flex-direction:column;gap:2px;min-width:120px;">'
+              + '<span style="font-size:10px;background:#dcfce7;color:#15803d;border-radius:4px;padding:2px 7px;font-weight:700;display:inline-block;">✓ Approved</span>'
+              + (rt.suppKcal != null ? '<span style="font-size:9.5px;color:#0f172a;font-weight:600;">' + Math.round(rt.suppKcal) + ' kcal · ' + (rt.suppProtein != null ? rt.suppProtein + 'g protein' : '') + '</span>' : '')
+              + (existingRx.batch_code ? '<span style="font-size:9px;color:#64748b;">Batch: ' + existingRx.batch_code + '</span>' : '')
+              + '<button onclick="showRxPreview(\'' + existingRx.id + '\',' + (d.oralIntake != null ? d.oralIntake : 'null') + ')" style="font-size:9.5px;background:none;border:none;color:#0e2247;text-decoration:underline;cursor:pointer;padding:0;text-align:left;font-weight:600;">View Rx →</button>'
+              + '</div>';
           } else {
-            rxBtn = '<button onclick="window._openWxRxById(\'' + existingRx.id + '\')" style="font-size:10px;background:#f59e0b;color:#fff;border:none;border-radius:4px;padding:3px 8px;cursor:pointer;margin-right:3px;">Review Rx</button>';
+            rxBtn = '<button onclick="window._openWxRxById(\'' + existingRx.id + '\',' + (d.oralIntake != null ? d.oralIntake : 'null') + ')" style="font-size:10px;background:#f59e0b;color:#fff;border:none;border-radius:4px;padding:3px 8px;cursor:pointer;margin-right:3px;">Review Rx</button>';
           }
           return '<td style="padding:6px 8px;border:1px solid #e2e8f0;white-space:nowrap;">' +
             rxBtn +
@@ -5807,6 +5951,26 @@ function renderMonitorTables() {
   }
 }
 
+function prefillWeeklyFormDefaults() {
+  var kcalEl = document.getElementById('monW_kcalPerKg');
+  var protEl = document.getElementById('monW_proteinPerKg');
+  var dateEl = document.getElementById('monW_date');
+  // Auto-set today's date if blank
+  if (dateEl && !dateEl.value) dateEl.value = new Date().toISOString().split('T')[0];
+  if (!kcalEl || !protEl) return;
+  if (kcalEl.value && protEl.value) return; // already filled (edit mode)
+  // Resolve current plan — try currentVersionedPlan first, then localStorage
+  var vPlan = window.currentVersionedPlan;
+  if (!vPlan && window.patient && window.patient.id && typeof getLatestPlanForPatient === 'function') {
+    vPlan = getLatestPlanForPatient(window.patient.id);
+  }
+  if (!vPlan) return;
+  var fp = vPlan.finalPlan || vPlan.engineOutput || vPlan;
+  if (!fp) return;
+  if (!kcalEl.value && fp.kcalPerKg)    kcalEl.value = fp.kcalPerKg;
+  if (!protEl.value && fp.proteinPerKg) protEl.value = fp.proteinPerKg;
+}
+
 function showMonitorTab(tab) {
   document.getElementById('monPanelDaily').style.display  = tab==='daily'  ? 'block' : 'none';
   document.getElementById('monPanelWeekly').style.display = tab==='weekly' ? 'block' : 'none';
@@ -5814,6 +5978,7 @@ function showMonitorTab(tab) {
   var twBtn = document.getElementById('monTabWeekly');
   if (tdBtn) { tdBtn.style.borderBottomColor = tab==='daily' ? '#0e2247' : 'transparent'; tdBtn.style.color = '#000'; }
   if (twBtn) { twBtn.style.borderBottomColor = tab==='weekly' ? '#0e2247' : 'transparent'; twBtn.style.color = '#000'; }
+  if (tab === 'weekly') prefillWeeklyFormDefaults();
 }
 
 function toggleMonitorForm(type) {
@@ -5841,6 +6006,7 @@ function editWeeklyLog(logId) {
   // Pre-fill form fields
   var sv = function(id, val){ var el=document.getElementById(id); if(el && val!=null) el.value=val; };
   sv('monW_week',        d.week);
+  sv('monW_date',        d.date);
   sv('monW_weight',      d.weight);
   sv('monW_bmi',         d.bmi);
   sv('monW_muac',        d.muac);
@@ -5849,10 +6015,14 @@ function editWeeklyLog(logId) {
   sv('monW_albumin',     d.albumin);
   sv('monW_crp',         d.crp);
   sv('monW_glucose',     d.glucose);
+  sv('monW_creatinine',  d.creatinine);
+  sv('monW_urea',        d.urea);
   sv('monW_oralIntake',  d.oralIntake);
   sv('monW_compliance',  d.compliance);
   sv('monW_interruptions', d.interruptions || 'None');
   sv('monW_notes',       d.notes);
+  sv('monW_kcalPerKg',    d.kcalPerKg);
+  sv('monW_proteinPerKg', d.proteinPerKg);
 
   // Scroll into view
   var formEl = document.getElementById('monPanelWeekly');
@@ -5868,7 +6038,7 @@ function cancelEditWeekly() {
   if (cancelEl) cancelEl.style.display = 'none';
   if (saveBtn)  saveBtn.textContent  = 'Save Weekly Entry';
   // Clear fields
-  ['week','weight','bmi','muac','handGrip','ecog','albumin','crp','glucose','oralIntake','compliance','interruptions','notes'].forEach(function(f){
+  ['week','weight','bmi','muac','handGrip','ecog','albumin','crp','glucose','oralIntake','compliance','interruptions','notes','kcalPerKg','proteinPerKg'].forEach(function(f){
     var el = document.getElementById('monW_' + f);
     if (el) el.value = f === 'ecog' ? '0' : f === 'interruptions' ? 'None' : '';
   });
@@ -5916,6 +6086,7 @@ async function saveMonitorLog(type) {
   } else {
     data = {
       week: gi('monW_week'),
+      date: gv('monW_date') || new Date().toISOString().split('T')[0],
       weight: gn('monW_weight'),
       bmi: gn('monW_bmi'),
       muac: gn('monW_muac'),
@@ -5924,10 +6095,15 @@ async function saveMonitorLog(type) {
       albumin: gn('monW_albumin'),
       crp: gn('monW_crp'),
       glucose: gi('monW_glucose'),
+      creatinine: gn('monW_creatinine'),
+      urea: gn('monW_urea'),
       oralIntake: gi('monW_oralIntake'),
       compliance: gi('monW_compliance'),
       interruptions: gv('monW_interruptions') || 'None',
-      notes: gv('monW_notes') || ''
+      notes: gv('monW_notes') || '',
+      // Doctor-overridden formula rates (null = use rule engine defaults)
+      kcalPerKg:    gn('monW_kcalPerKg')    || null,
+      proteinPerKg: gn('monW_proteinPerKg') || null
     };
     // Require at least week number and weight before saving
     if (!data.week && !data.weight) {
@@ -5953,12 +6129,23 @@ async function saveMonitorLog(type) {
       cancelEditWeekly();
     } else {
       // ── NEW ENTRY ────────────────────────────────────────────────────
+      // Ensure patient exists in DB. Capture the returned integer ID — the server may assign
+      // a new numeric id when given a client-generated string id (pat_XXXXX).
       try {
-        await fetch(apiBase + '/api/patients', {
+        var pSaveRes = await fetch(apiBase + '/api/patients', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': token },
           body: JSON.stringify(p)
         });
+        if (pSaveRes.ok) {
+          var savedPt = await pSaveRes.json();
+          if (savedPt && savedPt.id && String(savedPt.id) !== String(p.id)) {
+            // Server assigned a proper DB id — update window.patient so all subsequent
+            // API calls (monitoring, generate-weekly-rx) use the correct integer id
+            window.patient = Object.assign({}, p, { id: savedPt.id });
+            p = window.patient;
+          }
+        }
       } catch(_) { /* best effort */ }
       var res = await fetch(apiBase + '/api/patients/' + p.id + '/monitoring', {
         method: 'POST',
@@ -5971,7 +6158,7 @@ async function saveMonitorLog(type) {
       var logEntry = Object.assign({}, saved); delete logEntry.weeklyRx;
       _monLogs.unshift(logEntry);
       var prefix = type === 'daily' ? 'monD_' : 'monW_';
-      ['week','weight','oralIntake','compliance','radiation','notes','mucositis','feeding','ecog','hospitalDays','handGrip','albumin','crp','glucose','muac','tolerance','dietitian','physician','interruptions'].forEach(function(f) {
+      ['week','date','weight','oralIntake','compliance','radiation','notes','mucositis','feeding','ecog','hospitalDays','handGrip','albumin','crp','glucose','creatinine','urea','muac','tolerance','dietitian','physician','interruptions'].forEach(function(f) {
         var el = document.getElementById(prefix + f); if (el) el.value = '';
       });
     }
@@ -5980,6 +6167,9 @@ async function saveMonitorLog(type) {
 
     // Show prescription review panel if weekly rx was auto-generated
     if (type === 'weekly' && weeklyRx) {
+      // Store oral intake from form so showWxRxPanel can detect full-replacement cases
+      // even when patient.feedingMethod hasn't been updated to enteral yet
+      window._lastMonitoringOralIntake = (data.oralIntake != null) ? Number(data.oralIntake) : null;
       showWxRxPanel(weeklyRx);
     }
   } catch(e) { alert('Failed to save. Please try again.'); }
@@ -5996,6 +6186,26 @@ async function loadMonitoringLogs() {
     if (!res.ok) { console.warn('Monitoring API returned', res.status); return; }
     _monLogs = await res.json();
     renderMonitorTables();
+    // 7-day overdue notification
+    (function() {
+      var banner = document.getElementById('weeklyDueBanner');
+      if (!banner) return;
+      var weeklyLogs = _monLogs.filter(function(l){ return l.type === 'weekly'; });
+      var msgEl = banner.querySelector('.wb-msg');
+      if (weeklyLogs.length === 0) {
+        msgEl.textContent = 'No weekly monitoring entries yet. Please add the first weekly assessment.';
+        banner.style.display = 'flex';
+      } else {
+        var lastDate = new Date(weeklyLogs[0].recorded_at);
+        var daysSince = Math.floor((Date.now() - lastDate.getTime()) / 86400000);
+        if (daysSince >= 7) {
+          msgEl.textContent = 'Weekly monitoring update due — last entry was ' + daysSince + ' day' + (daysSince === 1 ? '' : 's') + ' ago.';
+          banner.style.display = 'flex';
+        } else {
+          banner.style.display = 'none';
+        }
+      }
+    })();
   } catch(e) { console.warn('Monitoring load failed:', e); }
 }
 
@@ -6056,10 +6266,14 @@ function renderWxRxHistory() {
 }
 
 // Helper called from Review button — avoids JSON-in-onclick issues
-window._openWxRxById = function(rxId) {
+// oralIntake: the monitoring log's oral intake % (0-100) passed directly from the row
+window._openWxRxById = function(rxId, oralIntake) {
   // DB id is a number; onclick passes it as a string — use == to match either
   var rx = _wxRxList.find(function(r) { return r.id == rxId; });
-  if (rx) showWxRxPanel(rx);
+  if (rx) {
+    window._lastMonitoringOralIntake = (oralIntake != null) ? Number(oralIntake) : null;
+    showWxRxPanel(rx);
+  }
 };
 
 // Call after patient is loaded — poll until window.patient is available
@@ -6067,6 +6281,7 @@ window._openWxRxById = function(rxId) {
   if (window.patient && window.patient.id) {
     loadMonitoringLogs();
     loadWeeklyPrescriptions();
+    prefillWeeklyFormDefaults();
   } else {
     setTimeout(waitForPatient, 300);
   }
@@ -6122,6 +6337,12 @@ async function generateRxFromLog(logId, weekNo) {
   // just open the review panel — don't silently overwrite it.
   var existing = _wxRxList.find(function(r) { return r.week_number == weekNo; });
   if (existing) {
+    // Pass oral intake from monitoring log so showWxRxPanel can correct full-replacement display
+    var existLog = (_monLogs || []).find(function(l){ return l.id == logId; });
+    if (existLog) {
+      var eld = existLog.data ? (typeof existLog.data === 'string' ? JSON.parse(existLog.data) : existLog.data) : {};
+      window._lastMonitoringOralIntake = eld.oralIntake != null ? Number(eld.oralIntake) : null;
+    }
     showWxRxPanel(existing);
     return;
   }
@@ -6135,9 +6356,81 @@ async function generateRxFromLog(logId, weekNo) {
       headers: { 'Content-Type': 'application/json', 'Authorization': token },
       body: JSON.stringify({ monitoringLogId: logId, weekNumber: weekNo })
     });
-    if (!res.ok) throw new Error((await res.json()).error || 'Failed');
+    if (!res.ok) {
+      var errBody = await res.json().catch(function(){ return {}; });
+      // Always try recovery first: maybe the Rx was already created (stale cache, duplicate batch code, etc.)
+      // Reload from DB and show the existing Rx if found — regardless of specific error type
+      await loadWeeklyPrescriptions();
+      var dbExisting = _wxRxList.find(function(r){ return r.week_number == weekNo; });
+      if (dbExisting) {
+        var dupLog = (_monLogs || []).find(function(l){ return l.id == logId; });
+        if (dupLog) {
+          var dpd = dupLog.data ? (typeof dupLog.data === 'string' ? JSON.parse(dupLog.data) : dupLog.data) : {};
+          window._lastMonitoringOralIntake = dpd.oralIntake != null ? Number(dpd.oralIntake) : null;
+        }
+        _wxRxCurMonLogId = logId;
+        _wxRxCurWeekNo   = weekNo;
+        showWxRxPanel(dbExisting);
+        return;
+      }
+      // No existing Rx in DB — fall back to client-side generation so the doctor isn't blocked
+      console.warn('generate-weekly-rx server error; falling back to client-side targets:', errBody);
+      var fbLog = (_monLogs || []).find(function(l){ return l.id == logId; });
+      var fbData = fbLog && fbLog.data ? (typeof fbLog.data === 'string' ? JSON.parse(fbLog.data) : fbLog.data) : {};
+      var fbPlan = {};
+      try { fbPlan = (typeof generateNutritionPlan === 'function') ? generateNutritionPlan(window.patient || {}) : {}; } catch(ex) { console.warn('client nutrition engine error:', ex); }
+      var fbWeight     = parseFloat(fbData.weight) || parseFloat(window.patient && window.patient.weight) || 0;
+      var fbOralIntake = fbData.oralIntake != null ? Number(fbData.oralIntake) : null;
+      // Re-run engine with monitoring weight so IBW is computed from correct actual weight
+      var fbPatForEngine = Object.assign({}, window.patient || {}, { weight: fbWeight });
+      try { fbPlan = (typeof generateNutritionPlan === 'function') ? generateNutritionPlan(fbPatForEngine) : fbPlan; } catch(ex) {}
+      // Use IBW-based calcWeight from engine; fall back to monitoring weight if height not recorded
+      var fbCalcWeight = (fbPlan.calcWeight && fbPlan.calcWeight > 0) ? fbPlan.calcWeight : fbWeight;
+      var fbKcalPerKg  = fbPlan.kcalPerKg   || 35;
+      var fbProtPerKg  = fbPlan.proteinPerKg || 1.8;
+      // KDIGO renal safety cap — apply before totals (creatinine ≥ 1.3 OR urea ≥ 50)
+      var fbPat = window.patient || {};
+      var fbCreat = parseFloat(fbPat.creatinine) || 0;
+      var fbUrea  = parseFloat(fbPat.urea)  || 0;
+      if ((fbCreat >= 1.3) || (fbUrea >= 50)) {
+        fbProtPerKg = Math.min(fbProtPerKg, 0.8);
+      }
+      // baseEnergy = total daily calorie target (IBW × kcalPerKg), NOT the supplement portion
+      // dailyCalories = supplement portion only — do NOT use as totalKcal
+      var fbTotalKcal  = fbPlan.baseEnergy  || Math.round(fbCalcWeight * fbKcalPerKg);
+      var fbTotalProt  = Math.round(fbCalcWeight * fbProtPerKg * 10) / 10;
+      var fbOralPct    = (fbOralIntake != null) ? fbOralIntake : 0;
+      var fbSuppKcal   = Math.round(fbTotalKcal * (1 - fbOralPct / 100));
+      var fbSuppProt   = Math.round(fbTotalProt * (1 - fbOralPct / 100) * 10) / 10;
+      window._lastMonitoringOralIntake = fbOralIntake;
+      // Track so approveWxRx can retry saving to DB
+      _wxRxCurMonLogId = logId;
+      _wxRxCurWeekNo   = weekNo;
+      var fbRx = {
+        id: null, week_number: weekNo, batch_code: '', status: 'PENDING_REVIEW', notes: '',
+        targets: {
+          totalKcal: fbTotalKcal, totalProtein: fbTotalProt,
+          suppKcal:  fbSuppKcal,  suppProtein:  fbSuppProt,
+          oralPct: fbOralPct, kcalPerKg: fbKcalPerKg, proteinPerKg: fbProtPerKg,
+          renalCap: (fbCreat >= 1.3 || fbUrea >= 50) || undefined,
+          calcWeight: fbCalcWeight, weight: fbWeight,
+          ibw: fbPlan.ibw || null, weightBasis: fbPlan.weightBasis || '',
+          feedingRoute: (window.patient && window.patient.feedingMethod) || '',
+          formulation: (fbPlan.recommendedFormulation || 'Standard').replace(/\s*\(.*?\)/,'').trim(),
+          _clientGenerated: true
+        }
+      };
+      showWxRxPanel(fbRx);
+      return;
+    }
     var rx = await res.json();
     await loadWeeklyPrescriptions();
+    // Pass oral intake from monitoring log for full-replacement detection
+    var newLog = (_monLogs || []).find(function(l){ return l.id == logId; });
+    if (newLog) {
+      var nld = newLog.data ? (typeof newLog.data === 'string' ? JSON.parse(newLog.data) : newLog.data) : {};
+      window._lastMonitoringOralIntake = nld.oralIntake != null ? Number(nld.oralIntake) : null;
+    }
     showWxRxPanel(rx);
   } catch(e) { alert('Could not generate prescription: ' + e.message); }
 }
@@ -6146,6 +6439,9 @@ async function generateRxFromLog(logId, weekNo) {
 var _wxRxId      = null; // current weekly_prescriptions.id being reviewed
 var _wxRxList    = [];   // all weekly prescriptions for this patient
 var _wxRxTargets = {};   // full targets object for the current Rx (kcalPerKg, oralPct, ibw, etc.)
+// Track monitoring log + week so approveWxRx can re-save to DB when _wxRxId is null
+var _wxRxCurMonLogId = null;
+var _wxRxCurWeekNo   = null;
 
 // ── Client-side recipe calculator (mirrors server calcWeeklyRecipe) ─────────
 function calcWxRecipe(suppKcal, suppProtein, formulation) {
@@ -6214,12 +6510,14 @@ function renderWxRxRecipe(recipe, targets) {
   });
 
   // ── Hero block ────────────────────────────────────────────────────────
-  var elKcal = document.getElementById('wxRxHeroKcal');
-  var elProt = document.getElementById('wxRxHeroProt');
-  var elSrv  = document.getElementById('wxRxHeroSrv');
-  if (elKcal) elKcal.textContent = (t.suppKcal   || '') + ' kcal';
-  if (elProt) elProt.textContent = (t.suppProtein || '') + ' g';
-  if (elSrv)  elSrv.textContent  = srv + ' servings/day';
+  var elKcal  = document.getElementById('wxRxHeroKcal');
+  var elProt  = document.getElementById('wxRxHeroProt');
+  var elSrv   = document.getElementById('wxRxHeroSrv');
+  var elRoute = document.getElementById('wxRxHeroRoute');
+  if (elKcal)  elKcal.textContent  = (t.suppKcal    || '') + ' kcal';
+  if (elProt)  elProt.textContent  = (t.suppProtein  || '') + ' g';
+  if (elSrv)   elSrv.textContent   = srv + ' servings/day';
+  if (elRoute) elRoute.textContent = t.feedingRoute  || 'Oral Feeding';
 
   // Hero summary line
   var elSum = document.getElementById('wxRxHeroSummary');
@@ -6313,6 +6611,38 @@ function renderWxRxRecipe(recipe, targets) {
   }
 }
 
+// ── Full-replacement shortcut ─────────────────────────────────────────────
+// Called when doctor clicks "Set Full Enteral Replacement" banner button.
+// Overrides suppKcal/suppProtein to totalKcal/totalProtein, updates oralPct=0,
+// refreshes hero block and recipe, then auto-saves.
+function wxRxSetFullReplacement() {
+  var totalKcal    = parseFloat(document.getElementById('wxRx_totalKcal').value)    || 0;
+  var totalProtein = parseFloat(document.getElementById('wxRx_totalProtein').value) || 0;
+  if (!totalKcal) { alert('Total Kcal is not set — please enter it first.'); return; }
+  document.getElementById('wxRx_suppKcal').value    = totalKcal;
+  document.getElementById('wxRx_suppProtein').value = totalProtein || '';
+  // Update targets so oninput handlers and recipe use correct oralPct
+  if (_wxRxTargets) {
+    _wxRxTargets.oralPct    = 0;
+    _wxRxTargets.suppKcal    = totalKcal;
+    _wxRxTargets.suppProtein = totalProtein;
+    var feedRoute = (window.patient && window.patient.feedingMethod) || '';
+    if (feedRoute) _wxRxTargets.feedingRoute = feedRoute;
+    else if (!_wxRxTargets.feedingRoute || _wxRxTargets.feedingRoute.toLowerCase().includes('oral')) {
+      _wxRxTargets.feedingRoute = 'Enteral / Full Replacement';
+    }
+  }
+  // Refresh hero and recipe
+  var elRoute = document.getElementById('wxRxHeroRoute');
+  if (elRoute) elRoute.textContent = (_wxRxTargets && _wxRxTargets.feedingRoute) || 'Enteral / Full Replacement';
+  recomputeWxRxRecipe();
+  // Hide the banner now that it's applied
+  var btn = document.getElementById('wxRxFullReplBtn');
+  if (btn) btn.style.display = 'none';
+  // Auto-save so the corrected values persist in DB
+  saveWxRxAdjustments();
+}
+
 function recomputeWxRxRecipe() {
   var calcWeight  = parseFloat(document.getElementById('wxRx_calcWeight').value);
   var formulation = document.getElementById('wxRx_formulation').value || 'Standard';
@@ -6368,17 +6698,92 @@ function wxRxSwitchWeightBasis(basis) {
   recomputeWxRxRecipe();
 }
 
+function updateWxRxTrace() {
+  var traceBox  = document.getElementById('wxRxCalcTrace');
+  var traceKcal = document.getElementById('wxRxTraceKcal');
+  var traceProt = document.getElementById('wxRxTraceProtein');
+  if (!traceBox || !traceKcal || !traceProt) return;
+  var cw   = parseFloat(document.getElementById('wxRx_calcWeight').value)    || 0;
+  var kpkg = parseFloat(document.getElementById('wxRx_kcalPerKg').value)     || 0;
+  var ppkg = parseFloat(document.getElementById('wxRx_proteinPerKg').value)  || 0;
+  var oralPct = (_wxRxTargets && _wxRxTargets.oralPct != null) ? parseFloat(_wxRxTargets.oralPct) : 0;
+  if (!cw || (!kpkg && !ppkg)) { traceBox.style.display = 'none'; return; }
+  var pill = function(v, color) {
+    return '<span style="background:' + (color||'rgba(255,255,255,0.15)') + ';border-radius:4px;padding:2px 7px;font-weight:800;font-size:12px;">' + v + '</span>';
+  };
+  var arrow = '<span style="color:rgba(255,255,255,0.45);font-size:10px;">→</span>';
+  if (kpkg) {
+    var totalK = Math.round(cw * kpkg);
+    var suppK  = Math.max(0, Math.round(totalK * (1 - oralPct / 100)));
+    traceKcal.innerHTML =
+      '⚡ ' + pill(kpkg + ' kcal/kg') + ' × ' + pill(cw + ' kg') + ' = ' + pill(totalK + ' kcal/day', 'rgba(234,179,8,0.25)') +
+      (oralPct > 0 ? ' ' + arrow + ' ' + pill(suppK + ' kcal supplement', 'rgba(74,222,128,0.2)') + ' <span style="font-size:10px;color:rgba(255,255,255,0.45);">(' + oralPct + '% oral)</span>' : '');
+  } else { traceKcal.innerHTML = ''; }
+  if (ppkg) {
+    var totalP = Math.round(cw * ppkg * 10) / 10;
+    var suppP  = Math.max(0, Math.round(totalP * (1 - oralPct / 100) * 10) / 10);
+    traceProt.innerHTML =
+      '🥩 ' + pill(ppkg + ' g/kg') + ' × ' + pill(cw + ' kg') + ' = ' + pill(totalP + ' g/day', 'rgba(234,179,8,0.25)') +
+      (oralPct > 0 ? ' ' + arrow + ' ' + pill(suppP + ' g supplement', 'rgba(74,222,128,0.2)') + ' <span style="font-size:10px;color:rgba(255,255,255,0.45);">(' + oralPct + '% oral)</span>' : '');
+  } else { traceProt.innerHTML = ''; }
+  traceBox.style.display = '';
+}
+
 function showWxRxPanel(rx) {
   _wxRxId = rx.id;
-  var t = rx.targets || {};
+  var t = Object.assign({}, rx.targets || {});
+  // Detect full-replacement: monitoring log oral intake is ground truth.
+  // If monitoring explicitly records > 0% oral, the patient IS eating — do NOT override to 100% ONS.
+  var feedMethod = (window.patient && window.patient.feedingMethod || '').toLowerCase();
+  var monOralPct = window._lastMonitoringOralIntake;
+  var isNonOral = (monOralPct != null)
+    ? (monOralPct === 0)    // monitoring is ground truth: 0% oral = full replacement, >0 = partial
+    : (((feedMethod.includes('enteral') || feedMethod.includes('parenteral')) && !feedMethod.includes('combination oral')));
+  if (isNonOral) {
+    t.oralPct = 0;
+    // Formula covers 100% — override stale supplement and route values from old oral plan
+    if (t.totalKcal)    t.suppKcal    = t.totalKcal;
+    if (t.totalProtein) t.suppProtein = t.totalProtein;
+    var rawFeedMethod = (window.patient && window.patient.feedingMethod) || '';
+    if (rawFeedMethod)  t.feedingRoute = rawFeedMethod;
+    else if (!t.feedingRoute || t.feedingRoute.toLowerCase().includes('oral')) {
+      t.feedingRoute = 'Enteral / Full Replacement';
+    }
+  }
+
+  // ── IBW Sanity Check ──────────────────────────────────────────────────────
+  // If the stored calcWeight is < 40% of actual monitoring weight, the IBW was
+  // computed from incorrect height data (e.g. height entered in metres instead of cm).
+  // Auto-correct using actual monitoring weight × stored kcal/protein rates so the
+  // doctor sees realistic values without having to re-enter anything.
+  // (Permanent fix = correct the patient's height in their profile.)
+  var _sanActualW = parseFloat(t.weight) || 0;
+  var _sanCalcW   = parseFloat(t.calcWeight) || 0;
+  if (!t.manuallyAdjusted && _sanActualW > 0 && _sanCalcW > 0 && _sanCalcW < _sanActualW * 0.4) {
+    var _sanK  = parseFloat(t.kcalPerKg)   || 35;
+    var _sanP  = parseFloat(t.proteinPerKg) || 1.8;
+    t.calcWeight   = _sanActualW;
+    t.ibw          = null;   // clear implausible IBW
+    t.totalKcal    = Math.round(_sanActualW * _sanK);
+    t.totalProtein = Math.round(_sanActualW * _sanP * 10) / 10;
+    var _sanOralPct = t.oralPct != null ? parseFloat(t.oralPct) : 0;
+    t.suppKcal    = Math.max(0, Math.round(t.totalKcal    * (1 - _sanOralPct / 100)));
+    t.suppProtein = Math.max(0, Math.round(t.totalProtein * (1 - _sanOralPct / 100) * 10) / 10);
+    console.warn('[WxRx] IBW sanity correction: stored calcWeight was', _sanCalcW,
+                 'vs actual', _sanActualW, '— overriding with actual weight × rates.');
+  }
+
   _wxRxTargets = t; // store for recalculation
   document.getElementById('wxRxBatch').textContent   = rx.batch_code || '';
   document.getElementById('wxRx_totalKcal').value    = t.totalKcal    || '';
   document.getElementById('wxRx_totalProtein').value = t.totalProtein || '';
-  document.getElementById('wxRx_suppKcal').value     = t.suppKcal     || '';
-  document.getElementById('wxRx_suppProtein').value  = t.suppProtein  || '';
+  document.getElementById('wxRx_suppKcal').value     = t.suppKcal    || '';
+  document.getElementById('wxRx_suppProtein').value  = t.suppProtein || '';
   // Show IBW as default calc weight when available
   document.getElementById('wxRx_calcWeight').value = (t.ibw != null ? t.ibw : t.calcWeight) || '';
+  // Populate rate fields from formula grid values stored in targets
+  document.getElementById('wxRx_kcalPerKg').value    = t.kcalPerKg    || '';
+  document.getElementById('wxRx_proteinPerKg').value = t.proteinPerKg || '';
   document.getElementById('wxRx_notes').value        = rx.notes        || '';
   var fmSel = document.getElementById('wxRx_formulation');
   if (fmSel) fmSel.value = t.formulation || 'Standard';
@@ -6433,16 +6838,45 @@ function showWxRxPanel(rx) {
     if (approveBtn) approveBtn.style.display = '';
   }
 
-  // Render ingredient breakdown — use stored recipe if available, else compute from targets
-  var recipe = t.recipe || calcWxRecipe(t.suppKcal, t.suppProtein, t.formulation || 'Standard');
+  // Render ingredient breakdown — for non-oral patients, always recompute from corrected suppKcal
+  // (cached recipe was built from old oral suppKcal and must be discarded)
+  var recipe = (isNonOral ? null : t.recipe) || calcWxRecipe(t.suppKcal, t.suppProtein, t.formulation || 'Standard');
   renderWxRxRecipe(recipe, t);
 
+  // Show "Set Full Replacement" banner if suppKcal is less than totalKcal
+  // (happens when patient switched to enteral but plan was generated from old oral targets)
+  var fullReplBanner = document.getElementById('wxRxFullReplBtn');
+  if (fullReplBanner) {
+    var sk = parseFloat(document.getElementById('wxRx_suppKcal').value) || 0;
+    var tk = parseFloat(document.getElementById('wxRx_totalKcal').value) || 0;
+    fullReplBanner.style.display = (sk > 0 && tk > 0 && sk < tk) ? '' : 'none';
+  }
+
+  updateWxRxTrace();
   document.getElementById('wxRxPanel').style.display = '';
   document.getElementById('wxRxPanel').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 async function saveWxRxAdjustments() {
-  if (!_wxRxId) return;
+  // If Rx was generated client-side (server error), try to persist it to DB first
+  if (!_wxRxId) {
+    var pid0 = window.patient && window.patient.id;
+    if (pid0 && _wxRxCurMonLogId) {
+      var u00 = (typeof auth !== 'undefined') ? auth.getCurrentUser() : {};
+      var tok00 = u00 && u00.token ? 'Bearer ' + u00.token : '';
+      var api00 = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : '';
+      try {
+        var rg = await fetch(api00 + '/api/patients/' + pid0 + '/generate-weekly-rx', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': tok00 },
+          body: JSON.stringify({ monitoringLogId: _wxRxCurMonLogId, weekNumber: _wxRxCurWeekNo })
+        });
+        if (rg.ok) { var sv = await rg.json(); _wxRxId = sv.id; await loadWeeklyPrescriptions(); }
+        else { await loadWeeklyPrescriptions(); var f0 = _wxRxList.find(function(r){ return r.week_number == _wxRxCurWeekNo; }); if (f0) _wxRxId = f0.id; }
+      } catch(ex) {}
+    }
+    if (!_wxRxId) return; // still no DB record — nothing to update
+  }
   var u = (typeof auth !== 'undefined') ? auth.getCurrentUser() : {};
   var token = u && u.token ? 'Bearer ' + u.token : '';
   var apiBase = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : '';
@@ -6456,9 +6890,10 @@ async function saveWxRxAdjustments() {
     calcWeight:   newCalcWeight,
     formulation:  document.getElementById('wxRx_formulation').value || 'Standard',
     // Preserve metadata fields so future recalculations work correctly
-    manuallyAdjusted: true,  // flag: doctor has saved overrides — regenerate must warn before discarding
-    kcalPerKg:    t.kcalPerKg    || null,
-    proteinPerKg: t.proteinPerKg || null,
+    manuallyAdjusted: true,  // flag: doctor has saved overrides
+    // Save whatever rates the doctor used (from formula grid or overridden)
+    kcalPerKg:    parseFloat(document.getElementById('wxRx_kcalPerKg').value)    || t.kcalPerKg    || null,
+    proteinPerKg: parseFloat(document.getElementById('wxRx_proteinPerKg').value) || t.proteinPerKg || null,
     oralPct:      t.oralPct      != null ? t.oralPct : null,
     ibw:          t.ibw          || null,
     weight:       t.weight       || null,
@@ -6493,7 +6928,38 @@ async function saveWxRxAdjustments() {
 }
 
 async function approveWxRx() {
-  if (!_wxRxId) return;
+  // If _wxRxId is null (client-side fallback due to server error), try to save to DB first
+  if (!_wxRxId) {
+    var pid = window.patient && window.patient.id;
+    if (!pid || !_wxRxCurMonLogId) {
+      alert('Cannot approve: prescription was not saved to the database.\nPlease click "Generate Rx" again, then approve.');
+      return;
+    }
+    var u0 = (typeof auth !== 'undefined') ? auth.getCurrentUser() : {};
+    var tok0 = u0 && u0.token ? 'Bearer ' + u0.token : '';
+    var api0 = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : '';
+    try {
+      var reGen = await fetch(api0 + '/api/patients/' + pid + '/generate-weekly-rx', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': tok0 },
+        body: JSON.stringify({ monitoringLogId: _wxRxCurMonLogId, weekNumber: _wxRxCurWeekNo })
+      });
+      if (reGen.ok) {
+        var savedRx = await reGen.json();
+        _wxRxId = savedRx.id;
+        await loadWeeklyPrescriptions();
+      } else {
+        // Server still failing — check if a record now exists in DB
+        await loadWeeklyPrescriptions();
+        var found = _wxRxList.find(function(r){ return r.week_number == _wxRxCurWeekNo; });
+        if (found) _wxRxId = found.id;
+      }
+    } catch(ex) { console.warn('Re-generate on approve failed:', ex); }
+    if (!_wxRxId) {
+      alert('Cannot approve: the prescription could not be saved to the database. Please check your connection and try "Generate Rx" again.');
+      return;
+    }
+  }
   // Save any adjustments first
   await saveWxRxAdjustments();
   var u = (typeof auth !== 'undefined') ? auth.getCurrentUser() : {};
@@ -6516,6 +6982,86 @@ async function approveWxRx() {
 
 // ── END WEEKLY PRESCRIPTION PANEL ────────────────────────────────────────
 // ── END MONITORING ────────────────────────────────────────────────────────
+</script>
+<!-- ── Rx Preview Modal ────────────────────────────────────────────────── -->
+<div id="rxPreviewOverlay" onclick="if(event.target===this)closeRxPreview()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:99998;align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:14px;padding:24px 28px;max-width:480px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,0.3);position:relative;max-height:90vh;overflow-y:auto;">
+    <button onclick="closeRxPreview()" style="position:absolute;top:12px;right:14px;background:none;border:none;font-size:20px;color:#94a3b8;cursor:pointer;line-height:1;">✕</button>
+    <div id="rxPv_badge" style="display:inline-block;font-size:10px;font-weight:700;padding:3px 10px;border-radius:20px;margin-bottom:10px;"></div>
+    <div id="rxPv_title" style="font-size:16px;font-weight:800;color:#0e2247;margin-bottom:2px;"></div>
+    <div id="rxPv_batch" style="font-size:12px;color:#64748b;margin-bottom:16px;"></div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;">
+      <div style="background:#f0fdf4;border-radius:8px;padding:12px;">
+        <div style="font-size:10px;font-weight:700;color:#15803d;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;">Total Energy</div>
+        <div id="rxPv_totalKcal" style="font-size:20px;font-weight:800;color:#0f172a;"></div>
+        <div id="rxPv_kcalRate" style="font-size:11px;color:#64748b;"></div>
+      </div>
+      <div style="background:#eff6ff;border-radius:8px;padding:12px;">
+        <div style="font-size:10px;font-weight:700;color:#1e40af;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;">Total Protein</div>
+        <div id="rxPv_totalProtein" style="font-size:20px;font-weight:800;color:#0f172a;"></div>
+        <div id="rxPv_proteinRate" style="font-size:11px;color:#64748b;"></div>
+      </div>
+    </div>
+
+    <div style="background:#fafafa;border:1px solid #e2e8f0;border-radius:8px;padding:12px;margin-bottom:16px;font-size:12px;">
+      <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+        <span style="color:#64748b;">Supplement Energy</span><span id="rxPv_suppKcal" style="font-weight:700;color:#0f172a;"></span>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+        <span style="color:#64748b;">Supplement Protein</span><span id="rxPv_suppProtein" style="font-weight:700;color:#0f172a;"></span>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+        <span style="color:#64748b;">Oral Intake</span><span id="rxPv_oralPct" style="font-weight:700;color:#0f172a;"></span>
+      </div>
+      <div style="display:flex;justify-content:space-between;">
+        <span style="color:#64748b;">Formulation</span><span id="rxPv_formulation" style="font-weight:700;color:#0f172a;"></span>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:10px;justify-content:flex-end;">
+      <button onclick="closeRxPreview()" style="background:#f1f5f9;border:none;border-radius:8px;padding:9px 18px;font-size:13px;cursor:pointer;color:#64748b;font-weight:600;">Close</button>
+      <button id="rxPv_openFull" style="background:#0e2247;color:#fff;border:none;border-radius:8px;padding:9px 18px;font-size:13px;cursor:pointer;font-weight:700;">Edit / Review Rx →</button>
+    </div>
+  </div>
+</div>
+
+<script>
+function showRxPreview(rxId, oralIntake) {
+  var rx = _wxRxList.find(function(r){ return r.id == rxId; });
+  if (!rx) return;
+  var t = rx.targets || {};
+  var overlay = document.getElementById('rxPreviewOverlay');
+  var isApproved = rx.status === 'APPROVED';
+
+  document.getElementById('rxPv_badge').textContent = isApproved ? '✓ Approved' : 'Pending Review';
+  document.getElementById('rxPv_badge').style.cssText = isApproved
+    ? 'display:inline-block;font-size:10px;font-weight:700;padding:3px 10px;border-radius:20px;background:#dcfce7;color:#15803d;margin-bottom:10px;'
+    : 'display:inline-block;font-size:10px;font-weight:700;padding:3px 10px;border-radius:20px;background:#fef9c3;color:#854d0e;margin-bottom:10px;';
+  document.getElementById('rxPv_title').textContent = 'Week ' + (rx.week_number || '—') + ' Prescription';
+  document.getElementById('rxPv_batch').textContent = rx.batch_code ? 'Batch: ' + rx.batch_code : '';
+
+  document.getElementById('rxPv_totalKcal').textContent    = t.totalKcal    ? Math.round(t.totalKcal) + ' kcal/day'  : '—';
+  document.getElementById('rxPv_kcalRate').textContent     = t.kcalPerKg    ? t.kcalPerKg + ' kcal/kg/day' : '';
+  document.getElementById('rxPv_totalProtein').textContent = t.totalProtein  ? t.totalProtein + ' g/day' : '—';
+  document.getElementById('rxPv_proteinRate').textContent  = t.proteinPerKg ? t.proteinPerKg + ' g/kg/day' : '';
+  document.getElementById('rxPv_suppKcal').textContent     = t.suppKcal    != null ? Math.round(t.suppKcal) + ' kcal'    : '—';
+  document.getElementById('rxPv_suppProtein').textContent  = t.suppProtein != null ? t.suppProtein + ' g'       : '—';
+  document.getElementById('rxPv_oralPct').textContent      = t.oralPct     != null ? t.oralPct + '%'            : '—';
+  document.getElementById('rxPv_formulation').textContent  = t.formulation || '—';
+
+  var openFull = document.getElementById('rxPv_openFull');
+  openFull.onclick = function() {
+    closeRxPreview();
+    window._lastMonitoringOralIntake = (oralIntake != null) ? Number(oralIntake) : null;
+    showWxRxPanel(rx);
+  };
+
+  overlay.style.display = 'flex';
+}
+function closeRxPreview() {
+  document.getElementById('rxPreviewOverlay').style.display = 'none';
+}
 </script>
 </body>
 

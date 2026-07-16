@@ -98,7 +98,7 @@ function generateNutritionPlan(patient, engineConfig) {
     c.includes('renal disease') || c.includes('renal impairment') || c.includes('renal insufficiency') ||
     c.includes('nephropathy') || c.includes('dialysis') || c.includes('aki') || c.includes('acute kidney')
   );
-  var hasRenalIssue = hasRenalDisease || creatinine > fv('creatinine_renal_danger', 1.3) || urea >= fv('urea_high', 50);
+  var hasRenalIssue = hasRenalDisease || creatinine > fv('creatinine_renal_danger', 1.3) || urea >= fv('urea_high', 45);
 
   // Toxicity grades — declared early to avoid temporal dead zone (used in hasNausea/hasMucositis below)
   const toxMucositis = parseInt(patient.toxMucositis || 0);
@@ -408,6 +408,18 @@ function generateNutritionPlan(patient, engineConfig) {
     }
   }
 
+  // ── DOCTOR-SPECIFIED FORMULA RATE OVERRIDES ───────────────────────────────
+  // If the doctor entered kcalPerKg / proteinPerKg at patient creation (or in the patient
+  // profile), use those values instead of the auto-calculated tiers.
+  // Renal safety cap on protein is always enforced regardless of override.
+  if (patient.kcalPerKg && parseFloat(patient.kcalPerKg) > 0) {
+    kcalPerKg = parseFloat(patient.kcalPerKg);
+  }
+  if (patient.proteinPerKg && parseFloat(patient.proteinPerKg) > 0) {
+    var _drProtein = parseFloat(patient.proteinPerKg);
+    proteinPerKg = hasRenalIssue ? Math.min(_drProtein, fv('protein_renal', 0.8)) : _drProtein;
+  }
+
   const baseDailyCalories = Math.round(calcWeight * kcalPerKg);
   const baseDailyProtein = Math.round(calcWeight * proteinPerKg);
 
@@ -685,8 +697,12 @@ function generateNutritionPlan(patient, engineConfig) {
     safetyStatus.steroidGlycemic = { level: 'warning', message: `STEROID GLYCAEMIA WATCH: Prednisolone + confirmed T2DM. Monitor blood glucose before each Prednisolone dose. Endocrinology review recommended.` };
   }
 
-  if (creatinine > 1.3) {
-    safetyStatus.renal = { level: 'danger', message: `CRITICAL RENAL ALERT: Creatinine ${creatinine} is elevated. Protein strictly restricted to 0.8g/kg.` };
+  if (creatinine > 1.3 && urea >= fv('urea_high', 45)) {
+    safetyStatus.renal = { level: 'danger', message: `CRITICAL RENAL ALERT: Creatinine ${creatinine} mg/dL AND Urea ${urea} mmol/L — both elevated. KDIGO protocol active. Protein strictly restricted to 0.8 g/kg. Nephrology review recommended.` };
+  } else if (creatinine > 1.3) {
+    safetyStatus.renal = { level: 'danger', message: `CRITICAL RENAL ALERT: Creatinine ${creatinine} mg/dL elevated (> 1.3). KDIGO protocol active. Protein strictly restricted to 0.8 g/kg.` };
+  } else if (urea >= fv('urea_high', 45)) {
+    safetyStatus.renal = { level: 'danger', message: `RENAL ALERT: Urea ${urea} mmol/L elevated (≥ 50). Renal impairment suspected. KDIGO protocol active — protein restricted to 0.8 g/kg. Check creatinine and eGFR; nephrology review recommended.` };
   } else if (creatinine >= 1.2 && hasCisplatin) {
     safetyStatus.renal = { level: 'warning', message: `RENAL BORDERLINE (Cisplatin): Creatinine ${creatinine} mg/dL — at/near upper safety threshold on a nephrotoxic platinum agent. Weekly creatinine monitoring mandatory each cycle. Escalation trigger: Creatinine >1.5 mg/dL = hold Cisplatin and escalate to nephrology. Do not dose-reduce protein without confirmed GFR decline.` };
   } else if (creatinine < 0.6) {

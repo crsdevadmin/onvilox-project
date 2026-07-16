@@ -985,5 +985,41 @@
     const rule = _rules.find(r => r.id === ruleId);
     if (!rule) return;
     if (!confirm(`Deactivate rule "${rule.rule_name}"? It will no longer apply to new patients.`)) return;
-    await fetch(`${apiBase}/api/engine-rules/${ruleId}`, {
-      
+    try {
+      const res = await fetch(`${apiBase}/api/engine-rules/${ruleId}`, {
+        method: 'PUT',
+        headers: headers(),
+        body: JSON.stringify({ status: 'inactive' })
+      });
+      if (!res.ok) throw new Error(await res.text());
+      await loadAll();
+    } catch (e) {
+      alert('Error deactivating rule: ' + e.message);
+    }
+  }
+
+  async function deleteRule(ruleId) {
+    const rule = _rules.find(r => r.id === ruleId);
+    if (!rule) return;
+    if (!confirm(`Permanently delete rule "${rule.rule_name}"? This cannot be undone.`)) return;
+    try {
+      const res = await fetch(`${apiBase}/api/engine-rules/${ruleId}`, {
+        method: 'DELETE',
+        headers: headers()
+      });
+      if (!res.ok) throw new Error(await res.text());
+      await loadAll();
+    } catch (e) {
+      alert('Error deleting rule: ' + e.message);
+    }
+  }
+
+  // Auth guard
+  auth.requireRole(['SUPER_ADMIN', 'ADMIN']);
+
+  // Initial load
+  loadAll();
+
+</script>
+</body>
+</html>

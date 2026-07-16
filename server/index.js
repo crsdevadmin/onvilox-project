@@ -246,11 +246,18 @@ app.get('/api/patients/:id', authenticateToken, async (req, res) => {
     if (row.usual_weight != null) patientData.usualWeight = row.usual_weight;
     if (row.height != null) patientData.height = row.height;
     if (row.sex    != null) patientData.sex    = row.sex;
-    if (row.albumin != null) patientData.albumin = row.albumin;
-    if (row.crp != null) patientData.crp = row.crp;
+    if (row.albumin    != null) patientData.albumin    = row.albumin;
+    if (row.crp        != null) patientData.crp        = row.crp;
     if (row.creatinine != null) patientData.creatinine = row.creatinine;
+    if (row.urea       != null) patientData.urea       = row.urea;
+    if (row.sodium     != null) patientData.sodium     = row.sodium;
+    if (row.potassium  != null) patientData.potassium  = row.potassium;
     if (row.blood_sugar != null) patientData.bloodSugar = row.blood_sugar;
-    if (row.status != null) patientData.status = row.status;
+    if (row.hemoglobin != null) patientData.hemoglobin = row.hemoglobin;
+    if (row.alt        != null) patientData.alt        = row.alt;
+    if (row.ast        != null) patientData.ast        = row.ast;
+    if (row.bilirubin  != null) patientData.bilirubin  = row.bilirubin;
+    if (row.status     != null) patientData.status     = row.status;
     res.json(patientData);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -564,7 +571,22 @@ function calcWeeklyRecipe(suppKcal, suppProtein, formulation) {
   };
 }
 
-function calcWeeklyRxTargets(baseline, mon) {
+// Helper: fetch engine_formulas from DB and return as { id: value } map
+async function loadFormulaConstants(pool) {
+  try {
+    const r = await pool.query('SELECT id, value FROM engine_formulas');
+    const map = {};
+    r.rows.forEach(row => { map[row.id] = row.value; });
+    return map;
+  } catch(e) {
+    console.warn('loadFormulaConstants failed, using hardcoded defaults:', e.message);
+    return {};
+  }
+}
+
+function calcWeeklyRxTargets(baseline, mon, formulas) {
+  // formulas = rows from engine_formulas keyed by id (e.g. formulas.kcal_cachexia = 35)
+  const F = formulas || {};
   const fd = baseline || {};
 
   // ── STATIC — always from patient's saved baseline record, never re-entered ─
@@ -574,51 +596,60 @@ function calcWeeklyRxTargets(baseline, mon) {
   const giIssues    = fd.giIssues            || false;  // patient.giIssues (hydrolyzed?)
 
   // ── DYNAMIC — from weekly monitoring; fall back to last saved baseline value ─
-  const weight  = mon.weight     != null ? mon.weight     : (fd.weight      || null);
-  const ecog    = parseInt(mon.ecog != null ? mon.ecog    : (fd.ecogStatus  || '0'), 10);
-  const albumin = mon.albumin    != null ? mon.albumin    : (fd.albumin     || null);
-  const crp     = mon.crp        != null ? mon.crp        : (fd.crp         || null);
-  const glucose = mon.glucose    != null ? mon.glucose    : (fd.bloodSugar  || null);
+  const weight     = mon.weight      != null ? mon.weight      : (fd.weight      || null);
+  const ecog       = parseInt(mon.ecog != null ? mon.ecog      : (fd.ecogStatus  || '0'), 10);
+  const albumin    = mon.albumin     != null ? mon.albumin     : (fd.albumin     || null);
+  const crp        = mon.crp         != null ? mon.crp         : (fd.crp         || null);
+  const glucose    = mon.glucose     != null ? mon.glucose     : (fd.bloodSugar  || null);
+  const creatinine = mon.creatinine  != null ? mon.creatinine  : (fd.creatinine  || null);
+  const urea       = mon.urea        != null ? mon.urea        : (fd.urea        || null);
 
   // ── Feeding route — preserved from initial plan ──
   // Read from finalPlan.feedingMethod first, then patient-level fields
   const _fp0 = fd.finalPlan || fd.engineOutput || {};
   const feedingRoute = _fp0.feedingMethod || _fp0.prescribedRoute
                     || fd.prescribedRoute  || fd.feedingMethod || '';
-  // Tube feed / enteral / parenteral patients have 0% oral intake —
-  // the supplement IS the full feeding; do not split off a diet portion.
-  const isTubeFeed = /enteral|tube|ng[- ]?tube|peg|jej|parenteral|tpn/i.test(feedingRoute);
+  // isTubeFeed based on saved plan's feeding route — but monitoring oralIntake overrides this.
+  // If the doctor records oralIntake > 0 in the monitoring form, the patient IS eating orally.
+  const _savedRouteIsTube = /enteral|tube|ng[- ]?tube|peg|jej|parenteral|tpn/i.test(feedingRoute);
+  const isTubeFeed = (mon.oralIntake != null)
+    ? (Number(mon.oralIntake) === 0)   // monitoring is ground truth: 0% oral = tube, >0 = partial oral
+    : _savedRouteIsTube;
 
   // oralIntake from monitoring is 0–100 %; baseline stores reducedFoodIntake (deficit %)
-  // Tube-feed patients always get oralPct = 0 (full replacement formula)
-  const oralPct = isTubeFeed ? 0
-    : (mon.oralIntake != null
-        ? mon.oralIntake
-        : (fd.reducedFoodIntake != null ? 100 - fd.reducedFoodIntake : 60));
+  const oralPct = (mon.oralIntake != null)
+    ? Number(mon.oralIntake)   // monitoring entry is always the ground truth
+    : (isTubeFeed ? 0 : (fd.reducedFoodIntake != null ? 100 - fd.reducedFoodIntake : 60));
 
   if (!weight) return null; // need at least weight
 
   // IBW (Hamwi) — use saved value from finalPlan first (same number doctor approved),
   // recalculate from height only as a fallback.
+  // Sanity-check: if saved IBW is < 40% of actual weight it was computed from wrong
+  // height data (e.g. height entered in metres instead of cm) — discard and recalculate.
   let calcWeight = weight;
   let ibw = null;
   let bsa = null;
+  const isFemaleIBW = sex && (sex.toLowerCase() === 'female' || sex.toLowerCase() === 'f');
   if (_fp0.ibw) {
-    // Authoritative: saved IBW from the initial plan
-    ibw = Math.round(_fp0.ibw * 10) / 10;
-    calcWeight = weightBasis === 'ibw' ? ibw : weight;
-    if (height) bsa = Math.round(Math.sqrt(height * weight / 3600) * 100) / 100;
-  } else if (height) {
-    // Fallback: recalculate Hamwi from stored height
+    const candidateIbw = Math.round(_fp0.ibw * 10) / 10;
+    // Plausibility gate: saved IBW must be at least 40% of the monitoring weight.
+    // If not, the saved IBW was computed from bad height data — recalculate instead.
+    const ibwIsPlausible = !weight || (candidateIbw >= weight * 0.4 && candidateIbw <= weight * 1.5);
+    if (ibwIsPlausible) {
+      ibw = candidateIbw;
+    }
+  }
+  if (!ibw && height) {
+    // Recalculate Hamwi from stored height
     const heightIn = height / 2.54;
-    const isFemale = sex && (sex.toLowerCase() === 'female' || sex.toLowerCase() === 'f');
-    ibw = isFemale
+    ibw = isFemaleIBW
       ? Math.max(30, 45.5 + 2.2 * (heightIn - 60))
       : Math.max(30, 48   + 2.7 * (heightIn - 60));
     ibw = Math.round(ibw * 10) / 10;
-    calcWeight = weightBasis === 'ibw' ? ibw : weight;
-    bsa = Math.round(Math.sqrt(height * weight / 3600) * 100) / 100;
   }
+  calcWeight = (weightBasis === 'ibw' && ibw) ? ibw : weight;
+  if (height) bsa = Math.round(Math.sqrt(height * weight / 3600) * 100) / 100;
 
   // ── Read base kcal/kg and protein/kg from the patient's saved initial prescription ──
   // Try finalPlan first, then engineOutput, then top-level fd fields.
@@ -629,7 +660,19 @@ function calcWeeklyRxTargets(baseline, mon) {
     || (fp.baseEnergy && fp.calcWeight ? Math.round(fp.baseEnergy / fp.calcWeight) : null)
     || fd.kcalPerKg
     || null;
-  const baseKcalPerKg = _fpKcalPerKg || 35;  // 35 = oncology high-risk default (cachexia/MUST≥2)
+  // Formula grid defaults (from engine_formulas table, admin-configurable)
+  const fKcalCachexia       = parseFloat(F.kcal_cachexia)           || 35;
+  const fKcalModerate       = parseFloat(F.kcal_moderate_risk)      || 30;
+  const fKcalStable         = parseFloat(F.kcal_stable)             || 25;
+  const fProtCachexia       = parseFloat(F.protein_cachexia)        || 1.8;
+  const fProtBaseline       = parseFloat(F.protein_baseline)        || 1.4;
+  const fProtHighCatab      = parseFloat(F.protein_high_catabolism) || 2.0;
+  const fProtRenal          = parseFloat(F.protein_renal)           || 0.8;  // KDIGO cap
+  const fCreatinineRenal    = parseFloat(F.creatinine_renal_danger) || 1.3;
+  const fUreaHigh           = parseFloat(F.urea_high)               || 45;
+
+  // Doctor override from monitoring entry takes highest priority
+  const baseKcalPerKg = mon.kcalPerKg || _fpKcalPerKg || fKcalCachexia;
 
   // protein/kg: stored value → derive from totalDailyProtein/calcWeight → stored dailyProtein/calcWeight → default
   const _fpProtPerKg = fp.proteinPerKg
@@ -637,23 +680,33 @@ function calcWeeklyRxTargets(baseline, mon) {
     || (fp.dailyProtein && fp.calcWeight      ? Math.round((fp.dailyProtein / fp.calcWeight) * 2 * 10) / 10 : null)
     || fd.proteinPerKg
     || null;
-  const baseProteinPerKg = _fpProtPerKg || 1.4;
+  // Doctor override from monitoring entry takes highest priority
+  const baseProteinPerKg = mon.proteinPerKg || _fpProtPerKg || fProtBaseline;
 
   // ECOG adjustment: step down if status has deteriorated from baseline
   const baseEcog = parseInt(fd.ecogStatus || '0', 10);
   let kcalPerKg = baseKcalPerKg;
-  if      (ecog >= 3 && baseEcog < 3) kcalPerKg = Math.max(25, baseKcalPerKg - 7);
-  else if (ecog >= 2 && baseEcog < 2) kcalPerKg = Math.max(28, baseKcalPerKg - 4);
+  if      (ecog >= 3 && baseEcog < 3) kcalPerKg = Math.max(fKcalStable,    baseKcalPerKg - 7);
+  else if (ecog >= 2 && baseEcog < 2) kcalPerKg = Math.max(fKcalModerate - 2, baseKcalPerKg - 4);
 
   const totalKcal = Math.round(calcWeight * kcalPerKg);
 
-  // Protein: albumin-driven, floored at the initial plan's protein/kg
-  const proteinPerKg = (!albumin || albumin >= 3.5)
+  // Protein: albumin-driven, then hard-capped by renal safety rule
+  const fAlbuminLow  = parseFloat(F.albumin_low_threshold)      || 3.5;
+  const fAlbuminCrit = parseFloat(F.albumin_critical_threshold) || 3.0;
+  let proteinPerKg = (!albumin || albumin >= fAlbuminLow)
     ? baseProteinPerKg
-    : albumin >= 2.5
-      ? Math.max(baseProteinPerKg, 1.7)
-      : Math.max(baseProteinPerKg, 2.0);
-  const totalProtein = Math.round(calcWeight * proteinPerKg); // whole number to match initial prescription
+    : albumin >= fAlbuminCrit
+      ? Math.max(baseProteinPerKg, fProtCachexia)
+      : Math.max(baseProteinPerKg, fProtHighCatab);
+
+  // KDIGO renal safety cap — highest priority, overrides all other protein targets.
+  // Triggered when creatinine ≥ 1.3 mg/dL OR urea ≥ 50 mmol/L.
+  const hasRenalFlag = (creatinine != null && creatinine >= fCreatinineRenal)
+                    || (urea       != null && urea       >= fUreaHigh);
+  if (hasRenalFlag) proteinPerKg = Math.min(proteinPerKg, fProtRenal);
+
+  const totalProtein = Math.round(calcWeight * proteinPerKg * 10) / 10; // one decimal to show cap clearly
 
   // Supplement portion
   const oralKcal    = Math.round(totalKcal    * (oralPct / 100));
@@ -670,7 +723,13 @@ function calcWeeklyRxTargets(baseline, mon) {
                      : 'Standard';
 
   const flags = [];
-  if (albumin && albumin < 3.5) flags.push(`Low albumin (${albumin} g/dL) → protein target increased to ${proteinPerKg} g/kg`);
+  if (hasRenalFlag) {
+    const renalReason = (creatinine != null && creatinine >= fCreatinineRenal)
+      ? `Creatinine ${creatinine} mg/dL (≥${fCreatinineRenal})`
+      : `Urea ${urea} mmol/L (≥${fUreaHigh})`;
+    flags.push(`⚠️ RENAL: ${renalReason} — KDIGO protocol applied, protein capped to ${fProtRenal} g/kg (${totalProtein}g/day)`);
+  }
+  if (albumin && albumin < 3.5 && !hasRenalFlag) flags.push(`Low albumin (${albumin} g/dL) → protein target increased to ${proteinPerKg} g/kg`);
   if (isAntiInflam) flags.push(`High CRP (${crp} mg/L) → anti-inflammatory formulation`);
   if (isDiabetic)   flags.push(`High glucose (${glucose} mg/dL) → diabetic formulation`);
   if (ecog >= 3)    flags.push(`ECOG ${ecog} → reduced calorie target (${kcalPerKg} kcal/kg)`);
@@ -714,7 +773,8 @@ app.post('/api/patients/:id/monitoring', authenticateToken, async (req, res) => 
           baseline.finalPlan   = planRow.rows[0].final_plan   || baseline.finalPlan;
           baseline.engineOutput = planRow.rows[0].engine_output || baseline.engineOutput;
         }
-        const targets  = calcWeeklyRxTargets(baseline, data);
+        const formulaConstants = await loadFormulaConstants(pool);
+        const targets  = calcWeeklyRxTargets(baseline, data, formulaConstants);
         if (targets) {
           // Batch code: StudyID-Wn-YYMM (fall back to patientId prefix)
           const enr = await pool.query('SELECT study_id FROM trial_enrollments WHERE patient_id=$1', [req.params.id]);
@@ -722,7 +782,10 @@ app.post('/api/patients/:id/monitoring', authenticateToken, async (req, res) => 
           const now = new Date();
           const yymm = String(now.getFullYear()).slice(2) + String(now.getMonth()+1).padStart(2,'0');
           const weekNo = data.week || 1;
-          const batchCode = `${studyId}-W${weekNo}-${yymm}`;
+          // Include last 4 digits of patient ID to prevent batch code collisions
+          // when two patients share the same studyId prefix and week number
+          const patSuffix = String(req.params.id).replace(/\D/g,'').slice(-4).padStart(4,'0');
+          const batchCode = `${studyId}-W${weekNo}-${yymm}-${patSuffix}`;
 
           // Baseline snapshot for delta comparison (uses correct patient field names)
           const baselineSnap = {
@@ -734,19 +797,34 @@ app.post('/api/patients/:id/monitoring', authenticateToken, async (req, res) => 
                           ? 100 - baseline.reducedFoodIntake : null
           };
 
-          const rxRes = await pool.query(
-            `INSERT INTO weekly_prescriptions
-               (patient_id, week_number, monitoring_log_id, batch_code,
-                clinical_params, targets, baseline_snapshot, status, created_by)
-             VALUES ($1,$2,$3,$4,$5,$6,$7,'PENDING_REVIEW',$8)
-             ON CONFLICT (patient_id, week_number) DO UPDATE
-               SET clinical_params=$5, targets=$6, batch_code=$4,
-                   monitoring_log_id=$3, status='PENDING_REVIEW', updated_at=NOW()
-             RETURNING *`,
-            [req.params.id, weekNo, log.id, batchCode,
-             JSON.stringify(data), JSON.stringify(targets),
-             JSON.stringify(baselineSnap), req.user.id]
+          // Explicit SELECT → UPDATE or INSERT to avoid batch_code unique constraint conflicts
+          const existingRxAuto = await pool.query(
+            'SELECT id FROM weekly_prescriptions WHERE patient_id=$1 AND week_number=$2',
+            [req.params.id, weekNo]
           );
+          let rxRes;
+          if (existingRxAuto.rowCount) {
+            rxRes = await pool.query(
+              `UPDATE weekly_prescriptions
+                 SET monitoring_log_id=$1, batch_code=$2, clinical_params=$3,
+                     targets=$4, baseline_snapshot=$5, status='PENDING_REVIEW', updated_at=NOW()
+               WHERE patient_id=$6 AND week_number=$7
+               RETURNING *`,
+              [log.id, batchCode, JSON.stringify(data), JSON.stringify(targets),
+               JSON.stringify(baselineSnap), req.params.id, weekNo]
+            );
+          } else {
+            rxRes = await pool.query(
+              `INSERT INTO weekly_prescriptions
+                 (patient_id, week_number, monitoring_log_id, batch_code,
+                  clinical_params, targets, baseline_snapshot, status, created_by)
+               VALUES ($1,$2,$3,$4,$5,$6,$7,'PENDING_REVIEW',$8)
+               RETURNING *`,
+              [req.params.id, weekNo, log.id, batchCode,
+               JSON.stringify(data), JSON.stringify(targets),
+               JSON.stringify(baselineSnap), req.user.id]
+            );
+          }
           weeklyRx = rxRes.rows[0];
         }
       } catch(rxErr) { console.error('weekly_rx auto-gen:', rxErr.message); }
@@ -761,33 +839,38 @@ app.post('/api/patients/:id/generate-weekly-rx', authenticateToken, async (req, 
   const { monitoringLogId, weekNumber } = req.body;
   if (!monitoringLogId) return res.status(400).json({ error: 'monitoringLogId required' });
   try {
-    const logRow = await pool.query('SELECT * FROM monitoring_logs WHERE id=$1 AND patient_id=$2', [monitoringLogId, req.params.id]);
+    const patId = req.params.id;
+    const logRow = await pool.query('SELECT * FROM monitoring_logs WHERE id=$1 AND patient_id=$2', [monitoringLogId, patId]);
     if (!logRow.rowCount) return res.status(404).json({ error: 'Monitoring log not found' });
     const data = logRow.rows[0].data || {};
 
-    const patRow = await pool.query('SELECT full_data, height, sex FROM patients WHERE id=$1', [req.params.id]);
-    const baseline = patRow.rows[0] ? (patRow.rows[0].full_data || {}) : {};
+    const patRow = await pool.query('SELECT full_data, height, sex FROM patients WHERE id=$1', [patId]);
+    if (!patRow.rowCount) return res.status(404).json({ error: 'Patient not found' });
+    const baseline = patRow.rows[0].full_data || {};
     // Dedicated columns override stale full_data blob (same merge as GET /api/patients/:id)
-    if (patRow.rows[0] && patRow.rows[0].height != null) baseline.height = patRow.rows[0].height;
-    if (patRow.rows[0] && patRow.rows[0].sex    != null) baseline.sex    = patRow.rows[0].sex;
+    if (patRow.rows[0].height != null) baseline.height = patRow.rows[0].height;
+    if (patRow.rows[0].sex    != null) baseline.sex    = patRow.rows[0].sex;
     // Pull finalPlan from nutrition_plans (it's NOT in patients.full_data)
     const planRow2 = await pool.query(
       'SELECT final_plan, engine_output FROM nutrition_plans WHERE patient_id=$1 ORDER BY version DESC LIMIT 1',
-      [req.params.id]
+      [patId]
     );
     if (planRow2.rowCount) {
       baseline.finalPlan    = planRow2.rows[0].final_plan    || baseline.finalPlan;
       baseline.engineOutput = planRow2.rows[0].engine_output || baseline.engineOutput;
     }
-    const targets  = calcWeeklyRxTargets(baseline, data);
+    const formulaConstants2 = await loadFormulaConstants(pool);
+    const targets  = calcWeeklyRxTargets(baseline, data, formulaConstants2);
     if (!targets) return res.status(422).json({ error: 'Cannot calculate — patient weight missing from profile or monitoring entry' });
 
-    const enr = await pool.query('SELECT study_id FROM trial_enrollments WHERE patient_id=$1', [req.params.id]);
-    const studyId = enr.rows[0] ? enr.rows[0].study_id : req.params.id.slice(0,6).toUpperCase();
+    const enr = await pool.query('SELECT study_id FROM trial_enrollments WHERE patient_id=$1', [patId]);
+    const studyId = enr.rows[0] ? enr.rows[0].study_id : patId.slice(0,6).toUpperCase();
     const now = new Date();
     const yymm = String(now.getFullYear()).slice(2) + String(now.getMonth()+1).padStart(2,'0');
     const weekNo = weekNumber || data.week || 1;
-    const batchCode = `${studyId}-W${weekNo}-${yymm}`;
+    // Include last 4 digits of patient ID to prevent batch_code collisions across patients
+    const patSuffix2 = String(patId).replace(/\D/g,'').slice(-4).padStart(4,'0');
+    const batchCode = `${studyId}-W${weekNo}-${yymm}-${patSuffix2}`;
 
     const baselineSnap = {
       weight:     baseline.weight    || null,
@@ -797,38 +880,48 @@ app.post('/api/patients/:id/generate-weekly-rx', authenticateToken, async (req, 
       oralIntake: baseline.reducedFoodIntake != null ? 100 - baseline.reducedFoodIntake : null
     };
 
-    // Always regenerate when the doctor explicitly clicks "Generate Rx" —
-    // even if previously APPROVED. Reset manufacturing job so the store
-    // does not print stale labels until the doctor re-approves.
+    // Use explicit SELECT → UPDATE or INSERT to avoid ON CONFLICT issues.
     const existing = await pool.query(
       'SELECT * FROM weekly_prescriptions WHERE patient_id=$1 AND week_number=$2',
-      [req.params.id, weekNo]
+      [patId, weekNo]
     );
-    if (existing.rowCount && existing.rows[0].status === 'APPROVED') {
-      // Reset the manufacturing job so store cannot print until re-approved
-      await pool.query(
-        `UPDATE manufacturing_jobs SET status='APPROVED', batch_no=NULL,
-          mfg_date=NULL, exp_date=NULL, updated_at=NOW()
-         WHERE id=$1`,
-        ['wxjob_' + req.params.id + '_w' + weekNo]
-      ).catch(() => {}); // job may not exist yet — ignore error
-    }
 
-    const rxRes = await pool.query(
-      `INSERT INTO weekly_prescriptions
-         (patient_id, week_number, monitoring_log_id, batch_code,
-          clinical_params, targets, baseline_snapshot, status, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,'PENDING_REVIEW',$8)
-       ON CONFLICT (patient_id, week_number) DO UPDATE
-         SET clinical_params=$5, targets=$6, batch_code=$4,
-             monitoring_log_id=$3, status='PENDING_REVIEW', updated_at=NOW()
-       RETURNING *`,
-      [req.params.id, weekNo, monitoringLogId, batchCode,
-       JSON.stringify(data), JSON.stringify(targets),
-       JSON.stringify(baselineSnap), req.user.id]
-    );
+    let rxRes;
+    if (existing.rowCount) {
+      // Record already exists — UPDATE it in place
+      if (existing.rows[0].status === 'APPROVED') {
+        // Reset the manufacturing job so store cannot print until re-approved
+        await pool.query(
+          `UPDATE manufacturing_jobs SET status='APPROVED', batch_no=NULL,
+            mfg_date=NULL, exp_date=NULL, updated_at=NOW()
+           WHERE id=$1`,
+          ['wxjob_' + patId + '_w' + weekNo]
+        ).catch(() => {});
+      }
+      rxRes = await pool.query(
+        `UPDATE weekly_prescriptions
+           SET monitoring_log_id=$1, batch_code=$2, clinical_params=$3,
+               targets=$4, baseline_snapshot=$5, status='PENDING_REVIEW', updated_at=NOW()
+         WHERE patient_id=$6 AND week_number=$7
+         RETURNING *`,
+        [monitoringLogId, batchCode, JSON.stringify(data), JSON.stringify(targets),
+         JSON.stringify(baselineSnap), patId, weekNo]
+      );
+    } else {
+      // No record yet — INSERT fresh
+      rxRes = await pool.query(
+        `INSERT INTO weekly_prescriptions
+           (patient_id, week_number, monitoring_log_id, batch_code,
+            clinical_params, targets, baseline_snapshot, status, created_by)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,'PENDING_REVIEW',$8)
+         RETURNING *`,
+        [patId, weekNo, monitoringLogId, batchCode,
+         JSON.stringify(data), JSON.stringify(targets),
+         JSON.stringify(baselineSnap), req.user.id]
+      );
+    }
     res.json(rxRes.rows[0]);
-  } catch(e) { res.status(500).json({ error: e.message }); }
+  } catch(e) { console.error('[generate-weekly-rx] Error:', e); res.status(500).json({ error: e.message }); }
 });
 
 // Weekly prescriptions — list for a patient
@@ -1248,8 +1341,27 @@ app.get('/api/trials/outcomes', authenticateToken, async (req, res) => {
     const jobsRes = await pool.query('SELECT DISTINCT patient_id FROM manufacturing_jobs');
     const ids = jobsRes.rows.map(r => r.patient_id).filter(Boolean);
     if (!ids.length) return res.json({ patients: [] });
-    const pats = (await pool.query('SELECT id, name FROM patients WHERE id = ANY($1)', [ids])).rows;
-    const nameById = {}; pats.forEach(p => { nameById[p.id] = p.name; });
+    const pats = (await pool.query(
+      'SELECT id, name, weight, albumin, crp, muac, hand_grip, ecog_status, full_data FROM patients WHERE id = ANY($1)', [ids]
+    )).rows;
+    const nameById = {};
+    const baselineById = {};
+    pats.forEach(p => {
+      nameById[p.id] = p.name;
+      const fd = p.full_data || {};
+      const reducedFI = fd.reducedFoodIntake != null ? fd.reducedFoodIntake : null;
+      baselineById[p.id] = {
+        weight:     p.weight      != null ? p.weight      : (fd.weight     || null),
+        albumin:    p.albumin     != null ? p.albumin     : (fd.albumin    || null),
+        crp:        p.crp         != null ? p.crp         : (fd.crp        || null),
+        muac:       p.muac        != null ? p.muac        : (fd.muac       || null),
+        handGrip:   p.hand_grip   != null ? p.hand_grip   : (fd.handGrip   || null),
+        bmi:        fd.bmi        != null ? fd.bmi        : null,
+        ecog:       p.ecog_status != null ? p.ecog_status : (fd.ecogStatus || null),
+        oralIntake: reducedFI     != null ? (100 - reducedFI) : null,
+        compliance: null
+      };
+    });
     const trials = (await pool.query('SELECT patient_id, study_id FROM trial_enrollments WHERE patient_id = ANY($1)', [ids])).rows;
     const studyByPat = {}; trials.forEach(t => { studyByPat[t.patient_id] = t.study_id; });
     const logs = (await pool.query(
@@ -1299,6 +1411,7 @@ app.get('/api/trials/outcomes', authenticateToken, async (req, res) => {
       patientId: id,
       studyId: studyByPat[id] || null,
       name: nameById[id] || '—',
+      baseline: baselineById[id] || null,
       weeks: byPat[id] || [],
       days: dayByPat[id] || []
     })).sort((a, b) => String(a.studyId).localeCompare(String(b.studyId)));
@@ -1992,11 +2105,12 @@ ENTERAL ESCALATION:
 - State that nasogastric or nasoduodenal tube feeding must be initiated immediately.
 
 PROTEIN SAFETY:
-- The renal protein cap of 0.8 g/kg applies ONLY when creatinine > 1.3 mg/dL (KDIGO guideline). If creatinine ≤ 1.3, this cap must NOT be applied.
-- For cachexia OR sarcopenia patients with creatinine ≤ 1.3: minimum protein is 1.6 g/kg.
-- For patients with BOTH (cachexia OR sarcopenia) AND (immunotherapy checkpoint inhibitor — pembrolizumab, nivolumab, atezolizumab, durvalumab — OR platinum agents): minimum protein is 1.6 g/kg due to combined immunometabolic and anti-catabolic demand.
-- If totalDailyProtein is below plan.calcWeight × 1.4 g/kg AND creatinine ≤ 1.3 AND cachexia or sarcopenia present: generate HIGH alert "PROTEIN_CRITICAL_UNDERDOSE", set isOverpowered:true, correctedPrescription.dailyProtein = plan.calcWeight × 1.6.
-- If totalDailyProtein is below plan.calcWeight × 1.5 g/kg AND patient has BOTH (cachexia or sarcopenia) AND (immunotherapy or platinum): generate HIGH alert "PROTEIN_UNDERDOSE_IMMUNOTHERAPY", set isOverpowered:true, correctedPrescription.dailyProtein = plan.calcWeight × 1.6. State that 1.6 g/kg is the minimum for this immunometabolic profile and that underdosing accelerates muscle catabolism, worsens sarcopenia, and increases chemotherapy toxicity risk.
+- The renal protein cap of 0.8 g/kg applies when creatinine > 1.3 mg/dL OR urea ≥ 50 mmol/L (KDIGO guideline + renal function indicator). If the engine has already applied this cap, DO NOT override it — respect it as a non-negotiable safety ceiling.
+- If creatinine ≤ 1.3 AND urea < 50: no renal cap. For cachexia OR sarcopenia patients in this case: minimum protein is 1.6 g/kg.
+- For patients with BOTH (cachexia OR sarcopenia) AND (immunotherapy checkpoint inhibitor — pembrolizumab, nivolumab, atezolizumab, durvalumab — OR platinum agents) AND creatinine ≤ 1.3 AND urea < 50: minimum protein is 1.6 g/kg due to combined immunometabolic and anti-catabolic demand.
+- If totalDailyProtein is below plan.calcWeight × 1.4 g/kg AND creatinine ≤ 1.3 AND urea < 50 AND cachexia or sarcopenia present: generate HIGH alert "PROTEIN_CRITICAL_UNDERDOSE", set isOverpowered:true, correctedPrescription.dailyProtein = plan.calcWeight × 1.6.
+- If totalDailyProtein is below plan.calcWeight × 1.5 g/kg AND patient has BOTH (cachexia or sarcopenia) AND (immunotherapy or platinum) AND creatinine ≤ 1.3 AND urea < 50: generate HIGH alert "PROTEIN_UNDERDOSE_IMMUNOTHERAPY", set isOverpowered:true, correctedPrescription.dailyProtein = plan.calcWeight × 1.6. State that 1.6 g/kg is the minimum for this immunometabolic profile and that underdosing accelerates muscle catabolism, worsens sarcopenia, and increases chemotherapy toxicity risk.
+- CRITICAL: Never raise protein above 0.8 g/kg when creatinine > 1.3 OR urea ≥ 50 — doing so risks accelerating renal failure in an oncology patient.
 
 ANTIFOLATE TOXICITY:
 - If the regimen contains Pemetrexed, Methotrexate, or FOLFIRINOX AND patient folate < 5 ng/mL: generate HIGH alert type "FOLATE_DEFICIENCY_ANTIFOLATE".
@@ -2472,7 +2586,7 @@ OUTPUT FORMAT — return ONLY valid JSON, no markdown, no text outside the JSON 
         { id:'magnesium_low',             category:'safety_labs',  name:'magnesium_low',             description:'Magnesium below this value triggers correction protocol (200–400mg Mg)',                         value:'1.7',  unit:'mg/dL',        source:'Clinical' },
         { id:'tsh_high',                  category:'safety_labs',  name:'tsh_high',                  description:'TSH above this value triggers metabolic rate flag',                                              value:'5.0',  unit:'mU/L',         source:'Clinical' },
         { id:'prealbumin_low',            category:'safety_labs',  name:'prealbumin_low',            description:'Prealbumin below this value used as a compound malnutrition factor',                             value:'18',   unit:'mg/dL',        source:'Clinical' },
-        { id:'urea_high',                 category:'safety_labs',  name:'urea_high',                 description:'Urea at or above this value contributes to renal issue flag (alongside creatinine)',             value:'50',   unit:'mmol/L',       source:'Clinical' },
+        { id:'urea_high',                 category:'safety_labs',  name:'urea_high',                 description:'Urea at or above this value contributes to renal issue flag (alongside creatinine)',             value:'45',   unit:'mg/dL',        source:'Clinical' },
         { id:'wbc_neutropenia',           category:'safety_labs',  name:'wbc_neutropenia',           description:'WBC below this value triggers neutropenia food safety protocol (no live cultures)',              value:'3500', unit:'/µL',          source:'ESMO' },
         { id:'wbc_severe_neutropenia',    category:'safety_labs',  name:'wbc_severe_neutropenia',    description:'WBC below this value triggers severe neutropenia danger protocol (G-CSF assessment)',            value:'2000', unit:'/µL',          source:'ESMO' },
         { id:'alt_liver_threshold',       category:'safety_labs',  name:'alt_liver_threshold',       description:'ALT above this value signals liver compromise (+2 risk score)',                                  value:'50',   unit:'IU/L',         source:'Clinical' },
@@ -2631,6 +2745,7 @@ OUTPUT FORMAT — return ONLY valid JSON, no markdown, no text outside the JSON 
       // ── Force-correct WBC thresholds to /µL units (fix for ON CONFLICT DO NOTHING leaving stale values) ──
       await pool.query(`UPDATE engine_formulas SET value = '3500', unit = '/µL' WHERE id = 'wbc_neutropenia'`);
       await pool.query(`UPDATE engine_formulas SET value = '2000', unit = '/µL' WHERE id = 'wbc_severe_neutropenia'`);
+      await pool.query(`UPDATE engine_formulas SET value = '45', unit = 'mg/dL' WHERE id = 'urea_high'`);
 
       // ── One-time migrations: remove deprecated / orphaned parameters ────────
       await pool.query(`DELETE FROM engine_formulas WHERE id IN (

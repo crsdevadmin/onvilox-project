@@ -331,6 +331,12 @@
 
     // If inputs identical and no significant change, update existing plan in place
     if (existing && JSON.stringify(existing.inputsSnapshot) === JSON.stringify(inputsSnapshot)) {
+      // If protein target changed (e.g., renal cap now applies), clear stale AI insights so they regenerate
+      const oldProtein = existing.finalPlan && existing.finalPlan.proteinPerKg;
+      const newProtein = finalPlan.proteinPerKg;
+      if (oldProtein && newProtein && Math.abs(oldProtein - newProtein) >= 0.05) {
+        delete existing.claudeInsights;
+      }
       existing.finalPlan = finalPlan;
       existing.engineOutput = engineOutput;
       existing.overrides = Object.assign(existing.overrides || {}, overrides || {});
