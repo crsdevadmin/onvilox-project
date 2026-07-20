@@ -1426,7 +1426,16 @@ app.get('/api/trials/:patientId/journey', authenticateToken, async (req, res) =>
     const pat = (await pool.query('SELECT id, uhic, name, cancer, created_date, created_at FROM patients WHERE id=$1', [pid])).rows[0];
     if (!pat) return res.status(404).json({ error: 'Patient not found' });
     const trial = (await pool.query('SELECT * FROM trial_enrollments WHERE patient_id=$1', [pid])).rows[0] || null;
-    const job = (await pool.query('SELECT status, history, mfg_date, batch_no, created_at FROM manufacturing_jobs WHERE patient_id=$1 ORDER BY created_at DESC LIMIT 1', [pid])).rows[0] || null;
+    const allJobs = (await pool.query('SELECT id, status, history, mfg_date, exp_date, batch_no, created_at FROM manufacturing_jobs WHERE patient_id=$1 ORDER BY created_at ASC', [pid])).rows;
+    // Initial product job = first non-weekly job (weekly jobs have id 'wxjob_...')
+    const job = allJobs.find(j => !String(j.id).startsWith('wxjob_')) || allJobs[0] || null;
+    let weeklyRx = [];
+    try {
+      weeklyRx = (await pool.query(
+        `SELECT wp.week_number, wp.status, wp.approved_at, wp.batch_code, u.name AS approved_by_name
+           FROM weekly_prescriptions wp LEFT JOIN users u ON u.id = wp.approved_by
+          WHERE wp.patient_id=$1 ORDER BY wp.week_number ASC`, [pid])).rows;
+    } catch(_) {}
     const planRes = await pool.query('SELECT generated_at FROM nutrition_plans WHERE patient_id=$1 ORDER BY generated_at ASC', [pid]);
     const weeklyRes = await pool.query(`SELECT recorded_at FROM monitoring_logs WHERE patient_id=$1 AND type='weekly' ORDER BY recorded_at ASC`, [pid]);
     const settings = (await pool.query('SELECT * FROM pilot_settings WHERE id=1')).rows[0] || { pilot_weeks: 6 };
@@ -1454,6 +1463,35 @@ app.get('/api/trials/:patientId/journey', authenticateToken, async (req, res) =>
       trialStatus = (wk > 0 && lastAt && (Date.now() - lastAt) > lostThreshold) ? 'Lost to Follow-up' : 'Active';
     } else trialStatus = 'Enrolled';
 
+    // Per-product dispatch timeline: initial job + each weekly job,
+    // with approved / processing / dispatched timestamps from job history.
+    const histEntry = (j, status) => {
+      const h = j && Array.isArray(j.history) ? j.history : [];
+      return h.find(x => (x.status || '').toUpperCase() === status) || null;
+    };
+    const products = allJobs.map(j => {
+      const isWeekly = String(j.id).startsWith('wxjob_');
+      const wkMatch  = isWeekly ? String(j.id).match(/_w(\d+)$/) : null;
+      const weekNum  = wkMatch ? Number(wkMatch[1]) : null;
+      const rx = isWeekly ? weeklyRx.find(r => Number(r.week_number) === weekNum) : null;
+      const ap = histEntry(j, 'APPROVED'), pr = histEntry(j, 'PROCESSING'), dp = histEntry(j, 'DISPATCHED');
+      return {
+        type:         isWeekly ? 'weekly' : 'initial',
+        week:         weekNum,
+        label:        isWeekly ? ('Week ' + weekNum) : 'Initial',
+        batchNo:      j.batch_no || (rx ? rx.batch_code : null),
+        status:       j.status,
+        approvedAt:   (ap ? ap.at : null) || (rx ? rx.approved_at : null) || j.created_at,
+        approvedBy:   (ap && ap.by) || (rx ? rx.approved_by_name : null) || null,
+        processingAt: pr ? pr.at : null,
+        processingBy: (pr && pr.by) || null,
+        dispatchedAt: dp ? dp.at : null,
+        dispatchedBy: (dp && dp.by) || null,
+        mfgDate:      j.mfg_date,
+        expDate:      j.exp_date
+      };
+    }).sort((a, b) => (a.type === 'initial' ? -1 : b.type === 'initial' ? 1 : (a.week || 0) - (b.week || 0)));
+
     res.json({
       patient: { id: pat.id, uhic: pat.uhic, name: pat.name, diagnosis: pat.cancer },
       studyId: trial ? trial.study_id : null,
@@ -1471,7 +1509,8 @@ app.get('/api/trials/:patientId/journey', authenticateToken, async (req, res) =>
         supplementStart:  histAt('DISPATCHED') || (job ? job.mfg_date : null),
         finalAssessment:  weeklyDates.length >= settings.pilot_weeks ? weeklyDates[weeklyDates.length - 1] : null
       },
-      weeklyReviews: weeklyDates
+      weeklyReviews: weeklyDates,
+      products
     });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });

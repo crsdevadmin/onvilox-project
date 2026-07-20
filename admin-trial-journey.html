@@ -68,6 +68,24 @@
 
       <hr class="section-divider">
 
+      <!-- ── Product dispatch table ── -->
+      <h3 style="margin:0;">Product Dispatch</h3>
+      <p style="color:#6b7280;font-size:13px;margin-top:2px;">Initial and weekly products — doctor approval, store processing and dispatch dates.</p>
+      <div style="overflow-x:auto;">
+        <table class="wk">
+          <thead>
+            <tr>
+              <th>Product</th><th>Batch No</th>
+              <th>Doctor Approved</th><th>Processing Started</th><th>Dispatched</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="pjProductsBody"></tbody>
+        </table>
+      </div>
+
+      <hr class="section-divider">
+
       <!-- ── Outcome trend charts ── -->
       <div style="display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-bottom:10px;">
         <h3 style="margin:0;">Outcome Trends</h3>
@@ -212,6 +230,51 @@ function renderJourney(d){
     <div class="tl-date ${fin?'has':'no'}">${fin||'Pending'}</div>
   </div>`;
   document.getElementById('pjTimeline').innerHTML=html;
+  renderProducts(d.products||[]);
+}
+
+// ── Product dispatch table (initial + weekly jobs) ─────────────────────────
+function fmtDT(d){
+  if(!d) return null;
+  const dt=new Date(d);
+  if(isNaN(dt.getTime())) return fmtDate(d);
+  const date=fmtDate(d);
+  const hm=('0'+dt.getHours()).slice(-2)+':'+('0'+dt.getMinutes()).slice(-2);
+  return date+(hm!=='00:00'?' '+hm:'');
+}
+const JOB_BADGE={
+  'DISPATCHED':'background:#dcfce7;color:#166534;',
+  'DELIVERED':'background:#dbeafe;color:#1e40af;',
+  'PROCESSING':'background:#fef9c3;color:#854d0e;',
+  'PENDING_PROCESSING':'background:#fef9c3;color:#854d0e;',
+  'PENDING_DISPATCH':'background:#ffedd5;color:#9a3412;',
+  'APPROVED':'background:#e0e7ff;color:#3730a3;'
+};
+function jobBadge(s){
+  const key=(s||'').toUpperCase();
+  const style=JOB_BADGE[key]||'background:#f1f5f9;color:#475569;';
+  return `<span style="display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;${style}">${(key||'—').replace(/_/g,' ')}</span>`;
+}
+function renderProducts(list){
+  const body=document.getElementById('pjProductsBody');
+  if(!body) return;
+  if(!list.length){
+    body.innerHTML='<tr><td colspan="6" style="padding:16px;color:var(--text-2);">No products created yet.</td></tr>';
+    return;
+  }
+  const cell=(at,by)=>{
+    const dt=fmtDT(at);
+    if(!dt) return '<td style="color:var(--text-2);font-style:italic;">Pending</td>';
+    return '<td><span style="font-weight:600;">'+dt+'</span>'+(by?'<div style="font-size:11px;color:var(--text-2);">by '+by+'</div>':'')+'</td>';
+  };
+  body.innerHTML=list.map(p=>`<tr>
+    <td style="font-weight:700;">${p.label||'—'}</td>
+    <td>${p.batchNo||'—'}</td>
+    ${cell(p.approvedAt,p.approvedBy)}
+    ${cell(p.processingAt,p.processingBy)}
+    ${cell(p.dispatchedAt,p.dispatchedBy)}
+    <td>${jobBadge(p.status)}</td>
+  </tr>`).join('');
 }
 
 function renderOutcomes(thisPat, allPats){
