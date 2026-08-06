@@ -72,7 +72,15 @@
 
 <div class="container page">
   <div class="card">
-    <a href="/admin/trials" style="display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:#0e2247;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:20px;padding:6px 14px;text-decoration:none;transition:background .15s;" onmouseover="this.style.background='#e2e8f0'" onmouseout="this.style.background='#f1f5f9'">&#8592; Back to Enrollment Log</a>
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+      <a href="/admin/trials" style="display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:#0e2247;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:20px;padding:6px 14px;text-decoration:none;transition:background .15s;" onmouseover="this.style.background='#e2e8f0'" onmouseout="this.style.background='#f1f5f9'">&#8592; Back to Enrollment Log</a>
+      <button id="onePagerBtn" onclick="buildOnePager()" disabled
+        style="font-size:13px;font-weight:600;border-radius:8px;padding:7px 15px;cursor:pointer;
+               background:var(--surface-2);color:var(--text);border:1px solid var(--border);">
+        📄 One-Page Summary
+      </button>
+    </div>
+    <div id="opMsg" style="font-size:12.5px;color:var(--text-2);margin-top:6px;"></div>
     <div id="pjMsg" style="color:#6b7280;font-size:13px;margin:10px 0;">Loading…</div>
     <div id="pjContent" style="display:none;">
 
@@ -163,6 +171,10 @@
   </div>
 </div>
 
+<canvas id="opCanvas" width="900" height="260" style="display:none;"></canvas>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <script src="/js/config.js"></script>
 <script src="/js/storage.js"></script>
 <script src="/js/seed.js"></script>
@@ -665,6 +677,222 @@ function renderOutcomes(thisPat, allPats){
   </tr>`).join('');
 }
 
+// ── One-Page Summary ──────────────────────────────────────────────────────
+// A single A4 sheet a doctor can read in clinic or file in the notes, built
+// from data already on this page — no extra server calls.
+const _op = { journey:null, patient:null, adherence:null, response:null };
+
+// Compact weight + total-intake sparkline drawn to a hidden canvas.
+function opSparkline(weeks, baseline){
+  const cv=document.getElementById('opCanvas');
+  cv.width=900; cv.height=230;
+  const ctx=cv.getContext('2d'), W=cv.width, H=cv.height;
+  const PAD_L=60, PAD_R=60, TOP=34, BOT=40;
+  ctx.clearRect(0,0,W,H); ctx.fillStyle='#fff'; ctx.fillRect(0,0,W,H);
+  ctx.fillStyle='#0e2247'; ctx.font='bold 17px Arial'; ctx.textAlign='left';
+  ctx.fillText('Weight (kg) and Total Intake %', 14, 22);
+
+  const wVals=[baseline&&baseline.weight!=null?Number(baseline.weight):null]
+    .concat(weeks.map(w=>w.weight!=null&&w.weight!==''?Number(w.weight):null));
+  const tVals=totalIntakeSeries(
+    [baseline&&baseline.oralIntake!=null?Number(baseline.oralIntake):null].concat(weeks.map(w=>w.oralIntake)),
+    [null].concat(weeks.map(w=>w.compliance))
+  );
+  const labels=['Adm'].concat(weeks.map((w,i)=>'W'+(w.week!=null?w.week:(i+1))));
+  const n=labels.length;
+  const px=i=>PAD_L+(n<2?(W-PAD_L-PAD_R)/2:i/(n-1)*(W-PAD_L-PAD_R));
+  const gH=H-TOP-BOT;
+
+  const wp=wVals.map((v,i)=>({i,v})).filter(p=>p.v!=null&&!isNaN(p.v));
+  let mn=0,mx=1;
+  if(wp.length){ mn=Math.min(...wp.map(p=>p.v)); mx=Math.max(...wp.map(p=>p.v)); if(mn===mx){mn-=1;mx+=1;} }
+  const pyW=v=>TOP+gH-((v-mn)/(mx-mn))*gH;
+  const tp=tVals.filter(v=>v!=null&&!isNaN(v)).map(Number);
+  const pMax=Math.max(100, tp.length?Math.ceil(Math.max(...tp)/25)*25:100);
+  const pyP=v=>TOP+gH-(v/pMax)*gH;
+
+  ctx.strokeStyle='#cbd5e1'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(PAD_L,TOP+gH); ctx.lineTo(W-PAD_R,TOP+gH); ctx.stroke();
+  ctx.setLineDash([4,4]); ctx.strokeStyle='#94a3b8';
+  ctx.beginPath(); ctx.moveTo(PAD_L,pyP(100)); ctx.lineTo(W-PAD_R,pyP(100)); ctx.stroke();
+  ctx.setLineDash([]);
+
+  ctx.fillStyle='#64748b'; ctx.font='13px Arial'; ctx.textAlign='center';
+  labels.forEach((l,i)=>ctx.fillText(l,px(i),TOP+gH+22));
+  if(wp.length){
+    ctx.fillStyle='#2563eb'; ctx.textAlign='right';
+    ctx.fillText(mx.toFixed(1),PAD_L-8,pyW(mx)+4);
+    ctx.fillText(mn.toFixed(1),PAD_L-8,pyW(mn)+4);
+  }
+  ctx.fillStyle='#64748b'; ctx.textAlign='left';
+  [0,100].concat(pMax>100?[pMax]:[]).forEach(v=>ctx.fillText(v+'%',W-PAD_R+8,pyP(v)+4));
+
+  const draw=(vals,yFn,color,dash)=>{
+    const pts=vals.map((v,i)=>({i,v})).filter(p=>p.v!=null&&p.v!==''&&!isNaN(p.v));
+    if(!pts.length) return;
+    ctx.strokeStyle=color; ctx.lineWidth=2.5; ctx.setLineDash(dash?[5,4]:[]);
+    ctx.beginPath();
+    pts.forEach((p,k)=>{const x=px(p.i),y=yFn(Number(p.v)); k?ctx.lineTo(x,y):ctx.moveTo(x,y);});
+    ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle=color;
+    pts.forEach(p=>{ctx.beginPath();ctx.arc(px(p.i),yFn(Number(p.v)),3.5,0,Math.PI*2);ctx.fill();});
+  };
+  draw(tVals,pyP,'#7c3aed',true);
+  draw(wVals,pyW,'#2563eb',false);
+  return cv.toDataURL('image/png');
+}
+
+// Adherence squares as a thin strip image.
+function opAdherenceStrip(adh){
+  const cv=document.getElementById('opCanvas');
+  cv.width=1000; cv.height=46;
+  const ctx=cv.getContext('2d');
+  ctx.clearRect(0,0,cv.width,cv.height);
+  ctx.fillStyle='#fff'; ctx.fillRect(0,0,cv.width,cv.height);
+  const strip=adh&&adh.strip?adh.strip:[];
+  if(!strip.length){
+    ctx.fillStyle='#94a3b8'; ctx.font='14px Arial';
+    ctx.fillText('No daily monitoring recorded',6,28);
+    return cv.toDataURL('image/png');
+  }
+  const cell=Math.max(4,Math.min(18,Math.floor((cv.width-8)/strip.length)-2));
+  const gap=cell>6?2:1;
+  strip.forEach((d,i)=>{
+    const x=4+i*(cell+gap);
+    if(x+cell>cv.width-4) return;
+    ctx.fillStyle=ADH_COLORS[d.state];
+    ctx.fillRect(x,10,cell,cell);
+    if(d.state==='unmonitored'||d.state==='nosupply'){
+      ctx.strokeStyle='#cbd5e1'; ctx.lineWidth=1; ctx.strokeRect(x+.5,10.5,cell-1,cell-1);
+    }
+  });
+  return cv.toDataURL('image/png');
+}
+
+function buildOnePager(){
+  const msg=document.getElementById('opMsg');
+  if(typeof window.jspdf==='undefined'){ msg.textContent='PDF library failed to load — check your connection and reload.'; return; }
+  const j=_op.journey;
+  if(!j){ msg.textContent='Patient data not loaded yet.'; return; }
+  msg.textContent='Building…';
+  try{
+    const { jsPDF }=window.jspdf;
+    const doc=new jsPDF({unit:'pt',format:'a4'});
+    const W=doc.internal.pageSize.getWidth();
+    const M=36, CW=W-M*2;
+    const p=j.patient||{}, weeks=(_op.patient&&_op.patient.weeks)||[], bl=(_op.patient&&_op.patient.baseline)||{};
+
+    // ── Header band ──
+    doc.setFillColor(14,34,71); doc.rect(0,0,W,74,'F');
+    doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(17);
+    doc.text(p.name||'—', M, 30);
+    doc.setFont('helvetica','normal'); doc.setFontSize(9.5);
+    doc.text([
+      'UHID ' + (p.uhic||'—') + '   ·   ' + (p.diagnosis||'—'),
+      'Study ' + (j.studyId||'—') + '   ·   ' + (j.trialStatus||'—') +
+        (j.batchNo ? '   ·   Batch ' + j.batchNo : '')
+    ], M, 46);
+    doc.setFontSize(8.5);
+    doc.text(new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}), W-M, 30, {align:'right'});
+    doc.text('GQUENCE Clinical Nutrition', W-M, 44, {align:'right'});
+
+    let y=92;
+
+    // ── Response verdict ──
+    const resp=_op.response;
+    if(resp){
+      const tint = resp.verdict==='Positive Treatment Response' ? [220,252,231]
+                 : resp.verdict==='Stable / Mixed Response'     ? [254,243,199]
+                 : resp.verdict==='Needs Clinical Review'       ? [254,226,226] : [241,245,249];
+      const ink  = resp.verdict==='Positive Treatment Response' ? [21,128,61]
+                 : resp.verdict==='Stable / Mixed Response'     ? [161,98,7]
+                 : resp.verdict==='Needs Clinical Review'       ? [153,27,27] : [71,85,105];
+      const chips=resp.signals.map(s=>(s.positive?'+ ':'- ')+s.text).join('     ');
+      doc.setFontSize(8.5); doc.setFont('helvetica','normal');
+      const lines=chips?doc.splitTextToSize(chips,CW-20):[];
+      const h=26+lines.length*10+(lines.length?6:0);
+      doc.setFillColor.apply(doc,tint);
+      doc.roundedRect(M,y,CW,h,5,5,'F');
+      doc.setTextColor.apply(doc,ink); doc.setFont('helvetica','bold'); doc.setFontSize(11.5);
+      doc.text(resp.verdict + (resp.total?'   ('+resp.pos+' of '+resp.total+' indicators favourable)':''), M+10, y+17);
+      if(lines.length){
+        doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(70,70,70);
+        doc.text(lines, M+10, y+30);
+      }
+      y+=h+12;
+    }
+
+    // ── Baseline vs latest vitals ──
+    const lastW=weeks.length?weeks[weeks.length-1]:{};
+    const val=(v,dp)=>(v==null||v===''||isNaN(v))?null:Number(v).toFixed(dp==null?1:dp);
+    const rowFor=(label,key,unit,dp,better)=>{
+      const b=val(bl[key],dp), l=val(lastW[key],dp);
+      let ch='—';
+      if(b!=null&&l!=null){
+        const d=(l-b).toFixed(dp==null?1:dp);
+        ch=(d>0?'+':'')+d+' '+unit;
+      }
+      return [label+' ('+unit+')', b!=null?b:'—', l!=null?l:'—', ch];
+    };
+    doc.autoTable({
+      startY:y, theme:'grid', margin:{left:M,right:M},
+      head:[['Measure','Baseline','Latest','Change']],
+      body:[
+        rowFor('Weight','weight','kg',1),
+        rowFor('BMI','bmi','',1),
+        rowFor('Albumin','albumin','g/dL',2),
+        rowFor('CRP','crp','mg/L',1),
+        rowFor('MUAC','muac','cm',1)
+      ],
+      styles:{fontSize:8.5,cellPadding:4}, headStyles:{fillColor:[14,34,71],fontSize:8.5},
+      columnStyles:{1:{halign:'center'},2:{halign:'center'},3:{halign:'center',fontStyle:'bold'}}
+    });
+    y=doc.lastAutoTable.finalY+14;
+
+    // ── Trend chart ──
+    doc.addImage(opSparkline(weeks,bl),'PNG',M,y,CW,118);
+    y+=126;
+
+    // ── Adherence ──
+    const adh=_op.adherence;
+    doc.setTextColor(14,34,71); doc.setFont('helvetica','bold'); doc.setFontSize(10.5);
+    doc.text('Supplement Adherence', M, y); y+=6;
+    doc.addImage(opAdherenceStrip(adh),'PNG',M,y,CW,20); y+=26;
+    doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(70,70,70);
+    doc.text(adh&&adh.start
+      ? adh.onSupplement+' days on supplement  ·  '+(adh.taken+adh.partial)+' taken  ·  '
+        +adh.missed+' missed  ·  '+adh.unmonitored+' not monitored  ·  longest gap '+adh.longestGap+'d'
+        +(adh.adherencePct!=null?'  ·  adherence '+adh.adherencePct+'%':'')
+      : 'No dispatch or daily monitoring recorded.', M, y);
+    y+=16;
+
+    // ── Product dispatch ──
+    const prods=(j.products||[]).map(pr=>[
+      pr.label||'—', pr.batchNo||'—',
+      pr.approvedAt?fmtDate(pr.approvedAt):'—',
+      pr.dispatchedAt?fmtDate(pr.dispatchedAt):'Pending',
+      (pr.status||'—').replace(/_/g,' ')
+    ]);
+    if(prods.length){
+      doc.autoTable({
+        startY:y, theme:'striped', margin:{left:M,right:M},
+        head:[['Product','Batch','Doctor Approved','Dispatched','Status']],
+        body:prods, styles:{fontSize:8,cellPadding:3.5},
+        headStyles:{fillColor:[14,34,71],fontSize:8}
+      });
+      y=doc.lastAutoTable.finalY;
+    }
+
+    doc.setFontSize(7.5); doc.setTextColor(150,150,150);
+    doc.text('Generated from GQUENCE clinical records · for clinical use only',
+             M, doc.internal.pageSize.getHeight()-18);
+
+    const safe=(p.name||'patient').replace(/[^a-z0-9]+/gi,'_');
+    doc.save('GQUENCE_'+safe+'_summary.pdf');
+    msg.textContent='Downloaded.';
+  }catch(e){ msg.textContent='Could not build summary: '+e.message; }
+}
+
 async function load(){
   if(!patientId){ document.getElementById('pjMsg').textContent='No patient specified.'; return; }
   try {
@@ -684,19 +912,27 @@ async function load(){
       dispatchDates.push(journeyData.milestones.dispatch);
     }
 
+    _op.journey = journeyData;
+
     if(outRes.ok){
       const outData=await outRes.json();
       const allPats=outData.patients||[];
       const thisPat=allPats.find(p=>p.patientId===patientId)||{ weeks:[], days:[] };
-      renderAdherence(computeAdherence(thisPat.days||[], dispatchDates));
+      const adh=computeAdherence(thisPat.days||[], dispatchDates);
+      renderAdherence(adh);
       renderOutcomes(thisPat, allPats);
+      _op.patient=thisPat; _op.adherence=adh; _op.response=computeResponse(thisPat);
     } else {
-      renderAdherence(computeAdherence([], dispatchDates));
+      const adh=computeAdherence([], dispatchDates);
+      renderAdherence(adh);
+      _op.adherence=adh;
       document.getElementById('pjCharts').innerHTML='<p style="color:var(--text-2);font-size:13px;">Could not load outcome data.</p>';
     }
 
     document.getElementById('pjMsg').style.display='none';
     document.getElementById('pjContent').style.display='block';
+    const opBtn=document.getElementById('onePagerBtn');
+    if(opBtn) opBtn.disabled=false;
   } catch(e){
     document.getElementById('pjMsg').textContent='Could not load journey: '+e.message;
   }

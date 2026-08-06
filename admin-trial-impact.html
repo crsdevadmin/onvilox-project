@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Clinical Trials — Impact Summary - Gquence</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <link rel="stylesheet" href="/css/app.css">
+  <style>
+    .subnav { display:flex; gap:6px; margin:0 0 14px; flex-wrap:wrap; }
+    .subnav a { padding:7px 14px; border-radius:20px; font-size:13px; text-decoration:none; color:var(--text-2); background:var(--surface-2); }
+    .subnav a.active { background:#0e2247; color:#fff; }
+    .hero { display:flex; gap:14px; flex-wrap:wrap; margin:16px 0 6px; }
+    .hero-card { flex:1; min-width:190px; background:var(--surface-2); border:1px solid var(--border); border-radius:14px; padding:18px 20px; }
+    .hero-num { font-size:34px; font-weight:800; line-height:1.05; }
+    .hero-lbl { font-size:12px; color:var(--text-2); text-transform:uppercase; letter-spacing:.04em; margin-top:4px; }
+    .hero-sub { font-size:12px; color:var(--text-2); margin-top:5px; }
+    table.imp { width:100%; border-collapse:collapse; margin-top:8px; }
+    table.imp th, table.imp td { padding:11px 12px; text-align:left; border-bottom:1px solid var(--border); font-size:13px; color:var(--text); }
+    table.imp th { color:var(--text-2); font-size:11.5px; text-transform:uppercase; letter-spacing:.03em; }
+    .arrow { font-weight:800; }
+    .up { color:#16a34a; } .down { color:#dc2626; } .flat { color:var(--text-2); }
+    .bar { display:flex; height:22px; border-radius:6px; overflow:hidden; min-width:150px; }
+    .bar span { display:block; }
+    .legend { display:flex; gap:14px; flex-wrap:wrap; font-size:12px; color:var(--text-2); margin-top:6px; }
+    .legend i { display:inline-block; width:11px; height:11px; border-radius:3px; margin-right:5px; vertical-align:-1px; font-style:normal; }
+    .caveat { background:var(--surface-2); border:1px solid var(--border); border-left:3px solid #94a3b8;
+              border-radius:9px; padding:13px 16px; margin-top:20px; }
+    .caveat li { font-size:12.5px; color:var(--text-2); line-height:1.6; margin-bottom:3px; }
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">Gquence Admin</div>
+  <div class="nav">
+    <a href="/admin">Dashboard</a>
+    <a href="/admin/stores">Stores</a>
+    <a href="/admin/users">Create Users</a>
+    <a href="/admin/mapping">Mapping</a>
+    <a href="/admin/trials">Clinical Trials</a>
+    <a href="/admin/rules">Rule Engine</a>
+    <a href="#" onclick="auth.logout()">Logout</a>
+    <button id="themeToggleBtn" onclick="toggleTheme()" class="btn-secondary btn-sm" style="margin-left:20px;border-radius:30px;padding:6px 14px;cursor:pointer;">🌙 Dark Mode</button>
+  </div>
+</div>
+
+<div class="container page">
+  <div class="card">
+    <div class="subnav">
+      <a href="/admin/trials">Enrollment Log</a>
+      <a href="/admin/trials/cohort">Cohort Dashboard</a>
+      <a href="/admin/trials/outcomes">Monitoring</a>
+      <a href="/admin/trials/impact" class="active">Impact Summary</a>
+      <a href="/admin/trials/formula">Formula Tracking</a>
+      <a href="/admin/trials/export">Export Dataset</a>
+    </div>
+
+    <h2 style="margin-bottom:0;">Impact Summary</h2>
+    <p style="color:var(--text-2);margin-top:4px;">
+      Where patients started versus where they are now. In advanced cancer the untreated
+      trajectory is continued loss, so holding weight is itself an outcome.
+    </p>
+
+    <div id="impMsg" style="color:var(--text-2);font-size:13px;margin:12px 0;">Loading…</div>
+
+    <div id="impContent" style="display:none;">
+      <div class="hero" id="impHero"></div>
+
+      <h3 style="margin:26px 0 2px;">Baseline vs Latest</h3>
+      <p style="color:var(--text-2);font-size:12.5px;margin:0 0 6px;">
+        Paired comparison — each patient counts only where both a baseline and a follow-up
+        value exist, so <b>n</b> differs between rows.
+      </p>
+      <div style="overflow-x:auto;">
+        <table class="imp">
+          <thead>
+            <tr>
+              <th>Measure</th><th>n</th><th>Baseline</th><th>Latest</th>
+              <th>Mean change</th><th style="min-width:180px;">Improved / Stable / Worsened</th>
+            </tr>
+          </thead>
+          <tbody id="impBody"></tbody>
+        </table>
+      </div>
+      <div class="legend">
+        <span><i style="background:#16a34a;"></i>Improved</span>
+        <span><i style="background:#94a3b8;"></i>Stable</span>
+        <span><i style="background:#dc2626;"></i>Worsened</span>
+        <span style="margin-left:6px;">“Stable” = within ±2% of baseline for weight, ±10% for lab values (measurement noise).</span>
+      </div>
+
+      <div class="caveat">
+        <div style="font-weight:700;font-size:13px;color:var(--text);margin-bottom:6px;">How to read this</div>
+        <ul style="margin:0;padding-left:18px;" id="impCaveats"></ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/js/config.js"></script>
+<script src="/js/storage.js"></script>
+<script src="/js/seed.js"></script>
+<script src="/js/auth.js"></script>
+<script src="/js/theme.js"></script>
+
+<script>
+auth.requireRole(['SUPER_ADMIN', 'ADMIN']);
+const me = auth.getCurrentUser();
+const apiBase = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : '';
+
+function signed(v, dp) {
+  if (v === null || v === undefined) return '—';
+  const n = Number(v).toFixed(dp === undefined ? 1 : dp);
+  return (Number(v) > 0 ? '+' : '') + n;
+}
+
+// Direction of clinical benefit differs by metric — CRP falling is good.
+function changeCell(m) {
+  if (m.meanChange === null) return '<td class="flat">—</td>';
+  const good = m.better === 'up' ? m.meanChange > 0 : m.meanChange < 0;
+  const flat = m.meanChange === 0;
+  const cls = flat ? 'flat' : (good ? 'up' : 'down');
+  const arrow = flat ? '' : (m.meanChange > 0 ? '▲' : '▼');
+  // Show ±SEM so a mean isn't presented as more precise than the data supports.
+  const range = m.semChange != null ? ` <span style="color:var(--text-2);font-size:11.5px;">± ${m.semChange}</span>` : '';
+  return `<td class="${cls}"><span class="arrow">${arrow}</span> ${signed(m.meanChange, m.key==='albumin'?2:1)} ${m.unit}${range}</td>`;
+}
+
+function distBar(m) {
+  const tot = m.improved + m.stable + m.worsened;
+  if (!tot) return '<td class="flat">—</td>';
+  const pc = n => (n / tot * 100).toFixed(1) + '%';
+  return `<td>
+    <div class="bar">
+      ${m.improved ? `<span style="width:${pc(m.improved)};background:#16a34a;" title="${m.improved} improved"></span>` : ''}
+      ${m.stable   ? `<span style="width:${pc(m.stable)};background:#94a3b8;" title="${m.stable} stable"></span>` : ''}
+      ${m.worsened ? `<span style="width:${pc(m.worsened)};background:#dc2626;" title="${m.worsened} worsened"></span>` : ''}
+    </div>
+    <div style="font-size:11.5px;color:var(--text-2);margin-top:3px;">
+      ${m.improved} improved · ${m.stable} stable · ${m.worsened} worsened
+    </div>
+  </td>`;
+}
+
+function render(d) {
+  const wt = (d.metrics || []).find(m => m.key === 'weight');
+  const alb = (d.metrics || []).find(m => m.key === 'albumin');
+
+  // Headline: weight maintained-or-gained is the primary anti-cachexia signal.
+  const held = wt ? wt.improved + wt.stable : 0;
+  const heldPct = (wt && wt.n) ? Math.round(held / wt.n * 100) : null;
+
+  document.getElementById('impHero').innerHTML = `
+    <div class="hero-card">
+      <div class="hero-num" style="color:var(--text);">${d.n}</div>
+      <div class="hero-lbl">Patients with follow-up</div>
+      <div class="hero-sub">at least one weekly review recorded</div>
+    </div>
+    <div class="hero-card">
+      <div class="hero-num" style="color:${heldPct >= 50 ? '#16a34a' : 'var(--text)'};">${heldPct != null ? heldPct + '%' : '—'}</div>
+      <div class="hero-lbl">Weight held or gained</div>
+      <div class="hero-sub">${wt ? held + ' of ' + wt.n + ' patients' : 'no paired data'}</div>
+    </div>
+    <div class="hero-card">
+      <div class="hero-num" style="color:${wt && wt.meanChange >= 0 ? '#16a34a' : 'var(--text)'};">${wt ? signed(wt.meanChange, 1) : '—'}</div>
+      <div class="hero-lbl">Mean weight change (kg)</div>
+      <div class="hero-sub">${wt && wt.semChange != null ? '± ' + wt.semChange + ' standard error' : ''}</div>
+    </div>
+    <div class="hero-card">
+      <div class="hero-num" style="color:${alb && alb.meanChange > 0 ? '#16a34a' : 'var(--text)'};">${alb ? signed(alb.meanChange, 2) : '—'}</div>
+      <div class="hero-lbl">Mean albumin change (g/dL)</div>
+      <div class="hero-sub">${alb ? 'n = ' + alb.n : ''}</div>
+    </div>`;
+
+  document.getElementById('impBody').innerHTML = (d.metrics || []).map(m => `
+    <tr>
+      <td style="font-weight:700;">${m.label} <span style="font-weight:400;color:var(--text-2);font-size:11.5px;">(${m.unit})</span></td>
+      <td>${m.n || 0}</td>
+      <td>${m.baselineMean != null ? m.baselineMean : '—'}</td>
+      <td>${m.latestMean != null ? m.latestMean : '—'}</td>
+      ${changeCell(m)}
+      ${distBar(m)}
+    </tr>`).join('');
+
+  document.getElementById('impCaveats').innerHTML =
+    (d.caveats || []).map(c => `<li>${c}</li>`).join('');
+
+  document.getElementById('impMsg').style.display = 'none';
+  document.getElementById('impContent').style.display = 'block';
+}
+
+(async function load() {
+  try {
+    const res = await fetch(apiBase + '/api/trials/impact', {
+      headers: { Authorization: 'Bearer ' + (me.token || '') }
+    });
+    if (!res.ok) throw new Error('Server error ' + res.status);
+    const data = await res.json();
+    if (!data.n) {
+      document.getElementById('impMsg').textContent =
+        'No patients with follow-up data yet — the summary appears once weekly reviews are recorded.';
+      return;
+    }
+    render(data);
+  } catch (e) {
+    document.getElementById('impMsg').textContent = 'Could not load impact summary: ' + e.message;
+  }
+})();
+</script>
+</body>
+</html>

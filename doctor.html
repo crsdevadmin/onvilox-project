@@ -142,6 +142,9 @@
       </div>
     </div>
 
+    <!-- ── Early-warning risk panel ── -->
+    <div id="riskPanel" style="display:none;"></div>
+
     <div class="card">
       <table class="table">
         <thead>
@@ -150,6 +153,7 @@
             <th>UHIC</th>
             <th>Cancer</th>
             <th>Created</th>
+            <th title="Products dispatched to this patient — initial plan plus each approved weekly prescription">Products</th>
             <th>Status</th>
             <th class="th-actions">Actions</th>
           </tr>
@@ -233,6 +237,202 @@
       document.getElementById('title').innerText = "Doctor's Patients";
     }
 
+
+    // ── Early-warning risk panel ──────────────────────────────────────────
+    // Answers "which of my patients is deteriorating right now?" without the
+    // doctor opening every chart. Server computes the flags (ESPEN/GLIM
+    // thresholds); this just renders them with the reason always visible.
+    const RISK_STYLE = {
+      critical: { bg:'#fef2f2', bd:'#fecaca', tx:'#991b1b', chip:'#ef4444', label:'CRITICAL' },
+      high:     { bg:'#fffbeb', bd:'#fde68a', tx:'#92400e', chip:'#f59e0b', label:'HIGH' },
+      watch:    { bg:'#f8fafc', bd:'#e2e8f0', tx:'#475569', chip:'#94a3b8', label:'WATCH' }
+    };
+
+    function fmtShort(iso) {
+      if (!iso) return '—';
+      const d = new Date(iso);
+      if (isNaN(d.getTime())) return '—';
+      return ('0'+d.getDate()).slice(-2) + '/' + ('0'+(d.getMonth()+1)).slice(-2);
+    }
+
+    let _supplyCache = [];
+
+    async function loadRiskPanel() {
+      const el = document.getElementById('riskPanel');
+      if (!el) return;
+      try {
+        const apiBase = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : '';
+        const hdr = { Authorization: 'Bearer ' + (me.token || '') };
+        const [riskRes, supRes] = await Promise.all([
+          fetch(apiBase + '/api/risk-panel',    { headers: hdr }),
+          fetch(apiBase + '/api/supply-status', { headers: hdr })
+        ]);
+        if (!riskRes.ok) return;                   // stay silent rather than alarm
+        const data = await riskRes.json();
+        // Supply is a separate concern — a patient can be clinically fine and
+        // still be about to run out, so it gets its own group rather than
+        // being folded into the clinical score.
+        if (supRes.ok) {
+          const sup = await supRes.json();
+          _supplyCache = (sup.patients || []).filter(s =>
+            s.state === 'out' || s.state === 'running_out' || s.state === 'none');
+        }
+        renderRiskPanel(data.patients || []);
+      } catch (e) { /* offline — panel simply stays hidden */ }
+    }
+
+    // Collapsed by default: the panel is a one-line summary until the doctor
+    // asks for detail, so it never dominates the dashboard.
+    let _riskCache = [];
+
+    // Which severity group is currently expanded (null = all collapsed).
+    let _riskOpen = null;
+    function toggleRiskGroup(key) {
+      _riskOpen = (_riskOpen === key) ? null : key;
+      renderRiskPanel(_riskCache);
+    }
+
+    // One compact row per patient — kept to a single line plus its reasons, so
+    // an expanded group of 10 still fits on screen without dominating the page.
+    // Colours come from theme variables (not hardcoded hex) so the panel stays
+    // legible in dark mode; only the severity accents are fixed colours.
+    // Handles both shapes fed into the panel: clinical rows carry a flags[]
+    // array, supply rows carry a plain reason string.
+    function riskRow(r) {
+      const s = RISK_STYLE[r.level] || RISK_STYLE.watch;
+      let reasons;
+      if (Array.isArray(r.flags) && r.flags.length) {
+        reasons = r.flags.map(f =>
+          `<span style="color:var(--text-2);"><b style="color:${(RISK_STYLE[f.level]||s).chip};">${f.label}</b> ${f.detail}</span>`
+        ).join('<span style="color:var(--border);"> · </span>');
+      } else if (r.reason) {
+        const urgent = r.state === 'out' || r.state === 'none';
+        reasons = `<span style="color:var(--text-2);">`
+          + (r.lastProduct ? `<b style="color:${urgent ? '#ef4444' : '#8b5cf6'};">${r.lastProduct} dispatched ${fmtShort(r.lastDispatchAt)}</b> — ` : '')
+          + `${r.reason}</span>`;
+      } else {
+        reasons = `<span style="color:var(--text-2);">${r.daysSinceLastEntry} days since last monitoring entry</span>`;
+      }
+      return `
+        <div style="display:flex;gap:12px;align-items:flex-start;padding:9px 12px;border-bottom:1px solid var(--border);">
+          <span style="flex:none;width:8px;height:8px;border-radius:50%;background:${s.chip};margin-top:6px;"></span>
+          <div style="flex:1;min-width:0;">
+            <div style="display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;">
+              <b style="font-size:13.5px;color:var(--text);">${r.name || '—'}</b>
+              <span style="font-size:11px;color:var(--text-2);">${r.uhic || '—'} · ${r.cancer || '—'}</span>
+            </div>
+            <div style="font-size:12px;line-height:1.5;margin-top:2px;">${reasons}</div>
+          </div>
+          <a href="/patients/profile?id=${r.patientId}"
+             style="flex:none;font-size:11.5px;font-weight:600;color:var(--text);text-decoration:none;
+                    background:var(--surface-2);border:1px solid var(--border);border-radius:6px;
+                    padding:4px 10px;white-space:nowrap;">Open</a>
+        </div>`;
+    }
+
+    function renderRiskPanel(list) {
+      const el = document.getElementById('riskPanel');
+      if (!el) return;
+      _riskCache = list;
+
+      // Clinical deterioration and follow-up failure are different problems,
+      // so they get their own buckets rather than one merged list.
+      // Severity accents are fixed hues (they carry meaning); every surface and
+      // text colour uses theme variables so the panel works in dark mode too.
+      const groups = [
+        { key:'critical', label:'Critical',      items:list.filter(r => r.level === 'critical'),
+          color:'#ef4444', tint:'rgba(239,68,68,.10)' },
+        { key:'high',     label:'High',          items:list.filter(r => r.level === 'high'),
+          color:'#f59e0b', tint:'rgba(245,158,11,.10)' },
+        { key:'supply',   label:'Supply running out', items:_supplyCache,
+          color:'#8b5cf6', tint:'rgba(139,92,246,.12)' },
+        { key:'lapsed',   label:'Not monitored', items:list.filter(r => r.lapsed && r.level !== 'critical' && r.level !== 'high'),
+          color:'#94a3b8', tint:'rgba(148,163,184,.12)' }
+      ].filter(g => g.items.length);
+
+      if (!groups.length) {
+        el.style.display = 'block';
+        el.innerHTML = `
+          <div class="card" style="border-left:4px solid #22c55e;padding:12px 16px;">
+            <span style="color:#22c55e;font-weight:700;">✓ No patients need attention</span>
+            <span style="font-size:12.5px;color:var(--text-2);margin-left:8px;">
+              No rapid weight loss, inflammatory catabolism or intake collapse detected.
+            </span>
+          </div>`;
+        return;
+      }
+
+      const chips = groups.map(g => {
+        const open = _riskOpen === g.key;
+        return `
+          <button onclick="toggleRiskGroup('${g.key}')"
+            style="display:flex;align-items:center;gap:9px;cursor:pointer;text-align:left;
+                   background:${open ? g.tint : 'var(--surface-2)'};
+                   border:1.5px solid ${open ? g.color : 'var(--border)'};
+                   border-radius:10px;padding:9px 15px;transition:all .15s;">
+            <span style="font-size:22px;font-weight:800;color:${g.color};line-height:1;">${g.items.length}</span>
+            <span style="font-size:12.5px;font-weight:700;color:var(--text);">${g.label}</span>
+            <span style="font-size:10px;color:var(--text-2);">${open ? '▲' : '▼'}</span>
+          </button>`;
+      }).join('');
+
+      const openGroup = groups.find(g => g.key === _riskOpen);
+      const detail = openGroup ? `
+        <div style="margin-top:12px;border:1px solid var(--border);border-radius:10px;overflow:hidden;">
+          <div style="background:${openGroup.tint};padding:7px 12px;font-size:11.5px;font-weight:700;
+                      color:${openGroup.color};letter-spacing:.03em;text-transform:uppercase;">
+            ${openGroup.label} — ${openGroup.items.length} patient${openGroup.items.length===1?'':'s'}
+          </div>
+          ${openGroup.items.map(riskRow).join('')}
+        </div>` : '';
+
+      const nCrit = (groups.find(g => g.key === 'critical') || { items:[] }).items.length;
+      el.style.display = 'block';
+      el.innerHTML = `
+        <div class="card" style="border-left:4px solid ${nCrit ? '#ef4444' : '#f59e0b'};">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+              <h3 style="margin:0;font-size:15px;white-space:nowrap;color:var(--text);">Patients Needing Attention</h3>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;">${chips}</div>
+            </div>
+            <span style="font-size:11px;color:var(--text-2);">ESPEN / GLIM criteria · click a group to view</span>
+          </div>
+          ${detail}
+        </div>`;
+    }
+
+    // ── Product / week progress ───────────────────────────────────────────
+    // Each approved weekly prescription creates its own manufacturing job with
+    // id 'wxjob_<patientId>_w<N>'; the initial plan is a plain job. Showing them
+    // here tells the doctor at a glance how many weeks of product the patient
+    // has actually received, and where each one currently sits.
+    function productOrder(j){
+      const m = String(j.id).match(/_w(\d+)$/);
+      return m ? parseInt(m[1], 10) : 0;
+    }
+    function productLabel(j){
+      const m = String(j.id).match(/_w(\d+)$/);
+      return m ? 'W' + m[1] : 'Initial';
+    }
+    function productCell(patientId){
+      if (typeof manufacturingService === 'undefined') return '<span style="color:#9ca3af;">—</span>';
+      const jobs = manufacturingService.getJobs()
+        .filter(j => (j.patientId || j.patient_id) === patientId)
+        .sort((a, b) => productOrder(a) - productOrder(b));
+      if (!jobs.length) return '<span style="color:#9ca3af;font-size:11px;">Not dispatched</span>';
+
+      const weeks = jobs.filter(j => productOrder(j) > 0).length;
+      const chips = jobs.map(j => {
+        const cls = manufacturingService.WORKFLOW.badgeClass(j.status);
+        const title = productLabel(j) + ' — ' + manufacturingService.WORKFLOW.statusLabel(j.status)
+          + (j.batchNo ? ' · Batch ' + j.batchNo : '');
+        return `<span class="status ${cls}" style="font-size:9.5px;padding:1px 6px;margin:1px 2px 1px 0;display:inline-block;" title="${title}">${productLabel(j)}</span>`;
+      }).join('');
+
+      return `<div style="font-size:11px;color:#6b7280;margin-bottom:2px;">
+                ${weeks ? '<b style="color:#111827;">Week ' + weeks + '</b> of monitoring' : 'Initial only'}
+              </div><div>${chips}</div>`;
+    }
 
     function render() {
       const table = document.getElementById('patientTable');
@@ -439,6 +639,7 @@
       <td>${p.uhic}</td>
       <td>${p.cancer}</td>
       <td>${p.createdDate || '-'}</td>
+      <td>${productCell(p.id)}</td>
       <td><span class="status ${statusClass}">${status}</span>${aiStatus}</td>
       <td>
         <div class="action-row" onclick="event.stopPropagation();" style="display:flex; gap:8px;">
@@ -462,7 +663,7 @@
         detailsRow.id = `details_${p.id}`;
         detailsRow.style.display = 'none';
         detailsRow.innerHTML = `
-      <td colspan="6">
+      <td colspan="7">
         <div class="card" style="margin:10px 0 0 0; box-shadow:none; border:1px solid #e5e7eb;">
           <div style="display:flex; gap:24px; flex-wrap:wrap;">
             <div style="min-width:260px;">
@@ -502,8 +703,54 @@
     }
 
 
-    // Load data from server DB before first render
-    initStore().then(() => { render(); checkLocalUnsynced(); });
+    // ── Keep the Products column live ─────────────────────────────────────
+    // Jobs are re-fetched from the DB every 30s. We only re-render when a job
+    // actually changed, because render() rebuilds the whole table — polling
+    // blindly would collapse expanded detail rows every half minute.
+    let _jobSig = '';
+    function _jobsSignature() {
+      if (typeof manufacturingService === 'undefined') return '';
+      return manufacturingService.getJobs()
+        .map(j => (j.id || '') + ':' + (j.status || ''))
+        .sort()
+        .join('|');
+    }
+    function _pollDoctorJobs() {
+      if (typeof manufacturingService === 'undefined' || !manufacturingService.initJobs) return;
+      manufacturingService.initJobs()
+        .then(() => {
+          const sig = _jobsSignature();
+          if (sig === _jobSig) return;          // nothing moved — leave the page alone
+          _jobSig = sig;
+          // Preserve which patient rows the doctor had expanded.
+          const openIds = Array.prototype.slice
+            .call(document.querySelectorAll('tr[id^="details_"]'))
+            .filter(r => r.style.display !== 'none')
+            .map(r => r.id);
+          render();
+          openIds.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.style.display = 'table-row';
+          });
+        })
+        .catch(() => { /* offline — keep showing the last known state */ });
+    }
+
+    // Load data from server DB before first render.
+    // Manufacturing jobs are fetched too so the Products column reflects server
+    // truth (weekly jobs approved on other devices) rather than stale localStorage.
+    initStore()
+      .then(() => (typeof manufacturingService !== 'undefined' && manufacturingService.initJobs)
+        ? manufacturingService.initJobs().catch(() => {})
+        : null)
+      .then(() => {
+        render();
+        checkLocalUnsynced();
+        loadRiskPanel();
+        _jobSig = _jobsSignature();
+        setInterval(_pollDoctorJobs, 30000);
+        setInterval(loadRiskPanel, 120000);   // refresh flags every 2 min
+      });
 
     // Show a banner if this device holds patients that never reached the database.
     function checkLocalUnsynced() {

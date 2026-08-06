@@ -1043,6 +1043,197 @@ app.delete('/api/monitoring/:logId', authenticateToken, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// ───────────────────── Early-warning risk panel ───────────────────────────
+// Surfaces the patients who are deteriorating RIGHT NOW, so a clinician doesn't
+// have to open 40 charts to find the 3 that matter. Thresholds follow ESPEN /
+// GLIM malnutrition criteria rather than arbitrary cut-offs:
+//   • unintentional loss >2%/week or >5%/month  → malnutrition red flag
+//   • albumin falling while CRP rises           → inflammatory catabolism,
+//     which nutrition alone will not reverse (needs clinical review)
+//   • intake/adherence collapse                 → the plan isn't reaching them
+// Every flag returns its own reason string; nothing is a black box.
+app.get('/api/risk-panel', authenticateToken, async (req, res) => {
+  try {
+    const role = req.user && req.user.role;
+    const isAdmin = ['ADMIN', 'SUPER_ADMIN'].includes(role);
+
+    // Doctors see their own list; admins see everyone.
+    let patRes;
+    if (isAdmin) {
+      patRes = await pool.query(
+        `SELECT id, name, uhic, cancer, weight, albumin, crp, ecog_status, full_data,
+                assigned_doctor_id, created_date
+           FROM patients`);
+    } else {
+      const docId = req.user.id;
+      patRes = await pool.query(
+        `SELECT id, name, uhic, cancer, weight, albumin, crp, ecog_status, full_data,
+                assigned_doctor_id, created_date
+           FROM patients
+          WHERE assigned_doctor_id = $1 OR full_data->>'assignedDoctorId' = $1`, [docId]);
+    }
+    const patients = patRes.rows;
+    if (!patients.length) return res.json({ patients: [] });
+
+    const ids = patients.map(p => p.id);
+    const logRes = await pool.query(
+      `SELECT patient_id, type, recorded_at, data FROM monitoring_logs
+        WHERE patient_id = ANY($1) ORDER BY recorded_at ASC`, [ids]);
+
+    const weeklyBy = {}, dailyBy = {};
+    logRes.rows.forEach(l => {
+      const bucket = (l.type === 'daily') ? dailyBy : weeklyBy;
+      (bucket[l.patient_id] = bucket[l.patient_id] || []).push({
+        at: l.recorded_at, ...(l.data || {})
+      });
+    });
+
+    const num = v => (v === null || v === undefined || v === '' || isNaN(parseFloat(v)))
+      ? null : parseFloat(v);
+    const DAY = 86400000;
+
+    const out = patients.map(p => {
+      const fd = p.full_data || {};
+      const weeks = weeklyBy[p.id] || [];
+      const days  = dailyBy[p.id]  || [];
+      const flags = [];
+      let score = 0;
+
+      const baseWeight  = num(p.weight)  != null ? num(p.weight)  : num(fd.weight);
+      const baseAlbumin = num(p.albumin) != null ? num(p.albumin) : num(fd.albumin);
+      const baseCrp     = num(p.crp)     != null ? num(p.crp)     : num(fd.crp);
+
+      const last  = weeks.length ? weeks[weeks.length - 1] : null;
+      const prev  = weeks.length > 1 ? weeks[weeks.length - 2] : null;
+
+      // ── Weight trajectory (ESPEN/GLIM) ──
+      // Scored by RATE, not cumulative total. Losing 4% over 7 weeks (0.6%/wk)
+      // is unremarkable in oncology; losing 4% over 2 weeks (2%/wk) is an
+      // emergency. Ranking on the total alone made those look identical and
+      // flooded the panel with slow, stable drifters.
+      const lastW = last ? num(last.weight) : null;
+      if (lastW != null && baseWeight) {
+        // Measure from the earliest known observation, not blindly from
+        // created_date: a patient enrolled and weighed the same day yields a
+        // 1-day window, which turns a 6% loss into a nonsense "43%/week".
+        const firstWeekAt = weeks.length ? weeks[0].at : null;
+        const candidates = [p.created_date, firstWeekAt]
+          .filter(Boolean)
+          .map(d => new Date(d).getTime())
+          .filter(t => !isNaN(t));
+        const startMs = candidates.length ? Math.min.apply(null, candidates) : null;
+        const endMs = last.at ? new Date(last.at).getTime() : null;
+        const elapsedDays = (startMs && endMs && endMs > startMs) ? (endMs - startMs) / DAY : null;
+        const lossPct = (baseWeight - lastW) / baseWeight * 100;
+
+        if (lossPct > 0) {
+          const since = lossPct.toFixed(1) + '% since baseline';
+          // Below ~7 days there aren't enough days to extrapolate a weekly rate
+          // without wild error, so judge on the absolute loss instead.
+          if (elapsedDays == null || elapsedDays < 7) {
+            if (lossPct >= 5) {
+              score += 30;
+              flags.push({ level:'high', label:'Significant weight loss',
+                detail: since + (elapsedDays ? ' over ' + Math.round(elapsedDays) + ' days' : '') });
+            } else if (lossPct >= 2) {
+              score += 12;
+              flags.push({ level:'watch', label:'Weight declining', detail: since });
+            }
+          } else {
+            const perWeek = lossPct / (elapsedDays / 7);
+            const detail = perWeek.toFixed(1) + '%/week (' + since + ', over '
+                         + Math.round(elapsedDays) + ' days)';
+            if (perWeek >= 2) {
+              score += 45;
+              flags.push({ level:'critical', label:'Rapid weight loss',
+                detail: detail + ' — exceeds the 2%/week malnutrition threshold' });
+            } else if (perWeek >= 1.25) {
+              score += 30;
+              flags.push({ level:'high', label:'Accelerated weight loss',
+                detail: detail + ' — above 5%/month' });
+            }
+            // Anything slower than 1.25%/week is background drift in an
+            // advanced-cancer cohort. A 0.8%/week "watch" tier existed here but
+            // produced rows no clinician would act on, so it was removed —
+            // the panel should only carry things worth interrupting for.
+          }
+        }
+      }
+
+      // ── Albumin falling while CRP rises = inflammatory catabolism ──
+      const lastAlb = last ? num(last.albumin) : null;
+      const prevAlb = prev ? num(prev.albumin) : baseAlbumin;
+      const lastCrp = last ? num(last.crp) : null;
+      const prevCrp = prev ? num(prev.crp) : baseCrp;
+      if (lastAlb != null && prevAlb != null && lastCrp != null && prevCrp != null
+          && lastAlb < prevAlb && lastCrp > prevCrp) {
+        score += 30;
+        flags.push({ level:'critical', label:'Inflammatory catabolism',
+          detail: 'Albumin ' + prevAlb + '→' + lastAlb + ' g/dL while CRP ' + prevCrp + '→' + lastCrp + ' mg/L — nutrition support alone may not reverse this' });
+      } else if (lastAlb != null && lastAlb < 3.0) {
+        score += 20;
+        flags.push({ level:'high', label:'Low albumin',
+          detail: lastAlb + ' g/dL — below 3.0 threshold' });
+      }
+
+      if (lastCrp != null && lastCrp > 50) {
+        score += 10;
+        flags.push({ level:'watch', label:'High inflammation', detail:'CRP ' + lastCrp + ' mg/L' });
+      }
+
+      // ── Intake / adherence collapse ──
+      const lastOral = last ? num(last.oralIntake) : null;
+      const lastComp = last ? num(last.compliance) : null;
+      // Only SEVERE intake failure is flagged. In a head & neck / GI cohort,
+      // eating 35-40% of requirement is the norm — it's why the patient is on
+      // supplements at all — so alerting on it told the doctor nothing they
+      // hadn't already assumed, and drowned the genuinely deteriorating cases.
+      if (lastOral != null && lastOral < 30) {
+        score += 30;
+        flags.push({ level:'critical', label:'Severe intake failure',
+          detail: lastOral + '% of requirement met orally' });
+      }
+      if (lastComp != null) {
+        if (lastComp < 40)      { score += 20; flags.push({ level:'high',  label:'Supplement not being taken', detail: 'only ' + lastComp + '% consumed' }); }
+        else if (lastComp < 60) { score += 10; flags.push({ level:'watch', label:'Low supplement compliance',  detail: lastComp + '% consumed' }); }
+      }
+
+      // ── ECOG deterioration ──
+      const lastEcog = last ? num(last.ecog) : null;
+      const prevEcog = prev ? num(prev.ecog) : num(p.ecog_status);
+      if (lastEcog != null && prevEcog != null && lastEcog > prevEcog) {
+        score += 15;
+        flags.push({ level:'high', label:'Performance status worsening',
+          detail: 'ECOG ' + prevEcog + ' → ' + lastEcog });
+      }
+
+      // ── Monitoring lapse ──
+      // Kept OUT of the clinical score. Silence is a follow-up failure, not
+      // deterioration — mixing them ranked out-of-contact patients above
+      // actively deteriorating ones and muddied the clinical signal.
+      const lastAnyAt = [last ? last.at : null, days.length ? days[days.length-1].at : null]
+        .filter(Boolean).sort().pop();
+      const daysSince = lastAnyAt ? Math.floor((Date.now() - new Date(lastAnyAt)) / DAY) : null;
+      const lapsed = (daysSince != null && daysSince > 14) || lastAnyAt === null;
+
+      const level = score >= 45 ? 'critical' : score >= 20 ? 'high' : score > 0 ? 'watch' : 'ok';
+      return {
+        patientId: p.id, name: p.name, uhic: p.uhic, cancer: p.cancer,
+        doctorId: p.assigned_doctor_id || fd.assignedDoctorId || null,
+        weeksMonitored: weeks.length,
+        lastEntryAt: lastAnyAt || null,
+        daysSinceLastEntry: daysSince,
+        lapsed,
+        score, level, flags
+      };
+    })
+    .filter(r => r.flags.length || r.lapsed)
+    .sort((a,b) => b.score - a.score);
+
+    res.json({ patients: out, generatedAt: new Date().toISOString() });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // ───────────────────────── Clinical Trials module ─────────────────────────
 // Pilot settings (target size, definition of "completed", lost-to-follow-up window)
 app.get('/api/pilot-settings', authenticateToken, async (req, res) => {
@@ -1427,6 +1618,269 @@ app.get('/api/trials/outcomes', authenticateToken, requireAdmin, async (req, res
       days: dayByPat[id] || []
     })).sort((a, b) => String(a.studyId).localeCompare(String(b.studyId)));
     res.json({ patients });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ───────────────────── Supply run-out prediction ──────────────────────────
+// The adherence tracker reports gaps AFTER they happen. This predicts them:
+// each dispatched product covers a fixed window, so we can tell who runs out
+// in the next few days and whether anything is in the pipeline to replace it.
+//
+// SUPPLY_DAYS is 7 because the whole model is weekly prescriptions — one
+// approved weekly Rx produces one product covering one week. If products ever
+// cover a different span this is the single place to change it.
+const SUPPLY_DAYS = 7;
+// Warn this many days before the current product is exhausted, so the store
+// has time to manufacture and dispatch the next one.
+const SUPPLY_WARN_DAYS = 3;
+
+app.get('/api/supply-status', authenticateToken, async (req, res) => {
+  try {
+    const role = req.user && req.user.role;
+    const isAdmin = ['ADMIN', 'SUPER_ADMIN'].includes(role);
+    const isStore = ['STORE', 'STORE_APPROVER'].includes(role);
+
+    let patRes;
+    if (isAdmin) {
+      patRes = await pool.query('SELECT id, name, uhic, cancer, assigned_doctor_id, full_data FROM patients');
+    } else if (isStore) {
+      // Store users see patients whose products belong to their store.
+      const u = (await pool.query('SELECT store_id FROM users WHERE id=$1', [req.user.id])).rows[0];
+      const storeId = u && u.store_id;
+      if (!storeId) return res.json({ patients: [], supplyDays: SUPPLY_DAYS });
+      patRes = await pool.query(
+        `SELECT DISTINCT p.id, p.name, p.uhic, p.cancer, p.assigned_doctor_id, p.full_data
+           FROM patients p JOIN manufacturing_jobs j ON j.patient_id = p.id
+          WHERE j.store_id = $1`, [storeId]);
+    } else {
+      patRes = await pool.query(
+        `SELECT id, name, uhic, cancer, assigned_doctor_id, full_data FROM patients
+          WHERE assigned_doctor_id = $1 OR full_data->>'assignedDoctorId' = $1`, [req.user.id]);
+    }
+    const patients = patRes.rows;
+    if (!patients.length) return res.json({ patients: [], supplyDays: SUPPLY_DAYS });
+
+    const ids = patients.map(p => p.id);
+    const jobs = (await pool.query(
+      `SELECT id, patient_id, status, history, batch_no, created_at
+         FROM manufacturing_jobs WHERE patient_id = ANY($1)`, [ids])).rows;
+    const trials = (await pool.query(
+      'SELECT patient_id, withdrawn_at FROM trial_enrollments WHERE patient_id = ANY($1)', [ids])).rows;
+    const withdrawnBy = {}; trials.forEach(t => { withdrawnBy[t.patient_id] = t.withdrawn_at; });
+
+    const settings = (await pool.query('SELECT * FROM pilot_settings WHERE id=1')).rows[0]
+      || { pilot_weeks: 6 };
+    const weekCounts = (await pool.query(
+      `SELECT patient_id, COUNT(*)::int AS n FROM monitoring_logs
+        WHERE type='weekly' AND patient_id = ANY($1) GROUP BY patient_id`, [ids])).rows;
+    const weeksBy = {}; weekCounts.forEach(r => { weeksBy[r.patient_id] = r.n; });
+
+    const jobsBy = {};
+    jobs.forEach(j => { (jobsBy[j.patient_id] = jobsBy[j.patient_id] || []).push(j); });
+
+    const DAY = 86400000;
+    const dispatchedAt = (j) => {
+      const h = Array.isArray(j.history) ? j.history : [];
+      const e = h.find(x => (x.status || '').toUpperCase() === 'DISPATCHED');
+      return e ? e.at : ((j.status || '').toUpperCase() === 'DISPATCHED' ? j.created_at : null);
+    };
+    const weekNo = (j) => {
+      const m = String(j.id).match(/_w(\d+)$/);
+      return m ? parseInt(m[1], 10) : 0;
+    };
+    const label = (j) => weekNo(j) ? 'Week ' + weekNo(j) : 'Initial';
+
+    const out = patients.map(p => {
+      const list = (jobsBy[p.id] || []).sort((a, b) => weekNo(a) - weekNo(b));
+      if (!list.length) return null;
+
+      // Latest product that actually reached the patient.
+      let lastDispatch = null, lastLabel = null;
+      list.forEach(j => {
+        const at = dispatchedAt(j);
+        if (at && (!lastDispatch || new Date(at) > new Date(lastDispatch))) {
+          lastDispatch = at; lastLabel = label(j);
+        }
+      });
+
+      // Anything already moving through the store counts as cover.
+      const pipeline = list.filter(j => {
+        const s = (j.status || '').toUpperCase();
+        return s !== 'DISPATCHED' && s !== 'DELIVERED';
+      }).map(j => ({ label: label(j), status: j.status }));
+
+      // Not a supply problem if the patient has finished or left the study.
+      const finished = (weeksBy[p.id] || 0) >= (settings.pilot_weeks || 6);
+      const withdrawn = !!withdrawnBy[p.id];
+
+      let runsOutAt = null, daysLeft = null;
+      if (lastDispatch) {
+        const end = new Date(new Date(lastDispatch).getTime() + SUPPLY_DAYS * DAY);
+        runsOutAt = end.toISOString();
+        daysLeft = Math.floor((end.getTime() - Date.now()) / DAY);
+      }
+
+      let state = 'ok', reason = null;
+      if (withdrawn)        { state = 'inactive'; reason = 'Withdrawn from study'; }
+      else if (finished)    { state = 'inactive'; reason = 'Pilot complete'; }
+      else if (!lastDispatch) {
+        state = pipeline.length ? 'awaiting_first' : 'none';
+        reason = pipeline.length
+          ? 'First product not dispatched yet (' + pipeline[0].label + ' ' + (pipeline[0].status||'') + ')'
+          : 'No product dispatched and nothing in production';
+      } else if (daysLeft < 0) {
+        state = pipeline.length ? 'out_pipeline' : 'out';
+        reason = Math.abs(daysLeft) + ' day' + (Math.abs(daysLeft)===1?'':'s') + ' past supply end'
+               + (pipeline.length ? ' — ' + pipeline[0].label + ' in production' : ' — nothing in production');
+      } else if (daysLeft <= SUPPLY_WARN_DAYS && !pipeline.length) {
+        state = 'running_out';
+        reason = daysLeft === 0 ? 'Supply ends today — nothing in production'
+               : daysLeft + ' day' + (daysLeft===1?'':'s') + ' of supply left — nothing in production';
+      }
+
+      return {
+        patientId: p.id, name: p.name, uhic: p.uhic, cancer: p.cancer,
+        doctorId: p.assigned_doctor_id || (p.full_data||{}).assignedDoctorId || null,
+        lastProduct: lastLabel, lastDispatchAt: lastDispatch,
+        runsOutAt, daysLeft, pipeline, state, reason
+      };
+    }).filter(Boolean);
+
+    // Most urgent first: already out, then running out, then the rest.
+    const rank = { out:0, running_out:1, out_pipeline:2, none:3, awaiting_first:4, ok:5, inactive:6 };
+    out.sort((a,b) => (rank[a.state] - rank[b.state]) || ((a.daysLeft ?? 999) - (b.daysLeft ?? 999)));
+
+    res.json({ patients: out, supplyDays: SUPPLY_DAYS, warnDays: SUPPLY_WARN_DAYS });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Impact summary: baseline vs latest across the cohort ──────────────────
+// Answers the question a doctor evaluating the product actually asks: "is this
+// working?" In advanced cancer the expected trajectory is continued loss, so
+// stabilisation is itself a result — but this is a single-arm pilot with no
+// control group, so the response deliberately ships the caveats alongside the
+// numbers rather than letting the UI imply proof of causation.
+app.get('/api/trials/impact', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const jobsRes = await pool.query('SELECT DISTINCT patient_id FROM manufacturing_jobs');
+    const ids = jobsRes.rows.map(r => r.patient_id).filter(Boolean);
+    if (!ids.length) return res.json({ metrics: [], patients: [], n: 0 });
+
+    const pats = (await pool.query(
+      `SELECT id, name, weight, height, albumin, crp, muac, hand_grip, full_data
+         FROM patients WHERE id = ANY($1)`, [ids])).rows;
+    const trials = (await pool.query(
+      'SELECT patient_id, study_id FROM trial_enrollments WHERE patient_id = ANY($1)', [ids])).rows;
+    const studyBy = {}; trials.forEach(t => { studyBy[t.patient_id] = t.study_id; });
+
+    const logs = (await pool.query(
+      `SELECT patient_id, recorded_at, data FROM monitoring_logs
+        WHERE type='weekly' AND patient_id = ANY($1) ORDER BY recorded_at ASC`, [ids])).rows;
+    const weeklyBy = {};
+    logs.forEach(l => { (weeklyBy[l.patient_id] = weeklyBy[l.patient_id] || []).push(l.data || {}); });
+
+    const num = v => (v === null || v === undefined || v === '' || isNaN(parseFloat(v)))
+      ? null : parseFloat(v);
+
+    // Per-patient baseline → latest pairs. A patient only counts for a metric
+    // if BOTH ends exist; otherwise the mean would be computed over a shifting
+    // denominator and quietly overstate the effect.
+    const rows = pats.map(p => {
+      const fd = p.full_data || {};
+      const weeks = weeklyBy[p.id] || [];
+      const lastOf = key => {
+        for (let i = weeks.length - 1; i >= 0; i--) {
+          const v = num(weeks[i][key]);
+          if (v !== null) return v;
+        }
+        return null;
+      };
+      const base = {
+        weight:  num(p.weight)    != null ? num(p.weight)    : num(fd.weight),
+        albumin: num(p.albumin)   != null ? num(p.albumin)   : num(fd.albumin),
+        crp:     num(p.crp)       != null ? num(p.crp)       : num(fd.crp),
+        muac:    num(p.muac)      != null ? num(p.muac)      : num(fd.muac),
+        grip:    num(p.hand_grip) != null ? num(p.hand_grip) : num(fd.handGrip)
+      };
+      const latest = {
+        weight: lastOf('weight'), albumin: lastOf('albumin'),
+        crp: lastOf('crp'), muac: lastOf('muac'), grip: lastOf('handGrip')
+      };
+      return {
+        patientId: p.id, name: p.name, studyId: studyBy[p.id] || null,
+        weeks: weeks.length, base, latest
+      };
+    }).filter(r => r.weeks > 0);
+
+    // "Higher is better" for weight/albumin/MUAC/grip; CRP is inverted.
+    const METRICS = [
+      { key:'weight',  label:'Weight',      unit:'kg',   better:'up'   },
+      { key:'albumin', label:'Albumin',     unit:'g/dL', better:'up'   },
+      { key:'crp',     label:'CRP',         unit:'mg/L', better:'down' },
+      { key:'muac',    label:'MUAC',        unit:'cm',   better:'up'   },
+      { key:'grip',    label:'Hand grip',   unit:'kg',   better:'up'   }
+    ];
+
+    const mean = a => a.length ? a.reduce((s, v) => s + v, 0) / a.length : null;
+    // Sample standard deviation of the paired differences.
+    const sd = a => {
+      if (a.length < 2) return null;
+      const m = mean(a);
+      return Math.sqrt(a.reduce((s, v) => s + Math.pow(v - m, 2), 0) / (a.length - 1));
+    };
+
+    const metrics = METRICS.map(m => {
+      const paired = rows
+        .map(r => ({ b: r.base[m.key], l: r.latest[m.key] }))
+        .filter(x => x.b !== null && x.l !== null);
+      if (!paired.length) {
+        return { ...m, n:0, baselineMean:null, latestMean:null, meanChange:null,
+                 improved:0, stable:0, worsened:0 };
+      }
+      const diffs = paired.map(x => x.l - x.b);
+      // "Stable" band avoids counting measurement noise as change:
+      // ±2% of baseline for weight, ±10% for the lab values.
+      const band = m.key === 'weight' ? 0.02 : 0.10;
+      let improved = 0, stable = 0, worsened = 0;
+      paired.forEach((x, i) => {
+        const tol = Math.abs(x.b) * band;
+        const d = diffs[i];
+        if (Math.abs(d) <= tol) stable++;
+        else if (m.better === 'up' ? d > 0 : d < 0) improved++;
+        else worsened++;
+      });
+      const md = mean(diffs), s = sd(diffs);
+      return {
+        ...m,
+        n: paired.length,
+        baselineMean: +mean(paired.map(x => x.b)).toFixed(2),
+        latestMean:   +mean(paired.map(x => x.l)).toFixed(2),
+        meanChange:   +md.toFixed(2),
+        sdChange:     s != null ? +s.toFixed(2) : null,
+        // Standard error of the mean difference — lets the UI show a range
+        // rather than a single figure that looks more precise than it is.
+        semChange:    (s != null && paired.length > 1) ? +(s / Math.sqrt(paired.length)).toFixed(2) : null,
+        improved, stable, worsened
+      };
+    });
+
+    res.json({
+      n: rows.length,
+      metrics,
+      patients: rows.map(r => ({
+        studyId: r.studyId, name: r.name, weeks: r.weeks,
+        weightChange:  (r.base.weight  != null && r.latest.weight  != null) ? +(r.latest.weight  - r.base.weight ).toFixed(1) : null,
+        albuminChange: (r.base.albumin != null && r.latest.albumin != null) ? +(r.latest.albumin - r.base.albumin).toFixed(2) : null,
+        crpChange:     (r.base.crp     != null && r.latest.crp     != null) ? +(r.latest.crp     - r.base.crp    ).toFixed(1) : null
+      })),
+      caveats: [
+        'Single-arm pilot: there is no control group, so these changes cannot be attributed to the supplement alone.',
+        'Patients also received concurrent oncological treatment, which independently affects every metric shown.',
+        'Only patients with both a baseline and a follow-up value are counted for each metric; n varies by row.',
+        'Albumin and CRP are acute-phase reactants and move with infection and treatment cycles, not nutrition alone.'
+      ],
+      generatedAt: new Date().toISOString()
+    });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -2997,6 +3451,7 @@ const cleanRoutes = {
   '/admin/trials/cohort': 'admin-trial-cohort.html',
   '/admin/trials/outcomes': 'admin-trial-outcomes.html',
   '/admin/trials/formula': 'admin-trial-formula.html',
+  '/admin/trials/impact':  'admin-trial-impact.html',
   '/admin/trials/export': 'admin-trial-export.html',
   '/admin/reports':    'admin-reports.html',
   '/admin/rules':      'admin-rules.html',

@@ -695,7 +695,7 @@
   <div class="topbar">
     <div class="logo">Gquence</div>
     <div class="nav">
-      <a href="/dashboard">Dashboard</a>
+      <a href="/dashboard" id="navDashboard">Dashboard</a>
       <a href="#" onclick="auth.logout()">Logout</a>
       <button id="themeToggleBtn" onclick="toggleTheme()" class="theme-toggle-btn" style="margin-left: 20px;">
         <span id="themeIcon">🌙</span> <span id="themeLabel">Dark</span>
@@ -2542,6 +2542,14 @@
           loadEngineConfig(); // Part 3: load formula constants + active rules from DB
 
           const me = auth.getCurrentUser();
+
+          // Store users came from the production queue, not the doctor dashboard.
+          // Point the nav link back to /store so they land on the queue (which
+          // restores their filter/search and scrolls to the patient's row).
+          if (me && (me.role === 'STORE' || me.role === 'STORE_APPROVER')) {
+            const navDash = document.getElementById('navDashboard');
+            if (navDash) { navDash.href = '/store'; navDash.textContent = '← Back to Queue'; }
+          }
 
           // Hide AI elements immediately for store-side users (before initStore delay)
           if (me && (me.role === 'STORE' || me.role === 'STORE_APPROVER')) {

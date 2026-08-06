@@ -112,6 +112,8 @@
       <div style="display:flex;gap:6px;flex-wrap:wrap;" id="statusTabs"></div>
     </div>
 
+    <div id="supplyAlert" style="display:none;margin-bottom:12px;"></div>
+
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px;">
       <input id="qSearch" type="search" placeholder="Search patient name or UHID…" oninput="render()"
         style="flex:1;min-width:220px;max-width:340px;padding:9px 12px;border:1px solid var(--border);border-radius:9px;background:var(--surface);color:var(--text);font-size:13px;">
@@ -127,6 +129,10 @@
           <th>UHID</th>
           <th>Cancer</th>
           <th>Products</th>
+          <th style="white-space:nowrap;" title="Date the doctor approved the nutrition plan">Approved</th>
+          <th onclick="toggleDateSort()" style="cursor:pointer;user-select:none;white-space:nowrap;" title="Most recent activity across this patient's products — click to sort">
+            Last Update <span id="dateSortCaret">▼</span>
+          </th>
           <th>Status</th>
           <th>Action</th>
         </tr>
@@ -349,6 +355,8 @@ window.addEventListener('DOMContentLoaded', () => {
   if (h) h.textContent = isApprover ? 'Approval Queue' : 'Production Queue';
   const chip = document.getElementById('roleChip');
   if (chip) chip.textContent = isApprover ? 'Store Approver' : 'Store Manager';
+  // Restore filter/search BEFORE tabs are built so the right tab shows active.
+  restoreQueueFilters();
   buildTabs();
 });
 
@@ -409,7 +417,7 @@ function render(){
   tbody.innerHTML='';
 
   if(!me.storeId){
-    tbody.innerHTML = '<tr><td colspan="8" style="padding:20px;color:#94a3b8;font-style:italic;">Loading store assignment...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" style="padding:20px;color:#94a3b8;font-style:italic;">Loading store assignment...</td></tr>';
     const apiBase = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : '';
     fetch(apiBase + '/api/users', { headers: { Authorization: 'Bearer ' + me.token } })
       .then(r => r.json())
@@ -421,11 +429,11 @@ function render(){
           db.setTable('session', session);
           render();
         } else {
-          tbody.innerHTML = '<tr><td colspan="8" style="padding:20px;color:#dc2626;font-weight:600;">This account is not assigned to a store. Please ask the Admin to go to Admin → Mappings and assign a store to your account.</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="10" style="padding:20px;color:#dc2626;font-weight:600;">This account is not assigned to a store. Please ask the Admin to go to Admin → Mappings and assign a store to your account.</td></tr>';
         }
       })
       .catch(() => {
-        tbody.innerHTML = '<tr><td colspan="8" style="padding:20px;color:#dc2626;font-weight:600;">This account is not assigned to a store. Please ask the Admin to go to Admin → Mappings and assign a store to your account.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="10" style="padding:20px;color:#dc2626;font-weight:600;">This account is not assigned to a store. Please ask the Admin to go to Admin → Mappings and assign a store to your account.</td></tr>';
       });
     return;
   }
@@ -470,7 +478,7 @@ function render(){
       DISPATCHED: 'No dispatched jobs.'
     };
     const msg = q ? `No patients matching “${qEl.value.trim()}”.` : (emptyLabels[_activeFilter] || 'No jobs.');
-    tbody.innerHTML = `<tr><td colspan="8" style="padding:20px;color:#94a3b8;font-style:italic;">${msg}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="10" style="padding:20px;color:#94a3b8;font-style:italic;">${msg}</td></tr>`;
     const meta = document.getElementById('queueMeta'); if (meta) meta.textContent = '';
     return;
   }
@@ -493,11 +501,19 @@ function render(){
     meta.textContent = `${nP} patient${nP===1?'':'s'} · ${nJ} product${nJ===1?'':'s'}`;
   }
 
+  // Sort patients by their most recent activity so the freshest work is on top.
+  const ordered = Array.from(groups.entries())
+    .sort((a,b) => {
+      const da = groupLatest(a[1]), db = groupLatest(b[1]);
+      return _dateSortDesc ? db.localeCompare(da) : da.localeCompare(db);
+    });
+
   let gi = 0;
-  groups.forEach((list, patientId) => {
+  ordered.forEach(([patientId, list]) => {
     const p = getPatientById(patientId);
     if(!p) return;
     list.sort((a,b) => productOrder(a) - productOrder(b));
+    const latestIso = groupLatest(list);
 
     // The row's headline job is whatever most needs the store's attention;
     // if nothing is actionable, fall back to the newest product.
@@ -512,6 +528,7 @@ function render(){
 
     const main = document.createElement('tr');
     main.className = 'clickable-row';
+    main.setAttribute('data-patient', p.id);
     if (multi) { main.style.cursor = 'pointer'; main.onclick = () => toggleGroup(gid); }
     main.innerHTML = `
       <td>${getUserName(primary.doctorId)}</td>
@@ -524,13 +541,16 @@ function render(){
       <td>${p.cancer}</td>
       <td>${multi ? `<span style="font-weight:700;">${list.length}</span> <span style="font-size:11px;color:var(--text-2);">products</span><div style="margin-top:3px;">${chips}</div>`
                   : chips}</td>
+      <td style="white-space:nowrap;">${p.approvedAt ? _lblFmtDate(p.approvedAt) : '-'}</td>
+      <td style="white-space:nowrap;"><span style="font-weight:600;">${_lblFmtDate(latestIso) || '-'}</span>
+          <div style="font-size:10.5px;color:var(--text-2);">${relativeDay(latestIso)}</div></td>
       <td><span class="status ${statusClass(primary.status)}">${manufacturingService.WORKFLOW.statusLabel(primary.status)}</span>
           ${actionable.length > 1 ? `<div style="font-size:10.5px;color:#d97706;font-weight:700;margin-top:3px;">${actionable.length} need action</div>` : ''}</td>
       <td>
         <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-start;">
           <div style="display:flex;gap:6px;flex-wrap:wrap;">
-            <a href="/patients/profile?id=${p.id}&store=1" class="btn-primary" style="padding:6px 12px;font-size:12px;border-radius:6px;" onclick="event.stopPropagation();">View Plan</a>
-            <button class="btn-warning" onclick="event.stopPropagation(); openPdf('${p.id}')" style="padding:6px 12px;font-size:12px;border-radius:6px;">PDF</button>
+            <a href="/patients/profile?id=${p.id}&store=1" class="btn-primary" style="padding:6px 12px;font-size:12px;border-radius:6px;" onclick="event.stopPropagation(); rememberQueueState('${p.id}');">View Plan</a>
+            <button class="btn-warning" onclick="event.stopPropagation(); rememberQueueState('${p.id}'); openPdf('${p.id}')" style="padding:6px 12px;font-size:12px;border-radius:6px;">PDF</button>
             ${multi ? `<button class="btn-secondary" style="padding:6px 12px;font-size:12px;border-radius:6px;" onclick="event.stopPropagation(); toggleGroup('${gid}')">${list.length} Products ▾</button>`
                     : printLabelBtn(primary)}
           </div>
@@ -547,13 +567,15 @@ function render(){
         sub.className = gid + '-row';
         sub.style.display = 'none';
         sub.style.background = 'var(--surface-2)';
+        const jobIso = jobDate(j);
         sub.innerHTML = `
           <td></td>
-          <td colspan="4" style="padding-left:26px;">
+          <td colspan="6" style="padding-left:26px;">
             <span style="font-weight:700;">${productLabel(j)}</span>
             ${j.batchNo ? `<span style="font-size:11px;color:var(--text-2);margin-left:8px;">Batch ${j.batchNo}</span>` : ''}
-            <span style="font-size:11px;color:var(--text-2);margin-left:8px;">${(j.createdAt || p.createdDate) ? _lblFmtDate(j.createdAt || p.createdDate) : '-'}</span>
           </td>
+          <td style="white-space:nowrap;">${_lblFmtDate(jobIso) || '-'}
+            <div style="font-size:10.5px;color:var(--text-2);">${relativeDay(jobIso)}</div></td>
           <td><span class="status ${statusClass(j.status)}">${manufacturingService.WORKFLOW.statusLabel(j.status)}</span></td>
           <td>
             <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
@@ -566,6 +588,137 @@ function render(){
       });
     }
   });
+}
+
+// ── Supply run-out warnings ───────────────────────────────────────────────
+// Tells the store who is about to run out BEFORE the gap happens, so the next
+// product can be made in time rather than chased afterwards.
+async function loadSupplyAlert(){
+  const el = document.getElementById('supplyAlert');
+  if(!el) return;
+  try{
+    const apiBase = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : '';
+    const res = await fetch(apiBase + '/api/supply-status', {
+      headers: { Authorization: 'Bearer ' + (me.token || '') }
+    });
+    if(!res.ok) return;
+    const data = await res.json();
+    // Only cases the store can act on: out, or running out with nothing queued.
+    const act = (data.patients || []).filter(s => s.state === 'out' || s.state === 'running_out');
+    if(!act.length){ el.style.display='none'; return; }
+
+    const nOut = act.filter(s => s.state === 'out').length;
+    const rows = act.slice(0, 8).map(s => {
+      const urgent = s.state === 'out';
+      return `<div style="display:flex;gap:9px;align-items:baseline;padding:4px 0;">
+        <span style="flex:none;width:7px;height:7px;border-radius:50%;background:${urgent?'#dc2626':'#d97706'};"></span>
+        <b style="font-size:12.5px;color:var(--text);">${s.name || '—'}</b>
+        <span style="font-size:11.5px;color:var(--text-2);">${s.uhic || ''} — ${s.reason || ''}</span>
+      </div>`;
+    }).join('');
+
+    el.style.display='block';
+    el.innerHTML = `
+      <div style="border:1px solid ${nOut?'#fecaca':'#fde68a'};background:${nOut?'rgba(220,38,38,.07)':'rgba(217,119,6,.07)'};
+                  border-radius:10px;padding:12px 15px;">
+        <div style="font-weight:800;font-size:13px;color:${nOut?'#dc2626':'#d97706'};margin-bottom:5px;">
+          ${act.length} patient${act.length===1?'':'s'} need${act.length===1?'s':''} the next product
+          ${nOut?`· ${nOut} already out of supply`:''}
+        </div>
+        ${rows}
+        ${act.length>8?`<div style="font-size:11.5px;color:var(--text-2);margin-top:5px;">+${act.length-8} more</div>`:''}
+        <div style="font-size:11px;color:var(--text-2);margin-top:7px;">
+          Based on ${data.supplyDays || 7} days of cover per dispatched product.
+        </div>
+      </div>`;
+  }catch(e){ /* offline — hide rather than alarm */ }
+}
+
+// ── Queue position memory ─────────────────────────────────────────────────
+// Leaving the queue to view a plan/PDF used to lose your place: on return the
+// filter, search text and scroll position all reset, forcing a re-search.
+// Before navigating away we snapshot that state; on load we restore it and
+// scroll the patient's row back into view with a brief highlight.
+const QSTATE_KEY = 'gq_store_queue_state';
+
+function rememberQueueState(patientId){
+  try {
+    sessionStorage.setItem(QSTATE_KEY, JSON.stringify({
+      patientId: patientId,
+      filter: _activeFilter,
+      search: (document.getElementById('qSearch') || {}).value || '',
+      sortDesc: _dateSortDesc,
+      scrollY: window.scrollY
+    }));
+  } catch(e){ /* private mode — fall back to normal navigation */ }
+}
+
+function readQueueState(){
+  try {
+    const raw = sessionStorage.getItem(QSTATE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch(e){ return null; }
+}
+
+// Applies saved filter/search/sort BEFORE the first render so the row exists.
+function restoreQueueFilters(){
+  const s = readQueueState();
+  if(!s) return null;
+  if(s.filter) _activeFilter = s.filter;
+  if(typeof s.sortDesc === 'boolean') _dateSortDesc = s.sortDesc;
+  const q = document.getElementById('qSearch');
+  if(q && s.search) q.value = s.search;
+  const caret = document.getElementById('dateSortCaret');
+  if(caret) caret.textContent = _dateSortDesc ? '▼' : '▲';
+  return s;
+}
+
+// Called after render(): scroll to the remembered patient and flash it.
+function restoreQueueScroll(){
+  const s = readQueueState();
+  if(!s || !s.patientId) return;
+  sessionStorage.removeItem(QSTATE_KEY);   // one-shot, don't re-trigger on refresh
+  const row = document.querySelector('tr[data-patient="' + s.patientId + '"]');
+  if(!row){
+    if(s.scrollY) window.scrollTo(0, s.scrollY);
+    return;
+  }
+  row.scrollIntoView({ behavior:'smooth', block:'center' });
+  const prev = row.style.background;
+  row.style.transition = 'background .4s';
+  row.style.background = '#fef3c7';
+  setTimeout(() => { row.style.background = prev || ''; }, 1800);
+}
+
+// ── Date helpers ──────────────────────────────────────────────────────────
+let _dateSortDesc = true;   // newest first by default
+
+// A job's effective date: last status change, else when it was created.
+function jobDate(j){
+  return j.updatedAt || j.createdAt || '';
+}
+// A patient's most recent activity across all their products.
+function groupLatest(list){
+  return list.reduce((max, j) => {
+    const d = jobDate(j);
+    return d > max ? d : max;
+  }, '');
+}
+// "Today" / "3d ago" — helps the store spot stale jobs without doing date math.
+function relativeDay(iso){
+  if(!iso) return '';
+  const d = new Date(iso);
+  if(isNaN(d.getTime())) return '';
+  const days = Math.floor((Date.now() - d.getTime()) / 86400000);
+  if(days <= 0) return 'Today';
+  if(days === 1) return 'Yesterday';
+  return days + 'd ago';
+}
+function toggleDateSort(){
+  _dateSortDesc = !_dateSortDesc;
+  const caret = document.getElementById('dateSortCaret');
+  if(caret) caret.textContent = _dateSortDesc ? '▼' : '▲';
+  render();
 }
 
 // 'Initial' sorts first, then Week 1, 2, 3… — weekly jobs use id 'wxjob_<pid>_w<N>'
@@ -1198,10 +1351,14 @@ if ('serviceWorker' in navigator) {
 // Start polling after page loads
 initStore().then(() => {
   render();
+  // Rows exist now — jump back to the patient the user came from.
+  setTimeout(restoreQueueScroll, 60);
   _initNotifications();
   _updateNotifStatus();
   _pollJobs(); // seed known job IDs (no notification on first load)
   setInterval(_pollJobs, 30000); // check every 30 seconds
+  loadSupplyAlert();
+  setInterval(loadSupplyAlert, 300000); // supply changes slowly — every 5 min
 });
 
 </script>
