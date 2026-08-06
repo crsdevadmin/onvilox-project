@@ -1088,8 +1088,16 @@ app.get('/api/risk-panel', authenticateToken, async (req, res) => {
       });
     });
 
-    const num = v => (v === null || v === undefined || v === '' || isNaN(parseFloat(v)))
-      ? null : parseFloat(v);
+    // A stored 0 for a lab or anthropometric measure means "not recorded" —
+    // CRP is never truly 0 and a MUAC/weight of 0 is impossible. Without this
+    // the panel raised "Low albumin 0 g/dL" style flags on missing data.
+    const num = (v, key) => {
+      if (v === null || v === undefined || v === '') return null;
+      const n = parseFloat(v);
+      if (isNaN(n)) return null;
+      if (n === 0 && key && ['crp','muac','albumin','weight','bmi','handGrip'].includes(key)) return null;
+      return n;
+    };
     const DAY = 86400000;
 
     const out = patients.map(p => {
@@ -1099,9 +1107,9 @@ app.get('/api/risk-panel', authenticateToken, async (req, res) => {
       const flags = [];
       let score = 0;
 
-      const baseWeight  = num(p.weight)  != null ? num(p.weight)  : num(fd.weight);
-      const baseAlbumin = num(p.albumin) != null ? num(p.albumin) : num(fd.albumin);
-      const baseCrp     = num(p.crp)     != null ? num(p.crp)     : num(fd.crp);
+      const baseWeight  = num(p.weight,'weight')   != null ? num(p.weight,'weight')   : num(fd.weight,'weight');
+      const baseAlbumin = num(p.albumin,'albumin') != null ? num(p.albumin,'albumin') : num(fd.albumin,'albumin');
+      const baseCrp     = num(p.crp,'crp')         != null ? num(p.crp,'crp')         : num(fd.crp,'crp');
 
       const last  = weeks.length ? weeks[weeks.length - 1] : null;
       const prev  = weeks.length > 1 ? weeks[weeks.length - 2] : null;
@@ -1111,7 +1119,7 @@ app.get('/api/risk-panel', authenticateToken, async (req, res) => {
       // is unremarkable in oncology; losing 4% over 2 weeks (2%/wk) is an
       // emergency. Ranking on the total alone made those look identical and
       // flooded the panel with slow, stable drifters.
-      const lastW = last ? num(last.weight) : null;
+      const lastW = last ? num(last.weight,'weight') : null;
       if (lastW != null && baseWeight) {
         // Measure from the earliest known observation, not blindly from
         // created_date: a patient enrolled and weighed the same day yields a
@@ -1161,10 +1169,10 @@ app.get('/api/risk-panel', authenticateToken, async (req, res) => {
       }
 
       // ── Albumin falling while CRP rises = inflammatory catabolism ──
-      const lastAlb = last ? num(last.albumin) : null;
-      const prevAlb = prev ? num(prev.albumin) : baseAlbumin;
-      const lastCrp = last ? num(last.crp) : null;
-      const prevCrp = prev ? num(prev.crp) : baseCrp;
+      const lastAlb = last ? num(last.albumin,'albumin') : null;
+      const prevAlb = prev ? num(prev.albumin,'albumin') : baseAlbumin;
+      const lastCrp = last ? num(last.crp,'crp') : null;
+      const prevCrp = prev ? num(prev.crp,'crp') : baseCrp;
       if (lastAlb != null && prevAlb != null && lastCrp != null && prevCrp != null
           && lastAlb < prevAlb && lastCrp > prevCrp) {
         score += 30;
@@ -1182,8 +1190,8 @@ app.get('/api/risk-panel', authenticateToken, async (req, res) => {
       }
 
       // ── Intake / adherence collapse ──
-      const lastOral = last ? num(last.oralIntake) : null;
-      const lastComp = last ? num(last.compliance) : null;
+      const lastOral = last ? num(last.oralIntake,'oralIntake') : null;
+      const lastComp = last ? num(last.compliance,'compliance') : null;
       // Only SEVERE intake failure is flagged. In a head & neck / GI cohort,
       // eating 35-40% of requirement is the norm — it's why the patient is on
       // supplements at all — so alerting on it told the doctor nothing they
@@ -1199,8 +1207,8 @@ app.get('/api/risk-panel', authenticateToken, async (req, res) => {
       }
 
       // ── ECOG deterioration ──
-      const lastEcog = last ? num(last.ecog) : null;
-      const prevEcog = prev ? num(prev.ecog) : num(p.ecog_status);
+      const lastEcog = last ? num(last.ecog,'ecog') : null;
+      const prevEcog = prev ? num(prev.ecog,'ecog') : num(p.ecog_status);
       if (lastEcog != null && prevEcog != null && lastEcog > prevEcog) {
         score += 15;
         flags.push({ level:'high', label:'Performance status worsening',

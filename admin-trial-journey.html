@@ -351,6 +351,18 @@ function renderProducts(list){
 // ── Treatment Response signal ───────────────────────────────────────────
 // Compares baseline vs latest recorded value across the markers clinicians
 // use to judge nutritional response, rolled into one plain-language verdict.
+// A recorded 0 for a lab or anthropometric measure means "not measured", not a
+// real reading — CRP is never truly 0 and a MUAC of 0 is impossible. Treating
+// these as data produced baselines like "CRP 0.0" and meaningless change columns.
+const ZERO_IS_MISSING = { crp:1, muac:1, albumin:1, weight:1, bmi:1, handGrip:1, grip:1 };
+function measured(key, v){
+  if (v === null || v === undefined || v === '') return null;
+  const n = Number(v);
+  if (isNaN(n)) return null;
+  if (n === 0 && ZERO_IS_MISSING[key]) return null;
+  return n;
+}
+
 function computeResponse(patient){
   const weeks = patient.weeks || [];
   const last = weeks.length ? weeks[weeks.length - 1] : null;
@@ -358,14 +370,14 @@ function computeResponse(patient){
   const signals = [];
 
   const pushDelta = (key, label, isGood, unit) => {
-    const b = (bl[key] != null && bl[key] !== '') ? Number(bl[key]) : null;
-    const l = (last && last[key] != null && last[key] !== '') ? Number(last[key]) : null;
+    const b = measured(key, bl[key]);
+    const l = last ? measured(key, last[key]) : null;
     if (b == null || l == null) return;
     const delta = Math.round((l - b) * 10) / 10;
     signals.push({ label, positive: isGood(delta), text: label + ' ' + (delta>0?'+':'') + delta + unit });
   };
   const pushLevel = (key, label, threshold, unit) => {
-    const v = (last && last[key] != null && last[key] !== '') ? Number(last[key]) : null;
+    const v = last ? measured(key, last[key]) : null;
     if (v == null) return;
     signals.push({ label, positive: v >= threshold, text: label + ' ' + v + unit });
   };
@@ -380,7 +392,10 @@ function computeResponse(patient){
   const pos = signals.filter(s => s.positive).length;
   const pct = total ? Math.round(pos/total*100) : null;
   let verdict, cls;
-  if (total === 0) { verdict = 'Insufficient Data'; cls = 'insufficient'; }
+  // Fewer than 3 available indicators can't support a verdict — a single
+  // weight reading previously produced "Needs Clinical Review (0 of 1)",
+  // which reads as a clinical judgement the data doesn't justify.
+  if (total < 3) { verdict = 'Insufficient Data'; cls = 'insufficient'; }
   else if (pct >= 70) { verdict = 'Positive Treatment Response'; cls = 'positive'; }
   else if (pct >= 40) { verdict = 'Stable / Mixed Response'; cls = 'mixed'; }
   else { verdict = 'Needs Clinical Review'; cls = 'review'; }
@@ -394,9 +409,13 @@ function renderResponseBadge(resp){
   const chips = resp.signals.map(s =>
     `<span class="resp-chip" style="color:${s.positive?'#15803d':'#b91c1c'};">${s.positive?'▲':'▼'} ${s.text}</span>`
   ).join('');
+  const note = resp.cls === 'insufficient'
+    ? `<div style="font-size:12px;color:var(--text-2);margin-top:6px;">Only ${resp.total} indicator${resp.total===1?'':'s'} available — at least 3 are needed before a response can be judged.</div>`
+    : '';
   el.innerHTML = `<div class="resp-badge ${resp.cls}">
     <div class="resp-title">${resp.verdict}${resp.total?` &nbsp;·&nbsp; ${resp.pos} of ${resp.total} indicators favorable`:''}</div>
     ${chips?`<div class="resp-chips">${chips}</div>`:`<div style="font-size:12.5px;color:var(--text-2);margin-top:6px;">Not enough weekly follow-up data recorded yet.</div>`}
+    ${note}
   </div>`;
 }
 
@@ -824,9 +843,11 @@ function buildOnePager(){
 
     // ── Baseline vs latest vitals ──
     const lastW=weeks.length?weeks[weeks.length-1]:{};
-    const val=(v,dp)=>(v==null||v===''||isNaN(v))?null:Number(v).toFixed(dp==null?1:dp);
+    // measured() strips zeros for fields where 0 means "not recorded", so the
+    // sheet shows an honest "—" instead of an impossible "CRP 0.0".
+    const val=(key,v,dp)=>{ const n=measured(key,v); return n==null?null:n.toFixed(dp==null?1:dp); };
     const rowFor=(label,key,unit,dp,better)=>{
-      const b=val(bl[key],dp), l=val(lastW[key],dp);
+      const b=val(key,bl[key],dp), l=val(key,lastW[key],dp);
       let ch='—';
       if(b!=null&&l!=null){
         const d=(l-b).toFixed(dp==null?1:dp);
