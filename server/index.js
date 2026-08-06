@@ -1049,7 +1049,7 @@ app.get('/api/pilot-settings', authenticateToken, async (req, res) => {
   try { const r = await pool.query('SELECT * FROM pilot_settings WHERE id=1'); res.json(r.rows[0] || {}); }
   catch (e) { res.status(500).json({ error: e.message }); }
 });
-app.put('/api/pilot-settings', authenticateToken, async (req, res) => {
+app.put('/api/pilot-settings', authenticateToken, requireAdmin, async (req, res) => {
   const { target_patients, pilot_weeks, lost_threshold_days } = req.body || {};
   try {
     await pool.query(
@@ -1061,8 +1061,19 @@ app.put('/api/pilot-settings', authenticateToken, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// Clinical Trials data is admin-only. Client-side auth.requireRole() just hides
+// the UI — this middleware is what actually stops a DOCTOR token calling the
+// trials endpoints directly. Applied to every /api/trials route below.
+function requireAdmin(req, res, next) {
+  const role = req.user && req.user.role;
+  if (!['ADMIN', 'SUPER_ADMIN'].includes(role)) {
+    return res.status(403).json({ error: 'Admin only' });
+  }
+  next();
+}
+
 // Manually flag a patient as Withdrawn (the one trial status that can't be auto-derived)
-app.post('/api/trials/:patientId/withdraw', authenticateToken, async (req, res) => {
+app.post('/api/trials/:patientId/withdraw', authenticateToken, requireAdmin, async (req, res) => {
   const { reason } = req.body || {};
   try {
     await pool.query(
@@ -1072,7 +1083,7 @@ app.post('/api/trials/:patientId/withdraw', authenticateToken, async (req, res) 
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 // Un-withdraw (correction)
-app.post('/api/trials/:patientId/reinstate', authenticateToken, async (req, res) => {
+app.post('/api/trials/:patientId/reinstate', authenticateToken, requireAdmin, async (req, res) => {
   try {
     await pool.query('UPDATE trial_enrollments SET withdrawn_at=NULL, withdrawn_reason=NULL WHERE patient_id=$1', [req.params.patientId]);
     res.json({ success: true });
@@ -1081,7 +1092,7 @@ app.post('/api/trials/:patientId/reinstate', authenticateToken, async (req, res)
 
 // Enrollment Log — auto-enrols pilot patients (those approved into production), assigns
 // Study IDs, and returns each with a fully-derived trial status + key dates.
-app.get('/api/trials', authenticateToken, async (req, res) => {
+app.get('/api/trials', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const settings = (await pool.query('SELECT * FROM pilot_settings WHERE id=1')).rows[0]
       || { pilot_weeks: 6, lost_threshold_days: 14, target_patients: 30 };
@@ -1175,7 +1186,7 @@ app.get('/api/trials', authenticateToken, async (req, res) => {
 });
 
 // Export Pilot Dataset — assembles the full pilot dataset (4 tables) for Excel export.
-app.get('/api/trials/export', authenticateToken, async (req, res) => {
+app.get('/api/trials/export', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const settings = (await pool.query('SELECT * FROM pilot_settings WHERE id=1')).rows[0]
       || { pilot_weeks: 6, lost_threshold_days: 14 };
@@ -1262,7 +1273,7 @@ app.get('/api/trials/export', authenticateToken, async (req, res) => {
 });
 
 // Formula Tracking — which formula version + batch each pilot patient received.
-app.get('/api/trials/formula', authenticateToken, async (req, res) => {
+app.get('/api/trials/formula', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const jobsRes = await pool.query('SELECT patient_id, status, history, mfg_date, batch_no, created_at FROM manufacturing_jobs');
     const jobByPatient = {};
@@ -1336,7 +1347,7 @@ app.post('/api/admin/migrate-doctor-id', authenticateToken, async (req, res) => 
 });
 
 // Weekly Outcomes — weekly monitoring metrics for every pilot patient.
-app.get('/api/trials/outcomes', authenticateToken, async (req, res) => {
+app.get('/api/trials/outcomes', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const jobsRes = await pool.query('SELECT DISTINCT patient_id FROM manufacturing_jobs');
     const ids = jobsRes.rows.map(r => r.patient_id).filter(Boolean);
@@ -1420,7 +1431,7 @@ app.get('/api/trials/outcomes', authenticateToken, async (req, res) => {
 });
 
 // Patient Journey — assembles every key date for one patient from existing data.
-app.get('/api/trials/:patientId/journey', authenticateToken, async (req, res) => {
+app.get('/api/trials/:patientId/journey', authenticateToken, requireAdmin, async (req, res) => {
   const pid = req.params.patientId;
   try {
     const pat = (await pool.query('SELECT id, uhic, name, cancer, created_date, created_at FROM patients WHERE id=$1', [pid])).rows[0];

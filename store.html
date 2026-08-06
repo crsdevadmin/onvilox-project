@@ -112,6 +112,12 @@
       <div style="display:flex;gap:6px;flex-wrap:wrap;" id="statusTabs"></div>
     </div>
 
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px;">
+      <input id="qSearch" type="search" placeholder="Search patient name or UHID…" oninput="render()"
+        style="flex:1;min-width:220px;max-width:340px;padding:9px 12px;border:1px solid var(--border);border-radius:9px;background:var(--surface);color:var(--text);font-size:13px;">
+      <span id="queueMeta" style="font-size:12.5px;color:var(--text-2);"></span>
+    </div>
+
     <table>
       <thead>
         <tr>
@@ -120,7 +126,7 @@
           <th>Age / Gender</th>
           <th>UHID</th>
           <th>Cancer</th>
-          <th>Date</th>
+          <th>Products</th>
           <th>Status</th>
           <th>Action</th>
         </tr>
@@ -441,6 +447,17 @@ function render(){
     jobs = jobs.filter(j => (j.status || 'APPROVED').toUpperCase() === _activeFilter);
   }
 
+  // Search by patient name / UHID
+  const qEl = document.getElementById('qSearch');
+  const q = qEl ? qEl.value.trim().toLowerCase() : '';
+  if (q) {
+    jobs = jobs.filter(j => {
+      const p = getPatientById(j.patientId);
+      if (!p) return false;
+      return (p.name || '').toLowerCase().includes(q) || String(p.uhic || '').toLowerCase().includes(q);
+    });
+  }
+
   if(jobs.length === 0){
     const emptyLabels = {
       ALL: 'No jobs.',
@@ -452,40 +469,127 @@ function render(){
       PROCESSING: 'No jobs in processing.',
       DISPATCHED: 'No dispatched jobs.'
     };
-    const msg = emptyLabels[_activeFilter] || 'No jobs.';
+    const msg = q ? `No patients matching “${qEl.value.trim()}”.` : (emptyLabels[_activeFilter] || 'No jobs.');
     tbody.innerHTML = `<tr><td colspan="8" style="padding:20px;color:#94a3b8;font-style:italic;">${msg}</td></tr>`;
+    const meta = document.getElementById('queueMeta'); if (meta) meta.textContent = '';
     return;
   }
 
+  // ── Group jobs by patient ────────────────────────────────────────────
+  // A patient accumulates one job per weekly approval on top of the initial
+  // product. Listing every job as its own row made the same patient appear
+  // many times; instead each patient gets ONE row that expands to show their
+  // individual products.
+  const groups = new Map();
   jobs.forEach(j => {
-    const p = getPatientById(j.patientId);
+    const key = j.patientId;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(j);
+  });
+
+  const meta = document.getElementById('queueMeta');
+  if (meta) {
+    const nP = groups.size, nJ = jobs.length;
+    meta.textContent = `${nP} patient${nP===1?'':'s'} · ${nJ} product${nJ===1?'':'s'}`;
+  }
+
+  let gi = 0;
+  groups.forEach((list, patientId) => {
+    const p = getPatientById(patientId);
     if(!p) return;
+    list.sort((a,b) => productOrder(a) - productOrder(b));
+
+    // The row's headline job is whatever most needs the store's attention;
+    // if nothing is actionable, fall back to the newest product.
+    const actionable = list.filter(isActionable);
+    const primary = actionable.length ? actionable[actionable.length-1] : list[list.length-1];
+    const gid = 'grp' + (gi++);
+    const multi = list.length > 1;
+
+    const chips = list.map(j =>
+      `<span class="status ${statusClass(j.status)}" style="font-size:10px;padding:2px 7px;margin:1px 2px 1px 0;display:inline-block;">${productLabel(j)}</span>`
+    ).join('');
 
     const main = document.createElement('tr');
     main.className = 'clickable-row';
+    if (multi) { main.style.cursor = 'pointer'; main.onclick = () => toggleGroup(gid); }
     main.innerHTML = `
-      <td>${getUserName(j.doctorId)}</td>
-      <td><a href="javascript:void(0)" class="link" onclick="showQr('${p.id}'); event.stopPropagation();">${p.name}</a></td>
+      <td>${getUserName(primary.doctorId)}</td>
+      <td>
+        ${multi ? `<span id="${gid}-caret" style="display:inline-block;width:14px;color:var(--text-2);font-size:11px;">▸</span>` : '<span style="display:inline-block;width:14px;"></span>'}
+        <a href="javascript:void(0)" class="link" onclick="showQr('${p.id}'); event.stopPropagation();">${p.name}</a>
+      </td>
       <td>${p.age ? p.age + ' yr' : '-'} / ${p.sex || '-'}</td>
       <td>${p.uhic || '-'}</td>
       <td>${p.cancer}</td>
-      <td>${(j.createdAt || p.createdDate) ? _lblFmtDate(j.createdAt || p.createdDate) : '-'}</td>
-      <td><span class="status ${statusClass(j.status)}">${manufacturingService.WORKFLOW.statusLabel(j.status)}</span></td>
+      <td>${multi ? `<span style="font-weight:700;">${list.length}</span> <span style="font-size:11px;color:var(--text-2);">products</span><div style="margin-top:3px;">${chips}</div>`
+                  : chips}</td>
+      <td><span class="status ${statusClass(primary.status)}">${manufacturingService.WORKFLOW.statusLabel(primary.status)}</span>
+          ${actionable.length > 1 ? `<div style="font-size:10.5px;color:#d97706;font-weight:700;margin-top:3px;">${actionable.length} need action</div>` : ''}</td>
       <td>
         <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-start;">
           <div style="display:flex;gap:6px;flex-wrap:wrap;">
             <a href="/patients/profile?id=${p.id}&store=1" class="btn-primary" style="padding:6px 12px;font-size:12px;border-radius:6px;" onclick="event.stopPropagation();">View Plan</a>
             <button class="btn-warning" onclick="event.stopPropagation(); openPdf('${p.id}')" style="padding:6px 12px;font-size:12px;border-radius:6px;">PDF</button>
-            ${printLabelBtn(j)}
+            ${multi ? `<button class="btn-secondary" style="padding:6px 12px;font-size:12px;border-radius:6px;" onclick="event.stopPropagation(); toggleGroup('${gid}')">${list.length} Products ▾</button>`
+                    : printLabelBtn(primary)}
           </div>
-          <div style="display:flex;gap:6px;flex-wrap:wrap;">
-            ${statusActionBtn(j)}
-          </div>
+          ${multi ? '' : `<div style="display:flex;gap:6px;flex-wrap:wrap;">${statusActionBtn(primary)}</div>`}
         </div>
       </td>
     `;
     tbody.appendChild(main);
+
+    // ── Per-product sub-rows (hidden until expanded) ──
+    if (multi) {
+      list.forEach(j => {
+        const sub = document.createElement('tr');
+        sub.className = gid + '-row';
+        sub.style.display = 'none';
+        sub.style.background = 'var(--surface-2)';
+        sub.innerHTML = `
+          <td></td>
+          <td colspan="4" style="padding-left:26px;">
+            <span style="font-weight:700;">${productLabel(j)}</span>
+            ${j.batchNo ? `<span style="font-size:11px;color:var(--text-2);margin-left:8px;">Batch ${j.batchNo}</span>` : ''}
+            <span style="font-size:11px;color:var(--text-2);margin-left:8px;">${(j.createdAt || p.createdDate) ? _lblFmtDate(j.createdAt || p.createdDate) : '-'}</span>
+          </td>
+          <td><span class="status ${statusClass(j.status)}">${manufacturingService.WORKFLOW.statusLabel(j.status)}</span></td>
+          <td>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+              ${printLabelBtn(j)}
+              ${statusActionBtn(j)}
+            </div>
+          </td>
+        `;
+        tbody.appendChild(sub);
+      });
+    }
   });
+}
+
+// 'Initial' sorts first, then Week 1, 2, 3… — weekly jobs use id 'wxjob_<pid>_w<N>'
+function productOrder(j){
+  const m = String(j.id).match(/_w(\d+)$/);
+  return m ? parseInt(m[1], 10) : 0;
+}
+function productLabel(j){
+  const m = String(j.id).match(/_w(\d+)$/);
+  return m ? 'Week ' + m[1] : 'Initial';
+}
+// True when this job is waiting on the logged-in store role to do something.
+function isActionable(j){
+  const W = manufacturingService.WORKFLOW;
+  const s = (j.status || 'APPROVED').toUpperCase();
+  return isApprover ? !!W.pending[s] : (!W.isPending(s) && !!W.requestFor(s));
+}
+function toggleGroup(gid){
+  const rows = document.querySelectorAll('.' + gid + '-row');
+  if (!rows.length) return;
+  const open = rows[0].style.display !== 'none';
+  rows.forEach(r => { r.style.display = open ? 'none' : ''; });
+  const caret = document.getElementById(gid + '-caret');
+  if (caret) caret.textContent = open ? '▸' : '▾';
 }
 
 // Print Labels: always available regardless of status

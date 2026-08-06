@@ -43,7 +43,7 @@
     </div>
 
     <h2 style="margin-bottom:0;">Export Pilot Dataset</h2>
-    <p style="color:var(--text-2);margin-top:4px;">Download the complete pilot dataset as a multi-sheet Excel workbook — ready for analysis or publication.</p>
+    <p style="color:var(--text-2);margin-top:4px;">Download the complete pilot dataset as a multi-sheet Excel workbook — ready for analysis, or as a formatted PDF report ready to present to a doctor.</p>
 
     <div class="sheet-list" id="sheetList">
       <div class="sheet-card"><div class="t">Enrollment</div><div class="d">Study ID, UHID, diagnosis, all dates, status, formula version, batch</div><div class="c" id="cEnroll">—</div></div>
@@ -52,12 +52,20 @@
       <div class="sheet-card"><div class="t">Final Outcomes</div><div class="d">Last values + change from baseline</div><div class="c" id="cFinal">—</div></div>
     </div>
 
-    <button class="btn-primary" id="exportBtn" style="border-radius:8px;padding:11px 22px;font-size:15px;cursor:pointer;" onclick="doExport()" disabled>⬇ Export Pilot Dataset (Excel)</button>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      <button class="btn-primary" id="exportBtn" style="border-radius:8px;padding:11px 22px;font-size:15px;cursor:pointer;" onclick="doExport()" disabled>⬇ Export Pilot Dataset (Excel)</button>
+      <button class="btn-secondary" id="exportPdfBtn" style="border-radius:8px;padding:11px 22px;font-size:15px;cursor:pointer;" onclick="doExportPDF()" disabled>📄 Doctor Presentation (PDF)</button>
+    </div>
     <div id="exMsg" style="color:var(--text-2);font-size:13px;margin-top:10px;">Loading dataset…</div>
+    <div id="pdfMsg" style="color:var(--text-2);font-size:13px;margin-top:4px;"></div>
   </div>
 </div>
 
+<canvas id="pdfChartCanvas" width="900" height="480" style="display:none;"></canvas>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <script src="/js/config.js"></script>
 <script src="/js/storage.js"></script>
 <script src="/js/seed.js"></script>
@@ -65,7 +73,7 @@
 <script src="/js/theme.js"></script>
 
 <script>
-auth.requireRole(['SUPER_ADMIN', 'ADMIN', 'DOCTOR']);
+auth.requireRole(['SUPER_ADMIN', 'ADMIN']);
 (function(){ var u=auth.getCurrentUser(); if(u&&u.role==="DOCTOR"){ ["/admin/stores","/admin/users","/admin/mapping","/admin/rules"].forEach(function(h){ var el=document.querySelector(".nav a[href=\""+h+"\"]"); if(el) el.style.display="none"; }); var dash=document.querySelector(".nav a[href=\"/admin\"]"); if(dash){ dash.href="/dashboard"; dash.textContent="Dashboard"; } } })();
 const me = auth.getCurrentUser();
 const apiBase = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : '';
@@ -82,6 +90,7 @@ async function load(){
     document.getElementById('cFinal').textContent = (_data.final||[]).length;
     const n = (_data.enrollment||[]).length;
     document.getElementById('exportBtn').disabled = n === 0;
+    document.getElementById('exportPdfBtn').disabled = n === 0;
     document.getElementById('exMsg').textContent = n ? `Ready — ${n} patient${n===1?'':'s'} in the dataset.` : 'No pilot patients yet.';
   } catch(e){
     document.getElementById('exMsg').textContent = 'Could not load dataset: ' + e.message;
@@ -102,6 +111,744 @@ function doExport(){
     document.getElementById('exMsg').textContent = 'Exported ' + fname;
   } catch(e) {
     document.getElementById('exMsg').textContent = 'Export failed: ' + e.message;
+  }
+}
+
+// ── Doctor Presentation PDF ──────────────────────────────────────────────
+// Trim trailing zeros so 5.0 shows as "5" but 5.4 stays "5.4".
+function chartNum(v){
+  const n = Number(v);
+  if(!isFinite(n)) return '';
+  return (Math.abs(n) >= 100 ? Math.round(n) : Math.round(n*10)/10).toString();
+}
+// Draw a value label with a white halo so it stays readable over gridlines/lines.
+function drawValueLabel(ctx, text, x, y, color, font){
+  ctx.font = font || 'bold 12px Arial';
+  ctx.textAlign = 'center';
+  ctx.lineWidth = 3; ctx.strokeStyle = '#ffffff';
+  ctx.strokeText(text, x, y);
+  ctx.fillStyle = color;
+  ctx.fillText(text, x, y);
+}
+
+// Draws a simple line chart (cohort mean per week, W0 = baseline) onto the
+// hidden canvas and returns a PNG data URL for embedding in the PDF.
+function drawTrendChart(title, unit, labels, values){
+  const cv = document.getElementById('pdfChartCanvas');
+  const ctx = cv.getContext('2d');
+  const W = cv.width, H = cv.height, PAD = 60, BPAD = 50;
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,W,H);
+  ctx.fillStyle = '#0e2247'; ctx.font = 'bold 22px Arial'; ctx.textAlign = 'center';
+  ctx.fillText(title + (unit ? ' ('+unit+')' : ''), W/2, 34);
+
+  const pts = values.map((v,i) => ({ i, v })).filter(p => p.v !== null && p.v !== undefined && !isNaN(p.v));
+  if(!pts.length){
+    ctx.fillStyle = '#94a3b8'; ctx.font = '18px Arial';
+    ctx.fillText('No data recorded', W/2, H/2);
+    return cv.toDataURL('image/png');
+  }
+  let mn = Math.min(...pts.map(p=>p.v)), mx = Math.max(...pts.map(p=>p.v));
+  if(mn === mx){ mn -= 1; mx += 1; }
+  const gW = W - PAD*2, gH = H - BPAD - 50;
+  const px = (i) => PAD + (values.length < 2 ? gW/2 : i/(values.length-1)*gW);
+  const py = (v) => 50 + gH - ((v-mn)/(mx-mn))*gH;
+
+  // axis
+  ctx.strokeStyle = '#cbd5e1'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(PAD, 50+gH); ctx.lineTo(W-PAD, 50+gH); ctx.stroke();
+
+  // labels on x axis
+  ctx.fillStyle = '#64748b'; ctx.font = '13px Arial'; ctx.textAlign = 'center';
+  labels.forEach((lbl,i) => { ctx.fillText(lbl, px(i), 50+gH+22); });
+  ctx.textAlign = 'right';
+  ctx.fillText(mx.toFixed(1), PAD-8, py(mx)+5);
+  ctx.fillText(mn.toFixed(1), PAD-8, py(mn)+5);
+
+  // line
+  ctx.strokeStyle = '#2563eb'; ctx.lineWidth = 3; ctx.lineJoin = 'round';
+  ctx.beginPath();
+  pts.forEach((p,idx) => { const x=px(p.i), y=py(p.v); if(idx===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); });
+  ctx.stroke();
+  ctx.fillStyle = '#2563eb';
+  pts.forEach(p => { ctx.beginPath(); ctx.arc(px(p.i), py(p.v), 5, 0, Math.PI*2); ctx.fill(); });
+
+  // value labels — alternate above/below so neighbouring labels don't collide
+  pts.forEach((p,idx) => {
+    const y = py(p.v), above = idx % 2 === 0;
+    drawValueLabel(ctx, chartNum(p.v), px(p.i), above ? y-12 : y+22, '#1e40af', 'bold 15px Arial');
+  });
+
+  return cv.toDataURL('image/png');
+}
+
+// Total Intake % = Oral Intake % + Supplement Compliance %, i.e. the share of
+// the patient's nutritional requirement achieved from both sources combined.
+// Null only when BOTH inputs are missing; a missing side counts as 0.
+function totalIntakeSeries(oralVals, compVals){
+  const n = Math.max(oralVals.length, compVals.length);
+  const out = [];
+  for(let i=0;i<n;i++){
+    const o = oralVals[i], c = compVals[i];
+    const oN = (o==null||o===undefined||o==='') ? null : Number(o);
+    const cN = (c==null||c===undefined||c==='') ? null : Number(c);
+    out.push((oN===null && cN===null) ? null : (oN||0) + (cN||0));
+  }
+  return out;
+}
+
+// Weight chart overlaid with a single Total Intake % line on a secondary
+// percentage axis, so the doctor sees total nutritional coverage driving weight.
+function drawWeightOverlayChart(labels, weightVals, totalVals){
+  const cv = document.getElementById('pdfChartCanvas');
+  cv.width = 860; cv.height = 260;
+  const ctx = cv.getContext('2d');
+  const W = cv.width, H = cv.height;
+  const PAD_L = 60, PAD_R = 64, TOP = 70, BOTTOM = 46;
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,W,H);
+
+  ctx.fillStyle = '#0e2247'; ctx.font = 'bold 20px Arial'; ctx.textAlign = 'center';
+  ctx.fillText('Weight vs Total Intake % (Oral + Supplement)', W/2, 30);
+
+  // legend
+  const legendY = 52;
+  const items = [
+    { c:'#2563eb', dash:false, lbl:'Weight (kg)' },
+    { c:'#7c3aed', dash:true,  lbl:'Total Intake % (oral + supplement)' }
+  ];
+  ctx.font = '12px Arial'; ctx.textAlign = 'left';
+  let legW = 0; items.forEach(it => { legW += 28 + ctx.measureText(it.lbl).width + 24; });
+  let lx = W/2 - legW/2;
+  items.forEach(it => {
+    ctx.strokeStyle = it.c; ctx.lineWidth = 3;
+    ctx.setLineDash(it.dash ? [5,3] : []);
+    ctx.beginPath(); ctx.moveTo(lx, legendY); ctx.lineTo(lx+22, legendY); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#334155';
+    ctx.fillText(it.lbl, lx+28, legendY+4);
+    lx += 28 + ctx.measureText(it.lbl).width + 24;
+  });
+
+  const gW = W - PAD_L - PAD_R, gH = H - TOP - BOTTOM;
+  const n = labels.length;
+  const px = (i) => PAD_L + (n < 2 ? gW/2 : i/(n-1)*gW);
+
+  const wPts = weightVals.map((v,i)=>({i,v})).filter(p=>p.v!==null && p.v!==undefined && !isNaN(p.v));
+  let wmn = 0, wmx = 1;
+  if(wPts.length){
+    wmn = Math.min(...wPts.map(p=>p.v)); wmx = Math.max(...wPts.map(p=>p.v));
+    if(wmn === wmx){ wmn -= 1; wmx += 1; }
+  }
+  const pyW = (v) => TOP + gH - ((v-wmn)/(wmx-wmn))*gH;
+
+  // Percentage axis scales up if total exceeds 100%.
+  const tPts = totalVals.filter(v => v!==null && v!==undefined && v!=='' && !isNaN(v)).map(Number);
+  const pMax = Math.max(100, tPts.length ? Math.ceil(Math.max(...tPts)/25)*25 : 100);
+  const pyPct = (v) => TOP + gH - (v/pMax)*gH;
+
+  // axes
+  ctx.strokeStyle = '#cbd5e1'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(PAD_L, TOP+gH); ctx.lineTo(W-PAD_R, TOP+gH); ctx.stroke();
+
+  // 100% requirement target reference line
+  ctx.strokeStyle = '#94a3b8'; ctx.lineWidth = 1; ctx.setLineDash([4,4]);
+  ctx.beginPath(); ctx.moveTo(PAD_L, pyPct(100)); ctx.lineTo(W-PAD_R, pyPct(100)); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // x labels
+  ctx.fillStyle = '#64748b'; ctx.font = '12px Arial'; ctx.textAlign = 'center';
+  labels.forEach((lbl,i) => { ctx.fillText(lbl, px(i), TOP+gH+20); });
+
+  // left axis (weight)
+  ctx.fillStyle = '#2563eb'; ctx.textAlign = 'right'; ctx.font = '11px Arial';
+  if(wPts.length){ ctx.fillText(wmx.toFixed(1)+'kg', PAD_L-8, pyW(wmx)+4); ctx.fillText(wmn.toFixed(1)+'kg', PAD_L-8, pyW(wmn)+4); }
+  // right axis (percentage)
+  ctx.fillStyle = '#64748b'; ctx.textAlign = 'left';
+  [0,50,100].concat(pMax>100?[pMax]:[]).forEach(v => { ctx.fillText(v+'%', W-PAD_R+8, pyPct(v)+4); });
+
+  const drawSeries = (vals, color, dashed, yFn) => {
+    const pts = vals.map((v,i)=>({i,v})).filter(p=>p.v!==null && p.v!==undefined && p.v!=='' && !isNaN(p.v));
+    if(!pts.length) return;
+    ctx.strokeStyle = color; ctx.lineWidth = 2.5; ctx.lineJoin = 'round';
+    ctx.setLineDash(dashed ? [5,3] : []);
+    ctx.beginPath();
+    pts.forEach((p,idx) => { const x=px(p.i), y=yFn(p.v); if(idx===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); });
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = color;
+    pts.forEach(p => { ctx.beginPath(); ctx.arc(px(p.i), yFn(p.v), 3.5, 0, Math.PI*2); ctx.fill(); });
+  };
+  drawSeries(totalVals, '#7c3aed', true, pyPct);
+  drawSeries(weightVals, '#2563eb', false, pyW);
+
+  // value labels — weight above its points, total intake below, so they don't collide
+  const labelSeries = (vals, yFn, color, above, suffix) => {
+    vals.forEach((v,i) => {
+      if(v===null || v===undefined || v==='' || isNaN(v)) return;
+      const y = yFn(Number(v));
+      drawValueLabel(ctx, chartNum(v)+(suffix||''), px(i), above ? y-10 : y+20, color, 'bold 12px Arial');
+    });
+  };
+  labelSeries(totalVals, pyPct, '#6d28d9', false, '%');
+  labelSeries(weightVals, pyW, '#1e40af', true, '');
+
+  const url = cv.toDataURL('image/png');
+  cv.width = 900; cv.height = 480; // reset for drawTrendChart reuse
+  return url;
+}
+
+// Small standalone chart with two 0–100% series (Oral Intake vs Supplement
+// Compliance) plotted together, sized to match the other small metric charts.
+function drawDualPctChart(title, labels, seriesA, lblA, seriesB, lblB){
+  const cv = document.getElementById('pdfChartCanvas');
+  cv.width = 620; cv.height = 480;
+  const ctx = cv.getContext('2d');
+  const W = cv.width, H = cv.height, PAD = 60, TOP = 78, BOTTOM = 100;
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,W,H);
+  ctx.fillStyle = '#0e2247'; ctx.font = 'bold 22px Arial'; ctx.textAlign = 'center';
+  ctx.fillText(title, W/2, 34);
+
+  // legend
+  ctx.font = '14px Arial'; ctx.textAlign = 'left';
+  const items = [ { c:'#ea580c', lbl:lblA }, { c:'#16a34a', lbl:lblB } ];
+  let lw = 0; items.forEach(it => { lw += 26 + ctx.measureText(it.lbl).width + 28; });
+  let lx = W/2 - lw/2;
+  items.forEach(it => {
+    ctx.strokeStyle = it.c; ctx.lineWidth = 3; ctx.setLineDash([6,4]);
+    ctx.beginPath(); ctx.moveTo(lx, 56); ctx.lineTo(lx+22, 56); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#334155'; ctx.fillText(it.lbl, lx+28, 60);
+    lx += 28 + ctx.measureText(it.lbl).width + 28;
+  });
+
+  const gW = W - PAD*2, gH = H - TOP - BOTTOM;
+  const n = labels.length;
+  const px = (i) => PAD + (n < 2 ? gW/2 : i/(n-1)*gW);
+  const py = (v) => TOP + gH - (v/100)*gH;
+
+  ctx.strokeStyle = '#cbd5e1'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(PAD, TOP+gH); ctx.lineTo(W-PAD, TOP+gH); ctx.stroke();
+
+  ctx.fillStyle = '#64748b'; ctx.font = '16px Arial'; ctx.textAlign = 'center';
+  labels.forEach((lbl,i) => { ctx.fillText(lbl, px(i), TOP+gH+28); });
+  ctx.textAlign = 'right';
+  [0,50,100].forEach(v => { ctx.fillText(v+'%', PAD-10, py(v)+5); });
+
+  const anyData = seriesA.concat(seriesB).some(v => v !== null && v !== undefined && v !== '');
+  if(!anyData){
+    ctx.fillStyle = '#94a3b8'; ctx.font = '18px Arial'; ctx.textAlign = 'center';
+    ctx.fillText('No data recorded', W/2, TOP+gH/2);
+  }
+
+  const drawSeries = (vals, color) => {
+    const pts = vals.map((v,i)=>({i,v})).filter(p=>p.v!==null && p.v!==undefined && p.v!=='' && !isNaN(p.v));
+    if(!pts.length) return;
+    ctx.strokeStyle = color; ctx.lineWidth = 3; ctx.lineJoin = 'round'; ctx.setLineDash([6,4]);
+    ctx.beginPath();
+    pts.forEach((p,idx) => { const x=px(p.i), y=py(p.v); if(idx===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); });
+    ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = color;
+    pts.forEach(p => { ctx.beginPath(); ctx.arc(px(p.i), py(p.v), 5, 0, Math.PI*2); ctx.fill(); });
+  };
+  drawSeries(seriesA, '#ea580c');
+  drawSeries(seriesB, '#16a34a');
+
+  // value labels — series A above its points, series B below
+  const labelSeries = (vals, color, above) => {
+    vals.forEach((v,i) => {
+      if(v===null || v===undefined || v==='' || isNaN(v)) return;
+      const y = py(Number(v));
+      drawValueLabel(ctx, chartNum(v)+'%', px(i), above ? y-12 : y+22, color, 'bold 14px Arial');
+    });
+  };
+  labelSeries(seriesA, '#c2410c', true);
+  labelSeries(seriesB, '#15803d', false);
+
+  const url = cv.toDataURL('image/png');
+  cv.width = 900; cv.height = 480; // reset for drawTrendChart reuse
+  return url;
+}
+
+// ── Supplement adherence / gap tracking ───────────────────────────────────
+// Daily logs are the only proof of intake, so a day with no log is
+// 'unmonitored' (unknown) — deliberately NOT counted as a missed dose.
+const ADH_COLORS = { taken:'#16a34a', partial:'#f59e0b', missed:'#dc2626', unmonitored:'#e2e8f0', nosupply:'#f8fafc' };
+
+function isoDay(d){
+  if(!d) return null;
+  const dt = new Date(d);
+  if(isNaN(dt.getTime())){
+    const m = String(d).slice(0,10).match(/^\d{4}-\d{2}-\d{2}$/);
+    return m ? m[0] : null;
+  }
+  return dt.getFullYear()+'-'+('0'+(dt.getMonth()+1)).slice(-2)+'-'+('0'+dt.getDate()).slice(-2);
+}
+function addDays(iso, n){
+  const dt = new Date(iso+'T00:00:00');
+  dt.setDate(dt.getDate()+n);
+  return isoDay(dt);
+}
+function fmtDayShort(iso){
+  if(!iso) return '';
+  const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return m ? m[3]+'/'+m[2] : iso;
+}
+
+function computeAdherence(days, dispatchDates){
+  const byDate = {};
+  (days||[]).forEach(d => {
+    const key = isoDay(d.date || d.recordedAt);
+    if(!key) return;
+    const v = (d.suppConsumed != null && d.suppConsumed !== '') ? Number(d.suppConsumed) : null;
+    if(byDate[key] == null || (v != null && v > byDate[key])) byDate[key] = v;
+  });
+
+  const dispatches = (dispatchDates||[]).map(isoDay).filter(Boolean).sort();
+  const firstDispatch = dispatches[0] || null;
+  const loggedDates = Object.keys(byDate).sort();
+  const todayIso = isoDay(new Date());
+
+  const start = firstDispatch || loggedDates[0] || null;
+  if(!start) return { strip:[], start:null, end:null, onSupplement:0, taken:0, partial:0, missed:0, unmonitored:0, longestGap:0, longestGapFrom:null, longestGapTo:null, adherencePct:null, gaps:[], daysSinceLastLog:null };
+  // Window ends at the LAST DAILY LOG, not today. Running to today would turn
+  // "monitoring stopped" into a phantom multi-week treatment gap. The lapse is
+  // reported separately as daysSinceLastLog.
+  const lastLog = loggedDates.length ? loggedDates[loggedDates.length-1] : null;
+  const end = lastLog && lastLog > start ? lastLog : start;
+  const daysSinceLastLog = lastLog
+    ? Math.round((new Date(todayIso+'T00:00:00') - new Date(lastLog+'T00:00:00')) / 86400000)
+    : null;
+
+  const strip = [];
+  let cur = start, guard = 0;
+  while(cur <= end && guard++ < 1000){
+    const v = byDate[cur];
+    let state;
+    if(firstDispatch && cur < firstDispatch) state = 'nosupply';
+    else if(v === undefined || v === null) state = 'unmonitored';
+    else if(v <= 0) state = 'missed';
+    else if(v < 50) state = 'partial';
+    else state = 'taken';
+    strip.push({ date: cur, state, value: (v==null?null:v) });
+    cur = addDays(cur, 1);
+  }
+
+  const count = (s) => strip.filter(d => d.state === s).length;
+  const taken = count('taken'), partial = count('partial'), missed = count('missed'), unmonitored = count('unmonitored');
+  const onSupplement = strip.filter(d => d.state !== 'nosupply').length;
+
+  const gaps = [];
+  let run = null;
+  strip.forEach(d => {
+    const isGap = d.state === 'missed' || d.state === 'unmonitored';
+    if(isGap){
+      if(!run) run = { from: d.date, to: d.date, len: 1, confirmed: d.state==='missed'?1:0 };
+      else { run.to = d.date; run.len++; if(d.state==='missed') run.confirmed++; }
+    } else if(run){ gaps.push(run); run = null; }
+  });
+  if(run) gaps.push(run);
+  gaps.sort((a,b) => b.len - a.len);
+  const longest = gaps[0] || null;
+
+  const evaluated = taken + partial + missed;
+  const adherencePct = evaluated ? Math.round((taken + partial) / evaluated * 100) : null;
+
+  return {
+    strip, start, end, onSupplement, taken, partial, missed, unmonitored,
+    longestGap: longest ? longest.len : 0,
+    longestGapFrom: longest ? longest.from : null,
+    longestGapTo: longest ? longest.to : null,
+    adherencePct, gaps, daysSinceLastLog
+  };
+}
+
+// Renders the day-by-day adherence strip as a PNG for embedding in the PDF.
+function drawAdherenceStrip(adh){
+  const cv = document.getElementById('pdfChartCanvas');
+  cv.width = 1100; cv.height = 150;
+  const ctx = cv.getContext('2d');
+  const W = cv.width, H = cv.height;
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,W,H);
+
+  ctx.fillStyle = '#0e2247'; ctx.font = 'bold 20px Arial'; ctx.textAlign = 'left';
+  ctx.fillText('Supplement Adherence — one square per day', 16, 26);
+
+  // legend
+  const legend = [
+    ['Taken', ADH_COLORS.taken], ['Partial', ADH_COLORS.partial], ['Missed (0%)', ADH_COLORS.missed],
+    ['Not monitored', ADH_COLORS.unmonitored], ['No supply', ADH_COLORS.nosupply]
+  ];
+  ctx.font = '13px Arial';
+  let lx = 16;
+  legend.forEach(([lbl,c]) => {
+    ctx.fillStyle = c; ctx.fillRect(lx, 40, 12, 12);
+    ctx.strokeStyle = '#cbd5e1'; ctx.lineWidth = 1; ctx.strokeRect(lx+.5, 40.5, 12, 12);
+    ctx.fillStyle = '#334155'; ctx.fillText(lbl, lx+17, 51);
+    lx += 17 + ctx.measureText(lbl).width + 18;
+  });
+
+  const n = adh.strip.length;
+  if(!n){
+    ctx.fillStyle = '#94a3b8'; ctx.font = '15px Arial';
+    ctx.fillText('No dispatch or daily monitoring recorded yet.', 16, 90);
+    const u = cv.toDataURL('image/png'); cv.width = 900; cv.height = 480; return u;
+  }
+
+  // Size squares to fit the full width, capped so short courses aren't giant.
+  const avail = W - 32;
+  const cell = Math.max(4, Math.min(20, Math.floor(avail / n) - 2));
+  const gap = cell > 6 ? 2 : 1;
+  const y = 72;
+  adh.strip.forEach((d,i) => {
+    const x = 16 + i*(cell+gap);
+    if(x + cell > W-16) return;
+    ctx.fillStyle = ADH_COLORS[d.state];
+    ctx.fillRect(x, y, cell, cell);
+    if(d.state === 'unmonitored' || d.state === 'nosupply'){
+      ctx.strokeStyle = '#cbd5e1'; ctx.lineWidth = 1; ctx.strokeRect(x+.5, y+.5, cell-1, cell-1);
+    }
+  });
+
+  // start / end date captions
+  ctx.fillStyle = '#64748b'; ctx.font = '12px Arial'; ctx.textAlign = 'left';
+  ctx.fillText(fmtDayShort(adh.start), 16, y+cell+18);
+  ctx.textAlign = 'right';
+  ctx.fillText(fmtDayShort(adh.end), W-16, y+cell+18);
+
+  const url = cv.toDataURL('image/png');
+  cv.width = 900; cv.height = 480; // reset for other chart renderers
+  return url;
+}
+
+// Single patient's series: [baseline, W1, W2, ...] for one metric.
+function patientSeries(patient, metric){
+  const bl = patient.baseline && patient.baseline[metric] != null && patient.baseline[metric] !== '' ? Number(patient.baseline[metric]) : null;
+  const weeks = (patient.weeks||[]).map(w => (w[metric] != null && w[metric] !== '') ? Number(w[metric]) : null);
+  return [bl].concat(weeks);
+}
+
+function statusCounts(enrollment){
+  const c = { Enrolled:0, Active:0, Completed:0, 'Lost to Follow-up':0, Withdrawn:0 };
+  (enrollment||[]).forEach(r => { const s = r['Status']; if(c[s] !== undefined) c[s]++; });
+  return c;
+}
+
+// ── Treatment Response signal ────────────────────────────────────────────
+// Compares baseline vs latest recorded value across the markers clinicians
+// use to judge nutritional response, and rolls them into one plain-language
+// verdict so a doctor gets a confidence read at a glance.
+function computeResponse(patient){
+  const weeks = patient.weeks || [];
+  const last = weeks.length ? weeks[weeks.length - 1] : null;
+  const bl = patient.baseline || {};
+  const signals = [];
+
+  const pushDelta = (key, label, isGood, unit) => {
+    const b = (bl[key] != null && bl[key] !== '') ? Number(bl[key]) : null;
+    const l = (last && last[key] != null && last[key] !== '') ? Number(last[key]) : null;
+    if(b == null || l == null) return;
+    const delta = Math.round((l - b) * 10) / 10;
+    const positive = isGood(delta);
+    signals.push({ label, positive, detail: (positive?'[+] ':'[-] ') + label + ' ' + (delta>0?'+':'') + delta + unit });
+  };
+  const pushLevel = (key, label, threshold, unit) => {
+    const v = (last && last[key] != null && last[key] !== '') ? Number(last[key]) : null;
+    if(v == null) return;
+    const positive = v >= threshold;
+    signals.push({ label, positive, detail: (positive?'[+] ':'[-] ') + label + ' ' + v + unit });
+  };
+
+  pushDelta('weight',  'Weight',  d => d > 0, ' kg');   // weight gain = good (anti-cachexia goal)
+  pushDelta('albumin', 'Albumin', d => d > 0, ' g/dL'); // rising albumin = improving nutritional status
+  pushDelta('crp',     'CRP',     d => d < 0, ' mg/L'); // falling CRP = reduced inflammation
+  pushLevel('oralIntake', 'Oral Intake', 70, '%');
+  pushLevel('compliance', 'Compliance', 75, '%');
+
+  const total = signals.length;
+  const pos = signals.filter(s => s.positive).length;
+  const pct = total ? Math.round(pos/total*100) : null;
+  let verdict;
+  if(total === 0) verdict = 'Insufficient Data';
+  else if(pct >= 70) verdict = 'Positive Treatment Response';
+  else if(pct >= 40) verdict = 'Stable / Mixed Response';
+  else verdict = 'Needs Clinical Review';
+
+  return { signals, pos, total, pct, verdict };
+}
+
+const RESPONSE_STYLE = {
+  'Positive Treatment Response': { bg:[220,252,231], tx:[21,128,61] },
+  'Stable / Mixed Response':     { bg:[254,243,199], tx:[161,98,7] },
+  'Needs Clinical Review':       { bg:[254,226,226], tx:[153,27,27] },
+  'Insufficient Data':           { bg:[241,245,249], tx:[71,85,105] }
+};
+
+// Draws the response verdict box; returns the box height used so callers can
+// position content below it.
+function drawResponseBadge(doc, x, y, w, resp){
+  const style = RESPONSE_STYLE[resp.verdict];
+  const detailStr = resp.signals.map(s => s.detail).join('     ');
+  doc.setFontSize(9.5); doc.setFont('helvetica','normal');
+  const lines = detailStr ? doc.splitTextToSize(detailStr, w-24) : [];
+  const boxH = 30 + lines.length * 12 + 8;
+
+  doc.setFillColor.apply(doc, style.bg);
+  doc.roundedRect(x, y, w, boxH, 6, 6, 'F');
+  doc.setTextColor.apply(doc, style.tx);
+  doc.setFont('helvetica','bold'); doc.setFontSize(13);
+  const title = resp.verdict + (resp.total ? '  (' + resp.pos + ' of ' + resp.total + ' indicators favorable)' : '');
+  doc.text(title, x+12, y+19);
+  if(lines.length){
+    doc.setFont('helvetica','normal'); doc.setFontSize(9.5); doc.setTextColor(70,70,70);
+    doc.text(lines, x+12, y+35);
+  }
+  return boxH;
+}
+
+async function doExportPDF(){
+  if(!_data){ return; }
+  const msg = document.getElementById('pdfMsg');
+  if(typeof window.jspdf === 'undefined'){ msg.textContent = 'PDF library failed to load. Check your connection and reload.'; return; }
+  msg.textContent = 'Building report…';
+  try {
+    const outRes = await fetch(apiBase + '/api/trials/outcomes', { headers: { 'Authorization': 'Bearer ' + (me.token||'') } });
+    const outData = outRes.ok ? await outRes.json() : { patients: [] };
+    const patients = outData.patients || [];
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+    const pageW = doc.internal.pageSize.getWidth();
+    const today = new Date().toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' });
+
+    // ── Active/Completed patients with weekly data, and their response verdicts ──
+    const statusByStudyId = {};
+    (_data.enrollment||[]).forEach(r => { statusByStudyId[r['Study ID']] = r['Status']; });
+    const chartPatients = patients.filter(p => {
+      const st = statusByStudyId[p.studyId];
+      return (st === 'Active' || st === 'Completed') && (p.weeks||[]).length > 0;
+    });
+    const responseByPatient = {};
+    chartPatients.forEach(p => { responseByPatient[p.patientId] = computeResponse(p); });
+
+    // Adherence needs the dispatch date, which lives in the enrollment sheet.
+    const dispatchByStudyId = {};
+    (_data.enrollment||[]).forEach(r => { dispatchByStudyId[r['Study ID']] = r['Dispatch / Start Date'] || null; });
+    const adherenceByPatient = {};
+    patients.forEach(p => {
+      const disp = dispatchByStudyId[p.studyId];
+      adherenceByPatient[p.patientId] = computeAdherence(p.days||[], disp ? [disp] : []);
+    });
+
+    // ── Cover page ──
+    doc.setFillColor(14, 34, 71); doc.rect(0, 0, pageW, 130, 'F');
+    doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(24);
+    doc.text('GQUENCE Clinical Nutrition Pilot', pageW/2, 60, { align:'center' });
+    doc.setFontSize(14); doc.setFont('helvetica','normal');
+    doc.text('Study Progress Report', pageW/2, 88, { align:'center' });
+    doc.setFontSize(11);
+    doc.text('Generated ' + today, pageW/2, 110, { align:'center' });
+
+    doc.setTextColor(30,30,30);
+    const counts = statusCounts(_data.enrollment);
+    const total = (_data.enrollment||[]).length;
+    const summaryRows = [
+      ['Total Enrolled', String(total)],
+      ['Active', String(counts.Active)],
+      ['Completed', String(counts.Completed)],
+      ['Lost to Follow-up', String(counts['Lost to Follow-up'])],
+      ['Withdrawn', String(counts.Withdrawn)]
+    ];
+    doc.autoTable({
+      startY: 160, theme: 'grid', head: [['Cohort Summary','Count']], body: summaryRows,
+      headStyles: { fillColor: [14,34,71] }, styles: { fontSize: 12, cellPadding: 8 },
+      columnStyles: { 0:{ fontStyle:'bold' }, 1:{ halign:'center' } }
+    });
+
+    // ── Per-patient outcome trend charts — Active & Completed patients only ──
+    const metrics = [
+      ['albumin','Albumin','g/dL'], ['crp','CRP','mg/L'], ['bmi','BMI','']
+    ];
+    if(!chartPatients.length){
+      doc.addPage();
+      doc.setTextColor(14,34,71); doc.setFontSize(18); doc.setFont('helvetica','bold');
+      doc.text('Patient Outcome Trends', 40, 50);
+      doc.setFontSize(11); doc.setTextColor(100,100,100); doc.setFont('helvetica','normal');
+      doc.text('No Active or Completed patients with weekly data yet.', 40, 75);
+    } else {
+      chartPatients.forEach(p => {
+        doc.addPage();
+        const st = statusByStudyId[p.studyId] || '';
+        doc.setTextColor(14,34,71); doc.setFontSize(18); doc.setFont('helvetica','bold');
+        doc.text((p.name||'—') + '  ·  ' + (p.studyId||'—'), 40, 50);
+        doc.setFontSize(11); doc.setFont('helvetica','normal');
+        const badgeColor = st === 'Completed' ? [37,99,235] : [22,163,74];
+        doc.setTextColor.apply(doc, badgeColor);
+        doc.text(st, 40, 68);
+        doc.setTextColor(100,100,100);
+        doc.text('Baseline (Adm) through each weekly review recorded for this patient.', 150, 68);
+
+        const fullW = pageW - 80;
+
+        // Treatment response verdict box
+        const resp = responseByPatient[p.patientId] || computeResponse(p);
+        const badgeH = drawResponseBadge(doc, 40, 80, fullW, resp);
+        const chartsTop = 80 + badgeH + 12;
+
+        const labels = ['Adm'].concat((p.weeks||[]).map((w,i) => 'W'+(w.week!=null?w.week:(i+1))));
+
+        // Weight + Total Intake % (oral + supplement) overlay — full width
+        const weightVals = patientSeries(p, 'weight');
+        const oralVals    = patientSeries(p, 'oralIntake');
+        const compVals    = patientSeries(p, 'compliance');
+        const totalVals   = totalIntakeSeries(oralVals, compVals);
+        const overlayImg  = drawWeightOverlayChart(labels, weightVals, totalVals);
+        const overlayH = 190;
+        doc.addImage(overlayImg, 'PNG', 40, chartsTop, fullW, overlayH);
+
+        // Albumin / CRP / BMI / Oral Intake vs Compliance — 2x2 grid, below
+        const cw = (fullW - 16) / 2, chH = 150, cy = chartsTop + overlayH + 16;
+        metrics.forEach(([key,title,unit], idx) => {
+          const series = patientSeries(p, key);
+          const img = drawTrendChart(title, unit, labels, series);
+          const col = idx % 2, row = Math.floor(idx/2);
+          doc.addImage(img, 'PNG', 40 + col*(cw+16), cy + row*(chH+16), cw, chH);
+        });
+        const dualImg = drawDualPctChart('Oral Intake vs Supplement Compliance', labels, oralVals, 'Oral Intake %', compVals, 'Compliance %');
+        const dualCol = metrics.length % 2, dualRow = Math.floor(metrics.length/2);
+        doc.addImage(dualImg, 'PNG', 40 + dualCol*(cw+16), cy + dualRow*(chH+16), cw, chH);
+
+        // ── Supplement adherence strip + gap summary ──
+        const adh = adherenceByPatient[p.patientId] || computeAdherence([], []);
+        const gridBottom = cy + Math.ceil((metrics.length+1)/2)*(chH+16);
+        const stripImg = drawAdherenceStrip(adh);
+        const stripH = 62;
+        doc.addImage(stripImg, 'PNG', 40, gridBottom, fullW, stripH);
+
+        doc.setFontSize(9.5); doc.setFont('helvetica','normal'); doc.setTextColor(70,70,70);
+        const gapSummary = adh.start
+          ? adh.onSupplement + ' days on supplement  ·  ' + (adh.taken+adh.partial) + ' taken  ·  '
+            + adh.missed + ' confirmed missed  ·  ' + adh.unmonitored + ' not monitored  ·  longest gap '
+            + adh.longestGap + ' day' + (adh.longestGap===1?'':'s')
+            + (adh.longestGapFrom ? ' (' + fmtDayShort(adh.longestGapFrom) + '–' + fmtDayShort(adh.longestGapTo) + ')' : '')
+            + (adh.adherencePct!=null ? '  ·  adherence ' + adh.adherencePct + '% of logged days' : '')
+          : 'No dispatch or daily monitoring recorded yet.';
+        doc.text(doc.splitTextToSize(gapSummary, fullW), 40, gridBottom + stripH + 12);
+      });
+    }
+
+    // ── Per-patient outcomes table ──
+    doc.addPage();
+    doc.setTextColor(14,34,71); doc.setFontSize(18); doc.setFont('helvetica','bold');
+    doc.text('Patient Outcomes', 40, 50);
+    const finalRows = (_data.final||[]).map(r => [
+      r['Study ID']||'', r['Patient Name']||'', r['Status']||'', r['Weeks Completed']!=null?r['Weeks Completed']:'',
+      r['Baseline Weight']!=null?r['Baseline Weight']:'—', r['Final Weight']!=null?r['Final Weight']:'—',
+      r['Weight Change']!=null?(r['Weight Change']>0?'+':'')+r['Weight Change']:'—',
+      r['Baseline Albumin']!=null?r['Baseline Albumin']:'—', r['Final Albumin']!=null?r['Final Albumin']:'—',
+      r['Albumin Change']!=null?(r['Albumin Change']>0?'+':'')+r['Albumin Change']:'—',
+      r['Baseline CRP']!=null?r['Baseline CRP']:'—', r['Final CRP']!=null?r['Final CRP']:'—',
+      r['CRP Change']!=null?(r['CRP Change']>0?'+':'')+r['CRP Change']:'—'
+    ]);
+    doc.autoTable({
+      startY: 65, theme: 'striped', styles: { fontSize: 8, cellPadding: 4 },
+      headStyles: { fillColor: [14,34,71], fontSize: 8 },
+      head: [['Study ID','Patient','Status','Wks','Wt (B)','Wt (F)','Δ Wt','Alb (B)','Alb (F)','Δ Alb','CRP (B)','CRP (F)','Δ CRP']],
+      body: finalRows,
+      didDrawPage: (data) => {
+        doc.setFontSize(8); doc.setTextColor(120,120,120); doc.setFont('helvetica','italic');
+        doc.text('(B) = Baseline value at enrollment    (F) = Final / most recent recorded value    Δ = change from baseline', 40, doc.internal.pageSize.getHeight()-32);
+      }
+    });
+
+    // ── Supplement adherence & gaps — all patients ──
+    doc.addPage();
+    doc.setTextColor(14,34,71); doc.setFontSize(18); doc.setFont('helvetica','bold');
+    doc.text('Supplement Adherence & Treatment Gaps', 40, 50);
+    doc.setFontSize(10); doc.setTextColor(100,100,100); doc.setFont('helvetica','normal');
+    doc.text('Tracked day-by-day from the first store dispatch using daily monitoring logs.', 40, 66);
+
+    const adhRows = patients.map(p => {
+      const a = adherenceByPatient[p.patientId] || {};
+      if(!a.start) return [p.studyId||'—', p.name||'—', '—','—','—','—','—','—','—'];
+      return [
+        p.studyId||'—', p.name||'—',
+        String(a.onSupplement),
+        String(a.taken + a.partial),
+        String(a.missed),
+        String(a.unmonitored),
+        a.longestGap + (a.longestGapFrom ? ' (' + fmtDayShort(a.longestGapFrom) + '–' + fmtDayShort(a.longestGapTo) + ')' : ''),
+        a.adherencePct != null ? a.adherencePct + '%' : '—',
+        a.daysSinceLastLog != null ? (a.daysSinceLastLog === 0 ? 'Today' : a.daysSinceLastLog + 'd ago') : '—'
+      ];
+    }).sort((x,y) => String(x[0]).localeCompare(String(y[0])));
+
+    doc.autoTable({
+      startY: 80, theme: 'striped', styles: { fontSize: 8, cellPadding: 4 },
+      headStyles: { fillColor: [14,34,71], fontSize: 8 },
+      head: [['Study ID','Patient','Days on Supp.','Taken','Missed (0%)','Not Monitored','Longest Gap','Adherence','Last Log']],
+      body: adhRows,
+      // Flag long gaps and low adherence in red so they stand out at a glance.
+      didParseCell: (data) => {
+        if(data.section !== 'body') return;
+        if(data.column.index === 6){
+          const n = parseInt(String(data.cell.raw), 10);
+          if(!isNaN(n) && n >= 3){ data.cell.styles.textColor = [185,28,28]; data.cell.styles.fontStyle = 'bold'; }
+        }
+        if(data.column.index === 7){
+          const n = parseInt(String(data.cell.raw), 10);
+          if(!isNaN(n)){
+            if(n >= 80) data.cell.styles.textColor = [21,128,61];
+            else if(n >= 60) data.cell.styles.textColor = [161,98,7];
+            else { data.cell.styles.textColor = [185,28,28]; data.cell.styles.fontStyle = 'bold'; }
+          }
+        }
+        if(data.column.index === 4){
+          const n = parseInt(String(data.cell.raw), 10);
+          if(!isNaN(n) && n > 0){ data.cell.styles.textColor = [185,28,28]; }
+        }
+        if(data.column.index === 8){
+          const n = parseInt(String(data.cell.raw), 10);
+          if(!isNaN(n) && n >= 7){ data.cell.styles.textColor = [185,28,28]; data.cell.styles.fontStyle = 'bold'; }
+        }
+      },
+      didDrawPage: () => {
+        doc.setFontSize(8); doc.setTextColor(120,120,120); doc.setFont('helvetica','italic');
+        doc.text('Missed = daily log explicitly recorded 0% consumed.   Not Monitored = no daily log for that date (intake unknown, not assumed missed).   Adherence = taken days as a share of days with a log.', 40, doc.internal.pageSize.getHeight()-32, { maxWidth: pageW-80 });
+      }
+    });
+
+    // ── Enrollment log ──
+    doc.addPage();
+    doc.setTextColor(14,34,71); doc.setFontSize(18); doc.setFont('helvetica','bold');
+    doc.text('Enrollment Log', 40, 50);
+    const enrollRows = (_data.enrollment||[]).map(r => [
+      r['Study ID']||'', r['Patient Name']||'', r['Diagnosis']||'', r['Enrolled Date']||'',
+      r['Dispatch / Start Date']||'', r['Status']||'', r['Batch No']||''
+    ]);
+    doc.autoTable({
+      startY: 65, theme: 'striped', styles: { fontSize: 8, cellPadding: 4 },
+      headStyles: { fillColor: [14,34,71], fontSize: 8 },
+      head: [['Study ID','Patient','Diagnosis','Enrolled','Dispatched','Status','Batch No']],
+      body: enrollRows
+    });
+
+    // ── Footer page numbers ──
+    const pageCount = doc.internal.getNumberOfPages();
+    for(let i=1;i<=pageCount;i++){
+      doc.setPage(i);
+      doc.setFontSize(9); doc.setTextColor(150,150,150);
+      doc.text('Gquence Clinical Pilot — Confidential', 40, doc.internal.pageSize.getHeight()-20);
+      doc.text('Page ' + i + ' of ' + pageCount, pageW-40, doc.internal.pageSize.getHeight()-20, { align:'right' });
+    }
+
+    const fname = 'GQUENCE_Pilot_Doctor_Report_' + new Date().toISOString().slice(0,10) + '.pdf';
+    doc.save(fname);
+    msg.textContent = 'Exported ' + fname;
+  } catch(e){
+    msg.textContent = 'PDF export failed: ' + e.message;
   }
 }
 
