@@ -365,21 +365,38 @@ function measured(key, v){
 
 function computeResponse(patient){
   const weeks = patient.weeks || [];
-  const last = weeks.length ? weeks[weeks.length - 1] : null;
   const bl = patient.baseline || {};
   const signals = [];
 
+  // Take the most recent RECORDED value for each metric, not simply the last
+  // week's row. Weekly entries are often partial — a final visit may capture
+  // only weight — and reading just that row discarded albumin and intake
+  // recorded a week earlier, leaving too few indicators to judge anything.
+  const latestOf = (key) => {
+    for (let i = weeks.length - 1; i >= 0; i--) {
+      const v = measured(key, weeks[i][key]);
+      if (v !== null) return { value: v, week: weeks[i].week != null ? weeks[i].week : (i + 1) };
+    }
+    return null;
+  };
+  // Label the source week when the value isn't from the most recent visit, so
+  // the doctor can see the reading is slightly older.
+  const lastIdx = weeks.length;
+  const age = (src) => (src && src.week && src.week < lastIdx) ? ' (W' + src.week + ')' : '';
+
   const pushDelta = (key, label, isGood, unit) => {
     const b = measured(key, bl[key]);
-    const l = last ? measured(key, last[key]) : null;
-    if (b == null || l == null) return;
-    const delta = Math.round((l - b) * 10) / 10;
-    signals.push({ label, positive: isGood(delta), text: label + ' ' + (delta>0?'+':'') + delta + unit });
+    const src = latestOf(key);
+    if (b == null || src == null) return;
+    const delta = Math.round((src.value - b) * 10) / 10;
+    signals.push({ label, positive: isGood(delta),
+      text: label + ' ' + (delta>0?'+':'') + delta + unit + age(src) });
   };
   const pushLevel = (key, label, threshold, unit) => {
-    const v = last ? measured(key, last[key]) : null;
-    if (v == null) return;
-    signals.push({ label, positive: v >= threshold, text: label + ' ' + v + unit });
+    const src = latestOf(key);
+    if (src == null) return;
+    signals.push({ label, positive: src.value >= threshold,
+      text: label + ' ' + src.value + unit + age(src) });
   };
 
   pushDelta('weight',  'Weight',  d => d > 0, ' kg');
