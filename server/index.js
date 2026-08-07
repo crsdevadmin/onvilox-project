@@ -1248,7 +1248,7 @@ app.get('/api/pilot-settings', authenticateToken, async (req, res) => {
   try { const r = await pool.query('SELECT * FROM pilot_settings WHERE id=1'); res.json(r.rows[0] || {}); }
   catch (e) { res.status(500).json({ error: e.message }); }
 });
-app.put('/api/pilot-settings', authenticateToken, requireAdmin, async (req, res) => {
+app.put('/api/pilot-settings', authenticateToken, requireAdminOnly, async (req, res) => {
   const { target_patients, pilot_weeks, lost_threshold_days } = req.body || {};
   try {
     await pool.query(
@@ -1260,10 +1260,20 @@ app.put('/api/pilot-settings', authenticateToken, requireAdmin, async (req, res)
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// Clinical Trials data is admin-only. Client-side auth.requireRole() just hides
-// the UI — this middleware is what actually stops a DOCTOR token calling the
-// trials endpoints directly. Applied to every /api/trials route below.
+// Clinical Trials READ access covers doctors as well as admins — clinicians
+// review the whole cohort, not just their own patients. Store roles are still
+// excluded: they handle manufacturing and have no need for outcome data.
+// Client-side auth.requireRole() only hides the UI; this is the real guard.
 function requireAdmin(req, res, next) {
+  const role = req.user && req.user.role;
+  if (!['ADMIN', 'SUPER_ADMIN', 'DOCTOR'].includes(role)) {
+    return res.status(403).json({ error: 'Not permitted' });
+  }
+  next();
+}
+
+// Changes that alter study-wide state stay restricted to admins.
+function requireAdminOnly(req, res, next) {
   const role = req.user && req.user.role;
   if (!['ADMIN', 'SUPER_ADMIN'].includes(role)) {
     return res.status(403).json({ error: 'Admin only' });

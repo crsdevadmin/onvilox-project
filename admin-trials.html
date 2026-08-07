@@ -54,7 +54,7 @@
       <a href="/admin/trials" style="padding:7px 14px;border-radius:20px;font-size:13px;text-decoration:none;color:#fff;background:#0e2247;">Enrollment Log</a>
       <a href="/admin/trials/cohort" style="padding:7px 14px;border-radius:20px;font-size:13px;text-decoration:none;color:var(--text-2);background:var(--surface-2);">Cohort Dashboard</a>
       <a href="/admin/trials/outcomes" style="padding:7px 14px;border-radius:20px;font-size:13px;text-decoration:none;color:var(--text-2);background:var(--surface-2);">Monitoring</a>
-      <a href="/admin/trials/impact">Impact Summary</a>
+      <a href="/admin/trials/impact" style="padding:7px 14px;border-radius:20px;font-size:13px;text-decoration:none;color:var(--text-2);background:var(--surface-2);">Impact Summary</a>
       <a href="/admin/trials/formula" style="padding:7px 14px;border-radius:20px;font-size:13px;text-decoration:none;color:var(--text-2);background:var(--surface-2);">Formula Tracking</a>
       <a href="/admin/trials/export" style="padding:7px 14px;border-radius:20px;font-size:13px;text-decoration:none;color:var(--text-2);background:var(--surface-2);">Export Dataset</a>
     </div>
@@ -106,7 +106,7 @@
 <script src="/js/theme.js"></script>
 
 <script>
-auth.requireRole(['SUPER_ADMIN', 'ADMIN']);
+auth.requireRole(['SUPER_ADMIN', 'ADMIN', 'DOCTOR']);
 (function(){ var u=auth.getCurrentUser(); if(u&&u.role==="DOCTOR"){ ["/admin/stores","/admin/users","/admin/mapping","/admin/rules"].forEach(function(h){ var el=document.querySelector(".nav a[href=\""+h+"\"]"); if(el) el.style.display="none"; }); var dash=document.querySelector(".nav a[href=\"/admin\"]"); if(dash){ dash.href="/dashboard"; dash.textContent="Dashboard"; } } })();
 const me = auth.getCurrentUser();
 const apiBase = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : '';

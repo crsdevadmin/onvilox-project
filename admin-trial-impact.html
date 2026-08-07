@@ -104,7 +104,10 @@
 <script src="/js/theme.js"></script>
 
 <script>
-auth.requireRole(['SUPER_ADMIN', 'ADMIN']);
+auth.requireRole(['SUPER_ADMIN', 'ADMIN', 'DOCTOR']);
+// Doctors reach this page too — hide the admin-only nav links and point
+// Dashboard back at their own dashboard rather than the admin one.
+(function(){ var u=auth.getCurrentUser(); if(u&&u.role==="DOCTOR"){ ["/admin/stores","/admin/users","/admin/mapping","/admin/rules"].forEach(function(h){ var el=document.querySelector(".nav a[href=\""+h+"\"]"); if(el) el.style.display="none"; }); var dash=document.querySelector(".nav a[href=\"/admin\"]"); if(dash){ dash.href="/dashboard"; dash.textContent="Dashboard"; } } })();
 const me = auth.getCurrentUser();
 const apiBase = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : '';
 
