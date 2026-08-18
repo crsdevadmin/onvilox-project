@@ -12,6 +12,17 @@
     .filter-tab.active { background:#0e2247; color:#fff; border-color:#0e2247; }
     .filter-tab:disabled { opacity:0.35; cursor:not-allowed; }
 
+    /* ===== KPI stat cards (clickable → filter the queue) ===== */
+    .kpi-card { flex:1; min-width:110px; background:var(--surface-2); border:1px solid var(--border); border-radius:10px; padding:14px 18px; cursor:pointer; transition:border-color .15s, transform .15s, box-shadow .15s; }
+    .kpi-card:hover { border-color:var(--border-2); transform:translateY(-1px); box-shadow:0 4px 14px rgba(0,0,0,.15); }
+    .kpi-card.active { border-color:var(--sky); box-shadow:0 0 0 1px var(--sky); }
+    .kpi-card .kpi-label { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--text-2); }
+    .kpi-card .kpi-val { font-size:28px; font-weight:800; margin-top:4px; color:var(--text); }
+    .kpi-card.k-open .kpi-val { color:var(--sky); }
+    .kpi-card.k-processing .kpi-val { color:var(--cyan); }
+    .kpi-card.k-pending .kpi-val { color:var(--amber); }
+    .kpi-card.k-dispatched .kpi-val { color:var(--green); }
+
     /* ===== Label modal + 100x75mm labels ===== */
     #labelOverlay { position:fixed; inset:0; background:rgba(15,23,42,.55); z-index:9998; display:none; align-items:flex-start; justify-content:center; overflow:auto; padding:24px 12px; }
     #labelDialog { background:#f1f5f9; border-radius:10px; max-width:540px; width:100%; padding:18px; box-shadow:0 20px 60px rgba(0,0,0,.35); }
@@ -83,22 +94,22 @@
     <button onclick="testPushNotification()" style="background:#0e2247;color:#fff;border:none;border-radius:6px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;">Send Test Notification</button>
   </div>
 
-  <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;">
-    <div style="flex:1;min-width:110px;background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:14px 18px;">
-      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-2);">Open</div>
-      <div id="kpiOpen" style="font-size:28px;font-weight:800;color:#0e2247;margin-top:4px;">—</div>
+  <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;" id="kpiRow">
+    <div class="kpi-card k-open" data-kpi="APPROVED" onclick="kpiFilter('APPROVED')" role="button" tabindex="0" title="Show open patients">
+      <div class="kpi-label">Open</div>
+      <div id="kpiOpen" class="kpi-val">—</div>
     </div>
-    <div style="flex:1;min-width:110px;background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:14px 18px;">
-      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-2);">Processing</div>
-      <div id="kpiProcessing" style="font-size:28px;font-weight:800;color:#0891b2;margin-top:4px;">—</div>
+    <div class="kpi-card k-processing" data-kpi="PROCESSING" onclick="kpiFilter('PROCESSING')" role="button" tabindex="0" title="Show patients in processing">
+      <div class="kpi-label">Processing</div>
+      <div id="kpiProcessing" class="kpi-val">—</div>
     </div>
-    <div style="flex:1;min-width:110px;background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:14px 18px;">
-      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-2);">Pending Approval</div>
-      <div id="kpiPending" style="font-size:28px;font-weight:800;color:#d97706;margin-top:4px;">—</div>
+    <div class="kpi-card k-pending" data-kpi="PENDING" onclick="kpiFilter('PENDING')" role="button" tabindex="0" title="Show patients pending approval">
+      <div class="kpi-label">Pending Approval</div>
+      <div id="kpiPending" class="kpi-val">—</div>
     </div>
-    <div style="flex:1;min-width:110px;background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:14px 18px;">
-      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-2);">Dispatched</div>
-      <div id="kpiDispatched" style="font-size:28px;font-weight:800;color:#16a34a;margin-top:4px;">—</div>
+    <div class="kpi-card k-dispatched" data-kpi="DISPATCHED" onclick="kpiFilter('DISPATCHED')" role="button" tabindex="0" title="Show dispatched patients">
+      <div class="kpi-label">Dispatched</div>
+      <div id="kpiDispatched" class="kpi-val">—</div>
     </div>
   </div>
 
@@ -358,6 +369,7 @@ window.addEventListener('DOMContentLoaded', () => {
   // Restore filter/search BEFORE tabs are built so the right tab shows active.
   restoreQueueFilters();
   buildTabs();
+  syncKpiActive();
 });
 
 function setFilter(f) {
@@ -365,7 +377,27 @@ function setFilter(f) {
   document.querySelectorAll('#statusTabs .filter-tab').forEach(btn => {
     btn.classList.toggle('active', btn.getAttribute('data-key') === f);
   });
+  syncKpiActive();
   render();
+}
+
+// Highlight the KPI card matching the current filter (NEEDS_APPROVAL and
+// PENDING both mean "awaiting approval", so they share the Pending card).
+function syncKpiActive() {
+  const f = (_activeFilter === 'NEEDS_APPROVAL') ? 'PENDING' : _activeFilter;
+  document.querySelectorAll('#kpiRow .kpi-card').forEach(card => {
+    card.classList.toggle('active', card.getAttribute('data-kpi') === f);
+  });
+}
+
+// Clicking a KPI card filters the queue below to that status.
+// Clicking the already-active card clears the filter back to All.
+function kpiFilter(k) {
+  if (isApprover && k === 'PENDING') k = 'NEEDS_APPROVAL';
+  const target = (k === _activeFilter) ? 'ALL' : k;
+  setFilter(target);
+  const queue = document.getElementById('queueTitle');
+  if (queue && target !== 'ALL') queue.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function getUserName(id){
