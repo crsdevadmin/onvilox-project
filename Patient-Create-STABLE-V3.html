@@ -713,7 +713,10 @@
 <div style="margin-top:30px;">
   
   <button class="btn-primary" onclick="submitPatient()">Create Patient</button>
-  <button class="btn-secondary" onclick="location.href='/dashboard'">Cancel</button>
+  <button class="btn-secondary" id="saveDraftBtn" onclick="saveDraft(true)"
+          title="Keep what you have and finish later. No nutrition plan is generated for a draft.">Save as Draft</button>
+  <button class="btn-secondary" onclick="leaveCreate()">Cancel</button>
+  <span id="draftStatus" style="font-size:12px;color:#94a3b8;margin-left:10px;"></span>
 </div>
 
 </div>
@@ -737,6 +740,24 @@ function tagsToArray(containerId){
   return [...c.children].map(el => el.dataset.value);
 }
 
+// Called by the oninput handlers on #usualWeight and #weight but never
+// defined, so every keystroke in either field threw a ReferenceError and
+// aborted the rest of the chain — validateField, updateCompletenessScore and
+// (on #weight) updateBSAAuto never ran. The saved record was unaffected:
+// weightLossPercent is recomputed in submitPatient. What was broken was the
+// live feedback — the completeness bar did not move while typing a weight,
+// and BSA did not auto-fill.
+function syncWeightLossFromForm() {
+  const uw = parseFloat(document.getElementById('usualWeight')?.value);
+  const cw = parseFloat(document.getElementById('weight')?.value);
+  const pct = (uw > 0 && cw > 0 && cw < uw)
+    ? Math.round(((uw - cw) / uw) * 1000) / 10
+    : 0;
+  const out = document.getElementById('weightLossPercent');
+  if (out) out.value = pct || '';
+  return pct;
+}
+
 function updateCompletenessScore() {
   const mandatoryIds = [
     'patientName', 'uhic', 'age', 'sex', 'usualWeight', 'weight', 'height', 
@@ -757,6 +778,176 @@ function updateCompletenessScore() {
   if (bar) bar.style.width = pct + '%';
   if (score) score.innerText = pct + '%';
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   DRAFTS
+   A draft lets a doctor stop half way and come back. The defining property is
+   that it is inert: no nutrition plan, no manufacturing job, invisible to the
+   stores. That is enforced structurally — a draft lives in patient_drafts, not
+   in `patients`, so nothing that reads `patients` can ever see it and the
+   engine is simply never handed one.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+// Every field on this form, so a draft round-trips completely.
+const DRAFT_FIELDS = [
+  'patientName','uhic','age','sex','usualWeight','weight','weightBasisOverride','height',
+  'creatinine','crp','alt','ast','bilirubin','bloodSugar','tsh','sodium','potassium','urea','hba1c',
+  'albumin','prealbumin','hemoglobin','wbc','anc','platelet','vitD','vitB12','folate','zinc','magnesium',
+  'cancerInput','regimenInput','cancerStage','tumorBurden',
+  'radiationStatus','radiationTechnique','subSite','tnmStage','totalDoseGy','fractionSizeGy',
+  'numberOfFractions','fractionsCompleted','concurrentTherapy',
+  'feedingMethod','reducedFoodIntake','giIssues','muac','ecogStatus','smi','handGrip',
+  'activityLevel','sarcopeniaStatus',
+  'toxMucositis','toxDysphagia','toxXerostomia','toxNausea','toxDiarrhea',
+  'isVegetarian','culturalPreferences','notes','kcalPerKg','proteinPerKg'
+];
+// Without these a plan cannot be built, so they gate activation — not saving.
+const DRAFT_BLOCKING = ['patientName','age','sex','cancerInput','weight','height'];
+
+let _draftId = null;          // set on first save, or when resuming
+let _draftDirty = false;
+let _draftTimer = null;
+let _draftSaving = false;
+// field -> 'doctor' | 'na'. Populated as the doctor fills the form; the chat
+// assistant writes 'na' here when a lab is explicitly unavailable.
+window._fieldSources = window._fieldSources || {};
+
+function _dApi(){ return (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : ''; }
+function _dHdr(){
+  const u = (typeof auth !== 'undefined' && auth.getCurrentUser) ? auth.getCurrentUser() : {};
+  return { 'Content-Type':'application/json', Authorization: 'Bearer ' + (u.token || '') };
+}
+function _dDoctorId(){
+  const u = (typeof auth !== 'undefined' && auth.getCurrentUser) ? auth.getCurrentUser() : {};
+  if (u.role === 'ASSISTANT' && typeof mappingService !== 'undefined') {
+    return mappingService.getDoctorForAssistant(u.id) || u.id;
+  }
+  return u.id;
+}
+function _draftStatus(msg, tone){
+  const el = document.getElementById('draftStatus');
+  if (!el) return;
+  el.textContent = msg || '';
+  el.style.color = tone === 'err' ? '#dc2626' : tone === 'ok' ? '#16a34a' : '#94a3b8';
+}
+
+function collectDraft(){
+  const data = {}, sources = Object.assign({}, window._fieldSources);
+  DRAFT_FIELDS.forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const v = (el.value || '').trim();
+    if (v !== '') {
+      data[id] = v;
+      // Anything typed into the form is the doctor's own entry unless the
+      // assistant already recorded a different provenance for it.
+      if (!sources[id]) sources[id] = 'doctor';
+    } else if (sources[id] === 'doctor') {
+      delete sources[id];               // cleared by hand — no longer stated
+    }
+  });
+  return { data, sources };
+}
+
+// Autosave. Drafts exist for the doctor who gets interrupted, so waiting for
+// them to press a button would miss the case the feature is for.
+function markDraftDirty(){
+  _draftDirty = true;
+  clearTimeout(_draftTimer);
+  _draftTimer = setTimeout(() => saveDraft(false), 2000);
+}
+
+async function saveDraft(explicit){
+  const { data, sources } = collectDraft();
+  if (!Object.keys(data).length){
+    if (explicit) _draftStatus('Nothing to save yet.', 'err');
+    return null;
+  }
+  if (_draftSaving) return null;
+  _draftSaving = true;
+  if (explicit) _draftStatus('Saving…');
+
+  _draftId = _draftId || ('draft_' + Date.now() + '_' + Math.floor(Math.random()*1e6));
+  try {
+    const res = await fetch(_dApi() + '/api/drafts', {
+      method:'POST', headers:_dHdr(),
+      body: JSON.stringify({
+        id: _draftId, doctorId: _dDoctorId(),
+        patientName: data.patientName || null,
+        data, sources,
+        nextQuestion: window._chatNextQuestion || 0
+      })
+    });
+    if (!res.ok) throw new Error('Save failed (' + res.status + ')');
+    _draftDirty = false;
+    // Survives a lost connection or a closed tab — synced on next load.
+    try { localStorage.setItem('gq_draft_' + _draftId, JSON.stringify({ id:_draftId, data, sources })); } catch(e){}
+
+    if (explicit){
+      const missing = DRAFT_BLOCKING.filter(k => sources[k] !== 'doctor');
+      _draftStatus('✓ Draft saved — no plan generated.', 'ok');
+      alert('Saved as a draft'
+        + (data.patientName ? ' under ' + data.patientName : '')
+        + '.\n\nNo nutrition plan has been generated and this patient is not visible to any store.'
+        + (missing.length ? '\n\nStill needed to activate: ' + missing.join(', ') + '.' : '')
+        + '\n\nIt is waiting under Drafts on your dashboard.');
+      window.location.href = '/dashboard';
+    } else {
+      _draftStatus('Draft autosaved ' + new Date().toLocaleTimeString());
+    }
+    return _draftId;
+  } catch (e) {
+    // Never lose the doctor's typing because the network blinked.
+    try { localStorage.setItem('gq_draft_' + _draftId, JSON.stringify({ id:_draftId, data, sources, _unsynced:true })); } catch(err){}
+    _draftStatus(explicit ? 'Could not reach the server — kept on this device.' : 'Saved on this device only.', 'err');
+    return _draftId;
+  } finally { _draftSaving = false; }
+}
+
+// Resume: /patients/create?draft=<id>
+async function loadDraft(id){
+  try {
+    const res = await fetch(_dApi() + '/api/drafts/' + encodeURIComponent(id)
+      + '?doctorId=' + encodeURIComponent(_dDoctorId()), { headers:_dHdr() });
+    if (!res.ok) throw new Error('Draft not found');
+    const d = await res.json();
+    _draftId = d.id;
+    window._fieldSources = d.sources || {};
+    window._chatNextQuestion = d.nextQuestion || 0;
+    Object.entries(d.data || {}).forEach(([k,v]) => {
+      const el = document.getElementById(k);
+      if (!el) return;
+      el.value = v;
+      // Keep provenance visible on resume — a value entered three days ago
+      // should still show whether it came from the doctor or was unavailable.
+      el.classList.add(window._fieldSources[k] === 'na' ? 'ai-na' : 'ai-filled');
+      if (typeof updateLabStatus === 'function') updateLabStatus(k, v);
+    });
+    if (typeof updateCompletenessScore === 'function') updateCompletenessScore();
+    if (typeof recalcBodyComposition === 'function') recalcBodyComposition();
+    _draftStatus('Resumed draft' + (d.patientName ? ' — ' + d.patientName : '') + '. No plan generated yet.');
+  } catch (e) {
+    _draftStatus('Could not load that draft.', 'err');
+  }
+}
+
+function leaveCreate(){
+  if (_draftDirty && !confirm('You have unsaved changes. Leave without saving a draft?')) return;
+  window.location.href = '/dashboard';
+}
+
+// Track edits for autosave, and warn before an accidental close.
+window.addEventListener('DOMContentLoaded', () => {
+  DRAFT_FIELDS.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { el.addEventListener('input', markDraftDirty); el.addEventListener('change', markDraftDirty); }
+  });
+  const q = new URLSearchParams(window.location.search).get('draft');
+  if (q) loadDraft(q);
+});
+window.addEventListener('beforeunload', e => {
+  if (_draftDirty){ e.preventDefault(); e.returnValue = ''; }
+});
 
 async function submitPatient(){
   const fields = [
@@ -908,6 +1099,17 @@ async function submitPatient(){
         plan && plan._syncPromise
       ].filter(Boolean));
     } catch (e) { /* retry layer covers any failure */ }
+
+    // Only now discard the draft. Deleting it before the patient is confirmed
+    // saved would destroy the doctor's work if the write failed.
+    if (_draftId){
+      _draftDirty = false;
+      try {
+        await fetch(_dApi() + '/api/drafts/' + encodeURIComponent(_draftId) + '/complete'
+          + '?doctorId=' + encodeURIComponent(_dDoctorId()), { method:'POST', headers:_dHdr() });
+        localStorage.removeItem('gq_draft_' + _draftId);
+      } catch (e) { /* a stale draft is harmless — it generates nothing */ }
+    }
     window.location.href = '/dashboard';
   } catch (err) {
     console.error("Clinical Save Error:", err);

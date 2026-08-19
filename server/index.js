@@ -3134,6 +3134,196 @@ OUTPUT FORMAT — return ONLY valid JSON, no markdown, no text outside the JSON 
   } catch(e) { console.error('weekly_prescriptions migration:', e.message); }
 })();
 
+// ── Patient drafts ────────────────────────────────────────────────────────
+// Deliberately NOT a row in `patients` with status='DRAFT'. Two reasons:
+//
+//  1. patients.name is NOT NULL and patients.uhic is UNIQUE NOT NULL — which
+//     is exactly the state a draft is allowed to be in. An unnamed draft
+//     cannot be inserted at all, and two drafts without a UHIC collide.
+//  2. Nineteen queries read FROM patients and none filter on status. A draft
+//     row would surface in the risk panel, the weekly queue, trial exports
+//     and the dashboard list, and every one of those would need patching.
+//
+// Keeping drafts in their own table makes the "no plan is ever generated for
+// a draft" guarantee structural rather than a filter someone has to remember:
+// nothing that reads `patients` can see them, so the engine is never invoked,
+// no nutrition_plans row appears, and no store ever receives a job.
+(async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS patient_drafts (
+        id             TEXT PRIMARY KEY,
+        doctor_id      TEXT NOT NULL,
+        created_by_id  TEXT,
+        patient_name   TEXT,
+        data           JSONB NOT NULL DEFAULT '{}'::jsonb,
+        sources        JSONB NOT NULL DEFAULT '{}'::jsonb,
+        next_question  INT DEFAULT 0,
+        created_at     TIMESTAMPTZ DEFAULT NOW(),
+        updated_at     TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_patient_drafts_doctor ON patient_drafts(doctor_id)');
+    console.log('patient_drafts table ready');
+  } catch(e) { console.error('patient_drafts migration:', e.message); }
+})();
+
+// Assistants act for their doctor; everyone else owns their own drafts.
+// A draft holds unverified, partly-entered clinical values, so it is visible
+// only to the doctor it belongs to — not to the whole clinic.
+function _draftOwner(req) {
+  return req.query.doctorId || (req.body && req.body.doctorId) || req.user.id;
+}
+
+// List this doctor's drafts. Returns a summary per draft — enough for the
+// dashboard card (name, progress, what is still missing) without shipping
+// every field of every draft.
+app.get('/api/drafts', authenticateToken, async (req, res) => {
+  try {
+    const r = await pool.query(
+      `SELECT id, patient_name, data, sources, next_question, created_at, updated_at
+         FROM patient_drafts WHERE doctor_id = $1 ORDER BY updated_at DESC`,
+      [_draftOwner(req)]
+    );
+    // Mirrors the client's tiers — keep the two lists in step if either changes.
+    const BLOCKING  = ['patientName','age','sex','cancerInput','weight','height'];
+    const ESSENTIAL = BLOCKING.concat(['usualWeight','albumin','crp','ecogStatus',
+                                       'reducedFoodIntake','feedingMethod','creatinine']);
+    const out = r.rows.map(d => {
+      const data = d.data || {}, src = d.sources || {};
+      const has = k => src[k] === 'doctor' || src[k] === 'na';
+      return {
+        id: d.id,
+        patientName: d.patient_name || null,
+        answered: ESSENTIAL.filter(has).length,
+        essentialTotal: ESSENTIAL.length,
+        missingBlocking: BLOCKING.filter(k => src[k] !== 'doctor'),
+        fieldsFilled: Object.keys(src).filter(k => src[k] === 'doctor').length,
+        nextQuestion: d.next_question,
+        createdAt: d.created_at,
+        updatedAt: d.updated_at
+      };
+    });
+    res.json({ drafts: out });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Create or update. Called by the Save button AND by autosave, so it must be
+// cheap and idempotent — the client owns the id and upserts against it.
+app.post('/api/drafts', authenticateToken, async (req, res) => {
+  const { id, patientName, data, sources, nextQuestion } = req.body || {};
+  if (!id) return res.status(400).json({ error: 'id required' });
+  try {
+    const r = await pool.query(
+      `INSERT INTO patient_drafts (id, doctor_id, created_by_id, patient_name, data, sources, next_question)
+       VALUES ($1,$2,$3,$4,$5,$6,$7)
+       ON CONFLICT (id) DO UPDATE SET
+         patient_name = EXCLUDED.patient_name,
+         data         = EXCLUDED.data,
+         sources      = EXCLUDED.sources,
+         next_question= EXCLUDED.next_question,
+         updated_at   = NOW()
+       WHERE patient_drafts.doctor_id = EXCLUDED.doctor_id
+       RETURNING id, updated_at`,
+      [id, _draftOwner(req), req.user.id, patientName || null,
+       JSON.stringify(data || {}), JSON.stringify(sources || {}), nextQuestion || 0]
+    );
+    if (!r.rowCount) return res.status(403).json({ error: 'Not your draft' });
+    res.json({ id: r.rows[0].id, updatedAt: r.rows[0].updated_at, saved: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Load one draft to resume it.
+app.get('/api/drafts/:id', authenticateToken, async (req, res) => {
+  try {
+    const r = await pool.query(
+      `SELECT * FROM patient_drafts WHERE id = $1 AND doctor_id = $2`,
+      [req.params.id, _draftOwner(req)]
+    );
+    if (!r.rowCount) return res.status(404).json({ error: 'Draft not found' });
+    const d = r.rows[0];
+    res.json({ id: d.id, patientName: d.patient_name, data: d.data || {},
+               sources: d.sources || {}, nextQuestion: d.next_question,
+               createdAt: d.created_at, updatedAt: d.updated_at });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/api/drafts/:id', authenticateToken, async (req, res) => {
+  try {
+    const r = await pool.query(
+      `DELETE FROM patient_drafts WHERE id = $1 AND doctor_id = $2 RETURNING id`,
+      [req.params.id, _draftOwner(req)]
+    );
+    if (!r.rowCount) return res.status(404).json({ error: 'Draft not found' });
+    res.json({ deleted: r.rows[0].id });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── The one gate ──────────────────────────────────────────────────────────
+// The ONLY route from draft to patient. Everything downstream — the nutrition
+// engine, the store queue, the weekly prescriptions — begins on the far side
+// of this call, so the completeness check lives here and nowhere else.
+app.post('/api/drafts/:id/activate', authenticateToken, async (req, res) => {
+  const BLOCKING = { patientName:'Patient Name', age:'Age', sex:'Sex',
+                     cancerInput:'Cancer Type', weight:'Current Weight', height:'Height' };
+  try {
+    const dr = await pool.query(
+      `SELECT * FROM patient_drafts WHERE id = $1 AND doctor_id = $2`,
+      [req.params.id, _draftOwner(req)]
+    );
+    if (!dr.rowCount) return res.status(404).json({ error: 'Draft not found' });
+    const draft = dr.rows[0];
+    const data  = draft.data || {};
+    const src   = draft.sources || {};
+
+    // A field marked "not available" does not satisfy a blocking requirement.
+    const missing = Object.keys(BLOCKING).filter(k => src[k] !== 'doctor');
+    if (missing.length) {
+      return res.status(422).json({
+        error: 'Draft is incomplete',
+        missing,
+        missingLabels: missing.map(k => BLOCKING[k])
+      });
+    }
+
+    // UHIC is UNIQUE NOT NULL. If the doctor never entered one, mint a stable
+    // fallback rather than failing the insert or writing an empty string that
+    // would collide with the next patient in the same position.
+    const patientId = req.body.patientId || ('pat_' + Date.now() + '_' + Math.floor(Math.random() * 1e6));
+    const uhic = (data.uhic && String(data.uhic).trim())
+      || ('UH-' + patientId.replace(/[^a-zA-Z0-9]/g, '').slice(-8).toUpperCase());
+
+    const payload = Object.assign({}, data, {
+      id: patientId,
+      uhic,
+      name: data.patientName,
+      cancer: data.cancerInput,
+      regimen: data.regimenInput,
+      status: 'CREATED',
+      assignedDoctorId: draft.doctor_id,
+      createdDate: new Date().toISOString().slice(0, 10),
+      // Which values the doctor actually stated, and which were recorded as
+      // unavailable. Carried onto the patient so the plan can flag that it was
+      // built on incomplete data instead of silently treating gaps as zeroes.
+      fieldSources: src,
+      unavailableFields: Object.keys(src).filter(k => src[k] === 'na'),
+      createdFromDraft: draft.id
+    });
+
+    res.json({ ok: true, patient: payload, draftId: draft.id });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Called once the client has successfully written the patient, so a failed
+// save never destroys the draft it came from.
+app.post('/api/drafts/:id/complete', authenticateToken, async (req, res) => {
+  try {
+    await pool.query(`DELETE FROM patient_drafts WHERE id = $1 AND doctor_id = $2`,
+      [req.params.id, _draftOwner(req)]);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // Clinical Trials module — enrollment records + pilot settings
 (async () => {
   try {

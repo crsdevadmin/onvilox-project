@@ -61,6 +61,25 @@
     .rbadge { display:inline-block; font-size:9px; font-weight:800; letter-spacing:.06em; text-transform:uppercase;
               border:1px solid; border-radius:5px; padding:1px 6px; vertical-align:middle; margin-left:4px; }
 
+    /* Drafts — unfinished records, violet so they read as "not yet real" */
+    .dcards { display:flex; gap:10px; flex-wrap:wrap; }
+    .dcard { flex:1; min-width:230px; background:var(--surface-2); border:1px solid var(--violet);
+             border-left:3px solid var(--violet); border-radius:12px; padding:12px 14px; }
+    .dcard .nm { font-size:13.5px; font-weight:800; color:var(--text); display:flex;
+                 align-items:center; gap:7px; flex-wrap:wrap; }
+    .dcard .nm.unnamed { color:var(--text-2); font-style:italic; }
+    .dbadge { font-size:8.5px; font-weight:800; letter-spacing:.08em; text-transform:uppercase;
+              color:var(--violet); border:1px solid var(--violet); background:var(--violet-dim);
+              border-radius:5px; padding:1px 6px; }
+    .dmeta { font-size:11px; color:var(--text-3); margin-top:3px; }
+    .dmiss { font-size:11px; color:var(--amber); margin-top:4px; }
+    .drow  { display:flex; align-items:center; gap:8px; margin-top:9px; }
+    .minibar { flex:1; height:5px; border-radius:99px; background:var(--border-2); overflow:hidden; }
+    .minibar i { display:block; height:100%; background:var(--violet); }
+    .dnoplan { font-size:10.5px; color:var(--text-3); margin-top:8px;
+               border-top:1px dashed var(--border-2); padding-top:7px; }
+    .dnoplan b { color:var(--violet); }
+
     /* Next Review chips in the patient table */
     .nrchip { display:inline-block; font-size:9.5px; font-weight:800; letter-spacing:.07em; text-transform:uppercase;
               border:1px solid; border-radius:999px; padding:3px 9px; white-space:nowrap; }
@@ -249,6 +268,11 @@
         <div class="kpi-value" id="kpiReady">0</div>
       </div>
     </div>
+
+    <!-- ── Unfinished patient records ──────────────────────────────────
+         Drafts are inert: no plan, no store job. They sit above the queue
+         so an interrupted record is visible rather than quietly forgotten. -->
+    <div id="draftsPanel" style="display:none;"></div>
 
     <!-- ── Early-warning risk panel ── -->
     <div id="riskPanel" style="display:none;"></div>
@@ -1443,6 +1467,100 @@
       if (card) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
+    // ══════════════════════════════════════════════════════════════════════
+    //  DRAFTS — unfinished patient records
+    //  They live in patient_drafts, never in `patients`, so no plan is
+    //  generated and no store can see them. Listing them here is the only
+    //  thing that stops an interrupted record from being forgotten entirely.
+    // ══════════════════════════════════════════════════════════════════════
+    let _drafts = [];
+
+    async function loadDrafts(){
+      try {
+        let doctorId = me.id;
+        if (me.role === 'ASSISTANT' && typeof mappingService !== 'undefined') {
+          doctorId = mappingService.getDoctorForAssistant(me.id) || me.id;
+        }
+        const res = await fetch(_api() + '/api/drafts?doctorId=' + encodeURIComponent(doctorId), { headers: _hdr() });
+        if (!res.ok) return;
+        const data = await res.json();
+        _drafts = data.drafts || [];
+        renderDrafts();
+      } catch (e) { /* offline — leave the panel as it was */ }
+    }
+
+    function _draftAgo(iso){
+      const t = new Date(iso).getTime();
+      if (isNaN(t)) return '';
+      const mins = Math.floor((Date.now() - t) / 60000);
+      if (mins < 1)  return 'just now';
+      if (mins < 60) return mins + ' min ago';
+      const hrs = Math.floor(mins / 60);
+      if (hrs < 24)  return hrs + (hrs === 1 ? ' hour ago' : ' hours ago');
+      const days = Math.floor(hrs / 24);
+      return days === 1 ? 'yesterday' : days + ' days ago';
+    }
+
+    function renderDrafts(){
+      const el = document.getElementById('draftsPanel');
+      if (!el) return;
+      if (!_drafts.length){ el.style.display = 'none'; return; }
+      el.style.display = 'block';
+      el.innerHTML = `
+        <div class="card" style="border-left:4px solid var(--violet);">
+          <div style="display:flex;align-items:center;gap:11px;flex-wrap:wrap;margin-bottom:12px;">
+            <h2 style="margin:0;font-size:15px;">Drafts</h2>
+            <span style="font-size:10.5px;font-weight:800;color:var(--bg);background:var(--violet);
+                         border-radius:999px;padding:2px 8px;">${_drafts.length}</span>
+            <span style="font-size:11.5px;color:var(--text-2);">
+              Unfinished records — no nutrition plan generated for any of them</span>
+          </div>
+          <div class="dcards">
+            ${_drafts.map(d => {
+              const named = !!d.patientName;
+              const miss  = (d.missingBlocking || []).map(k => DRAFT_LABELS[k] || k);
+              return `<div class="dcard">
+                <div class="nm${named ? '' : ' unnamed'}">${named ? _esc(d.patientName) : 'Unnamed patient'}
+                  <span class="dbadge">Draft</span></div>
+                <div class="dmeta">Saved ${_draftAgo(d.updatedAt)} · ${d.fieldsFilled} field${d.fieldsFilled===1?'':'s'} entered</div>
+                ${miss.length
+                  ? `<div class="dmiss">Still needs: ${miss.join(', ')}</div>`
+                  : `<div class="dmiss" style="color:var(--green)">Ready to activate</div>`}
+                <div class="drow">
+                  <div class="minibar"><i style="width:${Math.round(d.answered / d.essentialTotal * 100)}%"></i></div>
+                  <span class="dmeta" style="margin:0">${d.answered} of ${d.essentialTotal}</span>
+                  <a class="qbtn qbtn-cyan qbtn-sm" href="/patients/create?draft=${encodeURIComponent(d.id)}">Resume</a>
+                  <button class="qbtn qbtn-ghost qbtn-sm" onclick="discardDraft('${d.id}')" title="Delete this draft">✕</button>
+                </div>
+                <div class="dnoplan"><b>No plan generated.</b> Not visible to any store.</div>
+              </div>`;
+            }).join('')}
+          </div>
+        </div>`;
+    }
+
+    // Labels for the blocking fields, so the card reads in clinical language
+    // rather than form ids.
+    const DRAFT_LABELS = { patientName:'name', age:'age', sex:'sex',
+      cancerInput:'cancer type', weight:'weight', height:'height' };
+
+    async function discardDraft(id){
+      const d = _drafts.find(x => x.id === id);
+      const who = d && d.patientName ? d.patientName : 'this unnamed draft';
+      if (!confirm('Discard ' + who + '?\n\nThe entered values will be deleted. This cannot be undone.')) return;
+      try {
+        let doctorId = me.id;
+        if (me.role === 'ASSISTANT' && typeof mappingService !== 'undefined') {
+          doctorId = mappingService.getDoctorForAssistant(me.id) || me.id;
+        }
+        const res = await fetch(_api() + '/api/drafts/' + encodeURIComponent(id)
+          + '?doctorId=' + encodeURIComponent(doctorId), { method:'DELETE', headers: _hdr() });
+        if (!res.ok) throw new Error('Could not discard the draft');
+        qToast('Draft discarded');
+        loadDrafts();
+      } catch (e) { qToast(e.message || 'Could not discard the draft', true); }
+    }
+
     // Load data from server DB before first render.
     // Manufacturing jobs are fetched too so the Products column reflects server
     // truth (weekly jobs approved on other devices) rather than stale localStorage.
@@ -1455,10 +1573,12 @@
         checkLocalUnsynced();
         loadRiskPanel();
         loadWeeklyQueue();
+        loadDrafts();
         _jobSig = _jobsSignature();
         setInterval(_pollDoctorJobs, 30000);
         setInterval(loadRiskPanel, 120000);     // refresh flags every 2 min
         setInterval(loadWeeklyQueue, 120000);   // and the work queue alongside
+        setInterval(loadDrafts, 120000);
       });
 
     // Show a banner if this device holds patients that never reached the database.
