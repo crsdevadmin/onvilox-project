@@ -1008,6 +1008,200 @@ app.get('/api/weekly-prescriptions', authenticateToken, async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+// ── Doctor's weekly work queue ────────────────────────────────────────────
+// Answers "what needs me this week?" in ONE request. Previously the dashboard
+// had no weekly signal at all and the only way to find out was to open each
+// patient profile in turn; doing that from the client would mean two requests
+// per patient, so the aggregation lives here: three queries total regardless
+// of how many patients the doctor has.
+//
+// Shape is deliberately flat and pre-computed — the dashboard renders it
+// directly without re-deriving weeks, due dates or warnings client-side.
+app.get('/api/doctor/weekly-queue', authenticateToken, async (req, res) => {
+  try {
+    const role = req.user && req.user.role;
+    const isAdmin = ['ADMIN', 'SUPER_ADMIN'].includes(role);
+    // Assistants act on behalf of their doctor; the client passes ?doctorId=.
+    const docId = req.query.doctorId || req.user.id;
+
+    const patRes = isAdmin && !req.query.doctorId
+      ? await pool.query(
+          `SELECT id, name, uhic, cancer, weight, full_data, created_date FROM patients`)
+      : await pool.query(
+          `SELECT id, name, uhic, cancer, weight, full_data, created_date
+             FROM patients
+            WHERE assigned_doctor_id = $1 OR full_data->>'assignedDoctorId' = $1`, [docId]);
+
+    const patients = patRes.rows;
+    if (!patients.length) return res.json({ patients: [], generatedAt: new Date().toISOString() });
+
+    const ids = patients.map(p => p.id);
+    const [logRes, rxRes] = await Promise.all([
+      pool.query(
+        `SELECT patient_id, type, recorded_at, data FROM monitoring_logs
+          WHERE patient_id = ANY($1) ORDER BY recorded_at ASC`, [ids]),
+      pool.query(
+        `SELECT id, patient_id, week_number, status, batch_code, targets, notes,
+                monitoring_log_id, created_at, approved_at
+           FROM weekly_prescriptions
+          WHERE patient_id = ANY($1) ORDER BY week_number ASC`, [ids])
+    ]);
+
+    // `data` is JSONB but older rows were written as a JSON string — the profile
+    // page carries the same guard. Parse defensively rather than trusting the type.
+    const asObj = d => {
+      if (!d) return {};
+      if (typeof d === 'string') { try { return JSON.parse(d); } catch (e) { return {}; } }
+      return d;
+    };
+    const num = v => {
+      if (v === null || v === undefined || v === '') return null;
+      const n = parseFloat(v);
+      return isNaN(n) ? null : n;
+    };
+
+    const weeklyBy = {}, dailyBy = {}, rxBy = {};
+    logRes.rows.forEach(l => {
+      const bucket = (l.type === 'daily') ? dailyBy : weeklyBy;
+      (bucket[l.patient_id] = bucket[l.patient_id] || []).push({ at: l.recorded_at, d: asObj(l.data) });
+    });
+    rxRes.rows.forEach(r => { (rxBy[r.patient_id] = rxBy[r.patient_id] || []).push(r); });
+
+    const DAY = 86400000;
+    const now = Date.now();
+    const SUPPLY_DAYS = 7;   // one weekly batch = 7 days of cover
+
+    const out = patients.map(p => {
+      const fd      = p.full_data || {};
+      const weeks   = weeklyBy[p.id] || [];
+      const dailies = dailyBy[p.id]  || [];
+      const rxs     = rxBy[p.id]     || [];
+
+      // ── Week history, one entry per weekly log ──
+      // week_number is doctor-typed and carries no uniqueness or contiguity
+      // guarantee, so fall back to the log's ordinal position when it's absent.
+      const history = weeks.map((w, i) => ({
+        wk:      num(w.d.week) != null ? num(w.d.week) : (i + 1),
+        at:      w.at,
+        weight:  num(w.d.weight),
+        bmi:     num(w.d.bmi),
+        muac:    num(w.d.muac),
+        ecog:    num(w.d.ecog),
+        albumin: num(w.d.albumin),
+        crp:     num(w.d.crp),
+        creatinine: num(w.d.creatinine),
+        urea:    num(w.d.urea),
+        oral:    num(w.d.oralIntake),
+        adh:     num(w.d.compliance),
+        kcalkg:  num(w.d.kcalPerKg),
+        protkg:  num(w.d.proteinPerKg)
+      }));
+
+      const lastWeekly = weeks.length ? weeks[weeks.length - 1] : null;
+      const lastWeeklyAt = lastWeekly ? lastWeekly.at : null;
+      const daysSinceWeekly = lastWeeklyAt
+        ? Math.floor((now - new Date(lastWeeklyAt).getTime()) / DAY) : null;
+      const currentWeek = history.length
+        ? history.reduce((m, h) => Math.max(m, h.wk || 0), 0) : 0;
+
+      const lastDaily = dailies.length ? dailies[dailies.length - 1] : null;
+      const daysSinceDaily = lastDaily
+        ? Math.floor((now - new Date(lastDaily.at).getTime()) / DAY) : null;
+
+      // ── Prescription state ──
+      const pendingRow  = rxs.filter(r => r.status === 'PENDING_REVIEW')
+                             .sort((a, b) => b.week_number - a.week_number)[0] || null;
+      const approvedRows = rxs.filter(r => r.status === 'APPROVED');
+      const lastApproved = approvedRows.length
+        ? approvedRows[approvedRows.length - 1] : null;
+
+      // ── Warnings shown inline on the queue row ──
+      // The doctor approves from the row, so anything that should give them
+      // pause has to be visible there. Thresholds follow the same ESPEN/GLIM
+      // logic the risk panel uses.
+      const warnings = [];
+      const h1 = history[history.length - 1], h0 = history[history.length - 2];
+      if (h1 && h0 && h1.weight != null && h0.weight != null) {
+        const drop = h0.weight - h1.weight;
+        const pct  = h0.weight ? (drop / h0.weight) * 100 : 0;
+        if (drop >= 2 || pct >= 5) {
+          warnings.push({ level: 'high', label: 'WEIGHT',
+            detail: `down ${drop.toFixed(1)} kg (${pct.toFixed(1)}%) since week ${h0.wk}` });
+        }
+      }
+      if (h1 && h1.adh != null && h1.adh < 70) {
+        warnings.push({ level: 'high', label: 'ADHERENCE', detail: `${h1.adh}%` });
+      } else if (h1 && h0 && h1.adh != null && h0.adh != null && (h0.adh - h1.adh) >= 15) {
+        warnings.push({ level: 'watch', label: 'ADHERENCE',
+          detail: `${h1.adh}%, down from ${h0.adh}%` });
+      }
+      if (h1 && h0 && h1.ecog != null && h0.ecog != null && h1.ecog > h0.ecog) {
+        warnings.push({ level: 'watch', label: 'ECOG', detail: `${h0.ecog} → ${h1.ecog}` });
+      }
+      // Same renal thresholds the client-side fallback in the profile applies.
+      if (h1 && ((h1.creatinine != null && h1.creatinine >= 1.3) || (h1.urea != null && h1.urea >= 50))) {
+        warnings.push({ level: 'high', label: 'RENAL',
+          detail: [h1.creatinine != null ? `creatinine ${h1.creatinine}` : null,
+                   h1.urea != null ? `urea ${h1.urea}` : null].filter(Boolean).join(', ') });
+      }
+      if (h1 && h1.oral != null && h1.oral <= 30) {
+        warnings.push({ level: 'high', label: 'INTAKE', detail: `oral ${h1.oral}%` });
+      }
+      const t = pendingRow && pendingRow.targets;
+      if (t && t.manuallyAdjusted) {
+        warnings.push({ level: 'watch', label: 'ADJUSTED', detail: 'targets manually changed' });
+      }
+
+      // ── Supply cover, for the "no product going out" case ──
+      const lastApprovedAt = lastApproved
+        ? (lastApproved.approved_at || lastApproved.created_at) : null;
+      const supplyDaysLeft = lastApprovedAt
+        ? SUPPLY_DAYS - Math.floor((now - new Date(lastApprovedAt).getTime()) / DAY)
+        : null;
+
+      return {
+        id: p.id,
+        name: p.name,
+        uhic: p.uhic || fd.uhic || null,
+        cancer: p.cancer || fd.cancer || null,
+        currentWeek,
+        history,
+        lastWeeklyAt,
+        daysSinceWeekly,
+        // No due-date column exists; a week of cover from the last log is the
+        // same rule the profile page's overdue banner already uses.
+        dueAt: lastWeeklyAt
+          ? new Date(new Date(lastWeeklyAt).getTime() + 7 * DAY).toISOString() : null,
+        weeklyOverdue: daysSinceWeekly == null ? false : daysSinceWeekly >= 7,
+        neverMonitored: weeks.length === 0,
+        daysSinceDaily,
+        dailyGap: daysSinceDaily == null ? null : daysSinceDaily,
+        pendingRx: pendingRow ? {
+          id: pendingRow.id,
+          weekNumber: pendingRow.week_number,
+          status: pendingRow.status,
+          batchCode: pendingRow.batch_code,
+          targets: pendingRow.targets || {},
+          notes: pendingRow.notes,
+          createdAt: pendingRow.created_at
+        } : null,
+        lastApproved: lastApproved ? {
+          weekNumber: lastApproved.week_number,
+          batchCode: lastApproved.batch_code,
+          approvedAt: lastApproved.approved_at
+        } : null,
+        supplyDaysLeft,
+        warnings
+      };
+    });
+
+    res.json({ patients: out, generatedAt: new Date().toISOString() });
+  } catch (e) {
+    console.error('[weekly-queue]', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.get('/api/patients/:id/monitoring', authenticateToken, async (req, res) => {
   try {
     const result = await pool.query(

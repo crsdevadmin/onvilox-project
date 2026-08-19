@@ -2,6 +2,7 @@
 <html>
 
 <head>
+  <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard - Gquence</title>
   <script src="/js/config.js"></script>
@@ -9,6 +10,113 @@
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#0e2247">
   <style>
+    /* ═══ "Needs You This Week" queue ═════════════════════════════════════
+       Rows are actions, not patients. Everything needed to decide sits on the
+       row, so a routine week never requires opening the profile. Colours come
+       from theme variables so the queue works in dark and light mode. */
+    .queue-head { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:16px; }
+    .queue-title { display:flex; align-items:center; gap:10px; }
+    .qcount { font-size:11px; font-weight:800; color:var(--bg); background:var(--amber); border-radius:999px; padding:2px 9px; }
+    .qtabs { display:flex; gap:6px; flex-wrap:wrap; }
+    .qtab { padding:7px 14px; font-size:12px; font-weight:700; border-radius:999px; cursor:pointer;
+            border:1.5px solid var(--border-2); background:transparent; color:var(--text-2); font-family:inherit; transition:.15s; }
+    .qtab:hover { color:var(--text); }
+    .qtab .n { display:inline-block; margin-left:6px; font-size:10.5px; background:var(--border-2); color:var(--text); border-radius:999px; padding:1px 7px; }
+    .qtab.on { background:var(--surface-2); border-color:var(--cyan); color:var(--text); }
+    .qtab.on .n { background:var(--cyan); color:var(--bg); }
+
+    .qrow { display:grid; grid-template-columns:minmax(180px,1.4fr) auto minmax(250px,2fr) auto;
+            gap:16px; align-items:center; padding:15px 16px; border:1px solid var(--border);
+            border-radius:14px; background:var(--surface-2); margin-bottom:10px; transition:.18s; }
+    .qrow:hover { border-color:var(--border-2); }
+    .qrow.warn { border-left:3px solid var(--rose); }
+    .qrow.settled { opacity:.55; }
+    .qname { font-weight:700; color:var(--text); font-size:13.5px; }
+    .qsub  { font-size:11px; color:var(--text-3); margin-top:2px; }
+    .wkchip { font-size:11px; font-weight:800; letter-spacing:.06em; text-transform:uppercase;
+              color:var(--violet); background:var(--violet-dim); border:1px solid var(--violet);
+              border-radius:8px; padding:5px 10px; white-space:nowrap; }
+    .qmetrics { display:flex; gap:14px; flex-wrap:wrap; align-items:center; }
+    .qm { display:flex; flex-direction:column; gap:2px; min-width:58px; }
+    .qm .k { font-size:9.5px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--text-3); }
+    .qm .v { font-size:15px; font-weight:800; color:var(--text); letter-spacing:-.02em; }
+    .qm .v small { font-size:10px; font-weight:600; color:var(--text-2); letter-spacing:0; }
+    .qm .v.warn { color:var(--amber); } .qm .v.bad { color:var(--rose); } .qm .v.ok { color:var(--green); }
+    .qacts { display:flex; gap:8px; align-items:center; justify-content:flex-end; flex-wrap:wrap; }
+    .qflags { grid-column:1/-1; display:flex; gap:8px; flex-wrap:wrap; align-items:center;
+              margin-top:2px; padding-top:11px; border-top:1px dashed var(--border-2); }
+    .qflag { display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:700;
+             color:var(--rose); background:var(--rose-dim); border:1px solid var(--rose); border-radius:7px; padding:3px 9px; }
+    .qflag.watch { color:var(--amber); background:var(--amber-dim); border-color:var(--amber); }
+    .qempty { padding:28px 20px; text-align:center; color:var(--text-3); font-size:13.5px; font-style:italic; }
+    .qbtn { display:inline-flex; align-items:center; gap:6px; border-radius:9px; padding:8px 14px;
+            font-family:inherit; font-size:12.5px; font-weight:700; cursor:pointer; border:1px solid transparent; white-space:nowrap; }
+    .qbtn:disabled { opacity:.5; cursor:progress; }
+    .qbtn-approve { background:var(--green); color:#04120c; border-color:var(--green); }
+    .qbtn-approve.caution { background:var(--amber); color:#1a1000; border-color:var(--amber); }
+    .qbtn-ghost { background:transparent; color:var(--text-2); border-color:var(--border-2); }
+    .qbtn-ghost:hover { color:var(--text); border-color:var(--text-2); }
+    .qbtn-cyan { background:var(--cyan); color:var(--bg); border-color:var(--cyan); }
+    .qbtn-sm { padding:6px 11px; font-size:11.5px; }
+    .rbadge { display:inline-block; font-size:9px; font-weight:800; letter-spacing:.06em; text-transform:uppercase;
+              border:1px solid; border-radius:5px; padding:1px 6px; vertical-align:middle; margin-left:4px; }
+
+    /* Next Review chips in the patient table */
+    .nrchip { display:inline-block; font-size:9.5px; font-weight:800; letter-spacing:.07em; text-transform:uppercase;
+              border:1px solid; border-radius:999px; padding:3px 9px; white-space:nowrap; }
+    .nr-ok    { color:var(--green);  background:var(--green-dim);  border-color:rgba(16,185,129,.35); }
+    .nr-warn  { color:var(--amber);  background:var(--amber-dim);  border-color:rgba(245,158,11,.4); }
+    .nr-bad   { color:var(--rose);   background:var(--rose-dim);   border-color:rgba(244,63,94,.4); }
+    .nr-muted { color:var(--text-2); background:rgba(127,149,184,.1); border-color:var(--border-2); }
+
+    /* week-by-week history */
+    .hlink { color:var(--cyan); cursor:pointer; font-weight:700; border-bottom:1px dotted var(--cyan); }
+    .histslot { grid-column:1/-1; display:none; margin-top:4px; }
+    .histwrap { display:flex; gap:16px; align-items:flex-start; flex-wrap:wrap; border:1px solid var(--border-2);
+                border-radius:12px; background:var(--bg-2); padding:12px 14px; margin-top:8px; }
+    table.hist { border-collapse:collapse; flex:1; min-width:270px; }
+    table.hist th { background:transparent; border:none; padding:3px 10px 7px; font-size:9.5px; color:var(--text-3); letter-spacing:.08em; }
+    table.hist td { border:none; padding:4px 10px; font-size:12.5px; white-space:nowrap; }
+    table.hist td.hk { color:var(--text-3); font-size:10px; font-weight:700; letter-spacing:.07em; text-transform:uppercase; padding-left:0; }
+    table.hist td.hv { font-weight:800; color:var(--text); font-size:13.5px; }
+    .dlt { font-size:10px; font-weight:700; margin-left:5px; color:var(--text-3); }
+    .dlt.bad { color:var(--rose); } .dlt.good { color:var(--green); }
+    .sparkbox { min-width:118px; }
+    .sparkbox .k { font-size:9.5px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--text-3); margin-bottom:4px; }
+
+    /* entry drawer */
+    #qScrim { position:fixed; inset:0; background:rgba(2,6,15,.66); z-index:300; display:none; }
+    #qScrim.on { display:block; }
+    #qDrawer { position:fixed; top:0; right:0; height:100%; width:min(470px,96vw); background:var(--surface);
+               border-left:1px solid var(--border-2); z-index:301; transform:translateX(100%);
+               transition:transform .28s cubic-bezier(.22,1,.36,1); overflow-y:auto; padding:24px; }
+    #qDrawer.on { transform:translateX(0); }
+    #qDrawer h3 { font-size:18px; font-weight:800; letter-spacing:-.02em; margin:0 0 4px; color:var(--text); }
+    .fgrid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:16px; }
+    .fg { display:flex; flex-direction:column; gap:5px; }
+    .fg.full { grid-column:1/-1; }
+    .fg label { font-size:10px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:var(--text-3); }
+    .fg input, .fg select, .fg textarea { background:var(--surface-2); border:1px solid var(--border-2); color:var(--text);
+              border-radius:9px; padding:9px 11px; font-family:inherit; font-size:13px; width:100%; }
+    .lastwk { font-weight:600; color:var(--text-3); text-transform:none; letter-spacing:0; font-size:10px; margin-left:5px; }
+    .planbox { border:1px solid var(--border-2); border-radius:12px; background:var(--surface-2); overflow:hidden; }
+    .pm { display:flex; justify-content:space-between; align-items:baseline; gap:12px; padding:10px 13px; border-bottom:1px solid var(--border); }
+    .pm:last-child { border-bottom:none; }
+    .pm .k { font-size:12px; color:var(--text-2); font-weight:600; }
+    .pm .v { font-size:15px; font-weight:800; color:var(--text); letter-spacing:-.02em; }
+    .pm .v small { font-size:10.5px; font-weight:600; color:var(--text-3); }
+    .dbanner { display:flex; align-items:center; gap:10px; background:var(--amber-dim); border:1px solid var(--amber);
+               border-radius:12px; padding:11px 15px; margin-top:16px; font-size:13px; color:var(--amber); font-weight:600; }
+    .dbanner.ok { background:var(--green-dim); border-color:var(--green); color:var(--green); }
+    .dsect { font-size:10px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:var(--text-3); margin:18px 0 9px; }
+    .qtoast { position:fixed; bottom:24px; left:50%; transform:translate(-50%,20px); opacity:0; pointer-events:none;
+              background:var(--green); color:#04120c; font-weight:800; font-size:13px; padding:12px 22px;
+              border-radius:999px; z-index:400; transition:.25s; box-shadow:0 10px 30px rgba(0,0,0,.4); max-width:90vw; text-align:center; }
+    .qtoast.on { opacity:1; transform:translate(-50%,0); }
+    .qtoast.err { background:var(--rose); color:#fff; }
+    .dnote { font-size:12px; color:var(--text-3); line-height:1.6; margin-top:8px; }
+    @media (max-width:900px) { .qrow { grid-template-columns:1fr; } .qacts { justify-content:flex-start; } }
+
     .filter-tab { padding:7px 16px; font-size:12px; font-weight:700; border-radius:20px; border:1.5px solid #d1d5db; background:#fff; color:#64748b; cursor:pointer; transition:all .15s; }
     .filter-tab:hover { border-color:#0e2247; color:#0e2247; }
     .filter-tab.active { background:#0e2247; color:#fff; border-color:#0e2247; }
@@ -145,6 +253,24 @@
     <!-- ── Early-warning risk panel ── -->
     <div id="riskPanel" style="display:none;"></div>
 
+    <!-- ── "Needs You This Week" work queue ──────────────────────────────
+         Answers "what needs me?" where the table only answers "who are my
+         patients?". Hidden until the queue loads so it never flashes empty. -->
+    <div class="card" id="weekQueue" style="display:none; border-color:var(--amber);">
+      <div class="queue-head">
+        <div class="queue-title">
+          <h2 style="margin:0;">Needs You This Week</h2>
+          <span class="qcount" id="qCount">0</span>
+        </div>
+        <div class="qtabs" id="qTabs">
+          <button class="qtab on" data-b="rx"    onclick="setQBucket('rx')">Awaiting your approval <span class="n" id="qn-rx">0</span></button>
+          <button class="qtab"    data-b="asmt"  onclick="setQBucket('asmt')">Weekly assessment due <span class="n" id="qn-asmt">0</span></button>
+          <button class="qtab"    data-b="daily" onclick="setQBucket('daily')">Daily logs missing <span class="n" id="qn-daily">0</span></button>
+        </div>
+      </div>
+      <div id="qBucket"></div>
+    </div>
+
     <div class="card">
       <table class="table">
         <thead>
@@ -152,7 +278,8 @@
             <th>Patient</th>
             <th>UHIC</th>
             <th>Cancer</th>
-            <th>Created</th>
+            <th title="Latest weekly monitoring week recorded for this patient">Week</th>
+            <th title="Derived from the last weekly log plus 7 days">Next Review</th>
             <th title="Products dispatched to this patient — initial plan plus each approved weekly prescription">Products</th>
             <th>Status</th>
             <th class="th-actions">Actions</th>
@@ -164,6 +291,25 @@
 
   </div>
 
+
+  <!-- ── Monitoring entry drawer ────────────────────────────────────────
+       Weekly and daily entry, and the prescription the engine generates from
+       it, without leaving the dashboard. Uses the same fields and the same
+       endpoints as the profile page — a second door to the same room. -->
+  <div id="qScrim" onclick="closeQDrawer()"></div>
+  <aside id="qDrawer" role="dialog" aria-modal="true" aria-labelledby="qdTitle">
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
+      <div>
+        <h3 id="qdTitle">—</h3>
+        <div class="qsub" id="qdSub"></div>
+      </div>
+      <button class="qbtn qbtn-ghost qbtn-sm" onclick="closeQDrawer()" aria-label="Close">✕</button>
+    </div>
+    <div id="qdBody"></div>
+    <div id="qdFoot" style="display:flex; gap:9px; margin-top:22px; flex-wrap:wrap;"></div>
+    <div class="dnote" id="qdNote"></div>
+  </aside>
+  <div class="qtoast" id="qToast" role="status" aria-live="polite"></div>
 
   <!-- QR Modal -->
   <div id="qrOverlay" class="modal-overlay" onclick="closeQr()">
@@ -323,10 +469,16 @@
             </div>
             <div style="font-size:12px;line-height:1.5;margin-top:2px;">${reasons}</div>
           </div>
-          <a href="/patients/profile?id=${r.patientId}"
-             style="flex:none;font-size:11.5px;font-weight:600;color:var(--text);text-decoration:none;
-                    background:var(--surface-2);border:1px solid var(--border);border-radius:6px;
-                    padding:4px 10px;white-space:nowrap;">Open</a>
+          <div style="flex:none;display:flex;gap:6px;align-items:center;">
+            <button onclick="jumpToQueue('${r.patientId}')" title="Jump to this patient's open action"
+               style="font-size:11.5px;font-weight:600;color:var(--cyan);cursor:pointer;
+                      background:var(--surface-2);border:1px solid var(--border);border-radius:6px;
+                      font-family:inherit;padding:4px 10px;white-space:nowrap;">In queue ↓</button>
+            <a href="/patients/profile?id=${r.patientId}#monitoring"
+               style="font-size:11.5px;font-weight:600;color:var(--text);text-decoration:none;
+                      background:var(--surface-2);border:1px solid var(--border);border-radius:6px;
+                      padding:4px 10px;white-space:nowrap;">Open</a>
+          </div>
         </div>`;
     }
 
@@ -432,6 +584,31 @@
       return `<div style="font-size:11px;color:#6b7280;margin-bottom:2px;">
                 ${weeks ? '<b style="color:#111827;">Week ' + weeks + '</b> of monitoring' : 'Initial only'}
               </div><div>${chips}</div>`;
+    }
+
+    // ── Week / Next Review columns ────────────────────────────────────────
+    // Fed by the same queue payload, so the table agrees with the queue above
+    // it rather than deriving the week a second, slightly different way.
+    function _qFor(pid) { return (_queue || []).find(x => String(x.id) === String(pid)); }
+
+    function weekCell(pid) {
+      const q = _qFor(pid);
+      if (!q || !q.currentWeek) return '<span style="color:var(--text-3);font-size:11px;">—</span>';
+      return '<span class="wkchip">W' + q.currentWeek + '</span>';
+    }
+
+    function nextReviewCell(pid) {
+      const q = _qFor(pid);
+      if (!q) return '<span style="color:var(--text-3);font-size:11px;">—</span>';
+      const chip = (txt, cls) => '<span class="nrchip ' + cls + '">' + txt + '</span>';
+      if (q.pendingRx)      return chip('RX WAITING', 'nr-warn');
+      if (q.neverMonitored) return chip('BASELINE', 'nr-muted');
+      const d = q.daysSinceWeekly;
+      if (d === null)       return '<span style="color:var(--text-3);font-size:11px;">—</span>';
+      const left = 7 - d;
+      if (left < 0)   return chip('OVERDUE ' + Math.abs(left) + 'D', 'nr-bad');
+      if (left === 0) return chip('DUE TODAY', 'nr-bad');
+      return chip('IN ' + left + 'D', 'nr-ok');
     }
 
     function render() {
@@ -638,7 +815,8 @@
       <td><button class="linklike" onclick="showQr(\'${p.id}\');event.stopPropagation();" title="Show QR for patient">${p.name}</button></td>
       <td>${p.uhic}</td>
       <td>${p.cancer}</td>
-      <td>${p.createdDate || '-'}</td>
+      <td>${weekCell(p.id)}</td>
+      <td>${nextReviewCell(p.id)}</td>
       <td>${productCell(p.id)}</td>
       <td><span class="status ${statusClass}">${status}</span>${aiStatus}</td>
       <td>
@@ -663,7 +841,7 @@
         detailsRow.id = `details_${p.id}`;
         detailsRow.style.display = 'none';
         detailsRow.innerHTML = `
-      <td colspan="7">
+      <td colspan="8">
         <div class="card" style="margin:10px 0 0 0; box-shadow:none; border:1px solid #e5e7eb;">
           <div style="display:flex; gap:24px; flex-wrap:wrap;">
             <div style="min-width:260px;">
@@ -736,6 +914,535 @@
         .catch(() => { /* offline — keep showing the last known state */ });
     }
 
+    // ══════════════════════════════════════════════════════════════════════
+    //  "NEEDS YOU THIS WEEK" QUEUE
+    //  The table answers "who are my patients?". This answers "what needs me?".
+    //  All of it is fed by ONE request (/api/doctor/weekly-queue) which
+    //  pre-computes weeks, due dates, history and warnings server-side.
+    // ══════════════════════════════════════════════════════════════════════
+
+    let _queue = [];            // rows straight from the endpoint
+    let _qBucket = 'rx';        // which bucket tab is showing
+    let _qBusy = false;         // guards against double-submitting an approval
+
+    function _api() { return (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : ''; }
+    function _hdr(json) {
+      const h = { Authorization: 'Bearer ' + (me.token || '') };
+      if (json) h['Content-Type'] = 'application/json';
+      return h;
+    }
+    function qToast(msg, isErr) {
+      const t = document.getElementById('qToast');
+      if (!t) return;
+      t.textContent = msg;
+      t.className = 'qtoast on' + (isErr ? ' err' : '');
+      clearTimeout(t._t);
+      t._t = setTimeout(() => { t.className = 'qtoast'; }, isErr ? 5000 : 3000);
+    }
+
+    async function loadWeeklyQueue() {
+      try {
+        let doctorId = me.id;
+        if (me.role === 'ASSISTANT' && typeof mappingService !== 'undefined') {
+          doctorId = mappingService.getDoctorForAssistant(me.id) || me.id;
+        }
+        const res = await fetch(_api() + '/api/doctor/weekly-queue?doctorId=' + encodeURIComponent(doctorId),
+          { headers: _hdr() });
+        if (!res.ok) return;                       // stay quiet rather than alarm
+        const data = await res.json();
+        _queue = data.patients || [];
+        renderQueue();
+        // The Week / Next Review columns read from _queue, so the table has to
+        // be redrawn once the queue lands — it renders before this resolves.
+        render();
+      } catch (e) { /* offline — the queue simply stays as it was */ }
+    }
+
+    // ── Bucketing ─────────────────────────────────────────────────────────
+    // A patient can legitimately appear in more than one bucket (an overdue
+    // assessment AND a stale daily log), so these are filters, not a partition.
+    const DAILY_GAP_DAYS = 2;   // no daily entry for this long → surface it
+
+    function qBuckets() {
+      return {
+        rx:    _queue.filter(p => p.pendingRx),
+        asmt:  _queue.filter(p => !p.pendingRx && (p.weeklyOverdue || p.neverMonitored)),
+        daily: _queue.filter(p => p.daysSinceDaily === null || p.daysSinceDaily >= DAILY_GAP_DAYS)
+      };
+    }
+
+    function setQBucket(b) {
+      _qBucket = b;
+      document.querySelectorAll('#qTabs .qtab').forEach(t => t.classList.toggle('on', t.dataset.b === b));
+      renderQueue();
+    }
+
+    // ── Week history ──────────────────────────────────────────────────────
+    // A table rather than a chart: across 3–4 clinical readings the exact
+    // number matters more than the shape. One sparkline for weight, because
+    // that is the parameter a clinician reads AS a trajectory.
+    function qSpark(vals, w, h) {
+      w = w || 96; h = h || 26;
+      if (!vals.length) return '';
+      if (vals.length === 1) return '<div style="font-size:11px;color:var(--text-3)">one reading</div>';
+      const min = Math.min.apply(null, vals), max = Math.max.apply(null, vals), span = (max - min) || 1;
+      const pts = vals.map((v, i) => [ (i / (vals.length - 1)) * (w - 4) + 2, h - 2 - ((v - min) / span) * (h - 6) ]);
+      const d = pts.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' ');
+      const c = vals[vals.length - 1] < vals[0] ? 'var(--rose)' : 'var(--green)';
+      const last = pts[pts.length - 1];
+      return '<svg width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '" aria-hidden="true">'
+        + '<path d="' + d + '" fill="none" stroke="' + c + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>'
+        + '<circle cx="' + last[0].toFixed(1) + '" cy="' + last[1].toFixed(1) + '" r="3.2" fill="' + c
+        + '" stroke="var(--surface-2)" stroke-width="2"/></svg>';
+    }
+    function qDelta(cur, prev, lowerIsBetter) {
+      if (prev === null || prev === undefined || cur === null || cur === undefined) return '';
+      const d = Math.round((cur - prev) * 10) / 10;
+      if (d === 0) return '<span class="dlt">▬</span>';
+      const bad = lowerIsBetter ? d > 0 : d < 0;
+      return '<span class="dlt ' + (bad ? 'bad' : 'good') + '">' + (d > 0 ? '▲ +' : '▼ ') + d + '</span>';
+    }
+    function qHistTable(p) {
+      const h = (p.history || []).filter(r => r.wk != null);
+      if (!h.length) return '<div class="dnote">No weekly entries recorded yet.</div>';
+      const row = (label, key, unit, lowerIsBetter) => {
+        if (!h.some(r => r[key] !== null && r[key] !== undefined)) return '';   // skip empty rows
+        return '<tr><td class="hk">' + label + '</td>' + h.map((r, i) => {
+          const v = (r[key] === null || r[key] === undefined) ? '—' : r[key] + (unit || '');
+          return '<td class="hv">' + v + (i ? qDelta(r[key], h[i - 1][key], lowerIsBetter) : '') + '</td>';
+        }).join('') + '</tr>';
+      };
+      const weights = h.map(r => r.weight).filter(v => v !== null && v !== undefined);
+      return '<div class="histwrap"><table class="hist"><thead><tr><th></th>'
+        + h.map(r => '<th>Week ' + r.wk + '</th>').join('') + '</tr></thead><tbody>'
+        + row('Weight', 'weight', ' kg') + row('BMI', 'bmi') + row('Adherence', 'adh', '%')
+        + row('Oral intake', 'oral', '%') + row('ECOG', 'ecog', '', true)
+        + row('Albumin', 'albumin') + row('CRP', 'crp', '', true) + row('kcal/kg', 'kcalkg')
+        + '</tbody></table>'
+        + (weights.length > 1
+            ? '<div class="sparkbox"><div class="k">Weight trajectory</div>' + qSpark(weights)
+              + '<div class="k" style="margin-top:2px">' + weights[0] + ' → ' + weights[weights.length - 1]
+              + ' kg (' + (weights[weights.length - 1] - weights[0]).toFixed(1) + ')</div></div>'
+            : '')
+        + '</div>';
+    }
+    function toggleQHist(pid) {
+      const el = document.getElementById('qhist-' + pid);
+      if (!el) return;
+      const open = el.dataset.open === '1';
+      const p = _queue.find(x => String(x.id) === String(pid));
+      el.dataset.open = open ? '0' : '1';
+      el.innerHTML = open ? '' : qHistTable(p || {});
+      el.style.display = open ? 'none' : 'block';
+    }
+
+    // Cross-link to the risk panel: a patient who is also clinically flagged
+    // carries that here, so an approval is never made blind to deterioration.
+    function qRiskBadge(pid) {
+      const r = (_riskCache || []).find(x => String(x.patientId) === String(pid));
+      if (!r || !['critical', 'high'].includes(r.level)) return '';
+      const c = r.level === 'critical' ? '#ef4444' : '#f59e0b';
+      return '<span class="rbadge" style="color:' + c + ';border-color:' + c + ';background:' + c + '1a"'
+        + ' title="Flagged in Patients Needing Attention">⚠ ' + r.level.toUpperCase() + '</span>';
+    }
+
+    function qMetric(k, v, u, cls) {
+      return '<div class="qm"><div class="k">' + k + '</div><div class="v ' + (cls || '') + '">'
+        + v + (u ? ' <small>' + u + '</small>' : '') + '</div></div>';
+    }
+    function _esc(s) { return String(s == null ? '' : s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c])); }
+    function qHead(p, sub) {
+      return '<div><div class="qname">' + _esc(p.name) + ' ' + qRiskBadge(p.id) + '</div>'
+        + '<div class="qsub">' + (p.uhic ? 'UHIC ' + _esc(p.uhic) + ' · ' : '') + sub
+        + ' · <a class="hlink" onclick="toggleQHist(\'' + p.id + '\')">previous weeks ▾</a></div></div>';
+    }
+
+    function renderQueue() {
+      const card = document.getElementById('weekQueue');
+      const host = document.getElementById('qBucket');
+      if (!card || !host) return;
+
+      const b = qBuckets();
+      const setN = (id, n) => { const el = document.getElementById(id); if (el) el.textContent = n; };
+      setN('qn-rx', b.rx.length); setN('qn-asmt', b.asmt.length); setN('qn-daily', b.daily.length);
+
+      const total = b.rx.length + b.asmt.length + b.daily.length;
+      const cnt = document.getElementById('qCount');
+      if (cnt) {
+        cnt.textContent = total;
+        cnt.style.background = total ? 'var(--amber)' : 'var(--green)';
+      }
+      card.style.display = 'block';
+      card.style.borderColor = total ? 'var(--amber)' : 'var(--border)';
+
+      const rows = b[_qBucket] || [];
+      if (!rows.length) {
+        const msg = { rx: 'Nothing awaiting your approval.',
+                      asmt: 'No weekly assessments are due.',
+                      daily: 'Daily logging is up to date.' }[_qBucket];
+        host.innerHTML = '<div class="qempty">' + msg + '</div>';
+        return;
+      }
+      host.innerHTML = rows.map(p =>
+        _qBucket === 'rx' ? qRowRx(p) : _qBucket === 'asmt' ? qRowAsmt(p) : qRowDaily(p)
+      ).join('');
+    }
+
+    // ── Row: prescription awaiting approval ───────────────────────────────
+    // The doctor approves from here, so the numbers that drive the decision
+    // and any warning the server raised are both on the row. A warned plan
+    // still has an Approve button — it is amber and the reasons are spelled
+    // out beneath it, so the decision is informed rather than blocked.
+    function qRowRx(p) {
+      const rx = p.pendingRx, t = rx.targets || {};
+      const h = p.history || [], h1 = h[h.length - 1] || {}, h0 = h[h.length - 2] || {};
+      const wtDelta = (h1.weight != null && h0.weight != null) ? Math.round((h1.weight - h0.weight) * 10) / 10 : null;
+      const warned = (p.warnings || []).length > 0;
+      const waited = rx.createdAt ? _agoText(rx.createdAt) : '';
+
+      return '<div class="qrow ' + (warned ? 'warn' : '') + '">'
+        + qHead(p, 'waiting ' + waited)
+        + '<span class="wkchip">Week ' + rx.weekNumber + '</span>'
+        + '<div class="qmetrics">'
+          + qMetric('kcal/kg', t.kcalPerKg != null ? t.kcalPerKg : '—')
+          + qMetric('prot/kg', t.proteinPerKg != null ? t.proteinPerKg : '—', 'g')
+          + qMetric('Total', t.totalKcal != null ? Math.round(t.totalKcal).toLocaleString() : '—', 'kcal')
+          + (wtDelta !== null ? qMetric('Weight', (wtDelta > 0 ? '+' : '') + wtDelta, 'kg', wtDelta <= -2 ? 'bad' : wtDelta < 0 ? 'warn' : 'ok') : '')
+          + (h1.adh != null ? qMetric('Adherence', h1.adh, '%', h1.adh < 70 ? 'bad' : h1.adh < 85 ? 'warn' : 'ok') : '')
+          + qMetric('Formula', t.formulation || 'Standard')
+        + '</div>'
+        + '<div class="qacts">'
+          + '<button class="qbtn qbtn-approve' + (warned ? ' caution' : '') + '" id="apx-' + rx.id + '"'
+          + ' onclick="approveRxFromQueue(' + rx.id + ', this)">'
+          + (warned ? '⚠ Approve with warnings' : '✓ Approve &amp; send to store') + '</button>'
+          + '<button class="qbtn qbtn-ghost qbtn-sm" onclick="openRxReview(\'' + p.id + '\')">Review</button>'
+        + '</div>'
+        + (warned ? '<div class="qflags">' + p.warnings.map(w =>
+            '<span class="qflag' + (w.level === 'watch' ? ' watch' : '') + '">⚠ ' + _esc(w.label) + ' ' + _esc(w.detail) + '</span>'
+          ).join('') + '</div>' : '')
+        + '<div class="histslot" id="qhist-' + p.id + '" data-open="0"></div>'
+        + '</div>';
+    }
+
+    // ── Row: weekly assessment due ────────────────────────────────────────
+    function qRowAsmt(p) {
+      const h = p.history || [], h1 = h[h.length - 1] || {};
+      const nextWeek = (p.currentWeek || 0) + 1;
+      const over = p.daysSinceWeekly;
+      return '<div class="qrow ' + (over !== null && over >= 10 ? 'warn' : '') + '">'
+        + qHead(p, p.lastWeeklyAt ? 'last logged ' + _shortDate(p.lastWeeklyAt) : 'never monitored')
+        + '<span class="wkchip">Week ' + nextWeek + ' due</span>'
+        + '<div class="qmetrics">'
+          + (over !== null ? qMetric('Since last', over, 'days', over >= 10 ? 'bad' : 'warn')
+                           : qMetric('Status', 'No entries', '', 'warn'))
+          + (h1.ecog   != null ? qMetric('Last ECOG', h1.ecog) : '')
+          + (h1.weight != null ? qMetric('Last weight', h1.weight, 'kg') : '')
+          + (h1.adh    != null ? qMetric('Adherence', h1.adh, '%', h1.adh < 80 ? 'warn' : 'ok') : '')
+        + '</div>'
+        + '<div class="qacts">'
+          + '<button class="qbtn qbtn-cyan" onclick="openWeeklyEntry(\'' + p.id + '\')">Enter Week ' + nextWeek + ' data</button>'
+          + '<a class="qbtn qbtn-ghost qbtn-sm" href="/patients/profile?id=' + p.id + '#monitoring">Profile</a>'
+        + '</div>'
+        + '<div class="histslot" id="qhist-' + p.id + '" data-open="0"></div>'
+        + '</div>';
+    }
+
+    // ── Row: daily logs missing ───────────────────────────────────────────
+    function qRowDaily(p) {
+      const gap = p.daysSinceDaily;
+      const h = p.history || [], h1 = h[h.length - 1] || {};
+      return '<div class="qrow">'
+        + qHead(p, gap === null ? 'no daily entries' : 'last entry ' + gap + 'd ago')
+        + '<span class="wkchip">Daily</span>'
+        + '<div class="qmetrics">'
+          + qMetric('No log for', gap === null ? '—' : gap, gap === null ? '' : 'days', gap !== null && gap >= 4 ? 'bad' : 'warn')
+          + (h1.adh  != null ? qMetric('Adherence', h1.adh, '%', h1.adh < 70 ? 'bad' : 'warn') : '')
+          + (h1.oral != null ? qMetric('Oral intake', h1.oral, '%', h1.oral <= 30 ? 'bad' : '') : '')
+        + '</div>'
+        + '<div class="qacts">'
+          + '<button class="qbtn qbtn-cyan" onclick="openDailyEntry(\'' + p.id + '\')">Log today</button>'
+          + '<a class="qbtn qbtn-ghost qbtn-sm" href="/patients/profile?id=' + p.id + '#monitoring">Profile</a>'
+        + '</div>'
+        + '<div class="histslot" id="qhist-' + p.id + '" data-open="0"></div>'
+        + '</div>';
+    }
+
+    function _shortDate(iso) {
+      const d = new Date(iso);
+      if (isNaN(d.getTime())) return '—';
+      return ('0' + d.getDate()).slice(-2) + '/' + ('0' + (d.getMonth() + 1)).slice(-2);
+    }
+    function _agoText(iso) {
+      const t = new Date(iso).getTime();
+      if (isNaN(t)) return 'a while';
+      const mins = Math.floor((Date.now() - t) / 60000);
+      if (mins < 60) return mins <= 1 ? 'just now' : mins + ' min';
+      const hrs = Math.floor(mins / 60);
+      if (hrs < 24) return hrs + (hrs === 1 ? ' hour' : ' hours');
+      const days = Math.floor(hrs / 24);
+      return days + (days === 1 ? ' day' : ' days');
+    }
+
+    // ── Approve straight from the row ─────────────────────────────────────
+    // Same endpoint the profile page's approve button calls: flips the Rx to
+    // APPROVED and creates the weekly manufacturing job in one transaction.
+    async function approveRxFromQueue(rxId, btn) {
+      if (_qBusy) return;
+      _qBusy = true;
+      const original = btn ? btn.innerHTML : '';
+      if (btn) { btn.disabled = true; btn.innerHTML = 'Approving…'; }
+      try {
+        const res = await fetch(_api() + '/api/weekly-prescriptions/' + rxId + '/approve',
+          { method: 'POST', headers: _hdr(true) });
+        if (!res.ok) throw new Error('Approve failed (' + res.status + ')');
+        const out = await res.json();
+        qToast('✓ Approved — batch ' + (out.batchCode || '') + ' sent to store');
+        await loadWeeklyQueue();
+        if (typeof manufacturingService !== 'undefined' && manufacturingService.initJobs) {
+          manufacturingService.initJobs().then(render).catch(() => {});
+        }
+      } catch (e) {
+        qToast(e.message || 'Could not approve — please try again', true);
+        if (btn) { btn.disabled = false; btn.innerHTML = original; }
+      } finally { _qBusy = false; }
+    }
+
+    // ══ Entry drawer ══════════════════════════════════════════════════════
+    let _qd = null;   // { patientId, kind, weekNo, logId, rxId }
+
+    function showQDrawer() {
+      document.getElementById('qScrim').classList.add('on');
+      document.getElementById('qDrawer').classList.add('on');
+    }
+    function closeQDrawer() {
+      document.getElementById('qScrim').classList.remove('on');
+      document.getElementById('qDrawer').classList.remove('on');
+      _qd = null;
+    }
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeQDrawer(); });
+
+    function _fg(label, id, value, placeholder, prev, unit) {
+      const ghost = (prev !== null && prev !== undefined) ? '<span class="lastwk">last wk ' + prev + (unit || '') + '</span>' : '';
+      return '<div class="fg"><label for="' + id + '">' + label + ghost + '</label>'
+        + '<input id="' + id + '" value="' + (value == null ? '' : value) + '" placeholder="' + (placeholder || '—') + '"></div>';
+    }
+
+    // Weekly entry — the same fields the profile page's FORM 4 collects, with
+    // last week's value beside each so the doctor sees what it is moving from.
+    function openWeeklyEntry(pid) {
+      const p = _queue.find(x => String(x.id) === String(pid));
+      if (!p) return;
+      const h = p.history || [], prev = h[h.length - 1] || {};
+      const wk = (p.currentWeek || 0) + 1;
+      _qd = { patientId: p.id, kind: 'weekly', weekNo: wk, name: p.name };
+
+      document.getElementById('qdTitle').textContent = 'Week ' + wk + ' assessment';
+      document.getElementById('qdSub').textContent = p.name + (p.uhic ? ' · UHIC ' + p.uhic : '');
+      document.getElementById('qdBody').innerHTML =
+        (p.daysSinceWeekly !== null && p.daysSinceWeekly >= 7
+          ? '<div class="dbanner">⚠ Overdue by ' + p.daysSinceWeekly + ' days</div>' : '')
+        + (h.length ? '<div class="dsect" style="margin-bottom:0">Previous weeks</div>' + qHistTable(p) : '')
+        + '<div class="fgrid">'
+        + '<div class="fg"><label for="qw_week">Week</label><input id="qw_week" value="' + wk + '"></div>'
+        + '<div class="fg"><label for="qw_date">Date</label><input id="qw_date" type="date" value="' + new Date().toISOString().slice(0, 10) + '"></div>'
+        + _fg('Weight (kg)', 'qw_weight', '', '—', prev.weight)
+        + _fg('MUAC (cm)', 'qw_muac', '', '—', prev.muac)
+        + '<div class="fg"><label for="qw_ecog">ECOG' + (prev.ecog != null ? '<span class="lastwk">last wk ' + prev.ecog + '</span>' : '') + '</label>'
+          + '<select id="qw_ecog"><option value="">—</option>' + [0,1,2,3,4].map(v =>
+              '<option value="' + v + '"' + (prev.ecog === v ? ' selected' : '') + '>' + v + '</option>').join('') + '</select></div>'
+        + _fg('Hand grip (kg)', 'qw_grip', '', '—', prev.handGrip)
+        + _fg('Albumin (g/dL)', 'qw_albumin', '', '—', prev.albumin)
+        + _fg('CRP', 'qw_crp', '', '—', prev.crp)
+        + _fg('Creatinine', 'qw_creatinine', '', '—', prev.creatinine)
+        + _fg('Urea', 'qw_urea', '', '—', prev.urea)
+        + _fg('Oral intake %', 'qw_oral', '', '0–100', prev.oral, '%')
+        + _fg('Compliance %', 'qw_adh', '', '0–100', prev.adh, '%')
+        + '<div class="fg full"><label for="qw_notes">Notes</label><textarea id="qw_notes" rows="2" placeholder="Clinical notes…"></textarea></div>'
+        + '</div>';
+      document.getElementById('qdFoot').innerHTML =
+        '<button class="qbtn qbtn-cyan" style="flex:1;justify-content:center" id="qwSave" onclick="saveWeeklyEntry()">Save &amp; generate plan</button>'
+        + '<button class="qbtn qbtn-ghost" onclick="closeQDrawer()">Cancel</button>';
+      document.getElementById('qdNote').textContent =
+        'Same fields and the same API as the profile page — reachable without leaving the dashboard.';
+      showQDrawer();
+    }
+
+    const _v = id => { const el = document.getElementById(id); const s = el ? el.value.trim() : ''; return s === '' ? null : s; };
+    const _n = id => { const s = _v(id); return s === null ? null : (isNaN(parseFloat(s)) ? null : parseFloat(s)); };
+
+    async function saveWeeklyEntry() {
+      if (!_qd) return;
+      const weight = _n('qw_weight'), week = _n('qw_week');
+      // Same guard the profile page applies — a log with neither is meaningless.
+      if (week === null && weight === null) { qToast('Enter a week number or a weight', true); return; }
+
+      const btn = document.getElementById('qwSave');
+      if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+
+      const data = {
+        week: week, date: _v('qw_date'), weight: weight, muac: _n('qw_muac'),
+        ecog: _n('qw_ecog'), handGrip: _n('qw_grip'), albumin: _n('qw_albumin'),
+        crp: _n('qw_crp'), creatinine: _n('qw_creatinine'), urea: _n('qw_urea'),
+        oralIntake: _n('qw_oral'), compliance: _n('qw_adh'), notes: _v('qw_notes')
+      };
+      try {
+        const res = await fetch(_api() + '/api/patients/' + _qd.patientId + '/monitoring',
+          { method: 'POST', headers: _hdr(true), body: JSON.stringify({ type: 'weekly', data }) });
+        if (!res.ok) throw new Error('Save failed (' + res.status + ')');
+        const saved = await res.json();
+        _qd.logId = saved.id;
+
+        // The server auto-generates the prescription and returns it in the same
+        // response — no second navigation needed. Fall back to an explicit
+        // generate call for the case where auto-gen did not fire.
+        let rx = saved.weeklyRx;
+        if (!rx && saved.id) {
+          try {
+            const g = await fetch(_api() + '/api/patients/' + _qd.patientId + '/generate-weekly-rx',
+              { method: 'POST', headers: _hdr(true),
+                body: JSON.stringify({ monitoringLogId: saved.id, weekNumber: week }) });
+            if (g.ok) rx = await g.json();
+          } catch (e) { /* fall through to the no-plan message */ }
+        }
+        await loadWeeklyQueue();
+        showGeneratedPlan(rx, data);
+      } catch (e) {
+        qToast(e.message || 'Could not save the weekly entry', true);
+        if (btn) { btn.disabled = false; btn.textContent = 'Save & generate plan'; }
+      }
+    }
+
+    // Step 2 — the plan the engine produced, shown in the same drawer.
+    function showGeneratedPlan(rx, entered) {
+      const p = _queue.find(x => String(x.id) === String(_qd.patientId)) || { history: [] };
+      const t = (rx && (rx.targets || {})) || {};
+      _qd.rxId = rx ? rx.id : null;
+
+      document.getElementById('qdTitle').textContent = rx
+        ? 'Week ' + (rx.week_number || _qd.weekNo) + ' plan — generated'
+        : 'Week ' + _qd.weekNo + ' saved';
+      document.getElementById('qdBody').innerHTML =
+        '<div class="dbanner ok">✓ Weekly entry saved'
+          + (rx ? ' · plan generated' : ' · no plan was generated — open the profile to create one') + '</div>'
+        + (rx ? '<div class="dsect">Targets</div><div class="planbox">'
+            + _pm('Calories', t.kcalPerKg, 'kcal/kg')
+            + _pm('Protein', t.proteinPerKg, 'g/kg')
+            + _pm('Total energy', t.totalKcal, 'kcal')
+            + _pm('Total protein', t.totalProtein, 'g')
+            + _pm('From supplement', t.suppKcal, 'kcal')
+            + '<div class="pm"><span class="k">Formulation</span><span class="v">' + _esc(t.formulation || 'Standard') + '</span></div>'
+          + '</div>' : '')
+        + '<div class="dsect">All weeks so far</div>' + qHistTable(p)
+        + '<div class="dnote">The recipe, ingredient split, micronutrient table and engine trace live in the '
+        + 'full plan — they are only needed when you want to change the formulation itself.</div>';
+
+      document.getElementById('qdFoot').innerHTML =
+        (rx ? '<button class="qbtn qbtn-approve" style="flex:1;justify-content:center" id="qdApprove"'
+              + ' onclick="approveFromDrawer()">✓ Approve &amp; send to store</button>'
+            + '<button class="qbtn qbtn-ghost" onclick="closeQDrawer(); setQBucket(\'rx\')">Decide later</button>' : '')
+        + '<a class="qbtn qbtn-ghost qbtn-sm" href="/patients/profile?id=' + _qd.patientId + '#monitoring">Full plan</a>';
+      document.getElementById('qdNote').textContent = rx
+        ? 'Approving creates the weekly batch and sends it to the store.'
+        : '';
+    }
+    function _pm(label, val, unit) {
+      if (val === null || val === undefined || val === '') return '';
+      const n = typeof val === 'number' ? (Math.round(val * 100) / 100).toLocaleString() : val;
+      return '<div class="pm"><span class="k">' + label + '</span><span class="v">' + n
+        + (unit ? ' <small>' + unit + '</small>' : '') + '</span></div>';
+    }
+
+    async function approveFromDrawer() {
+      if (!_qd || !_qd.rxId) return;
+      const btn = document.getElementById('qdApprove');
+      await approveRxFromQueue(_qd.rxId, btn);
+      closeQDrawer();
+    }
+
+    // Open the pending plan for a patient already in the approval bucket.
+    function openRxReview(pid) {
+      const p = _queue.find(x => String(x.id) === String(pid));
+      if (!p || !p.pendingRx) return;
+      _qd = { patientId: p.id, kind: 'review', weekNo: p.pendingRx.weekNumber, name: p.name };
+      document.getElementById('qdSub').textContent = p.name + (p.uhic ? ' · UHIC ' + p.uhic : '');
+      showGeneratedPlan({ id: p.pendingRx.id, week_number: p.pendingRx.weekNumber, targets: p.pendingRx.targets }, null);
+      // Warnings matter more here than on the row, where space is tight.
+      if ((p.warnings || []).length) {
+        const body = document.getElementById('qdBody');
+        body.insertAdjacentHTML('afterbegin', '<div class="qflags" style="border:none;padding:0;margin:14px 0 0">'
+          + p.warnings.map(w => '<span class="qflag' + (w.level === 'watch' ? ' watch' : '') + '">⚠ '
+            + _esc(w.label) + ' ' + _esc(w.detail) + '</span>').join('') + '</div>');
+      }
+      showQDrawer();
+    }
+
+    // Daily entry — the profile page's FORM 3, in a drawer.
+    function openDailyEntry(pid) {
+      const p = _queue.find(x => String(x.id) === String(pid));
+      if (!p) return;
+      _qd = { patientId: p.id, kind: 'daily', name: p.name };
+      const sel = (id, label, opts) => '<div class="fg"><label for="' + id + '">' + label + '</label><select id="' + id + '">'
+        + opts.map(o => '<option>' + o + '</option>').join('') + '</select></div>';
+
+      document.getElementById('qdTitle').textContent = 'Daily log';
+      document.getElementById('qdSub').textContent = p.name + (p.uhic ? ' · UHIC ' + p.uhic : '');
+      document.getElementById('qdBody').innerHTML =
+        (p.daysSinceDaily !== null && p.daysSinceDaily >= 2
+          ? '<div class="dbanner">⚠ No entry for ' + p.daysSinceDaily + ' days</div>' : '')
+        + '<div class="fgrid">'
+        + '<div class="fg"><label for="qd_date">Date</label><input id="qd_date" type="date" value="' + new Date().toISOString().slice(0, 10) + '"></div>'
+        + '<div class="fg"><label for="qd_oral">Oral intake %</label><input id="qd_oral" placeholder="0–100"></div>'
+        + '<div class="fg"><label for="qd_supp">Supplement taken %</label><input id="qd_supp" placeholder="0–100"></div>'
+        + sel('qd_nausea', 'Nausea', ['None', 'Mild', 'Moderate', 'Severe'])
+        + sel('qd_vomiting', 'Vomiting', ['None', '1x', '2x', '3+ today'])
+        + sel('qd_mucositis', 'Mucositis grade', ['0', '1', '2', '3', '4'])
+        + sel('qd_bowel', 'Bowel', ['Normal', 'Constipated', 'Loose', 'Diarrhea', 'Nil'])
+        + sel('qd_hydration', 'Hydration', ['Adequate', 'Mild dehydration', 'Moderate dehydration', 'IV Fluids'])
+        + '<div class="fg full"><label for="qd_notes">Notes</label><textarea id="qd_notes" rows="2"></textarea></div>'
+        + '</div>';
+      document.getElementById('qdFoot').innerHTML =
+        '<button class="qbtn qbtn-cyan" style="flex:1;justify-content:center" id="qdSave" onclick="saveDailyEntry()">Save daily log</button>'
+        + '<button class="qbtn qbtn-ghost" onclick="closeQDrawer()">Cancel</button>';
+      document.getElementById('qdNote').textContent = '';
+      showQDrawer();
+    }
+
+    async function saveDailyEntry() {
+      if (!_qd) return;
+      const btn = document.getElementById('qdSave');
+      if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+      const data = {
+        date: _v('qd_date'), oralIntake: _n('qd_oral'), suppConsumed: _n('qd_supp'),
+        nausea: _v('qd_nausea'), vomiting: _v('qd_vomiting'), mucositis: _v('qd_mucositis'),
+        bowel: _v('qd_bowel'), hydration: _v('qd_hydration'), notes: _v('qd_notes')
+      };
+      try {
+        const res = await fetch(_api() + '/api/patients/' + _qd.patientId + '/monitoring',
+          { method: 'POST', headers: _hdr(true), body: JSON.stringify({ type: 'daily', data }) });
+        if (!res.ok) throw new Error('Save failed (' + res.status + ')');
+        const name = _qd.name;
+        closeQDrawer();
+        qToast('✓ ' + name + ' — today\'s log saved');
+        loadWeeklyQueue();
+      } catch (e) {
+        qToast(e.message || 'Could not save the daily log', true);
+        if (btn) { btn.disabled = false; btn.textContent = 'Save daily log'; }
+      }
+    }
+
+    // Jump from a risk-panel row to that patient's pending action.
+    function jumpToQueue(pid) {
+      const p = _queue.find(x => String(x.id) === String(pid));
+      if (!p) { qToast('No open action for this patient this week'); return; }
+      const b = p.pendingRx ? 'rx'
+              : (p.weeklyOverdue || p.neverMonitored) ? 'asmt'
+              : (p.daysSinceDaily === null || p.daysSinceDaily >= DAILY_GAP_DAYS) ? 'daily' : null;
+      if (!b) { qToast('No open action for this patient this week'); return; }
+      setQBucket(b);
+      const card = document.getElementById('weekQueue');
+      if (card) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
     // Load data from server DB before first render.
     // Manufacturing jobs are fetched too so the Products column reflects server
     // truth (weekly jobs approved on other devices) rather than stale localStorage.
@@ -747,9 +1454,11 @@
         render();
         checkLocalUnsynced();
         loadRiskPanel();
+        loadWeeklyQueue();
         _jobSig = _jobsSignature();
         setInterval(_pollDoctorJobs, 30000);
-        setInterval(loadRiskPanel, 120000);   // refresh flags every 2 min
+        setInterval(loadRiskPanel, 120000);     // refresh flags every 2 min
+        setInterval(loadWeeklyQueue, 120000);   // and the work queue alongside
       });
 
     // Show a banner if this device holds patients that never reached the database.

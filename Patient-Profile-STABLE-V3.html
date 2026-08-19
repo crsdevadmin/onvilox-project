@@ -6290,10 +6290,49 @@ window._openWxRxById = function(rxId, oralIntake) {
     loadMonitoringLogs();
     loadWeeklyPrescriptions();
     prefillWeeklyFormDefaults();
+    applyDeepLink();
   } else {
     setTimeout(waitForPatient, 300);
   }
 })();
+
+// ── Deep links ────────────────────────────────────────────────────────────
+// The dashboard queue links straight into a patient's monitoring section, so a
+// doctor arriving from "Full plan" lands on the plan instead of at the top of a
+// long page. A native #anchor cannot do this: the fragment differs from the
+// section id, and the monitoring tables are still loading when the browser
+// would perform the jump. So honour it here, once, after the data lands.
+//   #monitoring      → scroll to the monitoring section
+//   ?tab=weekly      → open the weekly tab first
+//   ?rx=<id>         → open that prescription's review panel
+function applyDeepLink() {
+  try {
+    var hash   = (window.location.hash || '').replace(/^#/, '');
+    var params = new URLSearchParams(window.location.search);
+    var tab    = params.get('tab');
+    var rxId   = params.get('rx');
+    if (!hash && !tab && !rxId) return;
+    if (hash.indexOf('monitoring') !== 0 && !tab && !rxId) return;
+
+    // Wait for the section to exist and the tables to have rendered, or the
+    // scroll target moves under the doctor as rows fill in.
+    var tries = 0;
+    (function go() {
+      var section = document.getElementById('monitoringSection');
+      if (!section && tries++ < 20) return setTimeout(go, 200);
+      if (!section) return;
+
+      if (tab === 'weekly' && typeof showMonitorTab === 'function') showMonitorTab('weekly');
+
+      if (rxId && typeof _wxRxList !== 'undefined' && Array.isArray(_wxRxList)) {
+        var rx = _wxRxList.filter(function (r) { return String(r.id) === String(rxId); })[0];
+        if (rx && typeof showWxRxPanel === 'function') { showWxRxPanel(rx); return; }  // self-scrolls
+      }
+
+      section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    })();
+  } catch (e) { /* a malformed link must never break the page */ }
+}
 
 // ── Force-regenerate from monitoring (discards manual edits) ─────────────
 async function regenerateWxRx() {
