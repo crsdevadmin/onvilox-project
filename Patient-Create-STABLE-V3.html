@@ -1302,11 +1302,27 @@ function updateBodyCompAuto() {
 }
 
 // --- CHATBOT & AI LOGIC ---
-function toggleChat() {
+// openChat/closeChat are explicit because toggling from code is what made the
+// assistant feel broken: the panel auto-opened on load, so the doctor's click
+// on the launcher toggled it shut and nothing appeared to happen. Anything
+// that is not the user pressing the launcher should say what it means.
+function openChat() {
   const win = document.getElementById('aiChatWindow');
-  const isOpening = win.style.display !== 'flex';
-  win.style.display = isOpening ? 'flex' : 'none';
-  if(isOpening) document.getElementById('chatInput').focus();
+  if (!win) return;
+  win.style.display = 'flex';
+  const inp = document.getElementById('chatInput');
+  if (inp) inp.focus();
+}
+function closeChat() {
+  const win = document.getElementById('aiChatWindow');
+  if (win) win.style.display = 'none';
+}
+function isChatOpen() {
+  const win = document.getElementById('aiChatWindow');
+  return !!win && win.style.display === 'flex';
+}
+function toggleChat() {           // only the launcher and the × should call this
+  isChatOpen() ? closeChat() : openChat();
 }
 
 function addMessage(text, type) {
@@ -1335,7 +1351,11 @@ async function sendChatMessage() {
   if(!text) return;
   addMessage(text, 'user');
   input.value = '';
-  toggleChat();
+  // Deliberately does NOT close the panel. It used to call toggleChat() here,
+  // which hid the window the moment you pressed send — the reply, the
+  // "clinical data detected" confirmation and any error all rendered into a
+  // panel the doctor could no longer see.
+  openChat();
 
   const typing = addTyping();
   try {
@@ -1685,7 +1705,10 @@ window.onload = function() {
   window.toggleIntakeUI();
   if (typeof updateCompletenessScore === 'function') updateCompletenessScore();
   console.log("🚀 V3.0 - STABLE AI LOADED - (Centralized API: " + CONFIG.API_BASE_URL + ")");
-  setTimeout(() => toggleChat(), 600);
+  // The assistant no longer opens itself 600ms after load. Because toggleChat()
+  // flips state, that auto-open meant the very next click on the launcher
+  // CLOSED the panel — so pressing the AI assistant button looked like it did
+  // nothing at all. The doctor opens it when they want it.
 };
 </script>
 
