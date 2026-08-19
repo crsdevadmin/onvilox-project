@@ -2609,10 +2609,14 @@ const rawKey = process.env.ANTHROPIC_API_KEY || '';
 const anthropic = new Anthropic({ apiKey: rawKey });
 
 // Prompt for mapping Clinical Data
-const extractionSystemPrompt = `You are an expert Oncology Assistant. 
+const extractionSystemPrompt = `You are a clinical data extraction tool. You transcribe what a document says; you do not diagnose, estimate or complete.
 Extract clinical parameters from the provided text/PDF and return a precise JSON object.
 Return ONLY valid JSON. START with '{' and END with '}'. NO preamble, NO markdown code blocks, NO headers.
-If unknown, return null.
+
+THE ONE RULE THAT OVERRIDES EVERYTHING ELSE:
+Return a value ONLY if the document explicitly states it. Never infer, estimate, or supply a typical value. If the document does not state it, return null for that key.
+These values are attached to a real patient and drive a real nutrition prescription that is manufactured and dispensed — an invented weight produces a wrong dose. A null is safe; a plausible guess is not.
+Do NOT choose a cancer subtype, stage, tumour burden or regimen that the document does not name. Do NOT pattern-complete laboratory values from the diagnosis.
 Schema: {
   "name": "String", "age": "Number", "sex": "Male/Female", "weight": "Number (kg)", "height": "Number (cm)", 
   "usualWeight": "Number (kg)", "uhic": "String", "cancer": "String", "regimen": "String", "feedingMethod": "String",
@@ -2659,30 +2663,74 @@ app.post('/api/chat', async (req, res) => {
   const { message, contextObj } = req.body;
   if (!message) return res.status(400).json({ error: 'No message provided.' });
 
+  // ── Mode is chosen by the CLIENT, never by the model ────────────────────
+  // Previously one prompt held both an EXTRACT and a GENERATE mode and the
+  // model decided which it was in from the phrasing of the message. "name
+  // subramani age 56 lung cancer" reads just as much like a request for a
+  // sample case as like a clinical note, and in generate mode the prompt
+  // instructed it to fill EVERY schema field. A doctor who supplied three
+  // facts about a real patient could receive sixty invented ones — including
+  // weight, albumin and creatinine, which the nutrition engine then turns
+  // into a real prescription. Extraction is now the default and generating a
+  // synthetic case requires the caller to ask for it explicitly.
+  const mode = (req.body.mode === 'generate') ? 'generate' : 'extract';
+
   try {
-    const systemPrompt = `You are a clinical nutrition AI Copilot (PhD/RD level) for an oncology platform. You operate in two modes:
+    const SCHEMA = `{ "name":str, "age":num, "sex":"Male"/"Female", "weight":num, "height":num, "usualWeight":num, "reducedFoodIntake":num, "albumin":num, "crp":num, "cancer":str, "cancerStage":"Stage I"/"Stage II"/"Stage III"/"Stage IV"/"Recurrent", "tumorBurden":"Low"/"Moderate"/"High (Bulky)", "regimen":str, "creatinine":num, "alt":num, "ast":num, "bilirubin":num, "bloodSugar":num, "sodium":num, "potassium":num, "urea":num, "muac":num, "prealbumin":num, "vitD":num, "vitB12":num, "folate":num, "zinc":num, "magnesium":num, "tsh":num, "hba1c":num, "hemoglobin":num, "wbc":num, "anc":num, "platelet":num, "sarcopeniaStatus":str, "activityLevel":str, "ecogStatus":num, "leanBodyMass":num, "smi":num, "handGrip":num, "fatPercent":num, "feedingMethod":str, "giIssues":bool, "comorbidities":[], "sideEffects":[], "existingSupplements":[], "allergies":[], "metastasisSites":[], "genomicMarkers":[], "notes":str }`;
 
-MODE 1 — EXTRACT: When the user provides real patient data (pasted notes, lab reports, clinical summaries), extract all available values from the text.
-
-MODE 2 — GENERATE: When the user asks you to "give", "create", "simulate", "generate", or "show" a patient case, generate a complete, clinically realistic synthetic patient. Use Indian epidemiological context by default unless another region is specified. Indian context means: use typical Indian names, Asian BMI thresholds (overweight ≥23, obese ≥27.5), realistic Indian lab normals, common Indian comorbidities (Type 2 Diabetes, hypertension prevalence), and appropriate body weight/height for Indian adults. Generate ALL schema fields with realistic values — do not leave fields empty. The reply in generate mode should give a 3-4 sentence clinical summary of the generated case explaining the key nutritional risk factors and why these values were chosen.
-
-SHARED RULES (apply to both modes):
+    // Formatting rules only. Nothing here may require a field to be present —
+    // "always include this" is what turned an extraction into an invention.
+    const FORMAT_RULES = `FORMAT RULES (these describe the SHAPE of a value, and never require one to exist):
 RULE: Use ONLY the keys in the schema. NO emojis in keys. NO custom keys like "RED_FLAGS".
-RULE: Map all "Red Flags" or "Additional Clinical Data" to the "notes" key.
-RULE: "cancer" MUST include the specific subtype in format "Cancer Type - Subtype". Examples: "Breast Cancer - Triple Negative", "Breast Cancer - HER2+", "Breast Cancer - HR+/HER2-", "Breast Cancer - Metastatic HR+", "Lung Cancer - NSCLC Adenocarcinoma", "Lung Cancer - NSCLC Squamous", "Lung Cancer - EGFR Mutant", "Lung Cancer - ALK+", "Lung Cancer - SCLC Extensive", "Colorectal Cancer - Stage III", "Colorectal Cancer - Metastatic", "Lymphoma - DLBCL", "Lymphoma - Hodgkin", "Lymphoma - Follicular", "Lymphoma - Mantle Cell", "Multiple Myeloma - Standard", "Ovarian Cancer - Epithelial". NEVER return just "Breast Cancer" or "Lung Cancer" or "Lymphoma" without the subtype.
-RULE: "feedingMethod" MUST be EXACTLY one of: "Oral Feeding (Normal Diet)" | "Enteral Feeding – Nasogastric Tube (NG)" | "Enteral Feeding – PEG Tube" | "Enteral Feeding – Jejunostomy (J-Tube)" | "Parenteral Nutrition (TPN)" | "Combination Feeding (Oral + Enteral)" | "Combination Feeding (Enteral + Parenteral)". Never return "Oral" or "Enteral" alone. If patient uses oral nutrition supplements, map to "Oral Feeding (Normal Diet)".
-RULE: "regimen" must use protocol notation matching clinical usage — e.g., "AC -> Taxane ± Pembrolizumab", "FOLFOX", "R-CHOP", "Carboplatin + Paclitaxel ± Pembrolizumab", "TCH (Docetaxel + Carboplatin + Trastuzumab)". Do NOT use shorthand like "AC-T Protocol".
+RULE: Map any "Red Flags" or "Additional Clinical Data" to the "notes" key.
+RULE: "cancer", when stated, uses the format "Cancer Type - Subtype", e.g. "Lung Cancer - NSCLC Adenocarcinoma", "Breast Cancer - Triple Negative", "Lymphoma - DLBCL". If the source names only the type and not the subtype, return just the type — do NOT choose a subtype.
+RULE: "feedingMethod" must be EXACTLY one of: "Oral Feeding (Normal Diet)" | "Enteral Feeding – Nasogastric Tube (NG)" | "Enteral Feeding – PEG Tube" | "Enteral Feeding – Jejunostomy (J-Tube)" | "Parenteral Nutrition (TPN)" | "Combination Feeding (Oral + Enteral)" | "Combination Feeding (Enteral + Parenteral)".
+RULE: "regimen", when stated, uses clinical protocol notation, e.g. "FOLFOX", "R-CHOP", "Carboplatin + Paclitaxel ± Pembrolizumab".
 RULE: "sex" must be "Male" or "Female" (not M/F).
-RULE: "reducedFoodIntake" is a percentage (0-100) of normal intake the patient is currently eating. E.g. 70 means eating 70% of usual intake.
+RULE: "reducedFoodIntake" is a percentage (0-100) of normal intake the patient is currently eating.
 RULE: "ecogStatus" must be 0, 1, 2, 3, or 4.
-RULE: "cancerStage" must be EXACTLY one of: "Stage I" | "Stage II" | "Stage III" | "Stage IV" | "Recurrent". Always include this.
-RULE: "tumorBurden" must be EXACTLY one of: "Low" | "Moderate" | "High (Bulky)". Always include this.
-RULE: "regimen" must always be included — use the standard clinical protocol name for the cancer type and stage (e.g. "R-CHOP" for DLBCL, "R-CVP" for low-grade NHL, "FOLFOX" for colorectal, "AC -> Taxane" for breast cancer).
+RULE: "cancerStage" must be EXACTLY one of: "Stage I" | "Stage II" | "Stage III" | "Stage IV" | "Recurrent".
+RULE: "tumorBurden" must be EXACTLY one of: "Low" | "Moderate" | "High (Bulky)".
 RULE: "activityLevel" must be one of: "Sedentary" | "Lightly Active" | "Moderately Active" | "Highly Active".
 RULE: "sarcopeniaStatus" must be one of: "No" | "Yes" | "Unknown".
-RULE: "comorbidities", "sideEffects", "existingSupplements", "allergies", "metastasisSites", "genomicMarkers" must be arrays of strings.
-Schema: { "name":str, "age":num, "sex":"Male"/"Female", "weight":num, "height":num, "usualWeight":num, "reducedFoodIntake":num, "albumin":num, "crp":num, "cancer":str, "cancerStage":"Stage I"/"Stage II"/"Stage III"/"Stage IV"/"Recurrent", "tumorBurden":"Low"/"Moderate"/"High (Bulky)", "regimen":str, "creatinine":num, "alt":num, "ast":num, "bilirubin":num, "bloodSugar":num, "sodium":num, "potassium":num, "urea":num, "muac":num, "prealbumin":num, "vitD":num, "vitB12":num, "folate":num, "zinc":num, "magnesium":num, "tsh":num, "hba1c":num, "hemoglobin":num, "wbc":num, "anc":num, "platelet":num, "sarcopeniaStatus":str, "activityLevel":str, "ecogStatus":num, "leanBodyMass":num, "smi":num, "handGrip":num, "fatPercent":num, "feedingMethod":str, "giIssues":bool, "comorbidities":[], "sideEffects":[], "existingSupplements":[], "allergies":[], "metastasisSites":[], "genomicMarkers":[], "notes":str }
-Format: { "reply": "Clinical summary (3-4 sentences for generate mode, <3 sentences for extract mode)", "extractedData": { ...all values... } }`;
+RULE: "comorbidities", "sideEffects", "existingSupplements", "allergies", "metastasisSites", "genomicMarkers" must be arrays of strings.`;
+
+    const EXTRACT_PROMPT = `You are a clinical data extraction tool for an oncology nutrition platform. You transcribe; you do not diagnose, estimate or complete.
+
+THE ONE RULE THAT OVERRIDES EVERYTHING ELSE:
+Return a value ONLY if it is explicitly stated in the user's text. Never infer, estimate, derive, assume a typical value, or fill a field because it is usually present. If the text does not state it, OMIT THE KEY ENTIRELY.
+
+These outputs are attached to a real patient and drive a real nutrition prescription that is manufactured and dispensed. An invented weight produces a wrong dose. A missing field is safe; a plausible guess is not.
+
+Specifically:
+- Do NOT choose a cancer subtype, stage, tumour burden or chemotherapy regimen that was not stated. Omit them.
+- Do NOT supply a weight, height, or any laboratory value that was not stated.
+- Do NOT convert an absent value into 0, "Unknown", or a normal-range figure.
+- Do NOT pattern-complete from the diagnosis. Two patients with the same cancer have different bodies.
+- If the text says a value is unavailable, pending or not done, list that field name in "notAvailable" rather than in "extractedData".
+
+${FORMAT_RULES}
+
+Schema (all keys OPTIONAL — include only what the text states): ${SCHEMA}
+
+"reply": one or two plain sentences naming what you found and, if anything essential is absent, what is still needed. Never claim to have filled something you omitted.
+
+Format: { "reply": str, "extractedData": { ...only stated values... }, "notAvailable": [ ...field names the text marks as unavailable... ] }`;
+
+    const GENERATE_PROMPT = `You are generating a SYNTHETIC DEMONSTRATION patient for an oncology nutrition platform. This case is fictional and is labelled as such in the product; it is never a real person.
+
+Generate a complete, clinically realistic synthetic patient. Use Indian epidemiological context by default unless another region is specified: typical Indian names, Asian BMI thresholds (overweight ≥23, obese ≥27.5), realistic Indian lab normals, common Indian comorbidities (Type 2 Diabetes, hypertension), and appropriate body weight and height for Indian adults. Populate ALL schema fields with realistic values.
+
+${FORMAT_RULES}
+RULE: include "cancerStage", "tumorBurden" and "regimen" — this is a generated case, so every field is expected.
+
+Schema: ${SCHEMA}
+
+"reply": a 3-4 sentence clinical summary of the generated case, explaining the key nutritional risk factors and why these values were chosen. Begin the reply with "Synthetic demonstration case — not a real patient."
+
+Format: { "reply": str, "extractedData": { ...all values... } }`;
+
+    const systemPrompt = (mode === 'generate') ? GENERATE_PROMPT : EXTRACT_PROMPT;
 
     const msg = await anthropic.messages.create({
       model: "claude-haiku-4-5-20251001",
@@ -2765,6 +2813,32 @@ Format: { "reply": "Clinical summary (3-4 sentences for generate mode, <3 senten
     // Final check for empty objects
     if (data.extractedData && Object.keys(data.extractedData).length === 0) {
         data.extractedData = null;
+    }
+
+    // Tell the client which mode produced this, so it can style the fields
+    // honestly: values the doctor stated look different from values a demo
+    // case invented, and a demo case can be blocked from becoming a patient.
+    data.mode = mode;
+    data.provenance = (mode === 'generate') ? 'generated' : 'stated';
+    if (mode === 'generate') data.synthetic = true;
+    if (!Array.isArray(data.notAvailable)) data.notAvailable = [];
+
+    // Belt and braces: in extract mode, drop anything the model returned that
+    // is not actually a value — a null, an empty string, or the strings some
+    // models emit instead of omitting a key. The prompt forbids these; this
+    // makes it impossible for one to reach the form.
+    if (mode === 'extract' && data.extractedData) {
+      const PLACEHOLDER = /^(unknown|not (available|stated|provided|specified|reported|documented|mentioned)|n\/?a|none|null|nil|tbd|pending|—|-)$/i;
+      Object.keys(data.extractedData).forEach(k => {
+        const v = data.extractedData[k];
+        if (v === null || v === undefined || v === '' ||
+            (typeof v === 'string' && PLACEHOLDER.test(v.trim())) ||
+            (Array.isArray(v) && v.length === 0)) {
+          delete data.extractedData[k];
+          if (!data.notAvailable.includes(k)) data.notAvailable.push(k);
+        }
+      });
+      if (!Object.keys(data.extractedData).length) data.extractedData = null;
     }
 
     res.json(data);

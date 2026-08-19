@@ -31,6 +31,23 @@
     .status-danger { background: #fee2e2; color: #991b1b; display: inline-block; }
     
     .ai-filled { background-color: rgba(16, 185, 129, 0.1) !important; border-color: #10b981 !important; }
+    /* A field the doctor explicitly said is unavailable. Visibly different
+       from a filled field and from an untouched one, and it stays empty. */
+    .ai-na { background-color: rgba(245, 158, 11, 0.10) !important; border-color: #f59e0b !important; }
+    /* A value from a synthetic demo case. Loud on purpose — it is not real. */
+    .ai-generated { background-color: rgba(244, 63, 94, 0.10) !important; border-color: #f43f5e !important; }
+    /* chat option chips — only ever used for fields that are a fixed list */
+    .cpick { font-size:12px; font-weight:700; border:1px solid #cbd5e1; background:#fff; color:#475569;
+             border-radius:999px; padding:5px 11px; cursor:pointer; font-family:inherit; margin:0 5px 5px 0; }
+    .cpick:hover { border-color:#0891b2; color:#0891b2; }
+    .cpick.na { border-style:dashed; color:#b45309; border-color:#f59e0b; }
+    .cpick-label { font-size:9.5px; font-weight:800; letter-spacing:.09em; text-transform:uppercase;
+                   color:#94a3b8; margin-bottom:5px; }
+    .cpick-note { font-size:11px; color:#94a3b8; font-style:italic; margin-top:3px; }
+    .cprog { display:flex; align-items:center; gap:7px; padding:0 14px 8px; }
+    .cprog .bar { flex:1; height:5px; border-radius:99px; background:#e2e8f0; overflow:hidden; }
+    .cprog .bar i { display:block; height:100%; background:#0891b2; width:0; transition:width .4s; }
+    .cprog .num { font-size:10px; font-weight:800; color:#64748b; white-space:nowrap; }
     
     /* V3 Completeness UI */
     .completeness-container {
@@ -75,16 +92,23 @@
     <div class="close-chat" onclick="toggleChat()">&times;</div>
   </div>
   <div class="ai-chat-messages" id="chatMsgs">
-    <div class="msg msg-ai">👋 Hi! I'm your <b>AI Assistance</b>. What can I do for you?<br><br>
-      📋 <b>Paste clinical notes</b> and I'll auto-fill all the patient fields.<br>
-      📎 <b>Upload a PDF</b> using the 📎 button to extract from a medical report.<br>
-      🩺 <b>Ask any oncology question</b> — drug interactions, guidelines, dosing, side effects — I'll answer!<br>
-      💬 <b>Type clinical data</b> like "65yr male, lung cancer, 58kg" and I'll fill the form automatically!
+    <div class="msg msg-ai">👋 Hi! I'm your <b>AI Assistance</b>.<br><br>
+      💬 <b>Describe the patient</b> — e.g. "Haleem, 56, lung cancer" — and I'll fill in
+      exactly what you tell me, then ask for the rest one question at a time.<br><br>
+      📋 <b>Paste clinical notes</b> or 📎 <b>upload a report</b> and I'll take the values it states.<br><br>
+      <span style="opacity:.85">I only record what you give me. I never invent a weight, a lab value,
+      a stage or a regimen — anything you don't state stays empty.</span>
     </div>
   </div>
+  <!-- Options appear here only for fields that are a fixed list in the form.
+       Measured values are always typed — a clinical value is never suggested. -->
+  <div id="chatPicker" style="padding:0 14px 8px; display:none;"></div>
   <div class="ai-chat-input-area">
     <input type="file" id="pdfUpload" accept=".pdf" style="display:none;" onchange="handlePdfUpload(event)">
     <button class="ai-chat-send" onclick="triggerFileUpload()" title="Upload Medical Report (PDF)" style="font-size:16px; margin-right:5px;">📎</button>
+    <!-- Generating a synthetic case is now a deliberate act, not something the
+         model can decide to do because a message sounded like a case prompt. -->
+    <button class="ai-chat-send" onclick="generateDemoCase()" title="Generate a SYNTHETIC demonstration patient (not a real record)" style="font-size:14px; margin-right:5px; background:#64748b;">🧪</button>
     <input type="text" class="ai-chat-input" id="chatInput" placeholder="Type or paste notes..." onkeypress="if(event.key==='Enter') sendChatMessage()">
     <button class="ai-chat-send" onclick="sendChatMessage()">&gt;</button>
   </div>
@@ -1345,6 +1369,347 @@ function addTyping() {
   return typing;
 }
 
+/* ══════════════════════════════════════════════════════════════════════════
+   GUIDED INTAKE
+   The assistant records what the doctor states and ASKS for the rest, one
+   field at a time. It never supplies a clinical value.
+
+   Why the questions are driven here and not by the model: once the doctor is
+   answering "what is the current weight?", the reply is a bare number and
+   parsing it is trivial and deterministic. Keeping the model out of that loop
+   removes every opportunity for it to helpfully round, convert or complete an
+   answer. The model is used only where it earns its place — pulling values
+   out of free prose or a pasted report.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+// The 13 fields a nutrition plan cannot be built without. Everything else on
+// the form is optional and is left for the doctor to fill if they want to.
+// `list` marks a fixed set of options (cancer type/subtype/regimen come from
+// cancerRegimenMap); `sel` reads the form's own <select>; everything else is
+// typed by the doctor.
+const INTAKE_QUESTIONS = [
+  { f:'cancerType',        q:'Which <b>cancer type</b>?',                 list:'type' },
+  { f:'cancerInput',       q:'Which <b>subtype</b>?',                     list:'subtype',
+    help:'The targets and the regimen both depend on this.' },
+  { f:'regimenInput',      q:'Which <b>chemo regimen</b>?',               list:'regimen', na:true,
+    help:'Standard options for this subtype. Choose "not applicable" if radiation-only.' },
+  { f:'sex',               q:'<b>Sex</b>?',                               sel:true },
+  { f:'weight',            q:'<b>Current weight</b> in kg?',              unit:'kg',
+    help:'This sets the calorie and protein targets.' },
+  { f:'height',            q:'<b>Height</b> in cm?',                      unit:'cm' },
+  { f:'usualWeight',       q:'<b>Usual weight</b> 6 months ago, in kg?',  unit:'kg',
+    help:'Used to calculate weight-loss %.' },
+  { f:'albumin',           q:'<b>Serum albumin</b> in g/dL?',             unit:'g/dL', na:true },
+  { f:'crp',               q:'<b>CRP</b> in mg/L?',                       unit:'mg/L', na:true },
+  { f:'ecogStatus',        q:'<b>ECOG performance status</b>?',           sel:true, na:true },
+  { f:'reducedFoodIntake', q:'Roughly what <b>% of normal intake</b> is the patient eating?', unit:'%',
+    help:'0–100. An estimate is fine — but it must be yours, not mine.' },
+  { f:'creatinine',        q:'<b>Creatinine</b> in mg/dL?',               unit:'mg/dL', na:true,
+    help:'Controls the renal protein cap.' },
+  { f:'feedingMethod',     q:'<b>Feeding method</b>?',                    sel:true }
+];
+const INTAKE_LABELS = {
+  cancerType:'Cancer Type', cancerInput:'Cancer', regimenInput:'Chemo Regimen', sex:'Sex',
+  weight:'Current Weight (kg)', height:'Height (cm)', usualWeight:'Usual Weight (kg)',
+  albumin:'Serum Albumin (g/dL)', crp:'CRP (mg/L)', ecogStatus:'ECOG Status',
+  reducedFoodIntake:'Oral Intake (%)', creatinine:'Creatinine (mg/dL)', feedingMethod:'Feeding Method'
+};
+// Plausibility bounds. These never change a value — they ask the doctor to
+// confirm one that looks like a slip (a height typed in metres, say).
+const INTAKE_RANGE = {
+  weight:[20,250,'kg'], usualWeight:[20,250,'kg'], height:[80,230,'cm'],
+  albumin:[0.5,8,'g/dL'], crp:[0,600,'mg/L'], creatinine:[0.1,20,'mg/dL'],
+  reducedFoodIntake:[0,100,'%']
+};
+
+let _intake = { active:false, idx:0, chosenType:null, pendingConfirm:null };
+
+function _cancerTypes(){
+  if (typeof cancerRegimenMap === 'undefined') return [];
+  return [...new Set(Object.keys(cancerRegimenMap).map(k => k.split(' - ')[0]))];
+}
+function _subtypesFor(type){
+  if (typeof cancerRegimenMap === 'undefined' || !type) return [];
+  return Object.keys(cancerRegimenMap)
+    .filter(k => k.startsWith(type + ' - '))
+    .map(k => k.slice(type.length + 3));
+}
+function _regimensFor(fullCancer){
+  if (typeof cancerRegimenMap === 'undefined') return [];
+  return cancerRegimenMap[fullCancer] || [];
+}
+// Returns {v,l} pairs: v is what goes into the form, l is what the doctor
+// reads. They differ on the form's own selects — ECOG stores "2" but means
+// "2 - Self-care", and a chip reading just "2" is no use to anyone.
+function _optionsFor(q){
+  const plain = a => a.map(x => ({ v:x, l:x }));
+  if (q.list === 'type')    return plain(_cancerTypes());
+  if (q.list === 'subtype') return plain(_subtypesFor(_intake.chosenType));
+  if (q.list === 'regimen') return plain(_regimensFor(document.getElementById('cancerInput').value));
+  if (q.sel) {
+    const el = document.getElementById(q.f);
+    if (!el || el.tagName !== 'SELECT') return null;
+    return [...el.options]
+      .filter(o => o.value !== '' && !/^select/i.test(o.value) && !/^select/i.test(o.text))
+      .map(o => ({ v:o.value, l:(o.text || o.value).trim() }));
+  }
+  return null;
+}
+
+// The single place a value reaches the form, so provenance can never diverge
+// from what is displayed.
+function setIntakeValue(field, value, source){
+  const el = document.getElementById(field);
+  window._fieldSources = window._fieldSources || {};
+  window._fieldSources[field] = source;
+  if (el){
+    el.value = (source === 'na') ? '' : value;
+    el.classList.remove('ai-filled','ai-na','ai-generated');
+    el.classList.add(source === 'na' ? 'ai-na' : source === 'generated' ? 'ai-generated' : 'ai-filled');
+    if (typeof updateLabStatus === 'function') updateLabStatus(field, el.value);
+  }
+  if (typeof syncWeightLossFromForm === 'function') syncWeightLossFromForm();
+  if (typeof updateBSAAuto === 'function') updateBSAAuto();
+  if (typeof updateCompletenessScore === 'function') updateCompletenessScore();
+  if (typeof markDraftDirty === 'function') markDraftDirty();
+}
+
+function _intakeAnswered(){
+  return INTAKE_QUESTIONS.filter(q => q.f !== 'cancerType' && _intakeIsAnswered(q)).length;
+}
+function _intakeProgress(){
+  const total = INTAKE_QUESTIONS.length - 1;   // cancerType folds into cancerInput
+  const done  = _intakeAnswered();
+  const host = document.getElementById('chatMsgs');
+  let bar = document.getElementById('cprogWrap');
+  if (!bar){
+    bar = document.createElement('div');
+    bar.id = 'cprogWrap'; bar.className = 'cprog';
+    bar.innerHTML = '<div class="bar"><i></i></div><span class="num"></span>';
+    host.parentNode.insertBefore(bar, document.getElementById('chatPicker'));
+  }
+  bar.querySelector('i').style.width = Math.round(done / total * 100) + '%';
+  bar.querySelector('.num').textContent = done + ' of ' + total;
+}
+
+function renderChatPicker(q){
+  const host = document.getElementById('chatPicker');
+  if (!host) return;
+  if (!q){ host.style.display = 'none'; host.innerHTML = ''; return; }
+  const opts = _optionsFor(q);
+  let html = '';
+  if (opts && opts.length){
+    html += `<div class="cpick-label">${INTAKE_LABELS[q.f] || q.f} — choose one</div>`
+      + `<div style="max-height:104px;overflow-y:auto">`
+      + opts.map(o => `<button class="cpick" onclick="answerIntake(${JSON.stringify(o.v).replace(/"/g,'&quot;')})">${o.l}</button>`).join('')
+      + (q.na ? `<button class="cpick na" onclick="answerIntake('not available')">not ${q.list==='regimen'?'applicable':'available'}</button>` : '')
+      + `</div>`;
+  } else {
+    html += `<div class="cpick-label">${INTAKE_LABELS[q.f] || q.f} — type the value${q.unit ? ' in ' + q.unit : ''}</div>`;
+    if (q.na) html += `<button class="cpick na" onclick="answerIntake('not available')">not available</button>`;
+    if (_intake.idx > 0) html += `<button class="cpick" onclick="undoIntake()">◀ change previous</button>`;
+    html += `<div class="cpick-note">Values are never suggested — type what was measured.</div>`;
+  }
+  host.innerHTML = html;
+  host.style.display = 'block';
+}
+function answerIntake(v){
+  const inp = document.getElementById('chatInput');
+  inp.value = v;
+  sendChatMessage();
+}
+function undoIntake(){
+  if (_intake.idx <= 0) return;
+  _intake.idx--;
+  const q = INTAKE_QUESTIONS[_intake.idx];
+  const el = document.getElementById(q.f);
+  if (el){ el.value = ''; el.classList.remove('ai-filled','ai-na','ai-generated'); }
+  if (window._fieldSources) delete window._fieldSources[q.f];
+  if (q.f === 'cancerInput') _intake.chosenType = null;
+  if (typeof updateCompletenessScore === 'function') updateCompletenessScore();
+  addMessage('Cleared ' + (INTAKE_LABELS[q.f] || q.f) + '. Let us set it again.', 'ai');
+  askIntakeQuestion();
+}
+
+// The form ships with real defaults selected — ECOG "0", GI issues "No",
+// activity "Sedentary", every toxicity grade "0". A populated <select> is
+// therefore NOT evidence that anyone answered anything, and treating it as
+// such silently skipped the question and left the default standing as if the
+// doctor had chosen it. Captured once at load so we can tell an untouched
+// control from a deliberate choice.
+let _formDefaults = null;
+function _captureFormDefaults(){
+  if (_formDefaults) return;
+  _formDefaults = {};
+  INTAKE_QUESTIONS.forEach(q => {
+    const el = document.getElementById(q.f);
+    if (el) _formDefaults[q.f] = el.value;
+  });
+}
+
+// "Lung Cancer" is a type, not a diagnosis the engine can work from. Treat the
+// cancer field as answered only once a subtype has actually been chosen —
+// otherwise the subtype question gets skipped, which is the exact gap that let
+// a subtype be invented in the first place.
+function _cancerHasSubtype(){
+  const v = (document.getElementById('cancerInput') || {}).value || '';
+  if (!v) return false;
+  const type = _cancerTypes().find(t => v === t || v.startsWith(t + ' - '));
+  if (!type) return true;                       // free text, not in the map
+  const subs = _subtypesFor(type);
+  if (!subs.length) return true;                // this type has no subtypes
+  return v.length > type.length + 3;            // i.e. "Type - Subtype"
+}
+
+function _intakeIsAnswered(q){
+  const src = window._fieldSources || {};
+  if (q.f === 'cancerType')  return !!_intake.chosenType;
+  if (q.f === 'cancerInput') return _cancerHasSubtype();
+  if (src[q.f] === 'doctor' || src[q.f] === 'na') return true;
+  const el = document.getElementById(q.f);
+  if (!el) return false;
+  if (el.tagName === 'SELECT'){
+    // Only a value that differs from the shipped default counts as a choice.
+    return el.value !== '' && el.value !== (_formDefaults ? _formDefaults[q.f] : '');
+  }
+  return el.value !== '';
+}
+
+// Skip anything genuinely already answered — by the doctor typing into the
+// form, or by an extraction from the notes they pasted.
+function _nextUnanswered(){
+  _captureFormDefaults();
+  while (_intake.idx < INTAKE_QUESTIONS.length){
+    const q = INTAKE_QUESTIONS[_intake.idx];
+    if (_intakeIsAnswered(q)){ _intake.idx++; continue; }
+    return q;
+  }
+  return null;
+}
+
+function askIntakeQuestion(){
+  const q = _nextUnanswered();
+  _intakeProgress();
+  if (!q) return finishIntake();
+  const n = _intake.idx + (_intake.chosenType ? 0 : 1);
+  addMessageHtml(
+    `<span style="font-size:10px;font-weight:800;letter-spacing:.08em;opacity:.6">QUESTION ${_intakeAnswered() + 1} OF ${INTAKE_QUESTIONS.length - 1}</span><br>`
+    + q.q + (q.help ? `<br><span style="font-size:11.5px;opacity:.75">${q.help}</span>` : ''), 'ai');
+  renderChatPicker(q);
+}
+
+function finishIntake(){
+  _intake.active = false;
+  renderChatPicker(null);
+  const src = window._fieldSources || {};
+  const na = Object.keys(src).filter(k => src[k] === 'na').map(k => INTAKE_LABELS[k] || k);
+  const cr = parseFloat(document.getElementById('creatinine')?.value);
+  addMessageHtml('That is everything essential.<br><br>'
+    + (na.length
+        ? `<b>${na.length}</b> field(s) recorded as not available (${na.join(', ')}) — <b>left empty, never guessed</b>.<br><br>`
+        : 'Every essential field came from you.<br><br>')
+    + (cr >= 1.3 ? '⚠ Creatinine ' + cr + ' — the renal protein cap will apply.<br><br>' : '')
+    + 'The remaining fields on the form are optional. Fill any of them yourself, '
+    + 'or use <b>Save as Draft</b> and come back later.', 'ai');
+}
+
+// Answers to a single asked field. Deterministic — no model involved.
+function parseIntakeAnswer(text, q){
+  const t = ' ' + text.toLowerCase().trim() + ' ';
+  if (/\b(not applicable|rt only|radiation only)\b/.test(t) && q.list === 'regimen') return '__NA__';
+  if (/\b(not available|n\/?a|unavailable|pending|awaited|not done|no value|skip)\b/.test(t)) return '__NA__';
+
+  const opts = _optionsFor(q);
+  if (opts && opts.length){
+    const raw = text.trim().toLowerCase();
+    // Accept either the stored value or the label the doctor actually sees.
+    const exact = opts.find(o => o.v.toLowerCase() === raw || o.l.toLowerCase() === raw);
+    if (exact) return exact.v;
+    const hits = opts.filter(o =>
+      o.l.toLowerCase().includes(raw) || raw.includes(o.l.toLowerCase()) ||
+      o.v.toLowerCase().includes(raw) || raw.includes(o.v.toLowerCase()));
+    if (hits.length === 1) return hits[0].v;
+    return hits.length > 1 ? '__AMBIGUOUS__' : null;   // never "closest guess"
+  }
+  const m = text.match(/(-?\d+(?:\.\d+)?)/);
+  return m ? parseFloat(m[1]) : null;
+}
+
+function handleIntakeAnswer(text){
+  const q = _nextUnanswered();
+  if (!q) return finishIntake();
+  const val = parseIntakeAnswer(text, q);
+
+  if (val === '__AMBIGUOUS__'){
+    addMessage('That matches more than one option — please tap the exact one.', 'ai');
+    return renderChatPicker(q);
+  }
+  if (val === null || val === undefined){
+    const opts = _optionsFor(q);
+    addMessageHtml(opts && opts.length
+      ? 'I did not catch that — please choose one of the options.'
+      : 'Please type just the number' + (q.unit ? ' in <b>' + q.unit + '</b>' : '')
+        + (q.na ? ', or say <b>not available</b>' : '') + '.', 'ai');
+    return renderChatPicker(q);
+  }
+
+  if (val === '__NA__'){
+    if (!q.na){
+      addMessageHtml('<b>' + (INTAKE_LABELS[q.f] || q.f) + '</b> is needed before a plan can be built. '
+        + 'You can still use <b>Save as Draft</b> and come back to it.', 'ai');
+      return renderChatPicker(q);
+    }
+    setIntakeValue(q.f, null, 'na');
+    _intake.idx++;
+    addMessageHtml('<b>' + (INTAKE_LABELS[q.f] || q.f) + '</b> — left empty, recorded as not available.', 'ai');
+    return askIntakeQuestion();
+  }
+
+  // Cancer type only routes the next question; it is not a form field.
+  if (q.f === 'cancerType'){
+    _intake.chosenType = val;
+    document.getElementById('cancerInput').value = val;
+    window._fieldSources = window._fieldSources || {};
+    _intake.idx++;
+    addMessageHtml('<b>Cancer type:</b> ' + val, 'ai');
+    return askIntakeQuestion();
+  }
+  if (q.f === 'cancerInput'){
+    const full = _intake.chosenType ? (_intake.chosenType + ' - ' + val) : val;
+    setIntakeValue('cancerInput', full, 'doctor');
+    if (typeof selectCancer === 'function') { try { selectCancer(full); } catch(e){} }
+    _intake.idx++;
+    addMessageHtml('<b>Cancer:</b> ' + full, 'ai');
+    return askIntakeQuestion();
+  }
+
+  const r = INTAKE_RANGE[q.f];
+  if (r && typeof val === 'number' && (val < r[0] || val > r[1]) && _intake.pendingConfirm !== q.f){
+    _intake.pendingConfirm = q.f;
+    addMessageHtml('<b>' + val + ' ' + r[2] + '</b> is outside the usual range ('
+      + r[0] + '–' + r[1] + ' ' + r[2] + '). Send it again to confirm, or type the correct value.', 'ai');
+    return renderChatPicker(q);
+  }
+  _intake.pendingConfirm = null;
+
+  setIntakeValue(q.f, val, 'doctor');
+  _intake.idx++;
+  let note = '';
+  if (q.f === 'usualWeight'){
+    const w = parseFloat(document.getElementById('weight').value);
+    if (w > 0 && val > w){
+      const pct = (val - w) / val * 100;
+      note = pct >= 10
+        ? '<br>⚠ <b>' + pct.toFixed(1) + '% weight loss</b> — GLIM severe. That will push the targets up.'
+        : '<br><b>' + pct.toFixed(1) + '% weight loss</b> recorded.';
+    }
+  }
+  if (q.f === 'creatinine' && val >= 1.3) note = '<br>⚠ The <b>renal protein cap</b> will apply.';
+  if (q.f === 'albumin' && val < 3.0)     note = '<br>⚠ Albumin below 3.0 — a marker of inflammatory catabolism.';
+  addMessageHtml('<b>' + (INTAKE_LABELS[q.f] || q.f) + ':</b> ' + val + note, 'ai');
+  askIntakeQuestion();
+}
+
 async function sendChatMessage() {
   const input = document.getElementById('chatInput');
   const text = input.value.trim();
@@ -1356,6 +1721,13 @@ async function sendChatMessage() {
   // "clinical data detected" confirmation and any error all rendered into a
   // panel the doctor could no longer see.
   openChat();
+
+  // Mid-interview: the answer belongs to the field we just asked about, and
+  // is read locally. No model call, so nothing can be "helpfully" completed.
+  if (_intake.active){
+    renderChatPicker(null);
+    return handleIntakeAnswer(text);
+  }
 
   const typing = addTyping();
   try {
@@ -1369,12 +1741,13 @@ async function sendChatMessage() {
     const response = await fetch(`${apiBase}/api/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: text, contextObj: ctx })
+      // Extraction is explicit. The server no longer lets the model decide
+      // whether it is extracting or inventing a case.
+      body: JSON.stringify({ message: text, contextObj: ctx, mode: 'extract' })
     });
 
     const data = await response.json();
     typing.remove();
-    console.log("Gquence AI Response:", data);
 
     if (!response.ok) {
         const errMsg = data.error || `Server error (${response.status})`;
@@ -1382,23 +1755,82 @@ async function sendChatMessage() {
         return;
     }
 
-    if (data.reply) {
-        addMessageHtml(data.reply, 'ai');
+    if (data.reply) addMessageHtml(data.reply, 'ai');
+
+    const fillData = data.extractedData || null;
+    const filled = [];
+    if (fillData) {
+      applyExtractionData(fillData);
+      // Everything the extractor returned came from the doctor's own text, so
+      // it is marked as stated — and it stays marked, rather than flashing
+      // green for three seconds and becoming indistinguishable afterwards.
+      window._fieldSources = window._fieldSources || {};
+      Object.keys(fillData).forEach(k => {
+        const el = document.getElementById(k) || document.getElementById(k === 'cancer' ? 'cancerInput' : k === 'regimen' ? 'regimenInput' : k === 'name' ? 'patientName' : k);
+        if (el && el.value !== ''){
+          window._fieldSources[el.id] = 'doctor';
+          el.classList.remove('ai-na','ai-generated');
+          el.classList.add('ai-filled');
+          filled.push(el.id);
+        }
+      });
+      const c = document.getElementById('cancerInput').value;
+      if (c) _intake.chosenType = _cancerTypes().find(t => c === t || c.startsWith(t + ' - ')) || null;
+    }
+    (data.notAvailable || []).forEach(k => {
+      const el = document.getElementById(k);
+      if (el && el.value === '') setIntakeValue(k, null, 'na');
+    });
+
+    if (filled.length){
+      addMessageHtml('Filled from what you told me: <b>' + filled.length + '</b> field(s).<br>'
+        + '<span style="font-size:11.5px;opacity:.75">Nothing else was filled — I do not invent values.</span>', 'ai');
+    } else if (!data.reply) {
+      addMessage('I could not find any patient values in that. Try naming the patient, age and diagnosis, or paste the notes.', 'ai');
     }
 
-    if (data.extractedData || data.name || data.age) {
-        const fillData = data.extractedData || data;
-        console.log("Auto-filling clinical fields from AI extraction:", Object.keys(fillData));
-        applyExtractionData(fillData);
-        addMessage('✨ Clinical data detected! Patient form has been auto-populated.', 'ai');
-    } else {
-        console.warn("AI Response contained no fillable clinical data.");
-        if (!data.reply) addMessage('No clinical data found in the pasted text. Try including lab values, patient details, or diagnosis information.', 'ai');
-    }
+    // Now take the remaining essentials one at a time.
+    _intake.active = true;
+    _intake.idx = 0;
+    setTimeout(askIntakeQuestion, 350);
   } catch (err) {
     typing.remove();
     addMessage('Sorry, I couldn\'t reach the AI. Please check server connection.', 'ai');
   }
+}
+
+/* Synthetic demo cases still exist, but only when explicitly asked for — and
+   the values arrive marked as generated, in red, so they can never be mistaken
+   for measurements. */
+async function generateDemoCase(){
+  if (!confirm('Generate a SYNTHETIC demonstration patient?\n\n'
+    + 'Every value will be invented by the AI and marked in red as "generated". '
+    + 'Do not use this for a real patient.')) return;
+  openChat();
+  addMessage('Generate a demonstration case', 'user');
+  const typing = addTyping();
+  try {
+    const apiBase = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : '';
+    const res = await fetch(`${apiBase}/api/chat`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ message:'Generate a demonstration oncology nutrition case.', mode:'generate' })
+    });
+    const data = await res.json();
+    typing.remove();
+    if (!res.ok) return addMessage('AI error: ' + (data.error || res.status), 'ai');
+    if (data.reply) addMessageHtml(data.reply, 'ai');
+    if (data.extractedData){
+      applyExtractionData(data.extractedData);
+      window._fieldSources = window._fieldSources || {};
+      Object.keys(data.extractedData).forEach(k => {
+        const el = document.getElementById(k);
+        if (el){ window._fieldSources[el.id] = 'generated';
+                 el.classList.remove('ai-filled','ai-na'); el.classList.add('ai-generated'); }
+      });
+      addMessageHtml('⚠ <b>Synthetic case.</b> Every red field was invented for demonstration '
+        + 'and none of it was measured.', 'ai');
+    }
+  } catch(e){ typing.remove(); addMessage('Could not reach the AI.', 'ai'); }
 }
 
 function addMessageHtml(htmlText, type) {
@@ -1428,12 +1860,36 @@ async function handlePdfUpload(event) {
     const response = await fetch(`${apiBase}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: `Extract medical data from this text:\n\n${text}`, contextObj: {} })
+        body: JSON.stringify({ message: `Extract medical data from this text:\n\n${text}`,
+                               contextObj: {}, mode: 'extract' })
     });
     const data = await response.json();
     if (data.extractedData) {
         applyExtractionData(data.extractedData);
-        addMessage('✅ Lab report extraction complete!', 'ai');
+        // Values read out of the report are marked as stated and stay marked.
+        window._fieldSources = window._fieldSources || {};
+        let n = 0;
+        Object.keys(data.extractedData).forEach(k => {
+          const el = document.getElementById(k)
+            || document.getElementById(k === 'cancer' ? 'cancerInput' : k === 'regimen' ? 'regimenInput' : k === 'name' ? 'patientName' : k);
+          if (el && el.value !== ''){
+            window._fieldSources[el.id] = 'doctor';
+            el.classList.remove('ai-na','ai-generated');
+            el.classList.add('ai-filled');
+            n++;
+          }
+        });
+        (data.notAvailable || []).forEach(k => {
+          const el = document.getElementById(k);
+          if (el && el.value === '') setIntakeValue(k, null, 'na');
+        });
+        addMessageHtml('✅ Took <b>' + n + '</b> value(s) from the report.<br>'
+          + '<span style="font-size:11.5px;opacity:.75">Only what the report states — nothing was filled in around it.</span>', 'ai');
+        // Continue with whatever the report did not contain.
+        _intake.active = true; _intake.idx = 0;
+        const c = document.getElementById('cancerInput').value;
+        if (c) _intake.chosenType = _cancerTypes().find(t => c === t || c.startsWith(t + ' - ')) || null;
+        setTimeout(askIntakeQuestion, 400);
     } else {
         addMessage('Extracted text but found no clinical markers.', 'ai');
     }
@@ -1521,29 +1977,46 @@ function applyExtractionData(data) {
       const normalize = s => s.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
       const cancerNorm = normalize(data.cancer);
 
-      // Score each map key: count matching significant words, prefer longer (more specific) keys on tie
-      let bestMatch = null;
-      let bestScore = -1;
-      allKeys.forEach(k => {
+      // Score each map key by how many significant words it shares with the
+      // extracted text.
+      //
+      // This used to accept `bestScore > 0` where bestScore started at -1 and
+      // every key scored `words + kNorm.length/1000`. A key matching ZERO
+      // words still scored ~0.03, which passed the test — so the match could
+      // never fail, and on a tie it chose the LONGEST key name. "Lung Cancer"
+      // with no subtype therefore resolved silently to one of the six lung
+      // subtypes, and the regimen block below then auto-filled that subtype's
+      // chemotherapy. Two clinical decisions decided by string length.
+      //
+      // Now a match must share at least one real word, and an ambiguous result
+      // (several keys tied on the same score) is left for the doctor to choose
+      // rather than settled arbitrarily.
+      const words = cancerNorm.split(' ').filter(w => w.length > 2);
+      let exact = null;
+      const scored = allKeys.map(k => {
         const kNorm = normalize(k);
-        if (kNorm === cancerNorm) { bestMatch = k; bestScore = 999; return; }
-        const words = cancerNorm.split(' ').filter(w => w.length > 2);
-        let score = words.reduce((acc, w) => acc + (kNorm.includes(w) ? 1 : 0), 0);
-        // Prefer more specific (longer) keys when word score is tied
-        const tiebreak = kNorm.length / 1000;
-        if (score + tiebreak > bestScore) { bestScore = score + tiebreak; bestMatch = k; }
+        if (kNorm === cancerNorm) exact = k;
+        return { key: k, score: words.reduce((a, w) => a + (kNorm.includes(w) ? 1 : 0), 0) };
       });
 
-      if (bestMatch && bestScore > 0) {
-        if (typeof selectCancer === 'function') {
-          selectCancer(bestMatch);
-        } else {
-          input.value = bestMatch;
-          highlight('cancerInput');
-        }
+      const best = scored.reduce((m, s) => (s.score > m.score ? s : m), { key: null, score: 0 });
+      const tied = scored.filter(s => s.score === best.score && best.score > 0);
+
+      if (exact) {
+        if (typeof selectCancer === 'function') selectCancer(exact);
+        else { input.value = exact; highlight('cancerInput'); }
+      } else if (best.score > 0 && tied.length === 1) {
+        if (typeof selectCancer === 'function') selectCancer(tied[0].key);
+        else { input.value = tied[0].key; highlight('cancerInput'); }
       } else {
+        // No confident single match — keep what was actually stated. The
+        // subtype stays unset rather than being picked for the doctor.
         input.value = data.cancer;
         highlight('cancerInput');
+        if (best.score > 0 && tied.length > 1) {
+          console.info('[cancer] "' + data.cancer + '" matches ' + tied.length
+            + ' subtypes equally — left for the doctor to choose.');
+        }
       }
     }
   }
