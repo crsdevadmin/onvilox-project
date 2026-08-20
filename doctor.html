@@ -61,6 +61,49 @@
     .rbadge { display:inline-block; font-size:9px; font-weight:800; letter-spacing:.06em; text-transform:uppercase;
               border:1px solid; border-radius:5px; padding:1px 6px; vertical-align:middle; margin-left:4px; }
 
+    /* Closure prompt — appears on a row that has gone quiet past the
+       hospital's lost-threshold. One tap, from the screen the doctor already
+       opens, because a separate "close patient" screen never gets visited. */
+    .closeask { grid-column:1/-1; margin-top:10px; padding-top:11px; border-top:1px dashed var(--border-2); }
+    .closeask .q { font-size:12px; font-weight:700; color:var(--amber); margin-bottom:8px; }
+    .closeask .opts { display:flex; gap:6px; flex-wrap:wrap; }
+    .cbtn { font-size:11.5px; font-weight:700; font-family:inherit; cursor:pointer; border-radius:999px;
+            padding:5px 12px; border:1px solid var(--border-2); background:var(--surface);
+            color:var(--text-2); transition:.15s; }
+    .cbtn:hover { color:var(--text); border-color:var(--text-2); }
+    .cbtn.keep { border-color:var(--green); color:var(--green); }
+    .cbtn.keep:hover { background:var(--green-dim); }
+    .cbtn.lost { border-color:var(--rose); color:var(--rose); }
+    .cbtn.lost:hover { background:var(--rose-dim); }
+    .cbtn.clin { border-color:var(--cyan); color:var(--cyan); }
+    .cbtn.clin:hover { background:var(--cyan-dim); }
+    .closeask .hint { font-size:10.5px; color:var(--text-3); margin-top:7px; }
+
+    /* Closed patients — out of the queue, still visible and reversible */
+    .closedcard { display:flex; align-items:center; gap:12px; flex-wrap:wrap; padding:10px 13px;
+                  border:1px solid var(--border); border-left:3px solid var(--text-3);
+                  border-radius:11px; background:var(--surface-2); margin-bottom:8px; }
+    .closedcard.unconfirmed { border-left-color:var(--amber); }
+    .closedcard .nm { font-weight:700; color:var(--text); font-size:13px; }
+    .closedcard .why { font-size:11.5px; color:var(--text-2); }
+    .closedcard .who { font-size:10.5px; color:var(--text-3); }
+    .cflag { font-size:9px; font-weight:800; letter-spacing:.06em; text-transform:uppercase;
+             border:1px solid var(--amber); color:var(--amber); background:var(--amber-dim);
+             border-radius:5px; padding:1px 6px; }
+
+    /* Retention funnel */
+    .funnel { display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end; }
+    .fstage { flex:1; min-width:78px; }
+    .fstage .bar { background:var(--cyan); border-radius:6px 6px 0 0; min-height:4px; }
+    .fstage .n { font-size:17px; font-weight:800; color:var(--text); }
+    .fstage .l { font-size:10px; color:var(--text-3); text-transform:uppercase; letter-spacing:.06em; margin-top:3px; }
+    .why-list { display:flex; gap:7px; flex-wrap:wrap; margin-top:12px; }
+    .why-chip { font-size:11px; font-weight:700; border-radius:7px; padding:3px 9px; border:1px solid; }
+    .wg-planned    { color:var(--green);  border-color:var(--green);  background:var(--green-dim); }
+    .wg-transition { color:var(--sky);    border-color:var(--sky);    background:rgba(56,189,248,.1); }
+    .wg-patient    { color:var(--amber);  border-color:var(--amber);  background:var(--amber-dim); }
+    .wg-lost       { color:var(--rose);   border-color:var(--rose);   background:var(--rose-dim); }
+
     /* Drafts — unfinished records, violet so they read as "not yet real" */
     .dcards { display:flex; gap:10px; flex-wrap:wrap; }
     .dcard { flex:1; min-width:230px; background:var(--surface-2); border:1px solid var(--violet);
@@ -268,6 +311,12 @@
         <div class="kpi-value" id="kpiReady">0</div>
       </div>
     </div>
+
+    <!-- ── Retention: how far patients got, and why the rest stopped ── -->
+    <div id="funnelPanel" style="display:none;"></div>
+
+    <!-- ── Recently closed, kept out of the queue but still reversible ── -->
+    <div id="closedPanel" style="display:none;"></div>
 
     <!-- ── Unfinished patient records ──────────────────────────────────
          Drafts are inert: no plan, no store job. They sit above the queue
@@ -975,7 +1024,9 @@
         if (!res.ok) return;                       // stay quiet rather than alarm
         const data = await res.json();
         _queue = data.patients || [];
+        _closed = data.closed || [];
         renderQueue();
+        renderClosed();
         // The Week / Next Review columns read from _queue, so the table has to
         // be redrawn once the queue lands — it renders before this resolves.
         render();
@@ -1168,6 +1219,9 @@
           + '<a class="qbtn qbtn-ghost qbtn-sm" href="/patients/profile?id=' + p.id + '#monitoring">Profile</a>'
         + '</div>'
         + '<div class="histslot" id="qhist-' + p.id + '" data-open="0"></div>'
+        // Past the hospital's lost-threshold the row stops only nagging and
+        // asks the question that actually resolves it.
+        + (p.askIfStillActive && !_snoozed.has(String(p.id)) ? closurePrompt(p) : '')
         + '</div>';
     }
 
@@ -1468,6 +1522,203 @@
     }
 
     // ══════════════════════════════════════════════════════════════════════
+    //  CLOSURES
+    //  A patient who stops is not automatically a dropout. Discharged, goal
+    //  met, switched to TPN, died — those are outcomes. Only "no contact" is a
+    //  genuine loss to follow-up. Recording which is which is what turns
+    //  "46 enrolled, 6 completed" from an indictment into a description.
+    //
+    //  The closure is offered ON the queue row, once a patient has gone quiet
+    //  past the hospital's own lost-threshold. A separate screen would never
+    //  be visited, which is precisely how patients end up in limbo.
+    // ══════════════════════════════════════════════════════════════════════
+    let _closed = [];
+    let _canCloseClinical = ['DOCTOR','ADMIN','SUPER_ADMIN'].includes(me.role);
+
+    // Shown on the row itself — the few reasons that cover almost every case.
+    // "Other…" opens the full list rather than making the row unreadable.
+    const QUICK_CLOSE = [
+      { k:'DISCHARGED', l:'Discharged',      cls:'' },
+      { k:'DECLINED',   l:'Declined',        cls:'' },
+      { k:'DIED',       l:'Died',            cls:'' },
+      { k:'COMPLETED',  l:'Completed',       cls:'clin', clinical:true },
+      { k:'LOST',       l:'No contact',      cls:'lost' }
+    ];
+    const ALL_CLOSE = [
+      ['COMPLETED','Completed the programme',true],
+      ['GOAL_MET','Stopped — nutritional goal met',true],
+      ['ROUTE_CHANGED','Switched to NG tube / TPN',true],
+      ['PALLIATIVE','Moved to palliative care',true],
+      ['DISCHARGED','Discharged home',false],
+      ['TRANSFERRED','Transferred to another centre',false],
+      ['DECLINED','Patient declined to continue',false],
+      ['COST','Could not afford it',false],
+      ['INTOLERANT','Could not tolerate the product',false],
+      ['DIED','Died',false],
+      ['LOST','No contact after repeated attempts',false]
+    ];
+
+    function closurePrompt(p){
+      const opts = QUICK_CLOSE
+        .filter(o => !o.clinical || _canCloseClinical)
+        .map(o => `<button class="cbtn ${o.cls}" onclick="closePatient('${p.id}','${o.k}')">${o.l}</button>`)
+        .join('');
+      return `<div class="closeask">
+        <div class="q">⚠ No weekly entry for ${p.daysSinceWeekly} days — is this patient still active?</div>
+        <div class="opts">
+          <button class="cbtn keep" onclick="keepChasing('${p.id}')">Yes, still chasing</button>
+          ${opts}
+          <button class="cbtn" onclick="openCloseDialog('${p.id}')">Other…</button>
+        </div>
+        <div class="hint">Closing removes this patient from your queue and records why they stopped.
+          ${_canCloseClinical ? '' : 'Clinical reasons are recorded by the doctor.'}</div>
+      </div>`;
+    }
+
+    // Dismiss for this session only — the patient is still open, the doctor
+    // just does not want to be asked again today.
+    const _snoozed = new Set();
+    function keepChasing(pid){
+      _snoozed.add(String(pid));
+      qToast('Kept open — I will ask again tomorrow');
+      renderQueue();
+    }
+
+    async function closePatient(pid, reason, note){
+      const p = _queue.find(x => String(x.id) === String(pid));
+      const label = (ALL_CLOSE.find(r => r[0] === reason) || [,reason])[1];
+      if (!confirm('Close ' + ((p && p.name) || 'this patient') + ' as:\n\n' + label
+        + '\n\nThey will leave your queue. You can reopen them at any time.')) return;
+      try {
+        const res = await fetch(_api() + '/api/patients/' + encodeURIComponent(pid) + '/close', {
+          method:'POST', headers:_hdr(true), body: JSON.stringify({ reason, note: note || null })
+        });
+        const out = await res.json();
+        if (!res.ok) throw new Error(out.error || 'Could not close this patient');
+        qToast('Closed — ' + (out.label || label)
+          + (out.needsConfirmation ? ' (awaiting doctor confirmation)' : ''));
+        loadWeeklyQueue(); loadFunnel();
+      } catch (e) { qToast(e.message, true); }
+    }
+
+    function openCloseDialog(pid){
+      const p = _queue.find(x => String(x.id) === String(pid));
+      const list = ALL_CLOSE
+        .filter(r => !r[2] || _canCloseClinical)
+        .map((r,i) => (i+1) + '. ' + r[1]).join('\n');
+      const pick = prompt('Why is ' + ((p && p.name) || 'this patient') + ' stopping?\n\n'
+        + list + '\n\nEnter the number:');
+      if (!pick) return;
+      const avail = ALL_CLOSE.filter(r => !r[2] || _canCloseClinical);
+      const chosen = avail[parseInt(pick, 10) - 1];
+      if (!chosen) return qToast('That was not one of the options', true);
+      const note = prompt('Any note? (optional)') || null;
+      closePatient(pid, chosen[0], note);
+    }
+
+    async function reopenPatient(pid){
+      const c = _closed.find(x => String(x.id) === String(pid));
+      if (!confirm('Reopen ' + ((c && c.name) || 'this patient') + '?\n\n'
+        + 'They will return to your queue.')) return;
+      try {
+        const res = await fetch(_api() + '/api/patients/' + encodeURIComponent(pid) + '/reopen',
+          { method:'POST', headers:_hdr(true) });
+        if (!res.ok) throw new Error('Could not reopen');
+        qToast('Reopened — back in your queue');
+        loadWeeklyQueue(); loadFunnel();
+      } catch (e) { qToast(e.message, true); }
+    }
+
+    async function confirmClosure(pid){
+      try {
+        const res = await fetch(_api() + '/api/patients/' + encodeURIComponent(pid) + '/close/confirm',
+          { method:'POST', headers:_hdr(true) });
+        if (!res.ok) throw new Error('Could not confirm');
+        qToast('Closure confirmed');
+        loadWeeklyQueue();
+      } catch (e) { qToast(e.message, true); }
+    }
+
+    function renderClosed(){
+      const el = document.getElementById('closedPanel');
+      if (!el) return;
+      if (!_closed.length){ el.style.display = 'none'; return; }
+      // Anything an assistant recorded comes first — it is waiting on the doctor.
+      const rows = _closed.slice().sort((a,b) =>
+        (b.closure.needsConfirmation ? 1 : 0) - (a.closure.needsConfirmation ? 1 : 0));
+      el.style.display = 'block';
+      el.innerHTML = `
+        <div class="card" style="border-left:4px solid var(--text-3);">
+          <div style="display:flex;align-items:center;gap:11px;flex-wrap:wrap;margin-bottom:12px;">
+            <h2 style="margin:0;font-size:15px;">Closed</h2>
+            <span style="font-size:11.5px;color:var(--text-2);">
+              Out of your queue — reopen any of them if the patient returns</span>
+          </div>
+          ${rows.map(p => `
+            <div class="closedcard${p.closure.needsConfirmation ? ' unconfirmed' : ''}">
+              <div style="flex:1;min-width:170px;">
+                <div class="nm">${_esc(p.name)}
+                  ${p.closure.needsConfirmation ? '<span class="cflag">confirm</span>' : ''}</div>
+                <div class="why">${_esc(p.closure.label)}${p.closure.note ? ' — ' + _esc(p.closure.note) : ''}</div>
+                <div class="who">Closed by ${_esc(p.closure.closedByRole || 'staff').toLowerCase()}
+                  · ${_draftAgo(p.closure.closedAt)}</div>
+              </div>
+              <div style="display:flex;gap:6px;">
+                ${p.closure.needsConfirmation && _canCloseClinical
+                  ? `<button class="qbtn qbtn-cyan qbtn-sm" onclick="confirmClosure('${p.id}')">Confirm</button>` : ''}
+                <button class="qbtn qbtn-ghost qbtn-sm" onclick="reopenPatient('${p.id}')">Reopen</button>
+              </div>
+            </div>`).join('')}
+        </div>`;
+    }
+
+    // ── Retention funnel ──────────────────────────────────────────────────
+    async function loadFunnel(){
+      try {
+        let doctorId = me.id;
+        if (me.role === 'ASSISTANT' && typeof mappingService !== 'undefined') {
+          doctorId = mappingService.getDoctorForAssistant(me.id) || me.id;
+        }
+        const res = await fetch(_api() + '/api/retention-funnel?doctorId=' + encodeURIComponent(doctorId),
+          { headers: _hdr() });
+        if (!res.ok) return;
+        renderFunnel(await res.json());
+      } catch (e) { /* offline */ }
+    }
+
+    function renderFunnel(d){
+      const el = document.getElementById('funnelPanel');
+      if (!el || !d || !d.enrolled) { if (el) el.style.display='none'; return; }
+      const max = Math.max.apply(null, d.stages.map(s => s.n)) || 1;
+      el.style.display = 'block';
+      el.innerHTML = `
+        <div class="card">
+          <div style="display:flex;align-items:center;gap:11px;flex-wrap:wrap;margin-bottom:14px;">
+            <h2 style="margin:0;font-size:15px;">Retention</h2>
+            <span style="font-size:11.5px;color:var(--text-2);">
+              How far patients got — and, for those who stopped, why</span>
+            ${d.lostToFollowUp !== undefined ? `<span style="margin-left:auto;font-size:11.5px;color:var(--text-2);">
+              Genuinely lost to follow-up: <b style="color:${d.lostToFollowUp ? 'var(--rose)' : 'var(--green)'}">
+              ${d.lostToFollowUp}</b> of ${d.enrolled}</span>` : ''}
+          </div>
+          <div class="funnel">
+            ${d.stages.map(s => `
+              <div class="fstage">
+                <div class="bar" style="height:${Math.max(4, Math.round(s.n / max * 70))}px;
+                     opacity:${0.45 + 0.55 * (s.n / max)}"></div>
+                <div class="n">${s.n}</div><div class="l">${s.stage}</div>
+              </div>`).join('')}
+          </div>
+          ${d.closures && d.closures.length ? `<div class="why-list">
+            ${d.closures.map(c => `<span class="why-chip wg-${c.group}">${_esc(c.label)}: ${c.n}</span>`).join('')}
+          </div>` : ''}
+          <div style="font-size:11px;color:var(--text-3);margin-top:10px;">
+            Only <b>no contact</b> counts as loss to follow-up. Everything else is a recorded outcome.
+          </div>
+        </div>`;
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
     //  DRAFTS — unfinished patient records
     //  They live in patient_drafts, never in `patients`, so no plan is
     //  generated and no store can see them. Listing them here is the only
@@ -1574,11 +1825,13 @@
         loadRiskPanel();
         loadWeeklyQueue();
         loadDrafts();
+        loadFunnel();
         _jobSig = _jobsSignature();
         setInterval(_pollDoctorJobs, 30000);
         setInterval(loadRiskPanel, 120000);     // refresh flags every 2 min
         setInterval(loadWeeklyQueue, 120000);   // and the work queue alongside
         setInterval(loadDrafts, 120000);
+        setInterval(loadFunnel, 300000);
       });
 
     // Show a banner if this device holds patients that never reached the database.

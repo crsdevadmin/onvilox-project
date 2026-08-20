@@ -1036,7 +1036,10 @@ app.get('/api/doctor/weekly-queue', authenticateToken, async (req, res) => {
     if (!patients.length) return res.json({ patients: [], generatedAt: new Date().toISOString() });
 
     const ids = patients.map(p => p.id);
-    const [logRes, rxRes] = await Promise.all([
+    // A closed patient must leave the queue. Nagging about someone who was
+    // discharged three weeks ago is how staff learn to ignore the queue, and
+    // an ignored queue is worse than no queue.
+    const [logRes, rxRes, closureRes, settingsRes] = await Promise.all([
       pool.query(
         `SELECT patient_id, type, recorded_at, data FROM monitoring_logs
           WHERE patient_id = ANY($1) ORDER BY recorded_at ASC`, [ids]),
@@ -1044,8 +1047,18 @@ app.get('/api/doctor/weekly-queue', authenticateToken, async (req, res) => {
         `SELECT id, patient_id, week_number, status, batch_code, targets, notes,
                 monitoring_log_id, created_at, approved_at
            FROM weekly_prescriptions
-          WHERE patient_id = ANY($1) ORDER BY week_number ASC`, [ids])
+          WHERE patient_id = ANY($1) ORDER BY week_number ASC`, [ids]),
+      pool.query(
+        `SELECT patient_id, reason, note, closed_by, closed_by_role, closed_at, confirmed_at
+           FROM patient_closures WHERE patient_id = ANY($1)`, [ids]),
+      pool.query('SELECT lost_threshold_days FROM pilot_settings WHERE id=1')
     ]);
+
+    const closedBy = {};
+    closureRes.rows.forEach(c => { closedBy[c.patient_id] = c; });
+    // The hospital's own definition of "this patient may be lost" already
+    // exists as a setting; use it rather than inventing a second threshold.
+    const lostThreshold = (settingsRes.rows[0] && settingsRes.rows[0].lost_threshold_days) || 14;
 
     // `data` is JSONB but older rows were written as a JSON string — the profile
     // page carries the same guard. Parse defensively rather than trusting the type.
@@ -1072,6 +1085,7 @@ app.get('/api/doctor/weekly-queue', authenticateToken, async (req, res) => {
     const SUPPLY_DAYS = 7;   // one weekly batch = 7 days of cover
 
     const out = patients.map(p => {
+      const closure = closedBy[p.id] || null;
       const fd      = p.full_data || {};
       const weeks   = weeklyBy[p.id] || [];
       const dailies = dailyBy[p.id]  || [];
@@ -1191,11 +1205,35 @@ app.get('/api/doctor/weekly-queue', authenticateToken, async (req, res) => {
           approvedAt: lastApproved.approved_at
         } : null,
         supplyDaysLeft,
-        warnings
+        warnings,
+        // Closure state travels with the row so the dashboard can drop the
+        // patient from the queue and, when an assistant recorded it, surface
+        // it to the doctor for confirmation instead of silently accepting it.
+        closed: !!closure,
+        closure: closure ? {
+          reason: closure.reason,
+          label: (CLOSURE_REASONS[closure.reason] || {}).label || closure.reason,
+          note: closure.note,
+          closedBy: closure.closed_by,
+          closedByRole: closure.closed_by_role,
+          closedAt: closure.closed_at,
+          needsConfirmation: !closure.confirmed_at
+        } : null,
+        // Past this, the queue stops merely nagging and asks whether the
+        // patient is still active at all.
+        askIfStillActive: !closure && daysSinceWeekly !== null && daysSinceWeekly >= lostThreshold,
+        lostThresholdDays: lostThreshold
       };
     });
 
-    res.json({ patients: out, generatedAt: new Date().toISOString() });
+    res.json({
+      patients: out.filter(p => !p.closed),
+      // Returned separately so the doctor can still see and confirm or reopen
+      // a closure without it sitting in the work queue.
+      closed: out.filter(p => p.closed),
+      lostThresholdDays: lostThreshold,
+      generatedAt: new Date().toISOString()
+    });
   } catch (e) {
     console.error('[weekly-queue]', e);
     res.status(500).json({ error: e.message });
@@ -3241,6 +3279,219 @@ OUTPUT FORMAT — return ONLY valid JSON, no markdown, no text outside the JSON 
     console.log('patient_drafts table ready');
   } catch(e) { console.error('patient_drafts migration:', e.message); }
 })();
+
+// ── Patient closures ──────────────────────────────────────────────────────
+// Until now a patient who stopped simply went quiet. trial_enrollments could
+// record a withdrawal, but only for pilot patients, only by an admin, and the
+// reason was free text — so "discharged", "Discharged" and "pt went home" were
+// three different values and none of them could be counted.
+//
+// The consequence is that every patient who stops looks identical. A pilot
+// reading "46 enrolled, 6 completed" implies 40 failures, when most of those
+// are discharges, clinician decisions or deaths — outcomes, not dropouts. Only
+// "lost to contact" is a genuine loss to follow-up.
+//
+// Closing a patient properly is therefore not bookkeeping; it is what makes
+// the retention number mean anything.
+(async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS patient_closures (
+        patient_id     TEXT PRIMARY KEY,
+        reason         TEXT NOT NULL,
+        note           TEXT,
+        closed_by      TEXT NOT NULL,
+        closed_by_role TEXT,
+        closed_at      TIMESTAMPTZ DEFAULT NOW(),
+        -- what the patient looked like at the moment they stopped, so a closed
+        -- record still carries its outcome without re-deriving it later
+        last_week      INT,
+        last_weight    DOUBLE PRECISION,
+        -- an assistant may record the administrative reasons; the doctor is
+        -- asked to confirm, and owns the clinical ones outright
+        confirmed_by   TEXT,
+        confirmed_at   TIMESTAMPTZ,
+        reopened_at    TIMESTAMPTZ,
+        reopened_by    TEXT
+      )
+    `);
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_patient_closures_reason ON patient_closures(reason)');
+    console.log('patient_closures table ready');
+  } catch(e) { console.error('patient_closures migration:', e.message); }
+})();
+
+// The fixed reason list. Grouped so the retention story reads correctly, and
+// so the funnel can separate an outcome from an actual loss.
+const CLOSURE_REASONS = {
+  // Clinical decisions — the doctor owns these outright.
+  COMPLETED:        { label:'Completed the programme',        group:'planned',    clinical:true },
+  GOAL_MET:         { label:'Stopped — nutritional goal met', group:'planned',    clinical:true },
+  ROUTE_CHANGED:    { label:'Switched to NG tube / TPN',      group:'planned',    clinical:true },
+  PALLIATIVE:       { label:'Moved to palliative care',       group:'transition', clinical:true },
+  // Administrative facts — whoever chases follow-up learns these first.
+  DISCHARGED:       { label:'Discharged home',                group:'transition', clinical:false },
+  TRANSFERRED:      { label:'Transferred to another centre',  group:'transition', clinical:false },
+  DECLINED:         { label:'Patient declined to continue',   group:'patient',    clinical:false },
+  COST:             { label:'Could not afford it',            group:'patient',    clinical:false },
+  INTOLERANT:       { label:'Could not tolerate the product', group:'patient',    clinical:false },
+  DIED:             { label:'Died',                           group:'patient',    clinical:false },
+  // The only reason that is genuinely a loss to follow-up.
+  LOST:             { label:'No contact after repeated attempts', group:'lost',   clinical:false }
+};
+
+app.get('/api/closure-reasons', authenticateToken, (req, res) => {
+  const role = (req.user && req.user.role) || '';
+  const canClinical = ['DOCTOR','ADMIN','SUPER_ADMIN'].includes(role);
+  res.json({
+    reasons: Object.entries(CLOSURE_REASONS).map(([k, v]) => ({
+      key: k, label: v.label, group: v.group, clinical: v.clinical,
+      allowed: v.clinical ? canClinical : true
+    })),
+    canCloseClinical: canClinical
+  });
+});
+
+// Close a patient. Works for ANY patient, not only trial-enrolled ones.
+app.post('/api/patients/:id/close', authenticateToken, async (req, res) => {
+  const { reason, note } = req.body || {};
+  const spec = CLOSURE_REASONS[reason];
+  if (!spec) return res.status(400).json({ error: 'Unknown closure reason' });
+
+  const role = (req.user && req.user.role) || '';
+  const isDoctor = ['DOCTOR','ADMIN','SUPER_ADMIN'].includes(role);
+  // A clinical ending is a clinical decision. An assistant may record that a
+  // patient was discharged; they may not record that treatment was stopped
+  // because the nutritional goal was met.
+  if (spec.clinical && !isDoctor) {
+    return res.status(403).json({ error: 'Only the doctor can record a clinical closure' });
+  }
+
+  try {
+    // Snapshot where the patient had reached, so the closed record still says
+    // something even after the monitoring rows age.
+    const last = await pool.query(
+      `SELECT data FROM monitoring_logs
+        WHERE patient_id=$1 AND type='weekly'
+        ORDER BY recorded_at DESC, id DESC LIMIT 1`, [req.params.id]);
+    let lastWeek = null, lastWeight = null;
+    if (last.rowCount){
+      let d = last.rows[0].data;
+      if (typeof d === 'string') { try { d = JSON.parse(d); } catch(e) { d = {}; } }
+      lastWeek   = d && d.week   != null ? parseInt(d.week)      : null;
+      lastWeight = d && d.weight != null ? parseFloat(d.weight)  : null;
+      if (isNaN(lastWeek))   lastWeek = null;
+      if (isNaN(lastWeight)) lastWeight = null;
+    }
+
+    await pool.query(
+      `INSERT INTO patient_closures
+         (patient_id, reason, note, closed_by, closed_by_role, last_week, last_weight, confirmed_by, confirmed_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+       ON CONFLICT (patient_id) DO UPDATE SET
+         reason=EXCLUDED.reason, note=EXCLUDED.note, closed_by=EXCLUDED.closed_by,
+         closed_by_role=EXCLUDED.closed_by_role, closed_at=NOW(),
+         last_week=EXCLUDED.last_week, last_weight=EXCLUDED.last_weight,
+         confirmed_by=EXCLUDED.confirmed_by, confirmed_at=EXCLUDED.confirmed_at,
+         reopened_at=NULL, reopened_by=NULL`,
+      [req.params.id, reason, note || null, req.user.id, role, lastWeek, lastWeight,
+       // A doctor closing it is its own confirmation.
+       isDoctor ? req.user.id : null, isDoctor ? new Date() : null]
+    );
+
+    // Keep the pilot record in step, so trial reporting and closures agree.
+    await pool.query(
+      `UPDATE trial_enrollments SET withdrawn_at=NOW(), withdrawn_reason=$2 WHERE patient_id=$1`,
+      [req.params.id, reason]
+    ).catch(() => {});
+
+    res.json({ ok:true, reason, label: spec.label, needsConfirmation: !isDoctor });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// The doctor confirming a closure an assistant recorded.
+app.post('/api/patients/:id/close/confirm', authenticateToken, async (req, res) => {
+  const role = (req.user && req.user.role) || '';
+  if (!['DOCTOR','ADMIN','SUPER_ADMIN'].includes(role)) {
+    return res.status(403).json({ error: 'Only the doctor can confirm a closure' });
+  }
+  try {
+    const r = await pool.query(
+      `UPDATE patient_closures SET confirmed_by=$2, confirmed_at=NOW()
+        WHERE patient_id=$1 RETURNING patient_id`, [req.params.id, req.user.id]);
+    if (!r.rowCount) return res.status(404).json({ error: 'No closure to confirm' });
+    res.json({ ok:true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Patients come back. Closure must never be a one-way door.
+app.post('/api/patients/:id/reopen', authenticateToken, async (req, res) => {
+  try {
+    const r = await pool.query(
+      `DELETE FROM patient_closures WHERE patient_id=$1 RETURNING reason`, [req.params.id]);
+    if (!r.rowCount) return res.status(404).json({ error: 'Patient is not closed' });
+    await pool.query(
+      `UPDATE trial_enrollments SET withdrawn_at=NULL, withdrawn_reason=NULL WHERE patient_id=$1`,
+      [req.params.id]).catch(() => {});
+    res.json({ ok:true, was: r.rows[0].reason });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Retention funnel ──────────────────────────────────────────────────────
+// The chart that makes a pilot legible: how far each patient got, and for the
+// ones who stopped, why. Separates outcomes from genuine loss to follow-up,
+// which is the difference between "40 dropped out" and "2 were lost".
+app.get('/api/retention-funnel', authenticateToken, async (req, res) => {
+  try {
+    const role = (req.user && req.user.role) || '';
+    const isAdmin = ['ADMIN','SUPER_ADMIN'].includes(role);
+    const docId = req.query.doctorId || req.user.id;
+
+    const pats = isAdmin && !req.query.doctorId
+      ? await pool.query('SELECT id, name FROM patients')
+      : await pool.query(
+          `SELECT id, name FROM patients
+            WHERE assigned_doctor_id=$1 OR full_data->>'assignedDoctorId'=$1`, [docId]);
+    const ids = pats.rows.map(p => p.id);
+    if (!ids.length) return res.json({ enrolled:0, stages:[], closures:[], lostToFollowUp:0 });
+
+    const weeks = await pool.query(
+      `SELECT patient_id, COUNT(*)::int AS n FROM monitoring_logs
+        WHERE patient_id = ANY($1) AND type='weekly' GROUP BY patient_id`, [ids]);
+    const byPatient = {};
+    weeks.rows.forEach(r => { byPatient[r.patient_id] = r.n; });
+
+    const reached = k => ids.filter(id => (byPatient[id] || 0) >= k).length;
+    const stages = [
+      { stage:'Enrolled', n: ids.length },
+      { stage:'Week 1',   n: reached(1) },
+      { stage:'Week 2',   n: reached(2) },
+      { stage:'Week 4',   n: reached(4) },
+      { stage:'Week 6',   n: reached(6) }
+    ];
+
+    const cl = await pool.query(
+      `SELECT reason, COUNT(*)::int AS n FROM patient_closures
+        WHERE patient_id = ANY($1) GROUP BY reason ORDER BY n DESC`, [ids]);
+    const closures = cl.rows.map(r => ({
+      reason: r.reason,
+      label: (CLOSURE_REASONS[r.reason] || {}).label || r.reason,
+      group: (CLOSURE_REASONS[r.reason] || {}).group || 'other',
+      n: r.n
+    }));
+    const closedTotal = closures.reduce((a, c) => a + c.n, 0);
+    const lost = closures.filter(c => c.group === 'lost').reduce((a, c) => a + c.n, 0);
+
+    res.json({
+      enrolled: ids.length,
+      stages,
+      closures,
+      closedTotal,
+      // The honest headline: everything else was an outcome, not a dropout.
+      lostToFollowUp: lost,
+      stillOpen: ids.length - closedTotal
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
 
 // Assistants act for their doctor; everyone else owns their own drafts.
 // A draft holds unverified, partly-entered clinical values, so it is visible
