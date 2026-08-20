@@ -1645,6 +1645,10 @@ function addTyping() {
 // cancerRegimenMap); `sel` reads the form's own <select>; everything else is
 // typed by the doctor.
 const INTAKE_QUESTIONS = [
+  { f:'patientName',       q:"What is the <b>patient's name</b>?",        text:true },
+  { f:'age',               q:'<b>Age</b> in years?',                      unit:'years' },
+  { f:'uhic',              q:'<b>UHIC code</b>?',                         text:true, na:true,
+    help:'The hospital identifier. Say "not available" and one will be generated.' },
   { f:'cancerType',        q:'Which <b>cancer type</b>?',                 list:'type' },
   { f:'cancerInput',       q:'Which <b>subtype</b>?',                     list:'subtype',
     help:'The targets and the regimen both depend on this.' },
@@ -1658,14 +1662,31 @@ const INTAKE_QUESTIONS = [
     help:'Used to calculate weight-loss %.' },
   { f:'albumin',           q:'<b>Serum albumin</b> in g/dL?',             unit:'g/dL', na:true },
   { f:'crp',               q:'<b>CRP</b> in mg/L?',                       unit:'mg/L', na:true },
+  { f:'hemoglobin',        q:'<b>Haemoglobin</b> in g/dL?',               unit:'g/dL', na:true },
+  { f:'bloodSugar',        q:'<b>Blood sugar</b> in mg/dL?',              unit:'mg/dL', na:true },
+  { f:'creatinine',        q:'<b>Creatinine</b> in mg/dL?',               unit:'mg/dL', na:true,
+    help:'Controls the renal protein cap.' },
   { f:'ecogStatus',        q:'<b>ECOG performance status</b>?',           sel:true, na:true },
   { f:'reducedFoodIntake', q:'Roughly what <b>% of normal intake</b> is the patient eating?', unit:'%',
     help:'0–100. An estimate is fine — but it must be yours, not mine.' },
-  { f:'creatinine',        q:'<b>Creatinine</b> in mg/dL?',               unit:'mg/dL', na:true,
-    help:'Controls the renal protein cap.' },
   { f:'feedingMethod',     q:'<b>Feeding method</b>?',                    sel:true }
 ];
+
+/* Optional, and offered only once the essentials are in. These override the
+   rule engine's own kcal/kg and protein/kg, and the form itself calls them
+   "optional — leave blank to use auto-calculated values". Putting them in the
+   main run would invite a doctor to override a calculation they had not seen
+   yet, so they are asked at the end and are trivially declined. */
+const INTAKE_OPTIONAL = [
+  { f:'kcalPerKg',    q:'<b>Kcal / kg / day</b> override?',    unit:'kcal/kg', na:true,
+    help:'Leave to the engine unless you have a reason to override it.' },
+  { f:'proteinPerKg', q:'<b>Protein / kg / day</b> override?', unit:'g/kg',    na:true,
+    help:'Same — the engine calculates this from the values you gave.' }
+];
 const INTAKE_LABELS = {
+  patientName:'Patient Name', age:'Age', uhic:'UHIC Code',
+  hemoglobin:'Hemoglobin (g/dL)', bloodSugar:'Blood Sugar (mg/dL)',
+  kcalPerKg:'Kcal / kg / day', proteinPerKg:'Protein / kg / day',
   cancerType:'Cancer Type', cancerInput:'Cancer', regimenInput:'Chemo Regimen', sex:'Sex',
   weight:'Current Weight (kg)', height:'Height (cm)', usualWeight:'Usual Weight (kg)',
   albumin:'Serum Albumin (g/dL)', crp:'CRP (mg/L)', ecogStatus:'ECOG Status',
@@ -1676,10 +1697,13 @@ const INTAKE_LABELS = {
 const INTAKE_RANGE = {
   weight:[20,250,'kg'], usualWeight:[20,250,'kg'], height:[80,230,'cm'],
   albumin:[0.5,8,'g/dL'], crp:[0,600,'mg/L'], creatinine:[0.1,20,'mg/dL'],
-  reducedFoodIntake:[0,100,'%']
+  reducedFoodIntake:[0,100,'%'],
+  age:[1,120,'years'], hemoglobin:[2,25,'g/dL'], bloodSugar:[20,900,'mg/dL'],
+  kcalPerKg:[10,60,'kcal/kg'], proteinPerKg:[0.4,3,'g/kg']
 };
 
-let _intake = { active:false, idx:0, chosenType:null, pendingConfirm:null };
+let _intake = { active:false, idx:0, chosenType:null, pendingConfirm:null,
+                optional:false, optIdx:0, optionalDone:false };
 
 function _cancerTypes(){
   if (typeof cancerRegimenMap === 'undefined') return [];
@@ -1927,7 +1951,24 @@ function askIntakeQuestion(){
 }
 
 function finishIntake(){
+  // Offer the engine overrides once — after the doctor has seen everything
+  // the engine will calculate from, never before.
+  if (!_intake.optionalDone){
+    _intake.optionalDone = true;
+    _intake.optional = true;
+    _intake.optIdx = 0;
+    addMessageHtml('That is everything essential.<span class="qhelp">'
+      + 'The engine will now calculate kcal/kg and protein/kg from these values. '
+      + 'You can override them if you have a reason to.</span>', 'ai');
+    document.getElementById('chatPicker').innerHTML =
+      '<div class="cpick-label">Formula rate overrides — optional</div><div>'
+      + '<button class="cpick" onclick="skipOverrides()">Use the engine\'s values</button>'
+      + '<button class="cpick" onclick="startOverrides()">Set them myself</button></div>';
+    document.getElementById('chatPicker').style.display = 'block';
+    return;
+  }
   _intake.active = false;
+  _intake.optional = false;
   renderChatPicker(null);
   const src = window._fieldSources || {};
   const na = Object.keys(src).filter(k => src[k] === 'na').map(k => INTAKE_LABELS[k] || k);
@@ -1939,6 +1980,50 @@ function finishIntake(){
     + (cr >= 1.3 ? '⚠ Creatinine ' + cr + ' — the renal protein cap will apply.<br><br>' : '')
     + 'The remaining fields on the form are optional. Fill any of them yourself, '
     + 'or use <b>Save as Draft</b> and come back later.', 'ai');
+}
+
+function skipOverrides(){
+  _intake.optional = false;
+  addMessageHtml('<span class="vchip">Using the engine\'s calculated targets</span>', 'ai');
+  finishIntake();
+}
+function startOverrides(){
+  _intake.optIdx = 0;
+  askOptionalQuestion();
+}
+function askOptionalQuestion(){
+  const q = INTAKE_OPTIONAL[_intake.optIdx];
+  if (!q){ _intake.optional = false; return finishIntake(); }
+  addMessageHtml('<span class="qnum">Optional ' + (_intake.optIdx + 1) + ' of ' + INTAKE_OPTIONAL.length + '</span>'
+    + q.q + (q.help ? '<span class="qhelp">' + q.help + '</span>' : ''), 'ai');
+  renderChatPicker(q);
+}
+function handleOptionalAnswer(text){
+  const q = INTAKE_OPTIONAL[_intake.optIdx];
+  if (!q) return finishIntake();
+  const val = parseIntakeAnswer(text, q);
+  if (val === '__NA__'){
+    addMessageHtml('<span class="vchip na">' + INTAKE_LABELS[q.f] + ': left to the engine</span>', 'ai');
+    _intake.optIdx++; return askOptionalQuestion();
+  }
+  if (val === null || val === undefined){
+    addMessageHtml('Please type just the number' + (q.unit ? ' in <b>' + q.unit + '</b>' : '')
+      + ', or say <b>not available</b> to leave it to the engine.', 'ai');
+    return renderChatPicker(q);
+  }
+  const r = INTAKE_RANGE[q.f];
+  if (r && (val < r[0] || val > r[1]) && _intake.pendingConfirm !== q.f){
+    _intake.pendingConfirm = q.f;
+    addMessageHtml('<b>' + val + ' ' + r[2] + '</b> is outside the usual range ('
+      + r[0] + '–' + r[1] + ' ' + r[2] + '). Send it again to confirm, or type the correct value.', 'ai');
+    return renderChatPicker(q);
+  }
+  _intake.pendingConfirm = null;
+  setIntakeValue(q.f, val, 'doctor');
+  addMessageHtml('<span class="vchip">' + INTAKE_LABELS[q.f] + ': ' + val + '</span>'
+    + '<span class="qhelp">Overrides the engine for this field.</span>', 'ai');
+  _intake.optIdx++;
+  askOptionalQuestion();
 }
 
 // Answers to a single asked field. Deterministic — no model involved.
@@ -1958,6 +2043,10 @@ function parseIntakeAnswer(text, q){
       o.v.toLowerCase().includes(raw) || raw.includes(o.v.toLowerCase()));
     if (hits.length === 1) return hits[0].v;
     return hits.length > 1 ? '__AMBIGUOUS__' : null;   // never "closest guess"
+  }
+  if (q.text){
+    const v = text.trim();
+    return v.length ? v : null;          // a name is not a number
   }
   const m = text.match(/(-?\d+(?:\.\d+)?)/);
   return m ? parseFloat(m[1]) : null;
@@ -2070,6 +2159,10 @@ async function sendChatMessage() {
 
   // Mid-interview: the answer belongs to the field we just asked about, and
   // is read locally. No model call, so nothing can be "helpfully" completed.
+  if (_intake.optional){
+    renderChatPicker(null);
+    return handleOptionalAnswer(text);
+  }
   if (_intake.active){
     renderChatPicker(null);
     return handleIntakeAnswer(text);
