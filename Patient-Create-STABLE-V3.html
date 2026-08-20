@@ -36,6 +36,23 @@
     .ai-na { background-color: rgba(245, 158, 11, 0.10) !important; border-color: #f59e0b !important; }
     /* A value from a synthetic demo case. Loud on purpose — it is not real. */
     .ai-generated { background-color: rgba(244, 63, 94, 0.10) !important; border-color: #f43f5e !important; }
+    /* ── Per-field markers, the visible half of the demo design ────────────
+       The input tint alone says "something happened here"; it does not say
+       WHAT. These say it in words, next to the label, and they persist. */
+    .ftag { font-size:8px; font-weight:800; letter-spacing:.07em; text-transform:uppercase;
+            border:1px solid; border-radius:4px; padding:1px 5px; margin-left:6px;
+            vertical-align:middle; white-space:nowrap; display:inline-block; }
+    .ftag-ess  { color:var(--cyan);   border-color:var(--cyan);   background:var(--cyan-dim); }
+    .ftag-doc  { color:var(--green);  border-color:var(--green);  background:var(--green-dim); }
+    .ftag-na   { color:var(--amber);  border-color:var(--amber);  background:var(--amber-dim); }
+    .ftag-gen  { color:var(--rose);   border-color:var(--rose);   background:var(--rose-dim); }
+    .form-group label { display:flex; align-items:center; flex-wrap:wrap; gap:2px; }
+    /* Second line under the completeness bar: 66 filled means nothing if the
+       13 that matter are missing, so both numbers are shown. */
+    .completeness-container { flex-wrap:wrap; }
+    #essLine { width:100%; font-size:11.5px; color:var(--text-3); margin-top:8px; }
+    #essLine b { color:var(--cyan); }
+
     /* Chat option chips — only ever shown for fields that are a fixed list.
        Theme variables throughout, so the panel reads correctly in dark mode
        as well as light; hardcoded greys turned these into white boxes on the
@@ -902,7 +919,26 @@ function collectDraft(){
 
 // Autosave. Drafts exist for the doctor who gets interrupted, so waiting for
 // them to press a button would miss the case the feature is for.
-function markDraftDirty(){
+function markDraftDirty(ev){
+  // A value the doctor types by hand carries the same provenance as one they
+  // give the assistant — otherwise half the form would look unattributed.
+  const id = ev && ev.target && ev.target.id;
+  if (id && document.getElementById(id)){
+    const el = document.getElementById(id);
+    window._fieldSources = window._fieldSources || {};
+    if (el.value !== ''){
+      if (window._fieldSources[id] !== 'na'){
+        window._fieldSources[id] = 'doctor';
+        el.classList.remove('ai-na','ai-generated');
+        if (typeof setFieldTag === 'function') setFieldTag(id, 'doctor');
+      }
+    } else if (window._fieldSources[id] === 'doctor'){
+      delete window._fieldSources[id];
+      el.classList.remove('ai-filled');
+      if (typeof setFieldTag === 'function') setFieldTag(id, null);
+    }
+    if (typeof updateEssentialLine === 'function') updateEssentialLine();
+  }
   _draftDirty = true;
   clearTimeout(_draftTimer);
   _draftTimer = setTimeout(() => saveDraft(false), 2000);
@@ -972,6 +1008,9 @@ async function loadDraft(id){
       // Keep provenance visible on resume — a value entered three days ago
       // should still show whether it came from the doctor or was unavailable.
       el.classList.add(window._fieldSources[k] === 'na' ? 'ai-na' : 'ai-filled');
+      // Provenance survives the round trip — a value entered three days ago
+      // still shows whether it was measured or recorded as unavailable.
+      if (typeof setFieldTag === 'function') setFieldTag(k, window._fieldSources[k]);
       if (typeof updateLabStatus === 'function') updateLabStatus(k, v);
     });
     if (typeof updateCompletenessScore === 'function') updateCompletenessScore();
@@ -993,6 +1032,8 @@ window.addEventListener('DOMContentLoaded', () => {
     const el = document.getElementById(id);
     if (el) { el.addEventListener('input', markDraftDirty); el.addEventListener('change', markDraftDirty); }
   });
+  markEssentialFields();
+  updateEssentialLine();
   const q = new URLSearchParams(window.location.search).get('draft');
   if (q) loadDraft(q);
 });
@@ -1534,6 +1575,73 @@ function _optionsFor(q){
   return null;
 }
 
+/* ── Field markers ────────────────────────────────────────────────────────
+   A tinted input tells the doctor something happened to a field; it does not
+   tell them WHAT. Three days later, resuming a draft, "was this measured or
+   did the assistant put it there?" is exactly the question that matters. The
+   tag answers it in words and it does not fade. */
+function _labelFor(id){
+  const el = document.getElementById(id);
+  if (!el) return null;
+  const group = el.closest('.form-group') || el.parentElement;
+  return group ? group.querySelector('label') : null;
+}
+
+function setFieldTag(id, source){
+  const label = _labelFor(id);
+  if (!label) return;
+  let tag = label.querySelector('.ftag-src');
+  const spec = source === 'na'        ? ['ftag-na',  'not available']
+             : source === 'generated' ? ['ftag-gen', 'AI generated']
+             : source === 'doctor'    ? ['ftag-doc', 'doctor stated']
+             : null;
+  if (!spec){ if (tag) tag.remove(); return; }
+  if (!tag){
+    tag = document.createElement('span');
+    tag.className = 'ftag ftag-src';
+    label.appendChild(tag);
+  }
+  tag.className = 'ftag ftag-src ' + spec[0];
+  tag.textContent = spec[1];
+}
+
+// Mark the 13 fields the assistant will chase, so it is obvious which of the
+// 66 actually gate a plan.
+function markEssentialFields(){
+  if (typeof INTAKE_QUESTIONS === 'undefined') return;
+  INTAKE_QUESTIONS.forEach(q => {
+    if (q.f === 'cancerType') return;
+    const label = _labelFor(q.f);
+    if (!label || label.querySelector('.ftag-ess')) return;
+    const t = document.createElement('span');
+    t.className = 'ftag ftag-ess';
+    t.textContent = 'essential';
+    t.title = 'Needed before a nutrition plan can be generated';
+    label.appendChild(t);
+  });
+}
+
+// Second line under the existing completeness bar. 12 of 66 reads as alarming
+// when the 12 are the ones that matter, so show both counts.
+function updateEssentialLine(){
+  const box = document.querySelector('.completeness-container');
+  if (!box || typeof INTAKE_QUESTIONS === 'undefined') return;
+  let line = document.getElementById('essLine');
+  if (!line){
+    line = document.createElement('div');
+    line.id = 'essLine';
+    box.appendChild(line);
+  }
+  const total = INTAKE_QUESTIONS.length - 1;
+  const done  = (typeof _intakeAnswered === 'function') ? _intakeAnswered() : 0;
+  const src = window._fieldSources || {};
+  const filled = Object.keys(src).filter(k => src[k] === 'doctor' || src[k] === 'generated').length;
+  const na = Object.keys(src).filter(k => src[k] === 'na').length;
+  line.innerHTML = `<b>${done} of ${total}</b> essential fields captured`
+    + ` · ${filled} value${filled === 1 ? '' : 's'} recorded`
+    + (na ? ` · <span style="color:var(--amber)">${na} not available</span>` : '');
+}
+
 // The single place a value reaches the form, so provenance can never diverge
 // from what is displayed.
 function setIntakeValue(field, value, source){
@@ -1546,6 +1654,8 @@ function setIntakeValue(field, value, source){
     el.classList.add(source === 'na' ? 'ai-na' : source === 'generated' ? 'ai-generated' : 'ai-filled');
     if (typeof updateLabStatus === 'function') updateLabStatus(field, el.value);
   }
+  setFieldTag(field, source);
+  updateEssentialLine();
   if (typeof syncWeightLossFromForm === 'function') syncWeightLossFromForm();
   if (typeof updateBSAAuto === 'function') updateBSAAuto();
   if (typeof updateCompletenessScore === 'function') updateCompletenessScore();
@@ -1604,6 +1714,8 @@ function undoIntake(){
   const el = document.getElementById(q.f);
   if (el){ el.value = ''; el.classList.remove('ai-filled','ai-na','ai-generated'); }
   if (window._fieldSources) delete window._fieldSources[q.f];
+  setFieldTag(q.f, null);
+  updateEssentialLine();
   if (q.f === 'cancerInput') _intake.chosenType = null;
   if (typeof updateCompletenessScore === 'function') updateCompletenessScore();
   addMessage('Cleared ' + (INTAKE_LABELS[q.f] || q.f) + '. Let us set it again.', 'ai');
@@ -1867,6 +1979,7 @@ async function sendChatMessage() {
           window._fieldSources[el.id] = 'doctor';
           el.classList.remove('ai-na','ai-generated');
           el.classList.add('ai-filled');
+          setFieldTag(el.id, 'doctor');
           filled.push(el.id);
         }
       });
@@ -1921,7 +2034,8 @@ async function generateDemoCase(){
       Object.keys(data.extractedData).forEach(k => {
         const el = document.getElementById(k);
         if (el){ window._fieldSources[el.id] = 'generated';
-                 el.classList.remove('ai-filled','ai-na'); el.classList.add('ai-generated'); }
+                 el.classList.remove('ai-filled','ai-na'); el.classList.add('ai-generated');
+                 setFieldTag(el.id, 'generated'); }
       });
       addMessageHtml('⚠ <b>Synthetic case.</b> Every red field was invented for demonstration '
         + 'and none of it was measured.', 'ai');
@@ -1972,6 +2086,7 @@ async function handlePdfUpload(event) {
             window._fieldSources[el.id] = 'doctor';
             el.classList.remove('ai-na','ai-generated');
             el.classList.add('ai-filled');
+            setFieldTag(el.id, 'doctor');
             n++;
           }
         });
