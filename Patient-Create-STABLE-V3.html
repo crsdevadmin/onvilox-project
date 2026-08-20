@@ -105,6 +105,95 @@
     .completeness-bar-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #3b82f6, #10b981); transition: width 0.4s ease; }
     .completeness-pct { font-weight: 800; font-size: 18px; color: #10b981; min-width: 50px; text-align: right; }
 
+    /* ══ AI ASSISTANT — launcher, greeting and panel ═══════════════════════
+       Scoped to this page. The launcher was a small face glyph that read as
+       decoration, and the tool buttons in the input row sat at low contrast
+       against their own background, so the attachment control was effectively
+       invisible. ══════════════════════════════════════════════════════════ */
+
+    .ai-chat-launcher {
+      width: 62px !important; height: 62px !important;
+      background: linear-gradient(135deg, var(--cyan), var(--violet)) !important;
+      box-shadow: 0 10px 30px rgba(34,211,238,.28), 0 0 0 1px rgba(255,255,255,.08) inset !important;
+      transition: transform .2s cubic-bezier(.22,1,.36,1), box-shadow .2s !important;
+    }
+    .ai-chat-launcher:hover { transform: translateY(-3px) scale(1.04) !important;
+      box-shadow: 0 16px 40px rgba(34,211,238,.4) !important; }
+    .ai-chat-launcher svg { width: 30px !important; height: 30px !important; fill: #051018 !important; }
+    /* A quiet ring, so the assistant reads as present without nagging. */
+    .ai-chat-launcher::after {
+      content:''; position:absolute; inset:-6px; border-radius:50%;
+      border:2px solid var(--cyan); opacity:.35; animation: aiRing 2.6s ease-out infinite; pointer-events:none;
+    }
+    @keyframes aiRing { 0%{transform:scale(.92);opacity:.4} 70%{transform:scale(1.18);opacity:0} 100%{opacity:0} }
+
+    /* Greeting bubble — says what the assistant is for, then gets out of the way. */
+    #aiGreeting {
+      position: fixed; right: 104px; bottom: 34px; z-index: 999; max-width: 262px;
+      background: var(--surface); border: 1px solid var(--border-2);
+      border-radius: 16px 16px 4px 16px; padding: 13px 15px;
+      box-shadow: 0 16px 44px rgba(0,0,0,.45);
+      font-size: 12.5px; line-height: 1.55; color: var(--text-2);
+      display: none; animation: aiPop .32s cubic-bezier(.22,1,.36,1);
+    }
+    #aiGreeting.on { display: block; }
+    #aiGreeting b { color: var(--text); }
+    #aiGreeting .hi { display:flex; align-items:center; gap:7px; margin-bottom:5px;
+      font-size:13px; font-weight:800; color:var(--text); }
+    #aiGreeting .hi .dot { width:7px; height:7px; border-radius:50%; background:var(--green);
+      box-shadow:0 0 8px var(--green); flex:none; }
+    #aiGreeting .x { position:absolute; top:6px; right:9px; cursor:pointer; color:var(--text-3);
+      font-size:15px; line-height:1; }
+    #aiGreeting .x:hover { color:var(--text); }
+    #aiGreeting .cta { margin-top:9px; font-size:11.5px; font-weight:800; color:var(--cyan); cursor:pointer; }
+    @keyframes aiPop { from{opacity:0; transform:translateY(8px) scale(.96)} to{opacity:1; transform:none} }
+
+    /* Panel header: an identity rather than a title bar. */
+    .ai-chat-header {
+      background: linear-gradient(135deg, rgba(34,211,238,.12), rgba(139,92,246,.10)) !important;
+      padding: 13px 16px !important;
+    }
+    .aih { display:flex; align-items:center; gap:10px; min-width:0; }
+    .aih-av { width:34px; height:34px; border-radius:11px; flex:none;
+      background:linear-gradient(135deg, var(--cyan), var(--violet));
+      display:flex; align-items:center; justify-content:center; }
+    .aih-av svg { width:19px; height:19px; fill:#051018; }
+    .aih-t { min-width:0; }
+    .aih-t h4 { font-size:13.5px !important; font-weight:800; margin:0; color:var(--text); }
+    .aih-t .s { font-size:10.5px; color:var(--text-3); display:flex; align-items:center; gap:5px; margin-top:1px; }
+    .aih-t .s .dot { width:6px; height:6px; border-radius:50%; background:var(--green);
+      box-shadow:0 0 6px var(--green); }
+
+    /* Input row. Tool buttons are outlined and labelled on hover, so the
+       attachment control is findable instead of a grey smudge. */
+    .ai-chat-input-area { padding: 11px 14px !important; gap: 7px !important; align-items: center !important;
+      border-top: 1px solid var(--border) !important; background: var(--bg-2); }
+    .chat-tool {
+      width: 36px; height: 36px; flex: none; border-radius: 10px; cursor: pointer;
+      border: 1px solid var(--border-2); background: var(--surface-2); color: var(--text-2);
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 15px; font-family: inherit; transition: all .15s; position: relative;
+    }
+    .chat-tool:hover { color: var(--cyan); border-color: var(--cyan); background: var(--cyan-dim); }
+    .chat-tool svg { width: 17px; height: 17px; fill: currentColor; }
+    .chat-tool[data-tip]:hover::after {
+      content: attr(data-tip); position:absolute; bottom: calc(100% + 7px); left: 50%;
+      transform: translateX(-50%); background: var(--bg-2); color: var(--text);
+      border: 1px solid var(--border-2); border-radius: 7px; padding: 4px 9px;
+      font-size: 10.5px; font-weight: 700; white-space: nowrap; z-index: 5;
+    }
+    .chat-tool.demo:hover { color: var(--rose); border-color: var(--rose); background: var(--rose-dim); }
+    .ai-chat-input { border-radius: 10px !important; padding: 10px 13px !important;
+      background: var(--surface-2) !important; border: 1px solid var(--border-2) !important; }
+    .ai-chat-input:focus { outline: none; border-color: var(--cyan) !important; }
+    .chat-send {
+      width: 38px; height: 38px; flex: none; border-radius: 10px; border: none; cursor: pointer;
+      background: var(--cyan); color: #051018; display: inline-flex; align-items: center;
+      justify-content: center; transition: filter .15s;
+    }
+    .chat-send:hover { filter: brightness(1.12); }
+    .chat-send svg { width: 17px; height: 17px; fill: currentColor; }
+
     /* ---- Layout gap fixes (scoped to this page) ---- */
     /* The grid already spaces rows via `gap`; the extra margin-bottom on each
        form-group was doubling vertical spacing to ~36px between rows. */
@@ -120,13 +209,28 @@
 <body>
 
 <!-- INTERACTIVE CLAUDE AI ASSISTANT -->
-<div class="ai-chat-launcher" onclick="toggleChat()">
-  <svg viewBox="0 0 24 24"><path d="M12,2A10,10 0 0,1 22,12A10,10 0 0,1 12,22A10,10 0 0,1 2,12A10,10 0 0,1 12,2M12,4A8,8 0 0,0 4,12C4,14.39 5,16.5 6.74,18L7,17.27C7.3,16.27 8.23,15.5 9.35,15.5H10.5V14.5A0.5,0.5 0 0,1 11,14H13A0.5,0.5 0 0,1 13.5,14.5V15.5H14.65C15.77,15.5 16.7,16.27 17,17.27L17.26,18C19,16.5 20,14.39 20,12A8,8 0 0,0 12,4M12.5,7A1.5,1.5 0 0,1 14,8.5A1.5,1.5 0 0,1 12.5,10A1.5,1.5 0 0,1 11,8.5A1.5,1.5 0 0,1 12.5,7M11,14.5A0.5,0.5 0 0,0 10.5,14H9A0.5,0.5 0 0,1 8.5,14.5V15.5H9.35C10.1,15.5 10.74,15.04 11,14.41V14.5M15.5,14.5A0.5,0.5 0 0,0 15,14H13.5A0.5,0.5 0 0,1 13,14.5V15.5H14.65C15,15.5 15.29,15.4 15.5,15.24V14.5Z"/></svg>
+<!-- Greeting: introduces the assistant once, then stays out of the way. -->
+<div id="aiGreeting">
+  <span class="x" onclick="dismissGreeting(event)">&times;</span>
+  <div class="hi"><span class="dot"></span> Hi, I'm your AI assistant</div>
+  Tell me about the patient and I'll fill this form — <b>only with what you tell me</b>.
+  I never invent a value.
+  <div class="cta" onclick="openFromGreeting()">Start with the assistant &rarr;</div>
+</div>
+
+<div class="ai-chat-launcher" onclick="toggleChat()" title="AI Assistance">
+  <svg viewBox="0 0 24 24"><path d="M12 2a1 1 0 0 1 .93.64l1.06 2.77 2.77 1.06a1 1 0 0 1 0 1.86l-2.77 1.06-1.06 2.77a1 1 0 0 1-1.86 0L9.99 9.39 7.22 8.33a1 1 0 0 1 0-1.86l2.77-1.06 1.06-2.77A1 1 0 0 1 12 2Z"/><path d="M5 13a.7.7 0 0 1 .65.45l.62 1.62 1.62.62a.7.7 0 0 1 0 1.3l-1.62.62-.62 1.62a.7.7 0 0 1-1.3 0l-.62-1.62-1.62-.62a.7.7 0 0 1 0-1.3l1.62-.62.62-1.62A.7.7 0 0 1 5 13Z"/><path d="M17.5 14a.6.6 0 0 1 .56.38l.5 1.31 1.31.5a.6.6 0 0 1 0 1.12l-1.31.5-.5 1.31a.6.6 0 0 1-1.12 0l-.5-1.31-1.31-.5a.6.6 0 0 1 0-1.12l1.31-.5.5-1.31A.6.6 0 0 1 17.5 14Z"/></svg>
 </div>
 
 <div class="ai-chat-window" id="aiChatWindow">
   <div class="ai-chat-header">
-    <h4><svg style="width:16px; height:16px; fill:currentColor;" viewBox="0 0 24 24"><path d="M12,2A10,10 0 0,1 22,12A10,10 0 0,1 12,22A10,10 0 0,1 2,12A10,10 0 0,1 12,2M12,4A8,8 0 0,0 4,12C4,14.39 5,16.5 6.74,18L7,17.27C7.3,16.27 8.23,15.5 9.35,15.5H10.5V14.5A0.5,0.5 0 0,1 11,14H13A0.5,0.5 0 0,1 13.5,14.5V15.5H14.65C15.77,15.5 16.7,16.27 17,17.27L17.26,18C19,16.5 20,14.39 20,12A8,8 0 0,0 12,4M12.5,7A1.5,1.5 0 0,1 14,8.5A1.5,1.5 0 0,1 12.5,10A1.5,1.5 0 0,1 11,8.5A1.5,1.5 0 0,1 12.5,7M11,14.5A0.5,0.5 0 0,0 10.5,14H9A0.5,0.5 0 0,1 8.5,14.5V15.5H9.35C10.1,15.5 10.74,15.04 11,14.41V14.5M15.5,14.5A0.5,0.5 0 0,0 15,14H13.5A0.5,0.5 0 0,1 13,14.5V15.5H14.65C15,15.5 15.29,15.4 15.5,15.24V14.5Z"/></svg> ✨ AI Assistance</h4>
+    <div class="aih">
+      <div class="aih-av"><svg viewBox="0 0 24 24"><path d="M12 2a1 1 0 0 1 .93.64l1.06 2.77 2.77 1.06a1 1 0 0 1 0 1.86l-2.77 1.06-1.06 2.77a1 1 0 0 1-1.86 0L9.99 9.39 7.22 8.33a1 1 0 0 1 0-1.86l2.77-1.06 1.06-2.77A1 1 0 0 1 12 2Z"/><path d="M5 13a.7.7 0 0 1 .65.45l.62 1.62 1.62.62a.7.7 0 0 1 0 1.3l-1.62.62-.62 1.62a.7.7 0 0 1-1.3 0l-.62-1.62-1.62-.62a.7.7 0 0 1 0-1.3l1.62-.62.62-1.62A.7.7 0 0 1 5 13Z"/><path d="M17.5 14a.6.6 0 0 1 .56.38l.5 1.31 1.31.5a.6.6 0 0 1 0 1.12l-1.31.5-.5 1.31a.6.6 0 0 1-1.12 0l-.5-1.31-1.31-.5a.6.6 0 0 1 0-1.12l1.31-.5.5-1.31A.6.6 0 0 1 17.5 14Z"/></svg></div>
+      <div class="aih-t">
+        <h4>AI Assistance</h4>
+        <div class="s"><span class="dot"></span> Fills only what you tell it</div>
+      </div>
+    </div>
     <div style="display:flex;align-items:center;gap:9px;">
       <button onclick="saveDraftFromChat()" title="Keep what you have and finish later — no plan is generated"
         style="font-size:11px;font-weight:800;font-family:inherit;cursor:pointer;border-radius:7px;
@@ -149,12 +253,18 @@
   <div id="chatPicker" style="padding:0 14px 8px; display:none;"></div>
   <div class="ai-chat-input-area">
     <input type="file" id="pdfUpload" accept=".pdf" style="display:none;" onchange="handlePdfUpload(event)">
-    <button class="ai-chat-send" onclick="triggerFileUpload()" title="Upload Medical Report (PDF)" style="font-size:16px; margin-right:5px;">📎</button>
-    <!-- Generating a synthetic case is now a deliberate act, not something the
+    <button class="chat-tool" onclick="triggerFileUpload()" data-tip="Attach a report (PDF)" aria-label="Attach a report">
+      <svg viewBox="0 0 24 24"><path d="M16.5 6v11.5a4.5 4.5 0 0 1-9 0V5a3 3 0 0 1 6 0v10.5a1.5 1.5 0 0 1-3 0V6H9v9.5a3 3 0 0 0 6 0V5a4.5 4.5 0 0 0-9 0v12.5a6 6 0 0 0 12 0V6h-1.5Z"/></svg>
+    </button>
+    <!-- Generating a synthetic case is a deliberate act, not something the
          model can decide to do because a message sounded like a case prompt. -->
-    <button class="ai-chat-send" onclick="generateDemoCase()" title="Generate a SYNTHETIC demonstration patient (not a real record)" style="font-size:14px; margin-right:5px; background:#64748b;">🧪</button>
-    <input type="text" class="ai-chat-input" id="chatInput" placeholder="Type or paste notes..." onkeypress="if(event.key==='Enter') sendChatMessage()">
-    <button class="ai-chat-send" onclick="sendChatMessage()">&gt;</button>
+    <button class="chat-tool demo" onclick="generateDemoCase()" data-tip="Synthetic demo case (not real)" aria-label="Generate a demo case">
+      <svg viewBox="0 0 24 24"><path d="M9 2h6v2h-1v4.2l4.4 8.6A3 3 0 0 1 15.7 21H8.3a3 3 0 0 1-2.7-4.2L10 8.2V4H9V2Zm3 2v4.7L8.6 15h6.8L12 8.7V4Z"/></svg>
+    </button>
+    <input type="text" class="ai-chat-input" id="chatInput" placeholder="Describe the patient, or paste notes…" onkeypress="if(event.key==='Enter') sendChatMessage()">
+    <button class="chat-send" onclick="sendChatMessage()" aria-label="Send">
+      <svg viewBox="0 0 24 24"><path d="M3.4 20.4 21 12 3.4 3.6 3.39 10.1 15.6 12 3.39 13.9 3.4 20.4Z"/></svg>
+    </button>
   </div>
 </div>
 
@@ -1398,9 +1508,37 @@ function updateBodyCompAuto() {
 // assistant feel broken: the panel auto-opened on load, so the doctor's click
 // on the launcher toggled it shut and nothing appeared to happen. Anything
 // that is not the user pressing the launcher should say what it means.
+/* ── Greeting ──────────────────────────────────────────────────────────────
+   Shown once per session, a moment after load, then it retires. The point is
+   to say what the assistant is FOR — a bare bubble in the corner tells a
+   doctor nothing, and the old auto-opening panel just got in the way. */
+function showGreeting(){
+  if (sessionStorage.getItem('gq_ai_greeted') === '1') return;
+  if (isChatOpen()) return;
+  const el = document.getElementById('aiGreeting');
+  if (!el) return;
+  el.classList.add('on');
+  clearTimeout(el._t);
+  el._t = setTimeout(hideGreeting, 12000);   // long enough to read, then gone
+}
+function hideGreeting(){
+  const el = document.getElementById('aiGreeting');
+  if (el) el.classList.remove('on');
+}
+function dismissGreeting(ev){
+  if (ev) ev.stopPropagation();
+  sessionStorage.setItem('gq_ai_greeted', '1');
+  hideGreeting();
+}
+function openFromGreeting(){
+  dismissGreeting();
+  openChat();
+}
+
 function openChat() {
   const win = document.getElementById('aiChatWindow');
   if (!win) return;
+  dismissGreeting();
   win.style.display = 'flex';
   const inp = document.getElementById('chatInput');
   if (inp) inp.focus();
@@ -2392,7 +2530,9 @@ window.onload = function() {
   // The assistant no longer opens itself 600ms after load. Because toggleChat()
   // flips state, that auto-open meant the very next click on the launcher
   // CLOSED the panel — so pressing the AI assistant button looked like it did
-  // nothing at all. The doctor opens it when they want it.
+  // nothing at all. The doctor opens it when they want it; a greeting bubble
+  // introduces it instead, without taking over the screen.
+  setTimeout(showGreeting, 1400);
 };
 </script>
 
