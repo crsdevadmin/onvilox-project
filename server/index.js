@@ -1535,6 +1535,12 @@ app.put('/api/pilot-settings', authenticateToken, requireAdminOnly, async (req, 
 // review the whole cohort, not just their own patients. Store roles are still
 // excluded: they handle manufacturing and have no need for outcome data.
 // Client-side auth.requireRole() only hides the UI; this is the real guard.
+// NOTE ON THE NAME: this admits DOCTOR as well as ADMIN and SUPER_ADMIN. It is
+// "admin or clinician", not "admin". Nine study-wide endpoints use it, which
+// means any doctor can currently read and export the entire pilot cohort —
+// including patients who are not theirs. That may be intended for a small
+// single-site pilot, but it should be a decision rather than a side effect of
+// the name. Use requireAdminOnly for anything that must exclude clinicians.
 function requireAdmin(req, res, next) {
   const role = req.user && req.user.role;
   if (!['ADMIN', 'SUPER_ADMIN', 'DOCTOR'].includes(role)) {
@@ -1764,7 +1770,10 @@ app.get('/api/trials/export', authenticateToken, requireAdmin, async (req, res) 
 // Reports its own denominator: a plan with no micronutrient block is counted
 // as missing rather than quietly skipped, so a thin result cannot be mistaken
 // for a complete one.
-app.get('/api/trials/micronutrients', authenticateToken, requireAdmin, async (req, res) => {
+// Admin only, deliberately. This report names every patient in the study and
+// shows what each was prescribed, so it is not scoped to one doctor's list —
+// requireAdmin would have admitted DOCTOR (see the note on that function).
+app.get('/api/trials/micronutrients', authenticateToken, requireAdminOnly, async (req, res) => {
   try {
     const plansRes = await pool.query(
       `SELECT DISTINCT ON (patient_id)

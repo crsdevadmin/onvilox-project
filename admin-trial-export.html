@@ -58,7 +58,7 @@
       <button class="btn-secondary" id="exportPdfBtn" style="border-radius:8px;padding:11px 22px;font-size:15px;cursor:pointer;" onclick="doExportPDF()" disabled>📄 Doctor Presentation (PDF)</button>
       <!-- Formulation and micronutrient orders live inside nutrition_plans as
            JSONB and were previously only visible one patient at a time. -->
-      <button class="btn-secondary" id="microPdfBtn" style="border-radius:8px;padding:11px 22px;font-size:15px;cursor:pointer;" onclick="doMicronutrientPDF()">🧪 Formulation &amp; Micronutrients (PDF)</button>
+      <button class="btn-secondary" id="microPdfBtn" style="border-radius:8px;padding:11px 22px;font-size:15px;cursor:pointer;display:none;" onclick="doMicronutrientPDF()">🧪 Formulation &amp; Micronutrients (PDF)</button>
     </div>
     <div id="exMsg" style="color:var(--text-2);font-size:13px;margin-top:10px;">Loading dataset…</div>
     <div id="pdfMsg" style="color:var(--text-2);font-size:13px;margin-top:4px;"></div>
@@ -618,6 +618,19 @@ function drawResponseBadge(doc, x, y, w, resp){
 // formulation split, the protein types, the feeding routes, and how often each
 // micronutrient is ordered and at which dose. Prints its own denominator so a
 // partial dataset cannot be mistaken for a complete one.
+// The report covers every patient in the study, so it is admin-only on the
+// server. Reveal the control only to those who can actually run it, rather
+// than showing a doctor a button that answers 403.
+(function gateMicronutrientReport(){
+  const show = () => {
+    const btn = document.getElementById('microPdfBtn');
+    const u = (typeof auth !== 'undefined' && auth.getCurrentUser) ? auth.getCurrentUser() : {};
+    if (btn && ['ADMIN','SUPER_ADMIN'].includes(u.role)) btn.style.display = '';
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', show);
+  else show();
+})();
+
 async function doMicronutrientPDF(){
   const msg = document.getElementById('exMsg');
   if (typeof window.jspdf === 'undefined'){
