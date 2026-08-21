@@ -88,8 +88,35 @@ async function notifyUsers(userIds, title, body, url) {
   for (const uid of userIds) {
     const sub = _pushSubs[uid];
     if (!sub) continue;
-    try { await webpush.sendNotification(sub, payload); } catch(e) { delete _pushSubs[uid]; }
+    try {
+      await webpush.sendNotification(sub, payload);
+    } catch(e) {
+      await dropPushSubscription(uid, e);
+    }
   }
+}
+
+// A push failure used to drop the subscription from the in-memory cache no
+// matter what went wrong. That meant a single transient error — a network
+// blip, a 5xx from the push service — permanently silenced that user's
+// notifications until someone happened to restart the server, and nothing
+// anywhere said so. The row stayed in push_subscriptions, so cache and table
+// quietly disagreed.
+//
+// Only 404 and 410 mean the subscription is genuinely gone (the browser
+// revoked it). Everything else is treated as temporary and left alone.
+async function dropPushSubscription(uid, err) {
+  const code = err && (err.statusCode || err.status);
+  if (code !== 404 && code !== 410) {
+    console.warn('push send failed for', uid, '— keeping subscription:', (err && err.message) || code);
+    return false;
+  }
+  delete _pushSubs[uid];
+  try {
+    await pool.query('DELETE FROM push_subscriptions WHERE user_id=$1', [uid]);
+    console.log('push: subscription for', uid, 'was revoked by the browser — removed');
+  } catch(e) { console.warn('push sub delete:', e.message); }
+  return true;
 }
 
 // Resolve the user IDs belonging to a store, optionally filtered by role.
@@ -125,9 +152,21 @@ app.post('/api/push/test', authenticateToken, async (req, res) => {
     }));
     res.json({ ok: true, message: 'Test notification sent' });
   } catch(e) {
-    delete _pushSubs[req.user.id];
-    res.status(500).json({ error: e.message });
+    // Same rule as notifyUsers: a failed test send is not proof the
+    // subscription is dead, so don't silently disable the user's notifications.
+    const removed = await dropPushSubscription(req.user.id, e);
+    res.status(500).json({ error: e.message, subscriptionRemoved: removed });
   }
+});
+
+// Turning notifications off should clear the stored subscription too,
+// otherwise the next server start reloads it and pushes resume.
+app.post('/api/push/unsubscribe', authenticateToken, async (req, res) => {
+  delete _pushSubs[req.user.id];
+  try {
+    await pool.query('DELETE FROM push_subscriptions WHERE user_id=$1', [req.user.id]);
+  } catch(e) { return res.status(500).json({ error: e.message }); }
+  res.json({ ok: true });
 });
 
 // Auth: Login

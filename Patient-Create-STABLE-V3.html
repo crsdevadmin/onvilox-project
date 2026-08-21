@@ -1216,6 +1216,12 @@ async function submitPatient(){
     fatPercent: parseFloat(document.getElementById('fatPercent').value || 0),
     smi: parseFloat(document.getElementById('smi').value || 0),
     handGrip: parseFloat(document.getElementById('handGrip').value || 0),
+    // MUAC was collected on the form, evaluated by updateLabStatus (which
+    // shows Low/Normal beside the field) and has its own column in the
+    // patients table — but it was never put on the payload, so every value a
+    // doctor entered saved as null. Mid-upper arm circumference is a GLIM
+    // criterion; it should not be the one measurement that gets thrown away.
+    muac: parseFloat(document.getElementById('muac').value) || null,
     sarcopeniaStatus: document.getElementById('sarcopeniaStatus').value,
     activityLevel: document.getElementById('activityLevel').value,
     weightLossPercent: (() => {
