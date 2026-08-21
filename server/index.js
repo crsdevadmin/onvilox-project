@@ -1753,6 +1753,143 @@ app.get('/api/trials/export', authenticateToken, requireAdmin, async (req, res) 
 });
 
 // Formula Tracking — which formula version + batch each pilot patient received.
+// ── Formulation & micronutrient report ────────────────────────────────────
+// The Excel export covers enrolment, baseline, weekly and outcomes, but the
+// prescribed formulation and the micronutrient orders live inside
+// nutrition_plans.final_plan as JSONB and were only ever rendered on one
+// patient's profile page. So the question "what are we actually prescribing,
+// across all patients?" could not be answered without reading the database by
+// hand. This aggregates it.
+//
+// Reports its own denominator: a plan with no micronutrient block is counted
+// as missing rather than quietly skipped, so a thin result cannot be mistaken
+// for a complete one.
+app.get('/api/trials/micronutrients', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const plansRes = await pool.query(
+      `SELECT DISTINCT ON (patient_id)
+              patient_id, version, final_plan, engine_output, generated_at
+         FROM nutrition_plans
+        ORDER BY patient_id, version DESC NULLS LAST`);
+    const rows = plansRes.rows;
+    if (!rows.length) return res.json({ patients: 0, plansAnalysed: 0, micronutrients: [] });
+
+    const ids = rows.map(r => r.patient_id);
+    const pats = (await pool.query(
+      'SELECT id, name, uhic, cancer, feeding_method FROM patients WHERE id = ANY($1)', [ids])).rows;
+    const byId = {}; pats.forEach(p => { byId[p.id] = p; });
+    const trials = (await pool.query(
+      'SELECT patient_id, study_id FROM trial_enrollments WHERE patient_id = ANY($1)', [ids])).rows;
+    const studyBy = {}; trials.forEach(t => { studyBy[t.patient_id] = t.study_id; });
+
+    // The formulation the store actually made is on the weekly prescription,
+    // not the plan — take the most recent one per patient.
+    const wrx = (await pool.query(
+      `SELECT DISTINCT ON (patient_id) patient_id, targets
+         FROM weekly_prescriptions WHERE patient_id = ANY($1)
+        ORDER BY patient_id, week_number DESC`, [ids])).rows;
+    const rxBy = {}; wrx.forEach(w => { rxBy[w.patient_id] = w.targets || {}; });
+
+    const asObj = v => {
+      if (!v) return {};
+      if (typeof v === 'string') { try { return JSON.parse(v); } catch(e) { return {}; } }
+      return v;
+    };
+    // "None", "Consider if…", "-" all mean not prescribed. Counting them as
+    // orders would inflate every nutrient to 100%.
+    const NOT_PRESCRIBED = /^(none|nil|n\/?a|-|—|not required|consider\b)/i;
+    const isOrdered = v => typeof v === 'string' && v.trim() !== '' && !NOT_PRESCRIBED.test(v.trim());
+
+    const tally = {};                 // field -> value -> count
+    const bump = (field, value) => {
+      if (value === undefined || value === null || value === '') return;
+      tally[field] = tally[field] || {};
+      tally[field][value] = (tally[field][value] || 0) + 1;
+    };
+    const micro = {};                 // nutrient -> { ordered, doses:{dose:n} }
+    let withMicro = 0;
+
+    const perPatient = rows.map(r => {
+      const fp = asObj(r.final_plan);
+      const eo = asObj(r.engine_output);
+      const plan = Object.keys(fp).length ? fp : eo;      // final overrides engine
+      const p = byId[r.patient_id] || {};
+      const rx = rxBy[r.patient_id] || {};
+
+      const formulation = rx.formulation || plan.formulation
+        || (plan.recipe && plan.recipe.formulation) || null;
+      const proteinType = plan.proteinType || null;
+      const route = plan.prescribedRoute || p.feeding_method || null;
+
+      bump('formulation', formulation);
+      bump('proteinType', proteinType);
+      bump('route', route);
+
+      const m = asObj(plan.micronutrients);
+      const ordered = [];
+      if (Object.keys(m).length) withMicro++;
+      Object.entries(m).forEach(([nutrient, dose]) => {
+        micro[nutrient] = micro[nutrient] || { ordered: 0, doses: {} };
+        if (isOrdered(dose)) {
+          micro[nutrient].ordered++;
+          const key = String(dose).trim();
+          micro[nutrient].doses[key] = (micro[nutrient].doses[key] || 0) + 1;
+          ordered.push(nutrient);
+        }
+      });
+
+      return {
+        patientId: r.patient_id,
+        studyId: studyBy[r.patient_id] || null,
+        name: p.name || '—',
+        uhic: p.uhic || null,
+        cancer: p.cancer || null,
+        planVersion: r.version,
+        formulation, proteinType, route,
+        kcalPerKg: plan.kcalPerKg != null ? plan.kcalPerKg : null,
+        proteinPerKg: plan.proteinPerKg != null ? plan.proteinPerKg : null,
+        dailyCalories: plan.dailyCalories != null ? plan.dailyCalories : null,
+        dailyProtein: plan.dailyProtein != null ? plan.dailyProtein : null,
+        cachexia: !!plan.cachexia,
+        sarcopenia: !!plan.sarcopenia,
+        micronutrientsOrdered: ordered.length,
+        micronutrients: ordered
+      };
+    });
+
+    const asList = field => Object.entries(tally[field] || {})
+      .map(([value, n]) => ({ value, n, pct: Math.round(n / rows.length * 1000) / 10 }))
+      .sort((a, b) => b.n - a.n);
+
+    const micronutrients = Object.entries(micro)
+      .map(([nutrient, d]) => ({
+        nutrient,
+        ordered: d.ordered,
+        pct: Math.round(d.ordered / rows.length * 1000) / 10,
+        doses: Object.entries(d.doses).map(([dose, n]) => ({ dose, n }))
+                 .sort((a, b) => b.n - a.n)
+      }))
+      .sort((a, b) => b.ordered - a.ordered);
+
+    res.json({
+      generatedAt: new Date().toISOString(),
+      patients: rows.length,
+      plansAnalysed: rows.length,
+      // Stated plainly so a partial dataset cannot read as a complete one.
+      coverage: {
+        plansWithMicronutrients: withMicro,
+        plansMissingMicronutrients: rows.length - withMicro,
+        formulationKnown: Object.values(tally.formulation || {}).reduce((a, b) => a + b, 0)
+      },
+      formulation: asList('formulation'),
+      proteinType: asList('proteinType'),
+      route: asList('route'),
+      micronutrients,
+      perPatient
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 app.get('/api/trials/formula', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const jobsRes = await pool.query('SELECT patient_id, status, history, mfg_date, batch_no, created_at FROM manufacturing_jobs');

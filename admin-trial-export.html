@@ -56,6 +56,9 @@
     <div style="display:flex;gap:10px;flex-wrap:wrap;">
       <button class="btn-primary" id="exportBtn" style="border-radius:8px;padding:11px 22px;font-size:15px;cursor:pointer;" onclick="doExport()" disabled>⬇ Export Pilot Dataset (Excel)</button>
       <button class="btn-secondary" id="exportPdfBtn" style="border-radius:8px;padding:11px 22px;font-size:15px;cursor:pointer;" onclick="doExportPDF()" disabled>📄 Doctor Presentation (PDF)</button>
+      <!-- Formulation and micronutrient orders live inside nutrition_plans as
+           JSONB and were previously only visible one patient at a time. -->
+      <button class="btn-secondary" id="microPdfBtn" style="border-radius:8px;padding:11px 22px;font-size:15px;cursor:pointer;" onclick="doMicronutrientPDF()">🧪 Formulation &amp; Micronutrients (PDF)</button>
     </div>
     <div id="exMsg" style="color:var(--text-2);font-size:13px;margin-top:10px;">Loading dataset…</div>
     <div id="pdfMsg" style="color:var(--text-2);font-size:13px;margin-top:4px;"></div>
@@ -607,6 +610,116 @@ function drawResponseBadge(doc, x, y, w, resp){
     doc.text(lines, x+12, y+35);
   }
   return boxH;
+}
+
+
+// ── Formulation & micronutrient report ────────────────────────────────────
+// Answers "what are we actually prescribing, across every patient?" — the
+// formulation split, the protein types, the feeding routes, and how often each
+// micronutrient is ordered and at which dose. Prints its own denominator so a
+// partial dataset cannot be mistaken for a complete one.
+async function doMicronutrientPDF(){
+  const msg = document.getElementById('exMsg');
+  if (typeof window.jspdf === 'undefined'){
+    msg.textContent = 'PDF library failed to load. Check your connection and reload.'; return;
+  }
+  msg.textContent = 'Building formulation report…';
+  try {
+    const hdr = { 'Authorization': 'Bearer ' + (me.token || '') };
+    const res = await fetch(apiBase + '/api/trials/micronutrients', { headers: hdr });
+    if (!res.ok) throw new Error('Report failed (' + res.status + ')');
+    const d = await res.json();
+    if (!d.patients){ msg.textContent = 'No nutrition plans found to analyse.'; return; }
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit:'pt', format:'a4' });
+    const pageW = doc.internal.pageSize.getWidth();
+    const today = new Date().toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' });
+
+    doc.setFillColor(14,34,71); doc.rect(0,0,pageW,120,'F');
+    doc.setTextColor(255,255,255); doc.setFontSize(22); doc.setFont(undefined,'bold');
+    doc.text('GQUENCE', 40, 52);
+    doc.setFontSize(13); doc.setFont(undefined,'normal');
+    doc.text('Formulation & Micronutrient Report', 40, 74);
+    doc.setFontSize(9); doc.setTextColor(160,190,220);
+    doc.text('Across all patients with a nutrition plan  ·  Generated ' + today, 40, 96);
+
+    doc.setTextColor(30,41,59); doc.setFontSize(10);
+    let y = 150;
+    doc.setFont(undefined,'bold'); doc.text('Scope', 40, y); doc.setFont(undefined,'normal');
+    y += 16;
+    doc.text(d.patients + ' patient(s) with a nutrition plan analysed.', 40, y); y += 14;
+    doc.text(d.coverage.plansWithMicronutrients + ' plan(s) carried micronutrient orders; '
+      + d.coverage.plansMissingMicronutrients + ' did not.', 40, y); y += 14;
+    doc.text(d.coverage.formulationKnown + ' patient(s) had a formulation recorded on a weekly prescription.', 40, y);
+    y += 12;
+    doc.setTextColor(120,130,145); doc.setFontSize(8);
+    doc.text('Percentages are of all analysed patients. Nutrients marked "None" or "Consider if…" '
+      + 'are counted as not ordered.', 40, y + 12, { maxWidth: pageW - 80 });
+    doc.setTextColor(30,41,59); doc.setFontSize(10);
+
+    const styles = { headStyles:{ fillColor:[14,34,71], fontSize:9 }, styles:{ fontSize:9, cellPadding:4 },
+                     margin:{ left:40, right:40 } };
+    const section = (title, head, body) => {
+      doc.autoTable(Object.assign({}, styles, {
+        startY: (doc.lastAutoTable ? doc.lastAutoTable.finalY : y + 24) + 26,
+        head:[head], body,
+        didDrawPage: () => {},
+        willDrawPage: () => {}
+      }));
+      const yy = doc.lastAutoTable.finalY;
+      doc.setFontSize(11); doc.setFont(undefined,'bold');
+      doc.text(title, 40, doc.lastAutoTable.settings.startY - 8);
+      doc.setFont(undefined,'normal'); doc.setFontSize(10);
+      return yy;
+    };
+
+    section('Formulation used', ['Formulation','Patients','% of patients'],
+      d.formulation.map(f => [f.value, f.n, f.pct + '%']));
+    section('Protein type', ['Protein type','Patients','%'],
+      d.proteinType.map(f => [f.value, f.n, f.pct + '%']));
+    section('Feeding route', ['Route','Patients','%'],
+      d.route.map(f => [f.value, f.n, f.pct + '%']));
+
+    doc.addPage();
+    doc.lastAutoTable = null;
+    doc.setFontSize(14); doc.setFont(undefined,'bold');
+    doc.text('Micronutrients ordered', 40, 50);
+    doc.setFont(undefined,'normal'); doc.setFontSize(9); doc.setTextColor(120,130,145);
+    doc.text('Ranked by how many patients received an order for that nutrient.', 40, 66);
+    doc.setTextColor(30,41,59);
+    doc.autoTable(Object.assign({}, styles, {
+      startY: 82,
+      head: [['Micronutrient','Patients','%','Doses prescribed']],
+      body: d.micronutrients.map(m => [
+        m.nutrient, m.ordered, m.pct + '%',
+        m.doses.map(x => x.dose + '  (' + x.n + ')').join('\n')
+      ]),
+      columnStyles: { 3:{ cellWidth: 240 } }
+    }));
+
+    doc.addPage();
+    doc.setFontSize(14); doc.setFont(undefined,'bold');
+    doc.text('Per patient', 40, 50);
+    doc.setFont(undefined,'normal');
+    doc.autoTable(Object.assign({}, styles, {
+      startY: 66,
+      head: [['Study ID','Patient','Cancer','Formulation','Protein','kcal/kg','g/kg','Micro.']],
+      body: d.perPatient.map(p => [
+        p.studyId || '—', p.name, (p.cancer || '—'),
+        p.formulation || '—', p.proteinType || '—',
+        p.kcalPerKg != null ? p.kcalPerKg : '—',
+        p.proteinPerKg != null ? p.proteinPerKg : '—',
+        p.micronutrientsOrdered
+      ]),
+      styles:{ fontSize:8, cellPadding:3 }
+    }));
+
+    doc.save('GQUENCE_Formulation_Micronutrients_' + new Date().toISOString().slice(0,10) + '.pdf');
+    msg.textContent = 'Formulation report downloaded.';
+  } catch (e) {
+    msg.textContent = 'Could not build the report: ' + e.message;
+  }
 }
 
 async function doExportPDF(){
