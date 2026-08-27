@@ -102,11 +102,13 @@ body::before {
 .logo::before {
   content: '';
   display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--cyan);
-  box-shadow: 0 0 10px var(--cyan);
+  width: 28px;
+  height: 28px;
+  background-image: url('/assets/logo/gquence-mark.png');
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  flex-shrink: 0;
 }
 
 .nav {
@@ -1252,6 +1254,7 @@ textarea:focus {
 }
 @media (max-width: 480px) {
   .topbar .logo { font-size: 16px; }
+  .topbar .logo::before { width: 22px; height: 22px; }
   .ct-card { min-width: 100%; }
   h2 { font-size: 18px; }
   h3 { font-size: 15px; }

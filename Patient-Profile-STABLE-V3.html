@@ -4,7 +4,9 @@
 <head>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta charset="UTF-8">
-  <link rel="icon" href="/icons/icon.svg">
+  <link rel="icon" href="/favicon.ico">
+  <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#0e2247">
   <title>Patient Nutrition Plan - Gquence</title>
@@ -46,11 +48,12 @@
 
     .rlt-brand-name::before {
       content: '';
-      width: 9px;
-      height: 9px;
-      border-radius: 50%;
-      background: #22d3ee;
-      box-shadow: 0 0 10px #22d3ee;
+      width: 28px;
+      height: 28px;
+      background-image: url('/assets/logo/gquence-mark.png');
+      background-size: contain;
+      background-repeat: no-repeat;
+      background-position: center;
       flex-shrink: 0;
     }
 

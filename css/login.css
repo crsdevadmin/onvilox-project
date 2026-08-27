@@ -178,6 +178,23 @@ body.light .hero-content p {
 }
 
 /* Animated Logo */
+.logo-animation {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.hero-logo-mark {
+  height: 64px;
+  width: auto;
+  display: block;
+  position: relative;
+  z-index: 1;
+  animation: textFloat 4s ease-in-out infinite alternate;
+  filter: drop-shadow(0 0 14px rgba(96, 165, 250, 0.4));
+}
+
 .logo-animation span {
   font-size: 72px;
   font-weight: 900;
@@ -199,7 +216,7 @@ body.light .logo-animation span {
 }
 
 .logo-animation span::after {
-  content: 'Onvilox';
+  content: 'Gquence';
   position: absolute;
   left: 0;
   top: 0;
@@ -301,6 +318,7 @@ body.light .login-card {
   .login-page { flex-direction: column; }
   .login-hero { flex: 0.8; }
   .hero-content h2 { font-size: 28px; }
+  .hero-logo-mark { height: 40px; }
   .logo-animation span { font-size: 48px; }
   .login-panel { flex: 1.2; align-items: flex-start; padding-top: 40px; }
 }

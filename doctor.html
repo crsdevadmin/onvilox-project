@@ -198,7 +198,9 @@
     }
     .cp-page { border: 2px solid #222; padding: 10pt 12pt 24pt; min-height: 257mm; page-break-after: always; position: relative; box-sizing: border-box; }
     .cp-page:last-child { page-break-after: auto; }
-    .cp-logo { text-align:center; font-size:20pt; font-weight:bold; letter-spacing:3px; margin-bottom:2pt; }
+    .cp-logo { text-align:center; margin-bottom:2pt; }
+    .cp-logo img { height:34pt; width:auto; }
+    .cp-logo sup { font-size:10pt; font-weight:bold; vertical-align:top; margin-left:2pt; }
     .cp-hr   { border:none; border-top:2px solid #222; margin:4pt 0; }
     .cp-prog { text-align:center; font-size:11pt; font-weight:bold; margin-bottom:2pt; }
     .cp-sub  { text-align:center; font-size:9pt; color:#555; margin-bottom:12pt; }
@@ -2091,7 +2093,7 @@
     /* ── COVER PAGE ────────────────────────────────────── */
     const cover = `
     <div class="cp-page">
-      <div class="cp-logo">GQUENCE™</div>
+      <div class="cp-logo"><img src="/assets/logo/gquence-logo.png" alt="GQUENCE"><sup>&trade;</sup></div>
       <hr class="cp-hr">
       <div class="cp-prog">Oncology Nutrition Support Program</div>
       <div class="cp-sub">Clinical Source Document (CSD) &nbsp;|&nbsp; Version GQ-CSD-V1.0</div>
