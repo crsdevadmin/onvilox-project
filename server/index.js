@@ -796,7 +796,24 @@ app.post('/api/patients/:id/monitoring', authenticateToken, async (req, res) => 
 
     // Auto-generate weekly prescription when type='weekly'
     let weeklyRx = null;
-    if (type === 'weekly') {
+    let weeklyRxSkipped = null;
+    // A weekly weight is the input the whole prescription turns on. The target
+    // engine will happily fall back to the baseline weight recorded at intake,
+    // which silently produces a full, confident-looking prescription from a
+    // number that may be months stale — and puts it in the doctor's approval
+    // queue as though it were fresh clinical data. Refuse instead: the log is
+    // still saved, but no prescription is generated without a weight measured
+    // at this visit.
+    const _weeklyWeight = (type === 'weekly') ? parseFloat(data.weight) : null;
+    const _hasWeeklyWeight = _weeklyWeight != null && !isNaN(_weeklyWeight) && _weeklyWeight > 0;
+    if (type === 'weekly' && !_hasWeeklyWeight) {
+      weeklyRxSkipped = {
+        reason: 'WEIGHT_REQUIRED',
+        message: 'Entry saved, but no prescription was generated: this week\'s weight is missing. '
+               + 'Targets are calculated per kg, so add the weight and save again to generate one.'
+      };
+    }
+    if (type === 'weekly' && _hasWeeklyWeight) {
       try {
         const patRow = await pool.query('SELECT full_data, name, height, sex FROM patients WHERE id=$1', [req.params.id]);
         const baseline = patRow.rows[0] ? (patRow.rows[0].full_data || {}) : {};
@@ -838,19 +855,32 @@ app.post('/api/patients/:id/monitoring', authenticateToken, async (req, res) => 
 
           // Explicit SELECT → UPDATE or INSERT to avoid batch_code unique constraint conflicts
           const existingRxAuto = await pool.query(
-            'SELECT id FROM weekly_prescriptions WHERE patient_id=$1 AND week_number=$2',
+            'SELECT id, status, approved_at FROM weekly_prescriptions WHERE patient_id=$1 AND week_number=$2',
             [req.params.id, weekNo]
           );
           let rxRes;
           if (existingRxAuto.rowCount) {
+            // Re-approval, not a fresh review. Editing the log behind an approved
+            // week legitimately sends it back — the targets may have moved — but
+            // the stale approved_at must go with it, or the row reads as approved
+            // while sitting in the pending queue, and supply-cover maths counts an
+            // approval that no longer stands.
+            const _prevAuto = existingRxAuto.rows[0];
+            const _wasApprovedAuto = _prevAuto.status === 'APPROVED';
             rxRes = await pool.query(
               `UPDATE weekly_prescriptions
                  SET monitoring_log_id=$1, batch_code=$2, clinical_params=$3,
-                     targets=$4, baseline_snapshot=$5, status='PENDING_REVIEW', updated_at=NOW()
+                     targets=$4, baseline_snapshot=$5, status='PENDING_REVIEW',
+                     approved_at = CASE WHEN $8::bool THEN NULL ELSE approved_at END,
+                     approved_by = CASE WHEN $8::bool THEN NULL ELSE approved_by END,
+                     previously_approved_at = CASE WHEN $8::bool THEN $9 ELSE previously_approved_at END,
+                     reopened_at = CASE WHEN $8::bool THEN NOW() ELSE reopened_at END,
+                     updated_at=NOW()
                WHERE patient_id=$6 AND week_number=$7
                RETURNING *`,
               [log.id, batchCode, JSON.stringify(data), JSON.stringify(targets),
-               JSON.stringify(baselineSnap), req.params.id, weekNo]
+               JSON.stringify(baselineSnap), req.params.id, weekNo,
+               _wasApprovedAuto, _prevAuto.approved_at]
             );
           } else {
             rxRes = await pool.query(
@@ -869,7 +899,7 @@ app.post('/api/patients/:id/monitoring', authenticateToken, async (req, res) => 
       } catch(rxErr) { console.error('weekly_rx auto-gen:', rxErr.message); }
     }
 
-    res.json({ ...log, weeklyRx });
+    res.json({ ...log, weeklyRx, weeklyRxSkipped });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -899,6 +929,16 @@ app.post('/api/patients/:id/generate-weekly-rx', authenticateToken, async (req, 
       baseline.engineOutput = planRow2.rows[0].engine_output || baseline.engineOutput;
     }
     const formulaConstants2 = await loadFormulaConstants(pool);
+    // Same rule as the auto-generate path: the weight must come from this
+    // week's log, not from the baseline the engine would otherwise fall back to.
+    const _regenWeight = parseFloat(data.weight);
+    if (_regenWeight == null || isNaN(_regenWeight) || _regenWeight <= 0) {
+      return res.status(422).json({
+        error: 'No weight recorded on this weekly entry. Targets are calculated per kg, '
+             + 'so add the weight to the entry and try again.',
+        reason: 'WEIGHT_REQUIRED'
+      });
+    }
     const targets  = calcWeeklyRxTargets(baseline, data, formulaConstants2);
     if (!targets) return res.status(422).json({ error: 'Cannot calculate — patient weight missing from profile or monitoring entry' });
 
@@ -937,14 +977,21 @@ app.post('/api/patients/:id/generate-weekly-rx', authenticateToken, async (req, 
           ['wxjob_' + patId + '_w' + weekNo]
         ).catch(() => {});
       }
+      const _wasApprovedRegen = existing.rows[0].status === 'APPROVED';
       rxRes = await pool.query(
         `UPDATE weekly_prescriptions
            SET monitoring_log_id=$1, batch_code=$2, clinical_params=$3,
-               targets=$4, baseline_snapshot=$5, status='PENDING_REVIEW', updated_at=NOW()
+               targets=$4, baseline_snapshot=$5, status='PENDING_REVIEW',
+               approved_at = CASE WHEN $8::bool THEN NULL ELSE approved_at END,
+               approved_by = CASE WHEN $8::bool THEN NULL ELSE approved_by END,
+               previously_approved_at = CASE WHEN $8::bool THEN $9 ELSE previously_approved_at END,
+               reopened_at = CASE WHEN $8::bool THEN NOW() ELSE reopened_at END,
+               updated_at=NOW()
          WHERE patient_id=$6 AND week_number=$7
          RETURNING *`,
         [monitoringLogId, batchCode, JSON.stringify(data), JSON.stringify(targets),
-         JSON.stringify(baselineSnap), patId, weekNo]
+         JSON.stringify(baselineSnap), patId, weekNo,
+         _wasApprovedRegen, existing.rows[0].approved_at]
       );
     } else {
       // No record yet — INSERT fresh
@@ -1004,7 +1051,10 @@ app.post('/api/weekly-prescriptions/:id/approve', authenticateToken, async (req,
 
     // Mark approved
     await pool.query(
-      `UPDATE weekly_prescriptions SET status='APPROVED', approved_at=NOW(), approved_by=$1, updated_at=NOW() WHERE id=$2`,
+      `UPDATE weekly_prescriptions
+          SET status='APPROVED', approved_at=NOW(), approved_by=$1,
+              reopened_at=NULL, updated_at=NOW()
+        WHERE id=$2`,
       [req.user.id, rx.id]
     );
 
@@ -1084,12 +1134,14 @@ app.get('/api/doctor/weekly-queue', authenticateToken, async (req, res) => {
           WHERE patient_id = ANY($1) ORDER BY recorded_at ASC`, [ids]),
       pool.query(
         `SELECT id, patient_id, week_number, status, batch_code, targets, notes,
-                monitoring_log_id, created_at, approved_at
+                monitoring_log_id, created_at, approved_at,
+                reopened_at, previously_approved_at
            FROM weekly_prescriptions
           WHERE patient_id = ANY($1) ORDER BY week_number ASC`, [ids]),
       pool.query(
         `SELECT patient_id, reason, note, closed_by, closed_by_role, closed_at, confirmed_at
-           FROM patient_closures WHERE patient_id = ANY($1)`, [ids]),
+           FROM patient_closures
+          WHERE patient_id = ANY($1) AND reopened_at IS NULL`, [ids]),
       pool.query('SELECT lost_threshold_days FROM pilot_settings WHERE id=1')
     ]);
 
@@ -1236,7 +1288,11 @@ app.get('/api/doctor/weekly-queue', authenticateToken, async (req, res) => {
           batchCode: pendingRow.batch_code,
           targets: pendingRow.targets || {},
           notes: pendingRow.notes,
-          createdAt: pendingRow.created_at
+          createdAt: pendingRow.created_at,
+          // Set only when this week had already been approved and the log was
+          // then edited. The row reads as re-approval rather than first review.
+          reopenedAt: pendingRow.reopened_at || null,
+          previouslyApprovedAt: pendingRow.previously_approved_at || null
         } : null,
         lastApproved: lastApproved ? {
           weekNumber: lastApproved.week_number,
@@ -1347,6 +1403,15 @@ app.get('/api/risk-panel', authenticateToken, async (req, res) => {
     if (!patients.length) return res.json({ patients: [] });
 
     const ids = patients.map(p => p.id);
+    // A withdrawn patient must raise no events anywhere on the doctor's
+    // dashboard. The weekly queue already drops them; this panel read the
+    // patients table directly and kept flagging people who had left the
+    // programme — deteriorating numbers they are no longer being treated for.
+    const closedRes = await pool.query(
+      `SELECT patient_id FROM patient_closures
+        WHERE patient_id = ANY($1) AND reopened_at IS NULL`, [ids]);
+    const closedIds = new Set(closedRes.rows.map(r => r.patient_id));
+
     const logRes = await pool.query(
       `SELECT patient_id, type, recorded_at, data FROM monitoring_logs
         WHERE patient_id = ANY($1) ORDER BY recorded_at ASC`, [ids]);
@@ -1507,6 +1572,7 @@ app.get('/api/risk-panel', authenticateToken, async (req, res) => {
       };
     })
     .filter(r => r.flags.length || r.lapsed)
+    .filter(r => !closedIds.has(r.patientId))
     .sort((a,b) => b.score - a.score);
 
     res.json({ patients: out, generatedAt: new Date().toISOString() });
@@ -2611,10 +2677,31 @@ async function reconcileJobs() {
 }
 
 // Manufacturing Jobs: Get All
+// Jobs carry the patient's withdrawal state. Closing a patient used to be
+// invisible here, so the store could still manufacture and dispatch product to
+// someone who had left the programme — the doctor's screen went quiet while the
+// store's did not. The job is not deleted (already-dispatched product is a real
+// record that must survive), it is marked, and the store refuses to advance it.
 app.get('/api/manufacturing-jobs', authenticateToken, async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM manufacturing_jobs ORDER BY created_at DESC');
-    res.json(result.rows);
+    const closures = await pool.query(
+      `SELECT patient_id, reason, closed_at FROM patient_closures
+        WHERE reopened_at IS NULL`);
+    const closedBy = {};
+    closures.rows.forEach(c => { closedBy[c.patient_id] = c; });
+
+    res.json(result.rows.map(j => {
+      const c = closedBy[j.patient_id];
+      if (!c) return j;
+      return {
+        ...j,
+        patientWithdrawn: true,
+        withdrawnReason: c.reason,
+        withdrawnLabel: (CLOSURE_REASONS[c.reason] || {}).label || c.reason,
+        withdrawnAt: c.closed_at
+      };
+    }));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -2682,10 +2769,40 @@ app.put('/api/manufacturing-jobs/:id', authenticateToken, async (req, res) => {
     const target = (status || '').toUpperCase();
 
     // Load the current job to validate the transition and ownership.
-    const cur = await pool.query('SELECT status, store_id FROM manufacturing_jobs WHERE id=$1', [req.params.id]);
+    const cur = await pool.query('SELECT status, store_id, patient_id FROM manufacturing_jobs WHERE id=$1', [req.params.id]);
     if (!cur.rows.length) return res.status(404).json({ error: 'Job not found' });
     const currentStatus = (cur.rows[0].status || '').toUpperCase();
     const jobStore = cur.rows[0].store_id;
+
+    // A withdrawn patient's job must not move FORWARD toward dispatch. The store
+    // UI already hides the buttons, but a stale tab still holds them, and the
+    // cost of getting this wrong is product physically sent to someone who left
+    // the programme.
+    //
+    // Two things stay allowed on purpose. Rejections (rolling a job back) are
+    // de-escalation and are exactly what an approver should be able to do when
+    // they learn the patient has withdrawn. And DISPATCHED → DELIVERED records
+    // something that already physically happened — refusing it would leave the
+    // record permanently wrong about where the product went.
+    const ADVANCES = {
+      APPROVED:           'PENDING_PROCESSING',
+      PENDING_PROCESSING: 'PROCESSING',
+      PROCESSING:         'PENDING_DISPATCH',
+      PENDING_DISPATCH:   'DISPATCHED'
+    };
+    if (ADVANCES[currentStatus] === target) {
+      const wd = await pool.query(
+        `SELECT reason FROM patient_closures
+          WHERE patient_id=$1 AND reopened_at IS NULL`, [cur.rows[0].patient_id]);
+      if (wd.rowCount) {
+        const lbl = (CLOSURE_REASONS[wd.rows[0].reason] || {}).label || wd.rows[0].reason;
+        return res.status(409).json({
+          error: `This patient has been withdrawn (${lbl}). No further product may be prepared or dispatched. `
+               + `Ask the doctor to reopen the patient if this is wrong.`,
+          reason: 'PATIENT_WITHDRAWN'
+        });
+      }
+    }
 
     if (!isAdmin) {
       // Store-scope: a manager/approver may only touch their own store's jobs.
@@ -3427,6 +3544,16 @@ OUTPUT FORMAT — return ONLY valid JSON, no markdown, no text outside the JSON 
       )
     `);
     await pool.query('CREATE INDEX IF NOT EXISTS idx_weekly_rx_patient ON weekly_prescriptions(patient_id)');
+    // Editing a weekly log after the doctor approved it has to send the row back
+    // for approval — the numbers changed. But it must not look like a brand-new
+    // pending item, or the doctor cannot tell "never reviewed" from "reviewed,
+    // then the data moved under me". A separate status value would break the
+    // several places that test for APPROVED / PENDING_REVIEW, so the fact is
+    // carried alongside the status instead.
+    await pool.query(`ALTER TABLE weekly_prescriptions
+                        ADD COLUMN IF NOT EXISTS reopened_at TIMESTAMPTZ`);
+    await pool.query(`ALTER TABLE weekly_prescriptions
+                        ADD COLUMN IF NOT EXISTS previously_approved_at TIMESTAMPTZ`);
     console.log('weekly_prescriptions table ready');
   } catch(e) { console.error('weekly_prescriptions migration:', e.message); }
 })();
@@ -3602,17 +3729,27 @@ app.post('/api/patients/:id/close/confirm', authenticateToken, async (req, res) 
   try {
     const r = await pool.query(
       `UPDATE patient_closures SET confirmed_by=$2, confirmed_at=NOW()
-        WHERE patient_id=$1 RETURNING patient_id`, [req.params.id, req.user.id]);
+        WHERE patient_id=$1 AND reopened_at IS NULL
+        RETURNING patient_id`, [req.params.id, req.user.id]);
     if (!r.rowCount) return res.status(404).json({ error: 'No closure to confirm' });
     res.json({ ok:true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // Patients come back. Closure must never be a one-way door.
+//
+// This stamps the closure as reopened rather than deleting it. Deleting erased
+// the fact that the patient had ever stopped, so someone who withdrew in week 3
+// and returned in week 6 counted as a continuous six-week patient and the gap
+// vanished from the retention funnel — the exact dishonesty structured closures
+// exist to prevent. Every read of this table is scoped to reopened_at IS NULL,
+// so the patient behaves as fully active again; only the history survives.
 app.post('/api/patients/:id/reopen', authenticateToken, async (req, res) => {
   try {
     const r = await pool.query(
-      `DELETE FROM patient_closures WHERE patient_id=$1 RETURNING reason`, [req.params.id]);
+      `UPDATE patient_closures SET reopened_at=NOW(), reopened_by=$2
+        WHERE patient_id=$1 AND reopened_at IS NULL
+        RETURNING reason`, [req.params.id, req.user.id]);
     if (!r.rowCount) return res.status(404).json({ error: 'Patient is not closed' });
     await pool.query(
       `UPDATE trial_enrollments SET withdrawn_at=NULL, withdrawn_reason=NULL WHERE patient_id=$1`,
@@ -3656,7 +3793,8 @@ app.get('/api/retention-funnel', authenticateToken, async (req, res) => {
 
     const cl = await pool.query(
       `SELECT reason, COUNT(*)::int AS n FROM patient_closures
-        WHERE patient_id = ANY($1) GROUP BY reason ORDER BY n DESC`, [ids]);
+        WHERE patient_id = ANY($1) AND reopened_at IS NULL
+        GROUP BY reason ORDER BY n DESC`, [ids]);
     const closures = cl.rows.map(r => ({
       reason: r.reason,
       label: (CLOSURE_REASONS[r.reason] || {}).label || r.reason,
@@ -3666,6 +3804,20 @@ app.get('/api/retention-funnel', authenticateToken, async (req, res) => {
     const closedTotal = closures.reduce((a, c) => a + c.n, 0);
     const lost = closures.filter(c => c.group === 'lost').reduce((a, c) => a + c.n, 0);
 
+    // Patients who stopped and came back. Worth stating plainly: they are
+    // counted as active above (correctly), but a funnel that silently absorbs
+    // them reads as though nobody ever interrupted treatment.
+    const ret = await pool.query(
+      `SELECT reason, COUNT(*)::int AS n FROM patient_closures
+        WHERE patient_id = ANY($1) AND reopened_at IS NOT NULL
+        GROUP BY reason ORDER BY n DESC`, [ids]);
+    const returnedBreakdown = ret.rows.map(r => ({
+      reason: r.reason,
+      label: (CLOSURE_REASONS[r.reason] || {}).label || r.reason,
+      n: r.n
+    }));
+    const returnedTotal = returnedBreakdown.reduce((a, c) => a + c.n, 0);
+
     res.json({
       enrolled: ids.length,
       stages,
@@ -3673,7 +3825,10 @@ app.get('/api/retention-funnel', authenticateToken, async (req, res) => {
       closedTotal,
       // The honest headline: everything else was an outcome, not a dropout.
       lostToFollowUp: lost,
-      stillOpen: ids.length - closedTotal
+      stillOpen: ids.length - closedTotal,
+      // Interrupted treatment and resumed — active now, but not continuous.
+      returnedTotal,
+      returnedBreakdown
     });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });

@@ -7,6 +7,16 @@
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#0e2247">
   <style>
+    /* ===== Withdrawn patient — visible before anything else on the row ===== */
+    .wdbadge { display:inline-flex; align-items:center; gap:5px; margin-top:4px;
+               font-size:10px; font-weight:800; letter-spacing:.05em;
+               color:#b91c1c; background:rgba(185,28,28,.10);
+               border:1px solid rgba(185,28,28,.45); border-radius:6px;
+               padding:2px 7px; white-space:nowrap; }
+    .wdnote  { display:inline-flex; align-items:center; gap:5px;
+               font-size:11px; font-weight:700; color:#b91c1c; white-space:nowrap; }
+    tr.wdrow { opacity:.62; }
+    tr.wdrow:hover { opacity:.85; }
     .filter-tab { padding:7px 16px; font-size:12px; font-weight:700; border-radius:20px; border:1.5px solid #d1d5db; background:#fff; color:#64748b; cursor:pointer; transition:all .15s; }
     .filter-tab:hover:not(:disabled) { border-color:#0e2247; color:#0e2247; }
     .filter-tab.active { background:#0e2247; color:#fff; border-color:#0e2247; }
@@ -414,9 +424,30 @@ const _btnAmber = 'padding:5px 10px;font-size:11px;border-radius:5px;border:1px 
 const _btnGreen = 'padding:5px 10px;font-size:11px;border-radius:5px;border:1px solid #16a34a;background:#f0fdf4;color:#15803d;font-weight:600;cursor:pointer;';
 const _btnRed   = 'padding:5px 10px;font-size:11px;border-radius:5px;border:1px solid #dc2626;background:#fef2f2;color:#b91c1c;font-weight:600;cursor:pointer;';
 
+function _esc2(s){return String(s==null?'':s).replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));}
+function _wdTitle(j) {
+  return 'Withdrawn' + (j.withdrawnLabel ? ': ' + _esc2(j.withdrawnLabel) : '')
+       + (j.withdrawnAt ? ' on ' + _lblFmtDate(j.withdrawnAt) : '');
+}
+function withdrawnBadge(list) {
+  const w = (list || []).find(j => j.patientWithdrawn);
+  if (!w) return '';
+  return `<div class="wdbadge" title="${_wdTitle(w)}">&#9940; WITHDRAWN`
+       + (w.withdrawnLabel ? ` &middot; <span style="font-weight:600;">${_esc2(w.withdrawnLabel)}</span>` : '')
+       + `</div>`;
+}
+
 function statusActionBtn(j) {
   const W = manufacturingService.WORKFLOW;
   const s = (j.status || 'APPROVED').toUpperCase();
+
+  // The patient has left the programme. Product already dispatched physically
+  // left the building and stays on the record, but nothing further should be
+  // made or sent. This is the single choke point every action button passes
+  // through, so blocking here covers manager and approver views alike.
+  if (j.patientWithdrawn && s !== 'DISPATCHED' && s !== 'DELIVERED') {
+    return `<span class="wdnote" title="${_wdTitle(j)}">&#9940; Patient withdrawn — do not dispatch</span>`;
+  }
 
   // ── Store Approver view ──────────────────────────────────────────────
   if (isApprover) {
@@ -558,8 +589,9 @@ function render(){
       `<span class="status ${statusClass(j.status)}" style="font-size:10px;padding:2px 7px;margin:1px 2px 1px 0;display:inline-block;">${productLabel(j)}</span>`
     ).join('');
 
+    const withdrawn = list.some(j => j.patientWithdrawn);
     const main = document.createElement('tr');
-    main.className = 'clickable-row';
+    main.className = 'clickable-row' + (withdrawn ? ' wdrow' : '');
     main.setAttribute('data-patient', p.id);
     if (multi) { main.style.cursor = 'pointer'; main.onclick = () => toggleGroup(gid); }
     main.innerHTML = `
@@ -567,6 +599,7 @@ function render(){
       <td>
         ${multi ? `<span id="${gid}-caret" style="display:inline-block;width:14px;color:var(--text-2);font-size:11px;">▸</span>` : '<span style="display:inline-block;width:14px;"></span>'}
         <a href="javascript:void(0)" class="link" onclick="showQr('${p.id}'); event.stopPropagation();">${p.name}</a>
+        ${withdrawnBadge(list)}
       </td>
       <td>${p.age ? p.age + ' yr' : '-'} / ${p.sex || '-'}</td>
       <td>${p.uhic || '-'}</td>

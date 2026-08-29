@@ -6123,7 +6123,7 @@ async function saveMonitorLog(type) {
     }
   }
   try {
-    var saved, weeklyRx = null;
+    var saved, weeklyRx = null, weeklyRxSkipped = null;
 
     if (type === 'weekly' && _editingLogId) {
       // ── EDIT MODE: update existing log ──────────────────────────────
@@ -6166,7 +6166,9 @@ async function saveMonitorLog(type) {
       if (!res.ok) throw new Error('Save failed');
       saved = await res.json();
       weeklyRx = saved.weeklyRx || null;
-      var logEntry = Object.assign({}, saved); delete logEntry.weeklyRx;
+      weeklyRxSkipped = saved.weeklyRxSkipped || null;
+      var logEntry = Object.assign({}, saved);
+      delete logEntry.weeklyRx; delete logEntry.weeklyRxSkipped;
       _monLogs.unshift(logEntry);
       var prefix = type === 'daily' ? 'monD_' : 'monW_';
       ['week','date','weight','oralIntake','compliance','radiation','notes','mucositis','feeding','ecog','hospitalDays','handGrip','albumin','crp','glucose','creatinine','urea','muac','tolerance','dietitian','physician','interruptions'].forEach(function(f) {
@@ -6176,6 +6178,13 @@ async function saveMonitorLog(type) {
 
     renderMonitorTables();
 
+    // The server refuses to build a prescription off a stale baseline weight.
+    // Say so plainly — silence here reads as "the panel is broken", and the
+    // entry itself did save.
+    if (type === 'weekly' && weeklyRxSkipped) {
+      alert(weeklyRxSkipped.message ||
+        'Entry saved, but no prescription was generated because this week\'s weight is missing.');
+    }
     // Show prescription review panel if weekly rx was auto-generated
     if (type === 'weekly' && weeklyRx) {
       // Store oral intake from form so showWxRxPanel can detect full-replacement cases

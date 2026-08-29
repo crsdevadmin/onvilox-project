@@ -36,6 +36,14 @@
     .wkchip { font-size:11px; font-weight:800; letter-spacing:.06em; text-transform:uppercase;
               color:var(--violet); background:var(--violet-dim); border:1px solid var(--violet);
               border-radius:8px; padding:5px 10px; white-space:nowrap; }
+    .chipstack { display:flex; flex-direction:column; gap:5px; align-items:flex-start; }
+    .agechip { font-size:10px; font-weight:700; letter-spacing:.03em; white-space:nowrap;
+               color:var(--text-3); background:var(--surface); border:1px solid var(--border-2);
+               border-radius:7px; padding:3px 8px; }
+    .agechip.stale    { color:var(--amber); background:var(--amber-dim); border-color:var(--amber); }
+    .agechip.reopened { color:var(--cyan);  background:var(--cyan-dim);  border-color:var(--cyan); }
+    .qrow.stale { border-left:3px solid var(--amber); }
+    .qrow.warn.stale { border-left:3px solid var(--rose); }
     .qmetrics { display:flex; gap:14px; flex-wrap:wrap; align-items:center; }
     .qm { display:flex; flex-direction:column; gap:2px; min-width:58px; }
     .qm .k { font-size:9.5px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--text-3); }
@@ -1170,16 +1178,47 @@
     // and any warning the server raised are both on the row. A warned plan
     // still has an Approve button — it is amber and the reasons are spelled
     // out beneath it, so the decision is informed rather than blocked.
+    // Nothing ages out of this queue on its own — an item sits here until it is
+    // approved. Without the age on the row, a prescription generated in week 1
+    // three months ago is indistinguishable from one generated yesterday, and
+    // the tab stops reading as "this week's work".
+    const RX_STALE_DAYS = 14;
+    function _daysSince(iso) {
+      const t = new Date(iso).getTime();
+      if (isNaN(t)) return null;
+      return Math.floor((Date.now() - t) / 86400000);
+    }
+
     function qRowRx(p) {
       const rx = p.pendingRx, t = rx.targets || {};
       const h = p.history || [], h1 = h[h.length - 1] || {}, h0 = h[h.length - 2] || {};
       const wtDelta = (h1.weight != null && h0.weight != null) ? Math.round((h1.weight - h0.weight) * 10) / 10 : null;
       const warned = (p.warnings || []).length > 0;
       const waited = rx.createdAt ? _agoText(rx.createdAt) : '';
+      const ageDays = rx.createdAt ? _daysSince(rx.createdAt) : null;
+      const stale = ageDays !== null && ageDays >= RX_STALE_DAYS;
+      // Re-approval reads differently from first review: the doctor already
+      // signed this week off and the log was edited underneath it.
+      const reopened = !!rx.reopenedAt;
 
-      return '<div class="qrow ' + (warned ? 'warn' : '') + '">'
-        + qHead(p, 'waiting ' + waited)
-        + '<span class="wkchip">Week ' + rx.weekNumber + '</span>'
+      const ageChip = ageDays === null ? ''
+        : '<span class="agechip' + (stale ? ' stale' : '') + '"'
+          + ' title="Generated ' + _shortDate(rx.createdAt) + ' — nothing removes it from this queue except approval">'
+          + (stale ? '⏳ ' : '') + 'waiting ' + waited + '</span>';
+      const reopenChip = reopened
+        ? '<span class="agechip reopened" title="This week was approved on '
+          + (rx.previouslyApprovedAt ? _shortDate(rx.previouslyApprovedAt) : 'an earlier date')
+          + ', then the weekly entry was edited. The targets below are the recalculated ones.">'
+          + '↻ Re-approval needed</span>'
+        : '';
+
+      return '<div class="qrow ' + (warned ? 'warn' : '') + (stale ? ' stale' : '') + '">'
+        + qHead(p, (reopened ? 'edited after approval · ' : '')
+                   + (rx.createdAt ? 'generated ' + _shortDate(rx.createdAt) : ''))
+        + '<div class="chipstack">'
+          + '<span class="wkchip">Week ' + rx.weekNumber + '</span>'
+          + reopenChip + ageChip
+        + '</div>'
         + '<div class="qmetrics">'
           + qMetric('kcal/kg', t.kcalPerKg != null ? t.kcalPerKg : '—')
           + qMetric('prot/kg', t.proteinPerKg != null ? t.proteinPerKg : '—', 'g')
@@ -1713,6 +1752,15 @@
           </div>
           ${d.closures && d.closures.length ? `<div class="why-list">
             ${d.closures.map(c => `<span class="why-chip wg-${c.group}">${_esc(c.label)}: ${c.n}</span>`).join('')}
+          </div>` : ''}
+          ${d.returnedTotal ? `<div style="font-size:11.5px;color:var(--text-2);margin-top:10px;
+              padding-top:9px;border-top:1px dashed var(--border-2);">
+            <b style="color:var(--cyan);">${d.returnedTotal}</b> patient${d.returnedTotal === 1 ? '' : 's'}
+            stopped and later resumed — counted as active above, but treatment was interrupted.
+            ${d.returnedBreakdown && d.returnedBreakdown.length
+              ? `<span style="color:var(--text-3);">(`
+                + d.returnedBreakdown.map(r => _esc(r.label) + ': ' + r.n).join(', ') + `)</span>`
+              : ''}
           </div>` : ''}
           <div style="font-size:11px;color:var(--text-3);margin-top:10px;">
             Only <b>no contact</b> counts as loss to follow-up. Everything else is a recorded outcome.

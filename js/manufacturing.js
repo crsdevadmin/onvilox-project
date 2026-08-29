@@ -43,7 +43,13 @@
       mfgDate: r.mfg_date || r.mfgDate || null,
       expDate: r.exp_date || r.expDate || null,
       createdAt: r.created_at || r.createdAt,
-      updatedAt: r.updated_at || r.updatedAt
+      updatedAt: r.updated_at || r.updatedAt,
+      // Withdrawal travels with the job so the store can never be the last
+      // place still working on a patient who has left the programme.
+      patientWithdrawn: !!(r.patientWithdrawn || r.patient_withdrawn),
+      withdrawnReason: r.withdrawnReason || r.withdrawn_reason || null,
+      withdrawnLabel: r.withdrawnLabel || r.withdrawn_label || null,
+      withdrawnAt: r.withdrawnAt || r.withdrawn_at || null
     }));
     db.setTable('manufacturing_jobs', _cache.jobs);
     return _cache.jobs;
