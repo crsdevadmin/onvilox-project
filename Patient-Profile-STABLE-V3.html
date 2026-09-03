@@ -11,6 +11,7 @@
   <meta name="theme-color" content="#0e2247">
   <title>Patient Nutrition Plan - Gquence</title>
   <link rel="stylesheet" href="/css/app.css?v=2.0">
+  <link rel="stylesheet" href="/css/brand.css?v=1">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" crossorigin="anonymous"
     referrerpolicy="no-referrer"></script>
   <script src="/js/config.js"></script>
@@ -5323,7 +5324,59 @@
             // Give the browser 1.5 seconds to settle all dynamic styles/content
             await new Promise(resolve => setTimeout(resolve, 1500));
 
-            // Step 4: Setup Export Source
+            // Step 4: Build the branded pouch-style cover page
+            function txt(id) {
+              const el = document.getElementById(id);
+              const v = el ? (el.textContent || '').trim() : '';
+              return v && v !== '—' ? v : '';
+            }
+            function buildGqCover() {
+              document.getElementById('gqPdfCover')?.remove();
+              const cover = document.createElement('div');
+              cover.id = 'gqPdfCover';
+              const today = new Date().toLocaleDateString('en-GB', {
+                day: '2-digit', month: 'short', year: 'numeric'
+              });
+              const rows = [
+                ['Patient',        txt('pName')     || (patient && patient.name)  || '—'],
+                ['UHIC',           txt('pUHIC')     || (patient && patient.uhic)  || '—'],
+                ['Age / Sex',      [txt('pAge'), txt('pSex')].filter(Boolean).join(' / ') || '—'],
+                ['Protocol',       txt('pCancer_header') || (patient && patient.cancerType) || '—'],
+                ['Hospital',       txt('pHospital') || '—'],
+                ['Approved By',    txt('pApprovedBy') || '—']
+              ].map(([k, v]) =>
+                `<div class="gqc-row"><span class="k">${k}</span><span class="v">${v}</span></div>`
+              ).join('');
+
+              cover.innerHTML = `
+                <div class="gqc-sweep"></div>
+                <div class="gqc-brand">
+                  <img class="gqc-mark" src="/assets/logo/gquence-mark.png" alt="">
+                  <div class="gqc-word">GQUENCE</div>
+                  <div class="gqc-tag">Precision Clinical Nutrition</div>
+                </div>
+                <div class="gqc-meta">
+                  <div class="gqc-meta-title">Nutrition Support Plan</div>
+                  <div class="gqc-meta-grid">${rows}</div>
+                </div>
+                <div class="gqc-dots"></div>
+                <div class="gqc-slab">
+                  <div class="gq-pillars">
+                    <div class="gq-pillar">Personalized<br>Formula</div>
+                    <div class="gq-pillar">Clinically<br>Designed</div>
+                    <div class="gq-pillar">Evidence<br>Driven</div>
+                    <div class="gq-pillar">Patient<br>Focused</div>
+                  </div>
+                  <div class="gqc-conf">Confidential &middot; Clinical Record</div>
+                  <div class="gqc-foot">
+                    <div class="l">Issued ${today}<br>System-generated recommendation</div>
+                    <div class="r">Hospital Use Only<br>Not for Retail Sale</div>
+                  </div>
+                </div>`;
+              return cover;
+            }
+
+            // Step 5: Setup Export Source
             const source = document.getElementById('pdfExportRoot');
             if (!source) {
               alert("Export Error: PDF root container not found.");
@@ -5342,13 +5395,17 @@
                 letterRendering: true,
                 allowTaint: true
               },
-              jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+              jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+              pagebreak: { mode: ['css', 'legacy'] }
             };
 
             // Hide the download button(s) and other UI junk inside the exported PDF
             const buttons = Array.from(document.querySelectorAll('button, .no-print, .ai-chat-launcher'));
             const prevDisplays = buttons.map(b => b.style.display);
             buttons.forEach(b => b.style.display = 'none');
+
+            const gqCover = buildGqCover();
+            source.insertBefore(gqCover, source.firstChild);
 
             try {
               await html2pdf().set(opts).from(source).save();
@@ -5357,6 +5414,8 @@
               console.error("PDF Export Failed:", err);
               window.print();
             } finally {
+              // Remove the cover page so it never shows on screen
+              gqCover.remove();
               // Restore UI
               buttons.forEach((b, i) => b.style.display = prevDisplays[i]);
               // Restore section display states

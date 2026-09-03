@@ -1,0 +1,487 @@
+/* ═══════════════════════════════════════════════════════════
+   GQUENCE — POUCH BRAND SYSTEM
+   Design language lifted from the retail pouch artwork:
+   teal sweep, halftone dot field, dark slate slab, pillar strip.
+   Loaded AFTER app.css so it can layer on the existing theme.
+   ═══════════════════════════════════════════════════════════ */
+
+:root {
+  /* Sampled directly from the pouch artwork */
+  --gq-teal: #25716f;
+  --gq-teal-deep: #1b5654;
+  --gq-teal-light: #57cdcf;
+  --gq-slate: #28353d;
+  --gq-slate-2: #1c262c;
+  --gq-navy: #2e336b;
+  --gq-paper: #f5f8f8;
+  --gq-rule: rgba(255, 255, 255, 0.28);
+}
+
+/* ─────────────────────────────────────────
+   1. HALFTONE DOT FIELD
+   The gradient band of dots that sweeps across
+   the lower third of the pouch. Density fades
+   out to the right via the mask.
+   ───────────────────────────────────────── */
+.gq-halftone {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: radial-gradient(circle at center, var(--gq-teal) 0 34%, transparent 36%);
+  background-size: 26px 22px;
+  opacity: 0.55;
+  -webkit-mask-image: linear-gradient(105deg, #000 0%, rgba(0, 0, 0, 0.75) 32%, rgba(0, 0, 0, 0.25) 62%, transparent 88%);
+  mask-image: linear-gradient(105deg, #000 0%, rgba(0, 0, 0, 0.75) 32%, rgba(0, 0, 0, 0.25) 62%, transparent 88%);
+}
+
+.gq-halftone.gq-halftone-sm {
+  background-size: 16px 14px;
+}
+
+.gq-halftone.gq-halftone-light {
+  background-image: radial-gradient(circle at center, rgba(255, 255, 255, 0.55) 0 34%, transparent 36%);
+}
+
+/* ─────────────────────────────────────────
+   2. TEAL SWEEP (top-left corner curve)
+   ───────────────────────────────────────── */
+.gq-sweep {
+  position: absolute;
+  top: -46%;
+  left: -34%;
+  width: 78%;
+  height: 116%;
+  border-radius: 0 0 100% 0;
+  background: linear-gradient(140deg, var(--gq-teal) 0%, var(--gq-teal-deep) 100%);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.gq-sweep::after {
+  content: '';
+  position: absolute;
+  inset: 12px -10px -10px 12px;
+  border-radius: inherit;
+  border-right: 3px solid rgba(255, 255, 255, 0.25);
+  border-bottom: 3px solid rgba(255, 255, 255, 0.25);
+  -webkit-mask-image: linear-gradient(200deg, transparent 40%, #000 100%);
+  mask-image: linear-gradient(200deg, transparent 40%, #000 100%);
+}
+
+/* ─────────────────────────────────────────
+   3. BRAND LOCKUP — mark over wordmark over tagline
+   ───────────────────────────────────────── */
+.gq-lockup {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.gq-lockup-mark {
+  width: 132px;
+  height: 132px;
+  object-fit: contain;
+  display: block;
+}
+
+.gq-lockup-word {
+  font-family: var(--font-display, 'Outfit', sans-serif);
+  font-size: 60px;
+  font-weight: 300;
+  letter-spacing: 0.18em;
+  text-indent: 0.18em;
+  line-height: 1;
+  color: var(--gq-slate);
+}
+
+.gq-tagline {
+  font-family: var(--font-body, 'Manrope', sans-serif);
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--gq-slate);
+  opacity: 0.85;
+}
+
+/* On dark surfaces */
+.gq-on-dark .gq-lockup-word,
+.gq-on-dark .gq-tagline {
+  color: #fff;
+}
+
+/* ─────────────────────────────────────────
+   4. PILLAR STRIP — the four claims, hairline-separated
+   ───────────────────────────────────────── */
+.gq-pillars {
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  gap: 0;
+  flex-wrap: wrap;
+}
+
+.gq-pillar {
+  padding: 4px 26px;
+  font-family: var(--font-body, 'Manrope', sans-serif);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.35;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-align: center;
+  color: #fff;
+  border-left: 1px solid var(--gq-rule);
+}
+
+.gq-pillar:first-child {
+  border-left: 0;
+}
+
+/* ─────────────────────────────────────────
+   5. DARK SLAB — the curved slate panel
+   ───────────────────────────────────────── */
+.gq-slab {
+  position: relative;
+  background: var(--gq-slate);
+  overflow: hidden;
+}
+
+.gq-slab::before {
+  content: '';
+  position: absolute;
+  top: -1px;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--gq-teal-deep), var(--gq-teal) 45%, var(--gq-teal-light));
+}
+
+/* ─────────────────────────────────────────
+   6. GLOBAL TOP BAR TREATMENT
+   Applies to every page that uses .topbar — the mark is
+   injected via ::before so no page markup has to change.
+   ───────────────────────────────────────── */
+.topbar {
+  border-bottom: 0;
+  box-shadow: inset 0 -3px 0 0 var(--gq-teal);
+  position: relative;
+}
+
+.topbar::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--gq-teal-deep) 0%, var(--gq-teal) 38%, var(--gq-teal-light) 100%);
+  pointer-events: none;
+}
+
+.topbar .logo::before {
+  content: '';
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  background-image: url('/assets/logo/gquence-mark.png');
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.topbar .logo {
+  font-weight: 400;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-size: 17px;
+}
+
+/* Hide the injected mark where a real logo <img> is already present */
+.topbar .logo:has(img)::before,
+.topbar .cp-logo::before {
+  display: none;
+}
+
+/* ─────────────────────────────────────────
+   7. LOGIN HERO — pouch composition
+   ───────────────────────────────────────── */
+.gq-hero-brand {
+  position: relative;
+  z-index: 4;
+}
+
+.gq-hero-brand .gq-lockup-mark {
+  height: 116px;
+  width: 116px;
+  filter: drop-shadow(0 10px 26px rgba(0, 0, 0, 0.45));
+}
+
+.gq-hero-brand .gq-lockup-word {
+  color: #fff;
+  font-size: 64px;
+  text-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+
+.gq-hero-brand .gq-tagline {
+  color: rgba(255, 255, 255, 0.92);
+  letter-spacing: 0.14em;
+  font-size: 16px;
+  margin-top: 2px;
+}
+
+body.light .gq-hero-brand .gq-lockup-word {
+  color: var(--gq-slate);
+  text-shadow: 0 6px 20px rgba(255, 255, 255, 0.8);
+}
+
+body.light .gq-hero-brand .gq-tagline {
+  color: var(--gq-slate);
+}
+
+/* Pillar band pinned to the bottom of the hero */
+.gq-hero-band {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 6;
+  padding: 18px 24px 20px;
+  background: linear-gradient(180deg, rgba(40, 53, 61, 0.86), rgba(28, 38, 44, 0.97));
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-top: 3px solid var(--gq-teal);
+  overflow: hidden;
+}
+
+.gq-hero-band .gq-halftone {
+  opacity: 0.3;
+}
+
+.gq-hero-band .gq-pillars {
+  position: relative;
+  z-index: 1;
+}
+
+.gq-hero-band .gq-pillar {
+  font-size: 12px;
+  padding: 2px 18px;
+  letter-spacing: 0.08em;
+}
+
+.gq-hero-note {
+  position: relative;
+  z-index: 1;
+  margin-top: 10px;
+  text-align: center;
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+/* Lift the carousel captions clear of the pillar band */
+.login-hero .slide-content {
+  bottom: 180px;
+}
+
+/* Teal sweep in the hero's top-left corner */
+.gq-hero-sweep {
+  position: absolute;
+  top: -30%;
+  left: -22%;
+  width: 46%;
+  height: 78%;
+  border-radius: 0 0 100% 0;
+  background: linear-gradient(140deg, rgba(37, 113, 111, 0.92), rgba(27, 86, 84, 0.75));
+  z-index: 3;
+  pointer-events: none;
+}
+
+@media (max-width: 900px) {
+  .gq-hero-brand .gq-lockup-mark { height: 70px; width: 70px; }
+  .gq-hero-brand .gq-lockup-word { font-size: 38px; }
+  .gq-hero-brand .gq-tagline { font-size: 12px; }
+  .gq-hero-band { padding: 12px 10px; }
+  .gq-hero-band .gq-pillar { font-size: 10px; padding: 2px 10px; }
+  .gq-hero-note { display: none; }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   8. PDF COVER PAGE
+   Injected as the first page of the exported patient report.
+   Fixed A4 proportions so html2canvas renders it predictably.
+   ═══════════════════════════════════════════════════════════ */
+#gqPdfCover {
+  position: relative;
+  width: 100%;
+  height: 1090px;
+  background: #ffffff;
+  color: var(--gq-slate);
+  overflow: hidden;
+  page-break-after: always;
+  break-after: page;
+  font-family: var(--font-body, 'Manrope', sans-serif);
+}
+
+#gqPdfCover .gqc-sweep {
+  position: absolute;
+  top: -190px;
+  left: -230px;
+  width: 470px;
+  height: 470px;
+  border-radius: 0 0 100% 0;
+  background: linear-gradient(140deg, var(--gq-teal) 0%, var(--gq-teal-deep) 100%);
+}
+
+#gqPdfCover .gqc-sweep::after {
+  content: '';
+  position: absolute;
+  inset: 0 -14px -14px 0;
+  border-radius: inherit;
+  border-right: 4px solid var(--gq-teal);
+  border-bottom: 4px solid var(--gq-teal);
+  opacity: 0.55;
+}
+
+#gqPdfCover .gqc-brand {
+  position: absolute;
+  top: 130px;
+  left: 0;
+  right: 0;
+  text-align: center;
+}
+
+#gqPdfCover .gqc-mark {
+  width: 190px;
+  height: 190px;
+  object-fit: contain;
+  display: block;
+  margin: 0 auto 26px;
+}
+
+#gqPdfCover .gqc-word {
+  font-family: var(--font-display, 'Outfit', sans-serif);
+  font-size: 62px;
+  font-weight: 300;
+  letter-spacing: 0.2em;
+  text-indent: 0.2em;
+  color: var(--gq-slate);
+  line-height: 1;
+}
+
+#gqPdfCover .gqc-tag {
+  margin-top: 14px;
+  font-size: 17px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--gq-slate);
+}
+
+/* Patient card sits in the pouch's empty white midfield */
+#gqPdfCover .gqc-meta {
+  position: absolute;
+  z-index: 2;
+  background: #ffffff;
+  top: 500px;
+  left: 90px;
+  right: 90px;
+  border: 1px solid rgba(40, 53, 61, 0.16);
+  border-left: 4px solid var(--gq-teal);
+  border-radius: 4px;
+  padding: 20px 26px;
+}
+
+#gqPdfCover .gqc-meta-title {
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--gq-teal);
+  margin-bottom: 14px;
+}
+
+#gqPdfCover .gqc-meta-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px 30px;
+}
+
+#gqPdfCover .gqc-row .k {
+  display: block;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #7b8a92;
+}
+
+#gqPdfCover .gqc-row .v {
+  display: block;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--gq-slate);
+  margin-top: 2px;
+}
+
+/* Halftone sweep above the slab, as on the pouch */
+#gqPdfCover .gqc-dots {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 296px;
+  height: 168px;
+  z-index: 1;
+  background-image: radial-gradient(circle at center, var(--gq-teal) 0 34%, transparent 36%);
+  background-size: 24px 20px;
+  opacity: 0.5;
+  transform: rotate(-4deg) scale(1.15);
+  -webkit-mask-image: linear-gradient(100deg, #000 0%, rgba(0, 0, 0, 0.6) 45%, transparent 85%);
+  mask-image: linear-gradient(100deg, #000 0%, rgba(0, 0, 0, 0.6) 45%, transparent 85%);
+}
+
+#gqPdfCover .gqc-slab {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 300px;
+  background: var(--gq-slate);
+  border-top: 5px solid var(--gq-teal);
+  padding: 40px 60px 0;
+}
+
+#gqPdfCover .gqc-slab .gq-pillar {
+  font-size: 15px;
+  padding: 4px 22px;
+}
+
+#gqPdfCover .gqc-foot {
+  position: absolute;
+  left: 60px;
+  right: 60px;
+  bottom: 34px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  font-size: 11px;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+#gqPdfCover .gqc-foot .r {
+  text-align: right;
+}
+
+#gqPdfCover .gqc-conf {
+  margin-top: 26px;
+  text-align: center;
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+/* The cover only exists during export — never on screen */
+#gqPdfCover.gqc-hidden {
+  display: none;
+}
