@@ -1023,6 +1023,30 @@ textarea:focus {
   fill: currentColor;
 }
 
+.ai-chat-launcher img {
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+  display: block;
+}
+
+/* Brand mark reads best on white — override the flat cyan puck */
+.ai-chat-launcher:has(img) {
+  background: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+}
+
+.ai-chat-header .ai-chat-brand {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+  vertical-align: -6px;
+  background: #fff;
+  border-radius: 50%;
+  padding: 2px;
+  box-sizing: border-box;
+}
+
 .ai-chat-window {
   position: fixed;
   bottom: 100px;
