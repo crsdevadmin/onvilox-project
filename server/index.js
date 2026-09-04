@@ -1261,11 +1261,34 @@ app.get('/api/doctor/weekly-queue', authenticateToken, async (req, res) => {
         ? Math.floor((now - new Date(lastDaily.at).getTime()) / DAY) : null;
 
       // ── Prescription state ──
-      const pendingRow  = rxs.filter(r => r.status === 'PENDING_REVIEW')
-                             .sort((a, b) => b.week_number - a.week_number)[0] || null;
       const approvedRows = rxs.filter(r => r.status === 'APPROVED');
       const lastApproved = approvedRows.length
         ? approvedRows[approvedRows.length - 1] : null;
+
+      // A pending week that a LATER week has already overtaken is dead weight.
+      // Nothing expires from this queue on its own, so an unapproved week 3 sits
+      // there for months after week 4 was approved and dispensed — the patient is
+      // not actually waiting on anything, and the count says otherwise. Approving
+      // it now would manufacture a batch from month-old measurements.
+      // Only a week that nothing newer has replaced is a real approval.
+      const _wkNo = r => {
+        const n = parseFloat(r.week_number);
+        return isNaN(n) ? -Infinity : n;
+      };
+      const maxApprovedWeek = approvedRows.length
+        ? Math.max(...approvedRows.map(_wkNo)) : -Infinity;
+
+      const pendingAll = rxs.filter(r => r.status === 'PENDING_REVIEW')
+                            .sort((a, b) => _wkNo(b) - _wkNo(a));
+      const pendingLive = pendingAll.filter(r => _wkNo(r) > maxApprovedWeek);
+      // Kept visible in the payload rather than silently dropped: the rows are
+      // still PENDING_REVIEW in the database, and staff should be able to see
+      // that they were skipped rather than wonder where they went.
+      const supersededWeeks = pendingAll
+        .filter(r => _wkNo(r) <= maxApprovedWeek)
+        .map(r => r.week_number);
+
+      const pendingRow = pendingLive[0] || null;
 
       // ── Warnings shown inline on the queue row ──
       // The doctor approves from the row, so anything that should give them
@@ -1352,6 +1375,8 @@ app.get('/api/doctor/weekly-queue', authenticateToken, async (req, res) => {
           batchCode: lastApproved.batch_code,
           approvedAt: lastApproved.approved_at
         } : null,
+        // Weeks still PENDING_REVIEW that a later approved week has overtaken.
+        supersededWeeks,
         supplyDaysLeft,
         warnings,
         // Closure state travels with the row so the dashboard can drop the

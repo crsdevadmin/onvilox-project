@@ -158,6 +158,64 @@ const padL = (s, n) => String(s == null ? '' : s).padStart(n).slice(0, n);
     console.log('(the tab only shows patients assigned to the logged-in doctor)');
     perDoc.rows.forEach(r => console.log(pad(r.doctor, 30) + padL(r.pats, 5)));
 
+    // ── 7. Row-by-row: why is each patient in the tab? ────────────────────
+    // The single question this script exists to answer. For every pending week
+    // it reports the two things that now decide visibility: has a later week
+    // already been approved (superseded), and are the required values present.
+    const REQUIRED = [
+      ['weight', 'weight'], ['ecog', 'ECOG'], ['oralIntake', 'oral'],
+      ['compliance', 'compliance'], ['albumin', 'albumin'], ['glucose', 'glucose'],
+      ['creatinine', 'creatinine'], ['urea', 'urea']
+    ];
+    const detail = await pool.query(`
+      SELECT p.name, p.uhic, wp.week_number, wp.created_at, wp.clinical_params,
+             (SELECT MAX(w2.week_number) FROM weekly_prescriptions w2
+               WHERE w2.patient_id = wp.patient_id AND w2.status = 'APPROVED') AS max_approved_wk
+        FROM weekly_prescriptions wp
+        JOIN patients p ON p.id = wp.patient_id
+       WHERE wp.status = 'PENDING_REVIEW'
+       ORDER BY p.name, wp.week_number
+    `);
+    console.log('\n═══ WHY IS EACH PENDING WEEK IN THE TAB? ═══');
+    if (!detail.rowCount) {
+      console.log('Nothing is pending.');
+    } else {
+      console.log(pad('PATIENT', 24) + padL('WK', 4) + padL('AGE', 6) + '  '
+        + pad('VERDICT', 26) + 'DETAIL');
+      console.log('-'.repeat(100));
+      detail.rows.forEach(r => {
+        const cp = (typeof r.clinical_params === 'string')
+          ? (() => { try { return JSON.parse(r.clinical_params); } catch (e) { return {}; } })()
+          : (r.clinical_params || {});
+        const missing = REQUIRED.filter(([k]) => {
+          const v = cp[k];
+          return v === null || v === undefined || v === '' || isNaN(parseFloat(v));
+        }).map(([, lbl]) => lbl);
+        const days = Math.floor((Date.now() - new Date(r.created_at).getTime()) / 86400000);
+        const superseded = r.max_approved_wk != null
+          && Number(r.week_number) <= Number(r.max_approved_wk);
+
+        let verdict, note;
+        if (superseded) {
+          verdict = 'HIDDEN — superseded';
+          note = 'week ' + r.max_approved_wk + ' already approved';
+        } else if (missing.length) {
+          verdict = 'MOVED — assessment due';
+          note = 'missing: ' + missing.join(', ');
+        } else {
+          verdict = 'SHOWS — awaiting approval';
+          note = 'complete' + (days >= 14 ? ' but ' + days + ' days old' : '');
+        }
+        console.log(pad(r.name, 24) + padL(r.week_number, 4) + padL(days + 'd', 6) + '  '
+          + pad(verdict, 26) + note);
+      });
+      console.log('\n  HIDDEN = a later week was approved, so this one is obsolete.');
+      console.log('  MOVED  = required values are blank; it sits under "Weekly assessment due".');
+      console.log('  SHOWS  = genuinely waiting on the doctor.');
+      console.log('\n  Rows marked HIDDEN/MOVED are still PENDING_REVIEW in the database —');
+      console.log('  they are filtered out of the tab, not deleted.');
+    }
+
     console.log('\nDone. No data was modified.\n');
     await pool.end();
   } catch (e) {
