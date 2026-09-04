@@ -1341,7 +1341,11 @@ app.get('/api/doctor/weekly-queue', authenticateToken, async (req, res) => {
           reopenedAt: pendingRow.reopened_at || null,
           previouslyApprovedAt: pendingRow.previously_approved_at || null,
           // Which required weekly values are still blank. Empty means approvable.
-          missingFields: missingWeeklyFields(pendingRow.clinical_params)
+          missingFields: missingWeeklyFields(pendingRow.clinical_params),
+          // The values already captured for this week, so the dashboard can
+          // reopen a half-finished entry with what was entered still in place
+          // rather than making the nurse retype it.
+          clinicalParams: asObj(pendingRow.clinical_params)
         } : null,
         lastApproved: lastApproved ? {
           weekNumber: lastApproved.week_number,

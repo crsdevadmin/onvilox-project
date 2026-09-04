@@ -1058,10 +1058,18 @@
     // assessment AND a stale daily log), so these are filters, not a partition.
     const DAILY_GAP_DAYS = 2;   // no daily entry for this long → surface it
 
+    // "Awaiting your approval" means exactly that: the weekly entry is complete
+    // and the only thing left is the doctor's decision. A week whose required
+    // values are still blank is waiting on data entry, not on a signature, so it
+    // belongs with the assessments — putting it in the approval tab inflates the
+    // count with work that is not the doctor's to do.
+    const _rxIncomplete = p => !!p.pendingRx && ((p.pendingRx.missingFields || []).length > 0);
+
     function qBuckets() {
       return {
-        rx:    _queue.filter(p => p.pendingRx),
-        asmt:  _queue.filter(p => !p.pendingRx && (p.weeklyOverdue || p.neverMonitored)),
+        rx:    _queue.filter(p => p.pendingRx && !_rxIncomplete(p)),
+        asmt:  _queue.filter(p => _rxIncomplete(p)
+                              || (!p.pendingRx && (p.weeklyOverdue || p.neverMonitored))),
         daily: _queue.filter(p => p.daysSinceDaily === null || p.daysSinceDaily >= DAILY_GAP_DAYS)
       };
     }
@@ -1173,7 +1181,7 @@
       const rows = b[_qBucket] || [];
       if (!rows.length) {
         const msg = { rx: 'Nothing awaiting your approval.',
-                      asmt: 'No weekly assessments are due.',
+                      asmt: 'No weekly assessments are due or unfinished.',
                       daily: 'Daily logging is up to date.' }[_qBucket];
         host.innerHTML = '<div class="qempty">' + msg + '</div>';
         return;
@@ -1271,11 +1279,22 @@
     // ── Row: weekly assessment due ────────────────────────────────────────
     function qRowAsmt(p) {
       const h = p.history || [], h1 = h[h.length - 1] || {};
-      const nextWeek = (p.currentWeek || 0) + 1;
       const over = p.daysSinceWeekly;
-      return '<div class="qrow ' + (over !== null && over >= 10 ? 'warn' : '') + '">'
-        + qHead(p, p.lastWeeklyAt ? 'last logged ' + _shortDate(p.lastWeeklyAt) : 'never monitored')
-        + '<span class="wkchip">Week ' + nextWeek + ' due</span>'
+      // Two different states share this tab. Either no entry exists for the next
+      // week yet, or one was started and saved with required values left blank —
+      // in which case the week to finish is the one already begun, not the next.
+      const partial  = _rxIncomplete(p);
+      const missing  = partial ? (p.pendingRx.missingFields || []) : [];
+      const openWeek = partial ? p.pendingRx.weekNumber : (p.currentWeek || 0) + 1;
+
+      return '<div class="qrow ' + (partial ? 'incomplete' : (over !== null && over >= 10 ? 'warn' : '')) + '">'
+        + qHead(p, partial
+            ? 'week ' + openWeek + ' started ' + _shortDate(p.pendingRx.createdAt) + ' — not finished'
+            : (p.lastWeeklyAt ? 'last logged ' + _shortDate(p.lastWeeklyAt) : 'never monitored'))
+        + '<div class="chipstack">'
+          + '<span class="wkchip">Week ' + openWeek + (partial ? ' incomplete' : ' due') + '</span>'
+          + (partial ? '<span class="agechip incomplete" title="A prescription was generated for this week, but it cannot be approved until these are filled in.">✎ Awaiting data, not approval</span>' : '')
+        + '</div>'
         + '<div class="qmetrics">'
           + (over !== null ? qMetric('Since last', over, 'days', over >= 10 ? 'bad' : 'warn')
                            : qMetric('Status', 'No entries', '', 'warn'))
@@ -1284,9 +1303,13 @@
           + (h1.adh    != null ? qMetric('Adherence', h1.adh, '%', h1.adh < 80 ? 'warn' : 'ok') : '')
         + '</div>'
         + '<div class="qacts">'
-          + '<button class="qbtn qbtn-cyan" onclick="openWeeklyEntry(\'' + p.id + '\')">Enter Week ' + nextWeek + ' data</button>'
+          + '<button class="qbtn qbtn-cyan" onclick="openWeeklyEntry(\'' + p.id + '\')">'
+          + (partial ? 'Complete Week ' + openWeek + ' data' : 'Enter Week ' + openWeek + ' data') + '</button>'
           + '<a class="qbtn qbtn-ghost qbtn-sm" href="/patients/profile?id=' + p.id + '#monitoring">Profile</a>'
         + '</div>'
+        + (partial ? '<div class="qflags">'
+            + '<span class="qflag missing">Still needed: ' + _esc(missing.join(' · ')) + '</span>'
+          + '</div>' : '')
         + '<div class="histslot" id="qhist-' + p.id + '" data-open="0"></div>'
         // Past the hospital's lost-threshold the row stops only nagging and
         // asks the question that actually resolves it.
@@ -1389,35 +1412,56 @@
     function openWeeklyEntry(pid) {
       const p = _queue.find(x => String(x.id) === String(pid));
       if (!p) return;
-      const h = p.history || [], prev = h[h.length - 1] || {};
-      const wk = (p.currentWeek || 0) + 1;
+      const h = p.history || [];
+      // Completing a half-finished week reopens THAT week, not the next one —
+      // otherwise finishing week 4 silently creates a week 5 and leaves the
+      // unapprovable week 4 behind forever.
+      const partial = _rxIncomplete(p);
+      const wk   = partial ? p.pendingRx.weekNumber : (p.currentWeek || 0) + 1;
+      // Last week's numbers are the ghost hints; on a partial week the values
+      // already entered are the real starting content of the form.
+      const prev = partial
+        ? (h.filter(x => x.wk !== wk).slice(-1)[0] || {})
+        : (h[h.length - 1] || {});
+      const cur  = partial ? (p.pendingRx.clinicalParams || {}) : {};
+      const _c   = k => (cur[k] === null || cur[k] === undefined ? '' : cur[k]);
       _qd = { patientId: p.id, kind: 'weekly', weekNo: wk, name: p.name };
 
-      document.getElementById('qdTitle').textContent = 'Week ' + wk + ' assessment';
+      document.getElementById('qdTitle').textContent =
+        'Week ' + wk + (partial ? ' — complete the entry' : ' assessment');
       document.getElementById('qdSub').textContent = p.name + (p.uhic ? ' · UHIC ' + p.uhic : '');
       document.getElementById('qdBody').innerHTML =
         (p.daysSinceWeekly !== null && p.daysSinceWeekly >= 7
           ? '<div class="dbanner">⚠ Overdue by ' + p.daysSinceWeekly + ' days</div>' : '')
+        + (partial ? '<div class="dbanner">✎ Week ' + wk + ' was saved with required values blank. '
+            + 'Fill in ' + _esc((p.pendingRx.missingFields || []).join(', '))
+            + ' to make it approvable.</div>' : '')
         + (h.length ? '<div class="dsect" style="margin-bottom:0">Previous weeks</div>' + qHistTable(p) : '')
         + '<div class="fgrid">'
         + '<div class="fg"><label for="qw_week">Week</label><input id="qw_week" value="' + wk + '"></div>'
-        + '<div class="fg"><label for="qw_date">Date</label><input id="qw_date" type="date" value="' + new Date().toISOString().slice(0, 10) + '"></div>'
-        + _fg('Weight (kg)', 'qw_weight', '', '—', prev.weight)
-        + _fg('MUAC (cm)', 'qw_muac', '', '—', prev.muac)
+        + '<div class="fg"><label for="qw_date">Date</label><input id="qw_date" type="date" value="'
+          + (partial && cur.date ? cur.date : new Date().toISOString().slice(0, 10)) + '"></div>'
+        + _fg('Weight (kg)', 'qw_weight', _c('weight'), '—', prev.weight)
+        + _fg('MUAC (cm)', 'qw_muac', _c('muac'), '—', prev.muac)
         + '<div class="fg"><label for="qw_ecog">ECOG' + (prev.ecog != null ? '<span class="lastwk">last wk ' + prev.ecog + '</span>' : '') + '</label>'
-          + '<select id="qw_ecog"><option value="">—</option>' + [0,1,2,3,4].map(v =>
-              '<option value="' + v + '"' + (prev.ecog === v ? ' selected' : '') + '>' + v + '</option>').join('') + '</select></div>'
-        + _fg('Hand grip (kg)', 'qw_grip', '', '—', prev.handGrip)
-        + _fg('Albumin (g/dL)', 'qw_albumin', '', '—', prev.albumin)
-        + _fg('CRP', 'qw_crp', '', '—', prev.crp)
-        + _fg('Creatinine', 'qw_creatinine', '', '—', prev.creatinine)
-        + _fg('Urea', 'qw_urea', '', '—', prev.urea)
-        + _fg('Oral intake %', 'qw_oral', '', '0–100', prev.oral, '%')
-        + _fg('Compliance %', 'qw_adh', '', '0–100', prev.adh, '%')
-        + '<div class="fg full"><label for="qw_notes">Notes</label><textarea id="qw_notes" rows="2" placeholder="Clinical notes…"></textarea></div>'
+          + '<select id="qw_ecog"><option value="">—</option>' + [0,1,2,3,4].map(v => {
+              const sel = partial ? (String(_c('ecog')) === String(v)) : (prev.ecog === v);
+              return '<option value="' + v + '"' + (sel ? ' selected' : '') + '>' + v + '</option>';
+            }).join('') + '</select></div>'
+        + _fg('Hand grip (kg)', 'qw_grip', _c('handGrip'), '—', prev.handGrip)
+        + _fg('Albumin (g/dL)', 'qw_albumin', _c('albumin'), '—', prev.albumin)
+        + _fg('CRP', 'qw_crp', _c('crp'), '—', prev.crp)
+        + _fg('Blood glucose (mg/dL)', 'qw_glucose', _c('glucose'), '—', prev.glucose)
+        + _fg('Creatinine', 'qw_creatinine', _c('creatinine'), '—', prev.creatinine)
+        + _fg('Urea', 'qw_urea', _c('urea'), '—', prev.urea)
+        + _fg('Oral intake %', 'qw_oral', _c('oralIntake'), '0–100', prev.oral, '%')
+        + _fg('Compliance %', 'qw_adh', _c('compliance'), '0–100', prev.adh, '%')
+        + '<div class="fg full"><label for="qw_notes">Notes</label><textarea id="qw_notes" rows="2" placeholder="Clinical notes…">'
+          + _esc(partial && cur.notes ? cur.notes : '') + '</textarea></div>'
         + '</div>';
       document.getElementById('qdFoot').innerHTML =
-        '<button class="qbtn qbtn-cyan" style="flex:1;justify-content:center" id="qwSave" onclick="saveWeeklyEntry()">Save &amp; generate plan</button>'
+        '<button class="qbtn qbtn-cyan" style="flex:1;justify-content:center" id="qwSave" onclick="saveWeeklyEntry()">'
+        + (partial ? 'Save &amp; recalculate' : 'Save &amp; generate plan') + '</button>'
         + '<button class="qbtn qbtn-ghost" onclick="closeQDrawer()">Cancel</button>';
       document.getElementById('qdNote').textContent =
         'Same fields and the same API as the profile page — reachable without leaving the dashboard.';
@@ -1439,7 +1483,8 @@
       const data = {
         week: week, date: _v('qw_date'), weight: weight, muac: _n('qw_muac'),
         ecog: _n('qw_ecog'), handGrip: _n('qw_grip'), albumin: _n('qw_albumin'),
-        crp: _n('qw_crp'), creatinine: _n('qw_creatinine'), urea: _n('qw_urea'),
+        crp: _n('qw_crp'), glucose: _n('qw_glucose'),
+        creatinine: _n('qw_creatinine'), urea: _n('qw_urea'),
         oralIntake: _n('qw_oral'), compliance: _n('qw_adh'), notes: _v('qw_notes')
       };
       try {
