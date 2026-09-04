@@ -346,6 +346,46 @@
     <!-- ── Early-warning risk panel ── -->
     <div id="riskPanel" style="display:none;"></div>
 
+    <!-- ── Caseload charts ───────────────────────────────────────────────
+         Reads the same /api/doctor/weekly-queue payload the work queue
+         below is built from — one request, two readings of it. Answers
+         "where do I look first?" before the queue answers "what's next?".
+         Hidden until the queue lands so it never flashes empty. -->
+    <div class="card gq-charts" id="caseloadCharts" style="display:none;">
+      <div class="gq-ch-head">
+        <div>
+          <div class="gq-eyebrow" id="ccContext">Caseload</div>
+          <h2 style="margin:2px 0 0;">Where the caseload needs you.</h2>
+        </div>
+        <button class="tbl-btn" id="ccToggle" onclick="toggleCaseloadCharts()">Hide charts</button>
+      </div>
+
+      <div id="ccBody">
+        <div class="gq-kpis" id="ccKpis"></div>
+        <div class="gq-grid">
+          <section class="gq-plotcard">
+            <h3>Patients by alert level</h3>
+            <p class="gq-cap">Derived from the alerts already shown on each queue row &mdash; weight loss, adherence, renal and intake thresholds.</p>
+            <div class="gq-plot" id="ccRisk"></div>
+            <div class="gq-legend" id="ccRiskLegend"></div>
+          </section>
+          <section class="gq-plotcard">
+            <h3>How long approvals have been waiting</h3>
+            <p class="gq-cap">Nothing leaves the approval queue except approval &mdash; the longest waits are the ones to act on.</p>
+            <div class="gq-plot" id="ccBacklog"></div>
+            <p class="gq-cap gq-empty" id="ccBacklogEmpty" hidden>Nothing is waiting for approval.</p>
+          </section>
+          <section class="gq-plotcard">
+            <h3>Weight change since last assessment</h3>
+            <p class="gq-cap">Loss and gain read as opposite directions from a shared zero. Only patients with two or more weekly entries appear.</p>
+            <div class="gq-plot" id="ccDelta"></div>
+            <div class="gq-legend" id="ccDeltaLegend"></div>
+            <p class="gq-cap gq-empty" id="ccDeltaEmpty" hidden>No patient has two weekly entries yet.</p>
+          </section>
+        </div>
+      </div>
+    </div>
+
     <!-- ── "Needs You This Week" work queue ──────────────────────────────
          Answers "what needs me?" where the table only answers "who are my
          patients?". Hidden until the queue loads so it never flashes empty. -->
@@ -354,6 +394,9 @@
         <div class="queue-title">
           <h2 style="margin:0;">Needs You This Week</h2>
           <span class="qcount" id="qCount">0</span>
+          <button class="tbl-btn" id="wqToggle" type="button"
+                  aria-controls="wqBody" aria-expanded="true"
+                  onclick="toggleWeekQueue()">Hide</button>
         </div>
         <div class="qtabs" id="qTabs">
           <button class="qtab on" data-b="rx"    onclick="setQBucket('rx')">Awaiting your approval <span class="n" id="qn-rx">0</span></button>
@@ -361,7 +404,7 @@
           <button class="qtab"    data-b="daily" onclick="setQBucket('daily')">Daily logs missing <span class="n" id="qn-daily">0</span></button>
         </div>
       </div>
-      <div id="qBucket"></div>
+      <div id="wqBody"><div id="qBucket"></div></div>
     </div>
 
     <div class="card">
@@ -1053,6 +1096,268 @@
       } catch (e) { /* offline — the queue simply stays as it was */ }
     }
 
+    // ══ Caseload charts ══════════════════════════════════════════════════
+    // Everything here is computed from _queue — the same payload the work
+    // queue uses. No second request, and no number on screen that the rows
+    // below could contradict.
+    const NSVG = 'http://www.w3.org/2000/svg';
+    const _sv = (t, a) => { const n = document.createElementNS(NSVG, t); for (const k in a) if (a[k] != null) n.setAttribute(k, a[k]); return n; };
+    const _svg = (w, h) => _sv('svg', { viewBox: '0 0 ' + w + ' ' + h, preserveAspectRatio: 'xMidYMid meet' });
+    const _txt = (s2, x, y, str, o) => {
+      const t = _sv('text', Object.assign({ x: x, y: y, 'font-size': 11, fill: 'var(--text-3)' }, o || {}));
+      t.textContent = str; s2.appendChild(t); return t;
+    };
+    const _daysAgo = iso => {
+      const t = new Date(iso).getTime();
+      return isNaN(t) ? null : Math.floor((Date.now() - t) / 86400000);
+    };
+
+    // Alert level per patient, straight from the warnings the server raised.
+    // Two or more HIGH warnings is a different conversation from one, so the
+    // top band is not just "has a high warning".
+    function _alertLevel(p) {
+      const w = p.warnings || [];
+      const high = w.filter(x => x.level === 'high').length;
+      const watch = w.length - high;
+      if (high >= 2) return 3;
+      if (high === 1) return 2;
+      if (watch >= 1) return 1;
+      return 0;
+    }
+    const _LEVELS = [
+      { label: 'No alerts', tone: 'ok',       icon: 'M2 6l3 3 5-6', fillNone: true },
+      { label: 'Watch',     tone: 'warn',     icon: 'M2 6h8',       fillNone: true },
+      { label: 'High',      tone: 'serious',  icon: 'M6 1.5L11 10.5H1z' },
+      { label: 'Critical',  tone: 'critical', icon: 'M6 1v6.5M6 10v.6', fillNone: true }
+    ];
+    const _chip = lv => '<span class="gq-chip ' + _LEVELS[lv].tone + '">'
+      + '<svg viewBox="0 0 12 12" aria-hidden="true"><path d="' + _LEVELS[lv].icon + '" fill="'
+      + (_LEVELS[lv].fillNone ? 'none' : 'currentColor')
+      + '" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+      + _esc(_LEVELS[lv].label) + '</span>';
+
+    function renderCaseloadCharts() {
+      const card = document.getElementById('caseloadCharts');
+      if (!card) return;
+      if (!_queue.length) { card.style.display = 'none'; return; }
+      card.style.display = '';
+
+      const live = _queue.filter(p => p.pendingRx);
+      const overdue = _queue.filter(p => p.weeklyOverdue || p.neverMonitored);
+      const adh = _queue.map(p => {
+        const h = p.history || [], h1 = h[h.length - 1];
+        return h1 && h1.adh != null ? h1.adh : null;
+      }).filter(v => v != null).sort((a, b) => a - b);
+      const median = adh.length
+        ? (adh.length % 2 ? adh[(adh.length - 1) / 2]
+                          : Math.round((adh[adh.length / 2 - 1] + adh[adh.length / 2]) / 2))
+        : null;
+      const stale = live.filter(p => (_daysAgo(p.pendingRx.createdAt) || 0) >= 14).length;
+
+      document.getElementById('ccContext').textContent =
+        _queue.length + ' active patient' + (_queue.length === 1 ? '' : 's');
+
+      // ── KPI row ────────────────────────────────────────────────────────
+      const kpis = [
+        { k: 'Active patients', v: _queue.length,
+          d: _closed.length ? _closed.length + ' closed, not shown' : 'none closed' },
+        { k: 'Awaiting approval', v: live.length,
+          d: stale ? stale + ' waiting over 14 days' : 'none over 14 days' },
+        { k: 'Assessments due', v: overdue.length,
+          d: overdue.length ? 'longest ' + Math.max.apply(null, overdue.map(p => p.daysSinceWeekly || 0)) + ' days' : 'all up to date' },
+        { k: 'Median adherence', v: median == null ? '—' : median, u: median == null ? '' : '%',
+          d: adh.length + ' of ' + _queue.length + ' reported' }
+      ];
+      document.getElementById('ccKpis').innerHTML = kpis.map(x =>
+        '<div class="gq-kpi"><span class="k">' + _esc(x.k) + '</span>'
+        + '<span class="v">' + _esc(x.v) + (x.u ? '<small>' + _esc(x.u) + '</small>' : '') + '</span>'
+        + '<span class="d">' + _esc(x.d) + '</span></div>').join('');
+
+      // ── Alert levels — reserved status scale, always with icon + label ──
+      (function () {
+        const counts = [0, 0, 0, 0];
+        _queue.forEach(p => counts[_alertLevel(p)]++);
+        const host = document.getElementById('ccRisk');
+        host.innerHTML = '';
+        const W = 460, H = 210, L = 34, R = 14, T = 16, B = 40;
+        const s2 = _svg(W, H);
+        s2.setAttribute('aria-label', 'Patients by alert level');
+        const max = Math.max(4, Math.max.apply(null, counts));
+        const iw = W - L - R, ih = H - T - B;
+        const Y = v => T + ih - (v / max) * ih;
+        const step = max <= 4 ? 1 : Math.ceil(max / 4);
+        for (let v = 0; v <= max; v += step) {
+          s2.appendChild(_sv('line', { x1: L, x2: W - R, y1: Y(v), y2: Y(v), stroke: 'var(--border)', 'stroke-width': 1 }));
+          _txt(s2, L - 8, Y(v) + 4, v, { 'text-anchor': 'end' });
+        }
+        const band = iw / 4, bw = Math.min(24, band - 30);
+        counts.forEach((n, i) => {
+          const cx = L + band * (i + .5), y = Y(n), col = 'var(--' + ({ ok: 'green', warn: 'amber', serious: 'serious', critical: 'rose' })[_LEVELS[i].tone] + ')';
+          if (n > 0) {
+            s2.appendChild(_sv('path', {
+              d: 'M' + (cx - bw / 2) + ' ' + Y(0) + ' L' + (cx - bw / 2) + ' ' + (y + 4)
+                 + ' Q' + (cx - bw / 2) + ' ' + y + ' ' + (cx - bw / 2 + 4) + ' ' + y
+                 + ' L' + (cx + bw / 2 - 4) + ' ' + y
+                 + ' Q' + (cx + bw / 2) + ' ' + y + ' ' + (cx + bw / 2) + ' ' + (y + 4)
+                 + ' L' + (cx + bw / 2) + ' ' + Y(0) + ' Z', fill: col
+            }));
+          }
+          _txt(s2, cx, y - 9, n, { 'text-anchor': 'middle', 'font-size': 13, 'font-weight': 600, fill: 'var(--text)' });
+          _txt(s2, cx, H - B + 20, _LEVELS[i].label, { 'text-anchor': 'middle', 'font-size': 11, fill: 'var(--text-2)' });
+        });
+        s2.appendChild(_sv('line', { x1: L, x2: W - R, y1: Y(0), y2: Y(0), stroke: 'var(--border-2)', 'stroke-width': 1 }));
+        host.appendChild(s2);
+        document.getElementById('ccRiskLegend').innerHTML = counts
+          .map((n, i) => n ? _chip(i) : '').join('');
+      })();
+
+      // ── Backlog age — one hue, darker is older ─────────────────────────
+      (function () {
+        const host = document.getElementById('ccBacklog');
+        const empty = document.getElementById('ccBacklogEmpty');
+        host.innerHTML = '';
+        const buckets = [
+          { label: '0–7 days',   n: 0 }, { label: '8–14 days', n: 0 },
+          { label: '15–30 days', n: 0 }, { label: '31+ days',  n: 0 }
+        ];
+        live.forEach(p => {
+          const d = _daysAgo(p.pendingRx.createdAt);
+          if (d == null) return;
+          buckets[d <= 7 ? 0 : d <= 14 ? 1 : d <= 30 ? 2 : 3].n++;
+        });
+        const total = buckets.reduce((a, b) => a + b.n, 0);
+        empty.hidden = total > 0;
+        if (!total) return;
+        const W = 460, H = 210, L = 92, R = 40, T = 12, B = 26;
+        const s2 = _svg(W, H);
+        s2.setAttribute('aria-label', 'Pending approvals by age');
+        const max = Math.max.apply(null, buckets.map(b => b.n));
+        const iw = W - L - R, ih = H - T - B;
+        const X = v => L + (v / max) * iw;
+        const band = ih / 4, bh = Math.min(22, band - 14);
+        const RAMP = ['var(--r1)', 'var(--r2)', 'var(--r3)', 'var(--r4)'];
+        buckets.forEach((b, i) => {
+          const cy = T + band * (i + .5), x2 = X(b.n);
+          if (b.n > 0) {
+            s2.appendChild(_sv('path', {
+              d: 'M' + L + ' ' + (cy - bh / 2) + ' L' + (x2 - 4) + ' ' + (cy - bh / 2)
+                 + ' Q' + x2 + ' ' + (cy - bh / 2) + ' ' + x2 + ' ' + (cy - bh / 2 + 4)
+                 + ' L' + x2 + ' ' + (cy + bh / 2 - 4)
+                 + ' Q' + x2 + ' ' + (cy + bh / 2) + ' ' + (x2 - 4) + ' ' + (cy + bh / 2)
+                 + ' L' + L + ' ' + (cy + bh / 2) + ' Z', fill: RAMP[i]
+            }));
+          }
+          _txt(s2, L - 10, cy + 4, b.label, { 'text-anchor': 'end', 'font-size': 11, fill: 'var(--text-2)' });
+          _txt(s2, x2 + 8, cy + 4, b.n, { 'font-size': 12, 'font-weight': 600, fill: 'var(--text)' });
+        });
+        s2.appendChild(_sv('line', { x1: L, x2: L, y1: T, y2: T + ih, stroke: 'var(--border-2)', 'stroke-width': 1 }));
+        host.appendChild(s2);
+      })();
+
+      // ── Weight change — the one diverging scale on the page ────────────
+      (function () {
+        const host = document.getElementById('ccDelta');
+        const empty = document.getElementById('ccDeltaEmpty');
+        const legend = document.getElementById('ccDeltaLegend');
+        host.innerHTML = '';
+        const rows = [];
+        _queue.forEach(p => {
+          const h = p.history || [];
+          const a = h[h.length - 2], b = h[h.length - 1];
+          if (!a || !b || a.weight == null || b.weight == null) return;
+          rows.push({ name: p.name || '—', d: Math.round((b.weight - a.weight) * 10) / 10 });
+        });
+        rows.sort((x, y) => x.d - y.d);
+        empty.hidden = rows.length > 0;
+        legend.innerHTML = rows.length
+          ? '<span class="gq-lg"><i style="background:var(--amber)"></i>Weight lost</span>'
+            + '<span class="gq-lg"><i style="background:var(--cyan)"></i>Weight gained</span>' : '';
+        if (!rows.length) return;
+        const shown = rows.slice(0, 12);
+        const W = 460, H = Math.max(150, 26 + shown.length * 22), L = 96, R = 40, T = 12, B = 26;
+        const s2 = _svg(W, H);
+        s2.setAttribute('aria-label', 'Weight change since previous assessment');
+        const lim = Math.max(1.5, Math.ceil(Math.max.apply(null, shown.map(r => Math.abs(r.d)))));
+        const iw = W - L - R, ih = H - T - B;
+        const X = v => L + ((v + lim) / (lim * 2)) * iw;
+        const band = ih / shown.length, bh = Math.min(13, band - 5), zero = X(0);
+        [-lim, -lim / 2, 0, lim / 2, lim].forEach(v => {
+          s2.appendChild(_sv('line', { x1: X(v), x2: X(v), y1: T, y2: T + ih, stroke: v === 0 ? 'var(--border-2)' : 'var(--border)', 'stroke-width': 1 }));
+          _txt(s2, X(v), H - 8, (v > 0 ? '+' : '') + (Math.round(v * 10) / 10), { 'text-anchor': 'middle', 'font-size': 10 });
+        });
+        shown.forEach((r, i) => {
+          const cy = T + band * (i + .5), loss = r.d < 0;
+          const col = loss ? 'var(--amber)' : 'var(--cyan)';
+          const x1 = loss ? X(r.d) : zero, x2 = loss ? zero : X(r.d), rad = 4;
+          if (Math.abs(x2 - x1) > 1) {
+            s2.appendChild(_sv('path', {
+              d: loss
+                ? 'M' + x2 + ' ' + (cy - bh / 2) + ' L' + (x1 + rad) + ' ' + (cy - bh / 2)
+                  + ' Q' + x1 + ' ' + (cy - bh / 2) + ' ' + x1 + ' ' + (cy - bh / 2 + rad)
+                  + ' L' + x1 + ' ' + (cy + bh / 2 - rad)
+                  + ' Q' + x1 + ' ' + (cy + bh / 2) + ' ' + (x1 + rad) + ' ' + (cy + bh / 2)
+                  + ' L' + x2 + ' ' + (cy + bh / 2) + ' Z'
+                : 'M' + x1 + ' ' + (cy - bh / 2) + ' L' + (x2 - rad) + ' ' + (cy - bh / 2)
+                  + ' Q' + x2 + ' ' + (cy - bh / 2) + ' ' + x2 + ' ' + (cy - bh / 2 + rad)
+                  + ' L' + x2 + ' ' + (cy + bh / 2 - rad)
+                  + ' Q' + x2 + ' ' + (cy + bh / 2) + ' ' + (x2 - rad) + ' ' + (cy + bh / 2)
+                  + ' L' + x1 + ' ' + (cy + bh / 2) + ' Z', fill: col
+            }));
+          }
+          const nm = r.name.length > 15 ? r.name.slice(0, 14) + '…' : r.name;
+          _txt(s2, L - 10, cy + 4, nm, { 'text-anchor': 'end', 'font-size': 11, fill: 'var(--text-2)' });
+          if (i < 3 && Math.abs(x2 - x1) > 34) {
+            _txt(s2, X(r.d) + (loss ? 7 : -7), cy + 4, r.d.toFixed(1),
+              { 'text-anchor': loss ? 'start' : 'end', 'font-size': 10.5, 'font-weight': 600, fill: '#fff' });
+          }
+        });
+        host.appendChild(s2);
+      })();
+    }
+
+    // The queue is long once a caseload builds up, and a doctor who has
+    // worked through it wants the rest of the page back. Collapsing hides the
+    // tabs and the rows but keeps the heading and its count, so the card still
+    // reports how much is outstanding while taking one line instead of ten.
+    function toggleWeekQueue() {
+      const body = document.getElementById('wqBody');
+      const tabs = document.getElementById('qTabs');
+      const btn  = document.getElementById('wqToggle');
+      if (!body || !btn) return;
+      const collapsing = !body.hasAttribute('hidden');
+      if (collapsing) {
+        body.setAttribute('hidden', '');
+        if (tabs) tabs.setAttribute('hidden', '');
+      } else {
+        body.removeAttribute('hidden');
+        if (tabs) tabs.removeAttribute('hidden');
+      }
+      btn.textContent = collapsing ? 'Show' : 'Hide';
+      btn.setAttribute('aria-expanded', collapsing ? 'false' : 'true');
+      try { localStorage.setItem('gq_wq_open', collapsing ? '0' : '1'); } catch (e) {}
+    }
+
+    // Restore the doctor's last choice. Default is open: an unseen queue is
+    // the failure mode this card exists to prevent.
+    (function restoreQueueState() {
+      let want = '1';
+      try { want = localStorage.getItem('gq_wq_open') || '1'; } catch (e) {}
+      if (want === '0') {
+        const run = () => { if (document.getElementById('wqBody')) toggleWeekQueue(); };
+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', run);
+        else run();
+      }
+    })();
+
+    function toggleCaseloadCharts() {
+      const b = document.getElementById('ccBody');
+      const btn = document.getElementById('ccToggle');
+      const open = b.hasAttribute('hidden');
+      if (open) { b.removeAttribute('hidden'); btn.textContent = 'Hide charts'; }
+      else { b.setAttribute('hidden', ''); btn.textContent = 'Show charts'; }
+      try { localStorage.setItem('gq_cc_open', open ? '1' : '0'); } catch (e) {}
+    }
+
     // ── Bucketing ─────────────────────────────────────────────────────────
     // A patient can legitimately appear in more than one bucket (an overdue
     // assessment AND a stale daily log), so these are filters, not a partition.
@@ -1161,6 +1466,7 @@
     }
 
     function renderQueue() {
+      try { renderCaseloadCharts(); } catch (e) { console.warn('caseload charts:', e); }
       const card = document.getElementById('weekQueue');
       const host = document.getElementById('qBucket');
       if (!card || !host) return;

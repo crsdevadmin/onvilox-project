@@ -1239,8 +1239,10 @@ app.get('/api/doctor/weekly-queue', authenticateToken, async (req, res) => {
         bmi:     num(w.d.bmi),
         muac:    num(w.d.muac),
         ecog:    num(w.d.ecog),
+        grip:    num(w.d.handGrip),
         albumin: num(w.d.albumin),
         crp:     num(w.d.crp),
+        glucose: num(w.d.glucose),
         creatinine: num(w.d.creatinine),
         urea:    num(w.d.urea),
         oral:    num(w.d.oralIntake),
@@ -3431,7 +3433,7 @@ OUTPUT FORMAT — return ONLY valid JSON, no markdown, no text outside the JSON 
 }`;
 
     const msg = await anthropic.messages.create({
-      model: "claude-sonnet-4-6",
+      model: "claude-sonnet-5",
       max_tokens: 4000,
       // Prompt caching: system prompt is identical for every patient — cache reads cost 10% vs 100%
       system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }],

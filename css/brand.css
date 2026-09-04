@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600&display=swap');
+
 /* ═══════════════════════════════════════════════════════════
    GQUENCE — POUCH BRAND SYSTEM
    Design language lifted from the retail pouch artwork:
@@ -485,3 +487,333 @@ body.light .gq-hero-brand .gq-tagline {
 #gqPdfCover.gqc-hidden {
   display: none;
 }
+
+
+/* ═══════════════════════════════════════════════════════════════
+   9. BRAND THEME — retones BOTH existing themes to the brochure
+   This file loads AFTER app.css, so these token blocks win on
+   source order at equal specificity. No markup or layout changes:
+   the app keeps its structure and picks up the identity.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── DARK: the original clinical-noir ground is KEPT ──────────────
+   Only the accent, the status steps and the shape language change
+   here. The near-black is deliberate and stays. ─────────────────── */
+:root {
+  --bg:        #060b17;
+  --bg-2:      #0b1220;
+  --surface:   #0f1829;
+  --surface-2: #141f35;
+  --border:    rgba(255, 255, 255, 0.07);
+  --border-2:  rgba(255, 255, 255, 0.12);
+
+  /* the accent the whole app keys off */
+  --cyan:      #3fc6cc;
+  --cyan-dim:  rgba(63, 198, 204, 0.10);
+  --cyan-glow: rgba(63, 198, 204, 0.20);
+  --sky:       #6b9fe0;
+
+  /* status — the validated set, distinct from the accent */
+  --amber:     #d99a3c;  --amber-dim:  rgba(217, 154, 60, 0.12);
+  --serious:   #e8794c;  --serious-dim: rgba(232, 121, 76, 0.14);
+  --green:     #4bbd8a;  --green-dim:  rgba(75, 189, 138, 0.12);
+  --rose:      #e86a80;  --rose-dim:   rgba(232, 106, 128, 0.12);
+  --violet:    #9d8ae0;  --violet-dim: rgba(157, 138, 224, 0.12);
+
+  --text:   #e8edf5;
+  --text-2: #7e95b8;
+  --text-3: #3d5070;
+
+  /* the brochure squares everything off */
+  --radius:    4px;
+  --radius-sm: 2px;
+  --radius-lg: 4px;
+  --radius-xl: 6px;
+
+  --font-display: 'Cormorant Garamond', 'Iowan Old Style', Georgia, serif;
+}
+
+/* The noir ground stays. The lower glow was violet; it becomes a
+   quiet navy so the accent family is teal-and-navy, not teal-and-purple. */
+body {
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(63, 198, 204, 0.05), transparent),
+    radial-gradient(ellipse 60% 40% at 80% 100%, rgba(9, 42, 93, 0.20), transparent);
+}
+
+/* ── LIGHT: blue-grey → brochure paper ───────────────────────── */
+body.light {
+  --bg:        #fcfcfc;
+  --bg-2:      #f1f5f8;
+  --surface:   #ffffff;
+  --surface-2: #f7f9fb;
+  --border:    rgba(9, 42, 93, 0.10);
+  --border-2:  rgba(9, 42, 93, 0.17);
+
+  --cyan:      #0d7a80;
+  --cyan-dim:  rgba(13, 122, 128, 0.08);
+  --cyan-glow: rgba(13, 122, 128, 0.16);
+  --sky:       #2f6fd0;
+
+  --amber:     #9c6200;  --amber-dim:  rgba(156, 98, 0, 0.09);
+  --serious:   #c2521c;  --serious-dim: rgba(194, 82, 28, 0.10);
+  --green:     #1c7d52;  --green-dim:  rgba(28, 125, 82, 0.09);
+  --rose:      #c0344a;  --rose-dim:   rgba(192, 52, 74, 0.09);
+  --violet:    #5b46a8;  --violet-dim: rgba(91, 70, 168, 0.09);
+
+  --text:   #0d2340;
+  --text-2: #52627a;
+  --text-3: #8493a8;
+
+  background-image:
+    radial-gradient(ellipse 90% 44% at 50% -14%, rgba(13, 122, 128, 0.06), transparent);
+}
+body.light::before {
+  background-image:
+    linear-gradient(rgba(9, 42, 93, 0.028) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(9, 42, 93, 0.028) 1px, transparent 1px);
+}
+
+/* ── Surfaces: hairline rules instead of glowing slabs ───────── */
+.card {
+  box-shadow: none;
+  border-color: var(--border-2);
+}
+body.light .card {
+  box-shadow: 0 1px 2px rgba(9, 42, 93, 0.04);
+}
+.topbar {
+  background: rgba(6, 11, 23, 0.88);
+}
+body.light .topbar {
+  background: var(--surface);
+  box-shadow: none;
+}
+
+/* ── Typography: the brochure's serif + letterspaced eyebrows ── */
+.page-title,
+.card h1,
+.card h2,
+.hospital-report h1 {
+  font-family: var(--font-display);
+  font-weight: 400;
+  letter-spacing: 0.005em;
+  text-wrap: balance;
+}
+.page-title {
+  font-size: 34px;
+  line-height: 1.15;
+}
+.page-subtitle {
+  color: var(--text-2);
+  letter-spacing: 0;
+}
+
+/* Section labels become the brochure's teal small-caps eyebrow.
+   NOTE: .rs-title is deliberately NOT in this list. It sits inside the
+   white printed report, which has its own fixed typography and must stay
+   legible on paper in both themes — a themed accent there would render
+   bright teal on white in dark mode, and print that way. */
+.dsect,
+.sec-label {
+  font-family: var(--font-body, inherit);
+  font-size: 10.5px !important;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--cyan);
+}
+.qtab {
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-size: 11px;
+  border-radius: 0;
+}
+.qtab.on {
+  border-bottom: 2px solid var(--cyan);
+}
+
+/* Numbers line up in columns all over this app. */
+.table td,
+.qmetrics .v,
+.rmi-v,
+.kpi .v,
+.pm .v {
+  font-variant-numeric: tabular-nums;
+}
+
+
+/* ── On-accent ink ────────────────────────────────────────────
+   app.css hardcodes a near-black label on every accent-filled
+   button (.btn-primary color:#060b17, .qbtn-approve color:#04120c).
+   That was legible on the old bright cyan (9.5:1) but not on the
+   light theme's deeper teal (3.75:1). Light mode flips those
+   labels to white; dark mode keeps the dark ink, which still
+   clears comfortably on the brighter accent.
+   ───────────────────────────────────────────────────────────── */
+body.light .btn-primary,
+body.light .qbtn-approve,
+body.light .qbtn-cyan {
+  color: #ffffff;
+}
+body.light .qbtn-approve.caution {
+  color: #ffffff;
+}
+.btn-primary:hover {
+  background: #5fd6db;
+  box-shadow: 0 0 18px var(--cyan-glow);
+}
+body.light .btn-primary:hover {
+  background: #0a666b;
+  box-shadow: none;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   10. CHART SYSTEM
+   Shared by the doctor dashboard and the patient profile. Marks are
+   thin, grids recessive, and every status colour ships with an icon
+   and a written label so state never rests on colour alone.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Ordered navy ramp — used where a scale has a direction (age, ECOG).
+   Steps are validated for monotone lightness against both grounds. */
+:root {
+  --r1: #345a8e; --r2: #4771ab; --r3: #5c8cc6; --r4: #75a8de; --r5: #96c4ee;
+}
+body.light {
+  --r1: #9ab4d4; --r2: #7593c0; --r3: #5170a6; --r4: #2f528b; --r5: #092a5d;
+}
+
+.gq-charts .gq-ch-head {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 16px; margin-bottom: 18px;
+}
+.gq-eyebrow {
+  font-size: 10.5px; font-weight: 600; letter-spacing: .2em;
+  text-transform: uppercase; color: var(--cyan);
+}
+.gq-charts h2 { font-family: var(--font-display); font-weight: 400; font-size: 24px; }
+
+.gq-kpis {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 1px; background: var(--border); border: 1px solid var(--border);
+  margin-bottom: 18px;
+}
+.gq-kpi { background: var(--surface); padding: 14px 16px 12px; display: flex; flex-direction: column; gap: 1px; }
+.gq-kpi .k { font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--text-3); font-weight: 600; }
+.gq-kpi .v {
+  font-size: 28px; font-weight: 500; line-height: 1.2; letter-spacing: -.02em;
+  color: var(--text); font-variant-numeric: tabular-nums;
+}
+.gq-kpi .v small { font-size: 13px; font-weight: 500; color: var(--text-2); margin-left: 2px; }
+.gq-kpi .d { font-size: 12px; color: var(--text-2); }
+
+.gq-grid { display: grid; gap: 18px; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+.gq-plotcard {
+  border: 1px solid var(--border); padding: 16px 18px 14px;
+  display: flex; flex-direction: column; min-width: 0;
+}
+.gq-plotcard h3 { margin: 0; font-size: 13.5px; font-weight: 600; color: var(--text); }
+.gq-cap { margin: 3px 0 0; font-size: 12px; color: var(--text-2); line-height: 1.5; }
+.gq-cap.gq-empty { margin-top: 12px; font-style: italic; }
+.gq-cap.gq-empty[hidden] { display: none; }
+.gq-plot { margin-top: 12px; min-width: 0; }
+.gq-plot svg { display: block; width: 100%; height: auto; }
+.gq-plot text { font-family: var(--font-body); }
+
+.gq-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 10px; }
+.gq-lg { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; color: var(--text-2); }
+.gq-lg i { width: 14px; height: 3px; border-radius: 2px; flex: none; }
+
+.gq-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 11px; font-weight: 600; letter-spacing: .03em;
+  padding: 3px 9px; white-space: nowrap;
+}
+.gq-chip svg { width: 11px; height: 11px; flex: none; }
+.gq-chip.ok       { color: var(--green); background: var(--green-dim); }
+.gq-chip.warn     { color: var(--amber); background: var(--amber-dim); }
+.gq-chip.serious  { color: var(--serious); background: var(--serious-dim); }
+.gq-chip.critical { color: var(--rose);    background: var(--rose-dim); }
+
+@media (max-width: 640px) {
+  .gq-charts .gq-ch-head { flex-direction: column; }
+  .gq-kpi .v { font-size: 24px; }
+}
+
+/* Toggle that collapses the chart block — the queue below is the
+   primary work surface, so charts must be dismissable. */
+.tbl-btn {
+  appearance: none; background: transparent; cursor: pointer;
+  border: 1px solid var(--border-2); color: var(--text-2);
+  font-family: var(--font-body); font-size: 11px; font-weight: 600;
+  letter-spacing: .09em; text-transform: uppercase;
+  padding: 6px 12px; border-radius: var(--radius-sm); flex: none;
+}
+.tbl-btn:hover { color: var(--text); border-color: var(--text-3); }
+.tbl-btn:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+#ccBody[hidden] { display: none; }
+
+
+/* ═══════════════════════════════════════════════════════════════
+   11. PATIENT TRAJECTORY CHARTS (inside the printed report)
+   Fixed colours, not theme tokens: #ptCharts lives inside
+   #pdfExportRoot, which is a white document in both themes and on
+   paper. Nothing here may depend on the app theme.
+   ═══════════════════════════════════════════════════════════════ */
+#ptCharts { break-inside: avoid; }
+.ptc-grid {
+  display: grid; gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+.ptc-card {
+  border: 1px solid rgba(9, 42, 93, 0.14);
+  padding: 12px 14px 10px; min-width: 0;
+  background: #fff;
+}
+.ptc-card h4 {
+  margin: 0; font-size: 12px; font-weight: 700; color: #0d2340;
+  letter-spacing: .01em;
+}
+.ptc-cap { margin: 3px 0 0; font-size: 10.5px; line-height: 1.5; color: #52627a; }
+.ptc-plot { margin-top: 8px; min-width: 0; }
+.ptc-plot svg { display: block; width: 100%; height: auto; }
+.ptc-plot text { font-family: 'Manrope', system-ui, sans-serif; }
+
+.ptc-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 8px; }
+.ptc-lg { display: inline-flex; align-items: center; gap: 6px; font-size: 10.5px; color: #52627a; }
+.ptc-lg i { width: 12px; height: 3px; border-radius: 2px; flex: none; }
+
+.ptc-labs-title {
+  margin: 16px 0 8px; font-size: 10px; font-weight: 800;
+  letter-spacing: .14em; text-transform: uppercase; color: #0e2247;
+}
+.ptc-labs {
+  display: grid; gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+.ptc-lab {
+  border: 1px solid rgba(9, 42, 93, 0.14); padding: 10px 12px 8px;
+  background: #fff; min-width: 0;
+}
+.ptc-lab-h { font-size: 11.5px; font-weight: 700; color: #0d2340; }
+.ptc-lab-h span { font-weight: 400; color: #8493a8; }
+.ptc-lab-r { font-size: 10px; color: #8493a8; margin-top: 1px; }
+.ptc-tag {
+  display: inline-block; margin-top: 6px; font-size: 9.5px; font-weight: 700;
+  letter-spacing: .04em; padding: 2px 7px;
+}
+.ptc-tag.ok  { color: #1c7d52; background: rgba(28, 125, 82, .10); }
+.ptc-tag.out { color: #9c6200; background: rgba(156, 98, 0, .10); }
+.ptc-note { margin: 12px 0 0; font-size: 10.5px; color: #8493a8; }
+
+@media print {
+  .ptc-card, .ptc-lab { break-inside: avoid; }
+}
+
+/* Collapsible "Needs You This Week". The heading and its count stay put so
+   a collapsed card still says how much is outstanding. */
+#wqBody[hidden], #qTabs[hidden] { display: none !important; }
+.queue-title { display: flex; align-items: center; gap: 12px; }
+.queue-title #wqToggle { margin-left: 4px; }

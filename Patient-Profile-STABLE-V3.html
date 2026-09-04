@@ -913,6 +913,37 @@
         </div>
 
         <!-- PROGRESS TRACKING -->
+        <!-- ── Weekly trajectory charts ──────────────────────────────
+             Sits above the Assessments History table it summarises, and
+             inside #pdfExportRoot, so it prints with the report. Colours
+             are fixed light-mode values, not theme tokens: this is a white
+             document in both themes and on paper. -->
+        <div class="rs" id="ptCharts" style="display:none;">
+          <div class="rs-title">Weekly Trajectory</div>
+          <div class="ptc-grid">
+            <section class="ptc-card">
+              <h4>Body weight</h4>
+              <p class="ptc-cap" id="ptcWeightCap">Against the first recorded weight.</p>
+              <div class="ptc-plot" id="ptcWeight"></div>
+            </section>
+            <section class="ptc-card">
+              <h4>Energy delivered against target</h4>
+              <p class="ptc-cap" id="ptcKcalCap">Columns are what each week delivered.</p>
+              <div class="ptc-plot" id="ptcKcal"></div>
+              <div class="ptc-legend" id="ptcKcalLegend"></div>
+            </section>
+            <section class="ptc-card">
+              <h4>Intake and adherence</h4>
+              <p class="ptc-cap">Oral intake as a share of requirement, and supplement compliance. Both self-reported at the visit.</p>
+              <div class="ptc-plot" id="ptcAdh"></div>
+              <div class="ptc-legend" id="ptcAdhLegend"></div>
+            </section>
+          </div>
+          <div class="ptc-labs-title">Laboratory &mdash; each marker on its own scale</div>
+          <div class="ptc-labs" id="ptcLabs"></div>
+          <p class="ptc-note" id="ptcNote"></p>
+        </div>
+
         <div class="rs" id="progressSection" style="display:none;">
           <div class="rs-title">Assessments History</div>
           <table class="rt">
@@ -2611,7 +2642,7 @@
               #editPatientSection, .rpt-actions-bar, .ai-chat-launcher,
               #safetyAlertsBlock, #clinicalProtocolsContainer,
               #calcTrace, #clinicalRationale, #monitoringSection,
-              #progressSection,
+              #progressSection, #ptCharts,
               [id^="claude"],
               #aiChatWindow, #aiNotGeneratedBanner, #aiActionRequired,
               #v3OutcomeModule, #outcomePredictions, .ai-insight,
@@ -5304,7 +5335,7 @@
               'clinicalHoldOrdersSection',
               'mdtReviewSection',
               'clinicalProtocolsContainer', 'mandatoryInvestigationsContainer',
-              'progressSection', 'specsHistory'
+              'progressSection', 'ptCharts', 'specsHistory'
             ];
             const sectionPrevDisplays = {};
             pdfVisibleSections.forEach(id => {
@@ -6259,6 +6290,7 @@ async function loadMonitoringLogs() {
     if (!res.ok) { console.warn('Monitoring API returned', res.status); return; }
     _monLogs = await res.json();
     renderMonitorTables();
+    try { renderPatientCharts(); } catch (e) { console.warn('patient charts:', e); }
     // 7-day overdue notification
     (function() {
       var banner = document.getElementById('weeklyDueBanner');
@@ -6280,6 +6312,240 @@ async function loadMonitoringLogs() {
       }
     })();
   } catch(e) { console.warn('Monitoring load failed:', e); }
+}
+
+// ══ Weekly trajectory charts ═══════════════════════════════════════════
+// Built from _monLogs — the same weekly entries the table below lists, so
+// the picture and the numbers can never disagree. Fixed light-mode colours:
+// this block is inside #pdfExportRoot and prints on white.
+var PTC = {
+  ink:  '#0d2340', ink2: '#52627a', ink3: '#8493a8',
+  grid: 'rgba(9,42,93,0.10)', rule: 'rgba(9,42,93,0.18)', paper: '#ffffff',
+  teal: '#00969e', amber: '#c77a00', navy: '#2f528b', ramp4: '#5170a6',
+  ok: '#1c7d52', warn: '#9c6200', band: 'rgba(192,52,74,0.09)', okBand: 'rgba(28,125,82,0.09)'
+};
+var PTC_NS = 'http://www.w3.org/2000/svg';
+function _pv(t, a) { var n = document.createElementNS(PTC_NS, t); for (var k in a) if (a[k] != null) n.setAttribute(k, a[k]); return n; }
+function _pvSvg(w, h) { return _pv('svg', { viewBox: '0 0 ' + w + ' ' + h, preserveAspectRatio: 'xMidYMid meet' }); }
+function _pvTxt(s, x, y, str, o) {
+  var t = _pv('text', Object.assign({ x: x, y: y, 'font-size': 10, fill: PTC.ink3 }, o || {}));
+  t.textContent = str; s.appendChild(t); return t;
+}
+function _pvNum(v) { if (v === null || v === undefined || v === '') return null; var n = parseFloat(v); return isNaN(n) ? null : n; }
+
+// A polyline that skips gaps rather than drawing through a missing week.
+function _pvLine(s, pts, colour, fillTo) {
+  var runs = [], run = [];
+  pts.forEach(function (p) { if (p) run.push(p); else { if (run.length) runs.push(run); run = []; } });
+  if (run.length) runs.push(run);
+  runs.forEach(function (g) {
+    var d = g.map(function (p, i) { return (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1); }).join(' ');
+    if (fillTo != null && g.length > 1) {
+      s.appendChild(_pv('path', { d: d + ' L' + g[g.length - 1][0] + ' ' + fillTo + ' L' + g[0][0] + ' ' + fillTo + ' Z', fill: colour, opacity: 0.10 }));
+    }
+    if (g.length === 1) s.appendChild(_pv('circle', { cx: g[0][0], cy: g[0][1], r: 3, fill: colour }));
+    else s.appendChild(_pv('path', { d: d, fill: 'none', stroke: colour, 'stroke-width': 2, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }));
+  });
+  var last = pts.filter(Boolean).pop();
+  if (last) s.appendChild(_pv('circle', { cx: last[0], cy: last[1], r: 4, fill: colour, stroke: PTC.paper, 'stroke-width': 2 }));
+  return last;
+}
+
+var PTC_LABS = [
+  { k: 'albumin',    t: 'Albumin',    u: 'g/dL',  lo: 3.5, hi: 5.0, dp: 1 },
+  { k: 'crp',        t: 'CRP',        u: 'mg/L',  lo: 0,   hi: 10,  dp: 0 },
+  { k: 'glucose',    t: 'Blood glucose', u: 'mg/dL', lo: 70, hi: 140, dp: 0 },
+  { k: 'creatinine', t: 'Creatinine', u: 'mg/dL', lo: 0.5, hi: 1.3, dp: 1 },
+  { k: 'urea',       t: 'Urea',       u: 'mg/dL', lo: 15,  hi: 45,  dp: 0 }
+];
+
+function renderPatientCharts() {
+  var host = document.getElementById('ptCharts');
+  if (!host) return;
+  var logs = (_monLogs || []).filter(function (l) { return l.type === 'weekly'; });
+  // The API returns newest-first; a trajectory reads oldest-first.
+  var rows = logs.map(function (l) {
+    var d = l.data;
+    if (typeof d === 'string') { try { d = JSON.parse(d); } catch (e) { d = {}; } }
+    return { wk: _pvNum(d.week), at: l.recorded_at, d: d || {} };
+  }).sort(function (a, b) {
+    if (a.wk != null && b.wk != null) return a.wk - b.wk;
+    return new Date(a.at) - new Date(b.at);
+  });
+
+  // One point is not a trajectory — the table already says it better.
+  if (rows.length < 2) { host.style.display = 'none'; return; }
+  host.style.display = 'block';
+
+  var labels = rows.map(function (r, i) { return 'W' + (r.wk != null ? r.wk : i + 1); });
+  var val = function (k) { return rows.map(function (r) { return _pvNum(r.d[k]); }); };
+  var W = 420, H = 190, L = 40, R = 46, T = 14, B = 28;
+  var iw = W - L - R, ih = H - T - B;
+  var X = function (i) { return L + (rows.length === 1 ? iw / 2 : (i / (rows.length - 1)) * iw); };
+
+  function axisX(s) {
+    labels.forEach(function (lb, i) {
+      if (rows.length > 8 && i % 2 && i !== rows.length - 1) return;
+      _pvTxt(s, X(i), H - 10, lb, { 'text-anchor': 'middle' });
+    });
+  }
+  function gridY(s, ticks, Y) {
+    ticks.forEach(function (v) {
+      s.appendChild(_pv('line', { x1: L, x2: W - R, y1: Y(v), y2: Y(v), stroke: PTC.grid, 'stroke-width': 1 }));
+      _pvTxt(s, L - 7, Y(v) + 3.5, v, { 'text-anchor': 'end' });
+    });
+  }
+  function niceTicks(lo, hi) {
+    var span = hi - lo, step = Math.pow(10, Math.floor(Math.log(span / 3) / Math.LN10));
+    if (span / step > 6) step *= 2;
+    var out = [], v = Math.ceil(lo / step) * step;
+    for (; v <= hi + 1e-9 && out.length < 7; v += step) out.push(Math.round(v * 100) / 100);
+    return out;
+  }
+
+  // ── Body weight, against baseline and the −5% GLIM threshold ─────────
+  (function () {
+    var wt = val('weight'), known = wt.filter(function (v) { return v != null; });
+    var el = document.getElementById('ptcWeight');
+    el.innerHTML = '';
+    if (known.length < 2) { el.innerHTML = '<p class="ptc-cap">Not enough weights recorded.</p>'; return; }
+    var base = known[0], thr = base * 0.95;
+    var lo = Math.min.apply(null, known.concat([thr])) - 1.5;
+    var hi = Math.max.apply(null, known.concat([base])) + 1.5;
+    var s = _pvSvg(W, H);
+    s.setAttribute('aria-label', 'Body weight by week');
+    var Y = function (v) { return T + ih - ((v - lo) / (hi - lo)) * ih; };
+    s.appendChild(_pv('rect', { x: L, y: Y(thr), width: iw, height: Math.max(0, T + ih - Y(thr)), fill: PTC.band }));
+    gridY(s, niceTicks(lo, hi), Y);
+    s.appendChild(_pv('line', { x1: L, x2: W - R, y1: Y(base), y2: Y(base), stroke: PTC.ink3, 'stroke-width': 1 }));
+    _pvTxt(s, W - R + 5, Y(base) + 3.5, 'baseline', { fill: PTC.ink2 });
+    _pvTxt(s, L + 6, Y(thr) + 12, '−5% threshold', { fill: PTC.ink2 });
+    axisX(s);
+    var last = _pvLine(s, wt.map(function (v, i) { return v == null ? null : [X(i), Y(v)]; }), PTC.teal, T + ih);
+    if (last) _pvTxt(s, last[0] + 8, last[1] + 4, known[known.length - 1].toFixed(1) + ' kg',
+      { 'font-size': 11, 'font-weight': 600, fill: PTC.ink });
+    el.appendChild(s);
+    var now = known[known.length - 1], delta = now - base, pct = base ? (delta / base) * 100 : 0;
+    document.getElementById('ptcWeightCap').textContent =
+      'Baseline ' + base.toFixed(1) + ' kg. Now ' + now.toFixed(1) + ' kg — '
+      + (delta >= 0 ? '+' : '') + delta.toFixed(1) + ' kg (' + (pct >= 0 ? '+' : '') + pct.toFixed(1) + '%).'
+      + (pct <= -5 ? ' Past the −5% GLIM threshold for significant loss.' : '');
+  })();
+
+  // ── Energy delivered vs the prescribed target ────────────────────────
+  (function () {
+    var k = val('kcalPerKg'), el = document.getElementById('ptcKcal');
+    el.innerHTML = '';
+    var known = k.filter(function (v) { return v != null; });
+    if (!known.length) {
+      el.innerHTML = '<p class="ptc-cap">No kcal/kg recorded on these weeks.</p>';
+      document.getElementById('ptcKcalLegend').innerHTML = ''; return;
+    }
+    var target = _pvNum((window.currentVersionedPlan && window.currentVersionedPlan.targets
+      && window.currentVersionedPlan.targets.kcalPerKg)) || Math.max.apply(null, known);
+    var max = Math.ceil(Math.max(target, Math.max.apply(null, known)) / 5) * 5 + 5;
+    var s = _pvSvg(W, H);
+    s.setAttribute('aria-label', 'Energy delivered per kg against target');
+    var Y = function (v) { return T + ih - (v / max) * ih; };
+    gridY(s, niceTicks(0, max), Y);
+    var bw = Math.min(22, iw / rows.length - 10);
+    k.forEach(function (v, i) {
+      if (v == null) return;
+      var cx = X(i), y = Y(v), at = v >= target - 0.001;
+      var col = at ? PTC.teal : PTC.ramp4;
+      s.appendChild(_pv('path', {
+        d: 'M' + (cx - bw / 2) + ' ' + Y(0) + ' L' + (cx - bw / 2) + ' ' + (y + 4)
+           + ' Q' + (cx - bw / 2) + ' ' + y + ' ' + (cx - bw / 2 + 4) + ' ' + y
+           + ' L' + (cx + bw / 2 - 4) + ' ' + y
+           + ' Q' + (cx + bw / 2) + ' ' + y + ' ' + (cx + bw / 2) + ' ' + (y + 4)
+           + ' L' + (cx + bw / 2) + ' ' + Y(0) + ' Z', fill: col }));
+      if (i === k.length - 1) _pvTxt(s, cx, y - 7, v, { 'text-anchor': 'middle', 'font-size': 11, 'font-weight': 600, fill: PTC.ink });
+    });
+    s.appendChild(_pv('line', { x1: L, x2: W - R, y1: Y(target), y2: Y(target), stroke: PTC.ink3, 'stroke-width': 1 }));
+    _pvTxt(s, L + 4, Y(target) - 5, 'target ' + target, { fill: PTC.ink2 });
+    s.appendChild(_pv('line', { x1: L, x2: W - R, y1: Y(0), y2: Y(0), stroke: PTC.rule, 'stroke-width': 1 }));
+    axisX(s);
+    el.appendChild(s);
+    document.getElementById('ptcKcalLegend').innerHTML =
+      '<span class="ptc-lg"><i style="background:' + PTC.teal + '"></i>At or above target</span>'
+      + '<span class="ptc-lg"><i style="background:' + PTC.ramp4 + '"></i>Below target</span>';
+    document.getElementById('ptcKcalCap').textContent =
+      'Prescribed ' + target + ' kcal/kg/day. Columns are what each week delivered.';
+  })();
+
+  // ── Oral intake and supplement adherence ─────────────────────────────
+  (function () {
+    var oral = val('oralIntake'), adh = val('compliance');
+    var el = document.getElementById('ptcAdh');
+    el.innerHTML = '';
+    var any = oral.concat(adh).filter(function (v) { return v != null; });
+    if (!any.length) {
+      el.innerHTML = '<p class="ptc-cap">No intake or adherence recorded.</p>';
+      document.getElementById('ptcAdhLegend').innerHTML = ''; return;
+    }
+    var s = _pvSvg(W, H);
+    s.setAttribute('aria-label', 'Oral intake and supplement adherence by week');
+    var Y = function (v) { return T + ih - (v / 100) * ih; };
+    gridY(s, [0, 25, 50, 75, 100], Y);
+    axisX(s);
+    var l1 = _pvLine(s, adh.map(function (v, i) { return v == null ? null : [X(i), Y(v)]; }), PTC.amber);
+    var l2 = _pvLine(s, oral.map(function (v, i) { return v == null ? null : [X(i), Y(v)]; }), PTC.teal);
+    var lastAdh = adh.filter(function (v) { return v != null; }).pop();
+    var lastOral = oral.filter(function (v) { return v != null; }).pop();
+    if (l1 && lastAdh != null) _pvTxt(s, l1[0] + 8, l1[1] + 4, lastAdh + '%', { 'font-size': 11, 'font-weight': 600, fill: PTC.ink });
+    if (l2 && lastOral != null && (!l1 || Math.abs(l1[1] - l2[1]) > 12))
+      _pvTxt(s, l2[0] + 8, l2[1] + 4, lastOral + '%', { 'font-size': 11, 'font-weight': 600, fill: PTC.ink });
+    el.appendChild(s);
+    document.getElementById('ptcAdhLegend').innerHTML =
+      '<span class="ptc-lg"><i style="background:' + PTC.amber + '"></i>Supplement adherence</span>'
+      + '<span class="ptc-lg"><i style="background:' + PTC.teal + '"></i>Oral intake</span>';
+  })();
+
+  // ── Labs: one scale each, never a shared axis ────────────────────────
+  (function () {
+    var host2 = document.getElementById('ptcLabs');
+    host2.innerHTML = '';
+    var shown = 0;
+    PTC_LABS.forEach(function (lab) {
+      var vals = val(lab.k), known = vals.filter(function (v) { return v != null; });
+      if (!known.length) return;
+      shown++;
+      var last = known[known.length - 1], inRange = last >= lab.lo && last <= lab.hi;
+      var card = document.createElement('div');
+      card.className = 'ptc-lab';
+      card.innerHTML = '<div class="ptc-lab-h">' + lab.t + ' <span>' + lab.u + '</span></div>'
+        + '<div class="ptc-lab-r">Ref ' + lab.lo + '–' + lab.hi + '</div>';
+      var LW = 200, LH = 92, PL = 26, PR = 34, PT2 = 10, PB = 18;
+      var liw = LW - PL - PR, lih = LH - PT2 - PB;
+      var lo = Math.min.apply(null, known.concat([lab.lo])), hi = Math.max.apply(null, known.concat([lab.hi]));
+      var pad = (hi - lo) * 0.15 || 1; lo -= pad; hi += pad;
+      var s = _pvSvg(LW, LH);
+      s.setAttribute('aria-label', lab.t + ' by week');
+      var LX = function (i) { return PL + (rows.length === 1 ? liw / 2 : (i / (rows.length - 1)) * liw); };
+      var LY = function (v) { return PT2 + lih - ((v - lo) / (hi - lo)) * lih; };
+      s.appendChild(_pv('rect', { x: PL, y: LY(lab.hi), width: liw, height: Math.max(1, LY(lab.lo) - LY(lab.hi)), fill: PTC.okBand }));
+      _pvTxt(s, PL - 5, LY(lab.hi) + 3.5, lab.hi, { 'text-anchor': 'end', 'font-size': 9 });
+      _pvTxt(s, PL - 5, LY(lab.lo) + 3.5, lab.lo, { 'text-anchor': 'end', 'font-size': 9 });
+      var lastPt = _pvLine(s, vals.map(function (v, i) { return v == null ? null : [LX(i), LY(v)]; }),
+        inRange ? PTC.navy : PTC.warn);
+      if (lastPt) _pvTxt(s, lastPt[0] + 7, lastPt[1] + 3.5, last.toFixed(lab.dp),
+        { 'font-size': 10, 'font-weight': 600, fill: PTC.ink });
+      _pvTxt(s, PL, LH - 5, labels[0], { 'font-size': 9 });
+      _pvTxt(s, LX(rows.length - 1), LH - 5, labels[labels.length - 1], { 'text-anchor': 'end', 'font-size': 9 });
+      var plot = document.createElement('div');
+      plot.className = 'ptc-plot'; plot.appendChild(s);
+      card.appendChild(plot);
+      card.insertAdjacentHTML('beforeend',
+        '<span class="ptc-tag ' + (inRange ? 'ok' : 'out') + '">' + (inRange ? 'In range' : 'Outside range') + '</span>');
+      host2.appendChild(card);
+    });
+    document.querySelector('.ptc-labs-title').style.display = shown ? '' : 'none';
+  })();
+
+  var missing = PTC_LABS.filter(function (l) { return !val(l.k).some(function (v) { return v != null; }); });
+  document.getElementById('ptcNote').textContent = rows.length + ' weekly assessment'
+    + (rows.length === 1 ? '' : 's') + ' plotted'
+    + (missing.length ? '. Not recorded on any week: ' + missing.map(function (l) { return l.t; }).join(', ') + '.' : '.');
 }
 
 async function loadWeeklyPrescriptions() {
