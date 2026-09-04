@@ -109,19 +109,6 @@
              border:1px solid var(--amber); color:var(--amber); background:var(--amber-dim);
              border-radius:5px; padding:1px 6px; }
 
-    /* Retention funnel */
-    .funnel { display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end; }
-    .fstage { flex:1; min-width:78px; }
-    .fstage .bar { background:var(--cyan); border-radius:6px 6px 0 0; min-height:4px; }
-    .fstage .n { font-size:17px; font-weight:800; color:var(--text); }
-    .fstage .l { font-size:10px; color:var(--text-3); text-transform:uppercase; letter-spacing:.06em; margin-top:3px; }
-    .why-list { display:flex; gap:7px; flex-wrap:wrap; margin-top:12px; }
-    .why-chip { font-size:11px; font-weight:700; border-radius:7px; padding:3px 9px; border:1px solid; }
-    .wg-planned    { color:var(--green);  border-color:var(--green);  background:var(--green-dim); }
-    .wg-transition { color:var(--sky);    border-color:var(--sky);    background:rgba(56,189,248,.1); }
-    .wg-patient    { color:var(--amber);  border-color:var(--amber);  background:var(--amber-dim); }
-    .wg-lost       { color:var(--rose);   border-color:var(--rose);   background:var(--rose-dim); }
-
     /* Drafts — unfinished records, violet so they read as "not yet real" */
     .dcards { display:flex; gap:10px; flex-wrap:wrap; }
     .dcard { flex:1; min-width:230px; background:var(--surface-2); border:1px solid var(--violet);
@@ -331,9 +318,6 @@
         <div class="kpi-value" id="kpiReady">0</div>
       </div>
     </div>
-
-    <!-- ── Retention: how far patients got, and why the rest stopped ── -->
-    <div id="funnelPanel" style="display:none;"></div>
 
     <!-- ── Recently closed, kept out of the queue but still reversible ── -->
     <div id="closedPanel" style="display:none;"></div>
@@ -2033,7 +2017,7 @@
         if (!res.ok) throw new Error(out.error || 'Could not close this patient');
         qToast('Closed — ' + (out.label || label)
           + (out.needsConfirmation ? ' (awaiting doctor confirmation)' : ''));
-        loadWeeklyQueue(); loadFunnel();
+        loadWeeklyQueue();
       } catch (e) { qToast(e.message, true); }
     }
 
@@ -2061,7 +2045,7 @@
           { method:'POST', headers:_hdr(true) });
         if (!res.ok) throw new Error('Could not reopen');
         qToast('Reopened — back in your queue');
-        loadWeeklyQueue(); loadFunnel();
+        loadWeeklyQueue();
       } catch (e) { qToast(e.message, true); }
     }
 
@@ -2105,61 +2089,6 @@
                 <button class="qbtn qbtn-ghost qbtn-sm" onclick="reopenPatient('${p.id}')">Reopen</button>
               </div>
             </div>`).join('')}
-        </div>`;
-    }
-
-    // ── Retention funnel ──────────────────────────────────────────────────
-    async function loadFunnel(){
-      try {
-        let doctorId = me.id;
-        if (me.role === 'ASSISTANT' && typeof mappingService !== 'undefined') {
-          doctorId = mappingService.getDoctorForAssistant(me.id) || me.id;
-        }
-        const res = await fetch(_api() + '/api/retention-funnel?doctorId=' + encodeURIComponent(doctorId),
-          { headers: _hdr() });
-        if (!res.ok) return;
-        renderFunnel(await res.json());
-      } catch (e) { /* offline */ }
-    }
-
-    function renderFunnel(d){
-      const el = document.getElementById('funnelPanel');
-      if (!el || !d || !d.enrolled) { if (el) el.style.display='none'; return; }
-      const max = Math.max.apply(null, d.stages.map(s => s.n)) || 1;
-      el.style.display = 'block';
-      el.innerHTML = `
-        <div class="card">
-          <div style="display:flex;align-items:center;gap:11px;flex-wrap:wrap;margin-bottom:14px;">
-            <h2 style="margin:0;font-size:15px;">Retention</h2>
-            <span style="font-size:11.5px;color:var(--text-2);">
-              How far patients got — and, for those who stopped, why</span>
-            ${d.lostToFollowUp !== undefined ? `<span style="margin-left:auto;font-size:11.5px;color:var(--text-2);">
-              Genuinely lost to follow-up: <b style="color:${d.lostToFollowUp ? 'var(--rose)' : 'var(--green)'}">
-              ${d.lostToFollowUp}</b> of ${d.enrolled}</span>` : ''}
-          </div>
-          <div class="funnel">
-            ${d.stages.map(s => `
-              <div class="fstage">
-                <div class="bar" style="height:${Math.max(4, Math.round(s.n / max * 70))}px;
-                     opacity:${0.45 + 0.55 * (s.n / max)}"></div>
-                <div class="n">${s.n}</div><div class="l">${s.stage}</div>
-              </div>`).join('')}
-          </div>
-          ${d.closures && d.closures.length ? `<div class="why-list">
-            ${d.closures.map(c => `<span class="why-chip wg-${c.group}">${_esc(c.label)}: ${c.n}</span>`).join('')}
-          </div>` : ''}
-          ${d.returnedTotal ? `<div style="font-size:11.5px;color:var(--text-2);margin-top:10px;
-              padding-top:9px;border-top:1px dashed var(--border-2);">
-            <b style="color:var(--cyan);">${d.returnedTotal}</b> patient${d.returnedTotal === 1 ? '' : 's'}
-            stopped and later resumed — counted as active above, but treatment was interrupted.
-            ${d.returnedBreakdown && d.returnedBreakdown.length
-              ? `<span style="color:var(--text-3);">(`
-                + d.returnedBreakdown.map(r => _esc(r.label) + ': ' + r.n).join(', ') + `)</span>`
-              : ''}
-          </div>` : ''}
-          <div style="font-size:11px;color:var(--text-3);margin-top:10px;">
-            Only <b>no contact</b> counts as loss to follow-up. Everything else is a recorded outcome.
-          </div>
         </div>`;
     }
 
@@ -2270,13 +2199,11 @@
         loadRiskPanel();
         loadWeeklyQueue();
         loadDrafts();
-        loadFunnel();
         _jobSig = _jobsSignature();
         setInterval(_pollDoctorJobs, 30000);
         setInterval(loadRiskPanel, 120000);     // refresh flags every 2 min
         setInterval(loadWeeklyQueue, 120000);   // and the work queue alongside
         setInterval(loadDrafts, 120000);
-        setInterval(loadFunnel, 300000);
       });
 
     // Show a banner if this device holds patients that never reached the database.

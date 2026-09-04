@@ -3433,7 +3433,7 @@ OUTPUT FORMAT — return ONLY valid JSON, no markdown, no text outside the JSON 
 }`;
 
     const msg = await anthropic.messages.create({
-      model: "claude-sonnet-5",
+      model: "claude-sonnet-4-6",
       max_tokens: 4000,
       // Prompt caching: system prompt is identical for every patient — cache reads cost 10% vs 100%
       system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }],
