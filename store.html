@@ -1350,7 +1350,7 @@ function _showNotification(title, body, kind) {
   // Only raise an OS notification when the tab is NOT visible — otherwise the
   // in-page toast below already informs the user, and showing both is noisy.
   if (_notifPermission && document.hidden) {
-    try { new Notification(title, { body, icon: '/favicon.ico', silent: true }); } catch(e) {}
+    try { new Notification(title, { body, icon: '/favicon.ico?v=3', silent: true }); } catch(e) {}
   }
 
   // In-page toast (amber + ⏳ for pending action items, navy otherwise).

@@ -4,9 +4,9 @@
 <head>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta charset="UTF-8">
-  <link rel="icon" href="/favicon.ico">
-  <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
-  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+  <link rel="icon" href="/favicon.ico?v=3">
+  <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png?v=3">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png?v=3">
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#0e2247">
   <title>Patient Nutrition Plan - Gquence</title>
@@ -51,7 +51,7 @@
       content: '';
       width: 28px;
       height: 28px;
-      background-image: url('/assets/logo/gquence-mark.png');
+      background-image: url('/assets/logo/gquence-mark.png?v=3');
       background-size: contain;
       background-repeat: no-repeat;
       background-position: center;
@@ -665,12 +665,12 @@
 
   <!-- INTERACTIVE CLAUDE AI ASSISTANT -->
   <div class="ai-chat-launcher" onclick="toggleChat()" title="AI Assistance">
-    <img src="/assets/logo/gquence-mark.png" alt="Gquence AI Assistance">
+    <img src="/assets/logo/gquence-mark.png?v=3" alt="Gquence AI Assistance">
   </div>
 
   <div class="ai-chat-window" id="aiChatWindow">
     <div class="ai-chat-header">
-      <h4><img src="/assets/logo/gquence-mark.png" alt="" class="ai-chat-brand"> AI Assistance</h4>
+      <h4><img src="/assets/logo/gquence-mark.png?v=3" alt="" class="ai-chat-brand"> AI Assistance</h4>
       <div class="close-chat" onclick="toggleChat()">✕</div>
     </div>
     <div class="ai-chat-messages" id="chatMsgs">
@@ -5351,7 +5351,7 @@
               cover.innerHTML = `
                 <div class="gqc-sweep"></div>
                 <div class="gqc-brand">
-                  <img class="gqc-mark" src="/assets/logo/gquence-mark.png" alt="">
+                  <img class="gqc-mark" src="/assets/logo/gquence-mark.png?v=3" alt="">
                   <div class="gqc-word">GQUENCE</div>
                   <div class="gqc-tag">Precision Clinical Nutrition</div>
                 </div>
@@ -7082,7 +7082,13 @@ async function approveWxRx() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': token }
     });
-    if (!res.ok) throw new Error((await res.json()).error || 'Approve failed');
+    if (!res.ok) {
+      // The server refuses approval when required weekly values are blank —
+      // surface which ones rather than the raw error code.
+      var errBody = {};
+      try { errBody = await res.json(); } catch (ex) { /* non-JSON error */ }
+      throw new Error(errBody.message || errBody.error || 'Approve failed');
+    }
     var result = await res.json();
     var statusEl = document.getElementById('wxRxStatus');
     statusEl.textContent = 'Approved'; statusEl.style.background = '#dcfce7'; statusEl.style.color = '#166534';

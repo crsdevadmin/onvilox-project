@@ -185,7 +185,7 @@
   width: 30px;
   height: 30px;
   flex: 0 0 30px;
-  background-image: url('/assets/logo/gquence-mark.png');
+  background-image: url('/assets/logo/gquence-mark.png?v=3');
   background-size: contain;
   background-position: center;
   background-repeat: no-repeat;

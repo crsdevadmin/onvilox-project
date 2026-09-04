@@ -104,7 +104,7 @@ body::before {
   display: inline-block;
   width: 28px;
   height: 28px;
-  background-image: url('/assets/logo/gquence-mark.png');
+  background-image: url('/assets/logo/gquence-mark.png?v=3');
   background-size: contain;
   background-repeat: no-repeat;
   background-position: center;

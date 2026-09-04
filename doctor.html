@@ -63,6 +63,15 @@
     .qbtn:disabled { opacity:.5; cursor:progress; }
     .qbtn-approve { background:var(--green); color:#04120c; border-color:var(--green); }
     .qbtn-approve.caution { background:var(--amber); color:#1a1000; border-color:var(--amber); }
+    /* Missing required data is a hard stop, not a warning the doctor can weigh. */
+    .qbtn-approve.blocked {
+      background:transparent; color:var(--text-3, #64748b);
+      border-color:var(--border-2, rgba(255,255,255,.12));
+      cursor:not-allowed; opacity:.75;
+    }
+    .qrow.incomplete { border-left:3px solid var(--text-3, #64748b); }
+    .agechip.incomplete { background:rgba(148,163,184,.14); color:#94a3b8; border-color:rgba(148,163,184,.3); }
+    .qflag.missing { background:rgba(148,163,184,.12); color:#94a3b8; border-color:rgba(148,163,184,.28); }
     .qbtn-ghost { background:transparent; color:var(--text-2); border-color:var(--border-2); }
     .qbtn-ghost:hover { color:var(--text); border-color:var(--text-2); }
     .qbtn-cyan { background:var(--cyan); color:var(--bg); border-color:var(--cyan); }
@@ -1195,6 +1204,11 @@
       const h = p.history || [], h1 = h[h.length - 1] || {}, h0 = h[h.length - 2] || {};
       const wtDelta = (h1.weight != null && h0.weight != null) ? Math.round((h1.weight - h0.weight) * 10) / 10 : null;
       const warned = (p.warnings || []).length > 0;
+      // A warning is a judgement call the doctor is allowed to override. Missing
+      // required data is not — there is nothing to exercise judgement on yet, so
+      // the row stays visible (the patient is still due) but Approve is closed.
+      const missing = rx.missingFields || [];
+      const incomplete = missing.length > 0;
       const waited = rx.createdAt ? _agoText(rx.createdAt) : '';
       const ageDays = rx.createdAt ? _daysSince(rx.createdAt) : null;
       const stale = ageDays !== null && ageDays >= RX_STALE_DAYS;
@@ -1213,12 +1227,17 @@
           + '↻ Re-approval needed</span>'
         : '';
 
-      return '<div class="qrow ' + (warned ? 'warn' : '') + (stale ? ' stale' : '') + '">'
+      const incompleteChip = incomplete
+        ? '<span class="agechip incomplete" title="Required weekly values are still blank: '
+          + _esc(missing.join(', ')) + '">✎ Data incomplete</span>'
+        : '';
+
+      return '<div class="qrow ' + (incomplete ? 'incomplete' : warned ? 'warn' : '') + (stale ? ' stale' : '') + '">'
         + qHead(p, (reopened ? 'edited after approval · ' : '')
                    + (rx.createdAt ? 'generated ' + _shortDate(rx.createdAt) : ''))
         + '<div class="chipstack">'
           + '<span class="wkchip">Week ' + rx.weekNumber + '</span>'
-          + reopenChip + ageChip
+          + incompleteChip + reopenChip + ageChip
         + '</div>'
         + '<div class="qmetrics">'
           + qMetric('kcal/kg', t.kcalPerKg != null ? t.kcalPerKg : '—')
@@ -1229,11 +1248,19 @@
           + qMetric('Formula', t.formulation || 'Standard')
         + '</div>'
         + '<div class="qacts">'
-          + '<button class="qbtn qbtn-approve' + (warned ? ' caution' : '') + '" id="apx-' + rx.id + '"'
-          + ' onclick="approveRxFromQueue(' + rx.id + ', this)">'
-          + (warned ? '⚠ Approve with warnings' : '✓ Approve &amp; send to store') + '</button>'
+          + (incomplete
+              ? '<button class="qbtn qbtn-approve blocked" disabled'
+                + ' title="Fill in ' + _esc(missing.join(', ')) + ' on the weekly entry, then this can be approved.">'
+                + '🔒 Data incomplete — cannot approve</button>'
+                + '<a class="qbtn qbtn-ghost qbtn-sm" href="/patients/profile?id=' + p.id + '#monitoring">Complete week ' + rx.weekNumber + '</a>'
+              : '<button class="qbtn qbtn-approve' + (warned ? ' caution' : '') + '" id="apx-' + rx.id + '"'
+                + ' onclick="approveRxFromQueue(' + rx.id + ', this)">'
+                + (warned ? '⚠ Approve with warnings' : '✓ Approve &amp; send to store') + '</button>')
           + '<button class="qbtn qbtn-ghost qbtn-sm" onclick="openRxReview(\'' + p.id + '\')">Review</button>'
         + '</div>'
+        + (incomplete ? '<div class="qflags">'
+            + '<span class="qflag missing">Missing: ' + _esc(missing.join(' · ')) + '</span>'
+          + '</div>' : '')
         + (warned ? '<div class="qflags">' + p.warnings.map(w =>
             '<span class="qflag' + (w.level === 'watch' ? ' watch' : '') + '">⚠ ' + _esc(w.label) + ' ' + _esc(w.detail) + '</span>'
           ).join('') + '</div>' : '')
@@ -1314,7 +1341,17 @@
       try {
         const res = await fetch(_api() + '/api/weekly-prescriptions/' + rxId + '/approve',
           { method: 'POST', headers: _hdr(true) });
-        if (!res.ok) throw new Error('Approve failed (' + res.status + ')');
+        if (!res.ok) {
+          // The server re-checks completeness. If a stale tab still shows an
+          // Approve button, say exactly what is missing rather than "failed".
+          let body = null;
+          try { body = await res.json(); } catch (e) { /* non-JSON error */ }
+          if (body && body.error === 'INCOMPLETE_WEEKLY_DATA') {
+            await loadWeeklyQueue();
+            throw new Error(body.message || 'This week is missing required data.');
+          }
+          throw new Error((body && body.message) || 'Approve failed (' + res.status + ')');
+        }
         const out = await res.json();
         qToast('✓ Approved — batch ' + (out.batchCode || '') + ' sent to store');
         await loadWeeklyQueue();
@@ -1456,13 +1493,19 @@
         + '<div class="dnote">The recipe, ingredient split, micronutrient table and engine trace live in the '
         + 'full plan — they are only needed when you want to change the formulation itself.</div>';
 
+      const _dMissing = (rx && rx.missingFields) || [];
       document.getElementById('qdFoot').innerHTML =
-        (rx ? '<button class="qbtn qbtn-approve" style="flex:1;justify-content:center" id="qdApprove"'
-              + ' onclick="approveFromDrawer()">✓ Approve &amp; send to store</button>'
+        (rx ? (_dMissing.length
+                ? '<button class="qbtn qbtn-approve blocked" style="flex:1;justify-content:center" disabled>'
+                  + '🔒 Data incomplete — cannot approve</button>'
+                : '<button class="qbtn qbtn-approve" style="flex:1;justify-content:center" id="qdApprove"'
+                  + ' onclick="approveFromDrawer()">✓ Approve &amp; send to store</button>')
             + '<button class="qbtn qbtn-ghost" onclick="closeQDrawer(); setQBucket(\'rx\')">Decide later</button>' : '')
         + '<a class="qbtn qbtn-ghost qbtn-sm" href="/patients/profile?id=' + _qd.patientId + '#monitoring">Full plan</a>';
       document.getElementById('qdNote').textContent = rx
-        ? 'Approving creates the weekly batch and sends it to the store.'
+        ? (_dMissing.length
+            ? 'Cannot approve yet — still missing: ' + _dMissing.join(', ') + '.'
+            : 'Approving creates the weekly batch and sends it to the store.')
         : '';
     }
     function _pm(label, val, unit) {
@@ -2142,7 +2185,7 @@
     /* ── COVER PAGE ────────────────────────────────────── */
     const cover = `
     <div class="cp-page">
-      <div class="cp-logo"><img src="/assets/logo/gquence-logo.png" alt="GQUENCE"><sup>&trade;</sup></div>
+      <div class="cp-logo"><img src="/assets/logo/gquence-logo.png?v=3" alt="GQUENCE"><sup>&trade;</sup></div>
       <hr class="cp-hr">
       <div class="cp-prog">Oncology Nutrition Support Program</div>
       <div class="cp-sub">Clinical Source Document (CSD) &nbsp;|&nbsp; Version GQ-CSD-V1.0</div>

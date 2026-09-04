@@ -50,6 +50,40 @@ const pool = new Pool({
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
 });
 
+// ── Weekly data completeness gate ───────────────────────────────────────────
+// A weekly prescription is a clinical instruction to manufacture and dispense.
+// The target engine will produce a confident-looking plan from weight alone,
+// which means a week with every lab blank used to arrive in the doctor's queue
+// looking identical to a fully worked-up one. These are the values a doctor
+// needs in front of them to sign the week off; without them the prescription is
+// still generated and still visible, but it cannot be approved.
+//
+// CRP is deliberately NOT here: it is not consumed by the target calculation.
+const WEEKLY_REQUIRED_FIELDS = [
+  { key: 'weight',     label: 'Weight (kg)' },
+  { key: 'ecog',       label: 'ECOG' },
+  { key: 'oralIntake', label: 'Oral Intake %' },
+  { key: 'compliance', label: 'Supp Compliance %' },
+  { key: 'albumin',    label: 'Albumin (g/dL)' },
+  { key: 'glucose',    label: 'Blood Glucose (mg/dL)' },
+  { key: 'creatinine', label: 'Creatinine (mg/dL)' },
+  { key: 'urea',       label: 'Urea (mg/dL)' }
+];
+
+// ECOG 0, oral intake 0 and compliance 0 are all real, meaningful readings, so
+// presence is tested against null/blank/NaN — never falsiness.
+function missingWeeklyFields(data) {
+  let d = data || {};
+  if (typeof d === 'string') { try { d = JSON.parse(d); } catch (e) { d = {}; } }
+  return WEEKLY_REQUIRED_FIELDS
+    .filter(f => {
+      const v = d[f.key];
+      if (v === null || v === undefined || v === '') return true;
+      return isNaN(parseFloat(v));
+    })
+    .map(f => f.label);
+}
+
 // Auth Middleware
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
@@ -1049,6 +1083,19 @@ app.post('/api/weekly-prescriptions/:id/approve', authenticateToken, async (req,
     if (!rxRes.rowCount) return res.status(404).json({ error: 'Not found' });
     const rx = rxRes.rows[0];
 
+    // The queue disables the Approve button on an incomplete week, but the UI is
+    // not the enforcement point — a stale tab, a second browser or a direct call
+    // would otherwise still push an unworked-up week into manufacturing.
+    const _missing = missingWeeklyFields(rx.clinical_params);
+    if (_missing.length) {
+      return res.status(400).json({
+        error: 'INCOMPLETE_WEEKLY_DATA',
+        missingFields: _missing,
+        message: 'This week cannot be approved yet — ' + _missing.join(', ')
+               + (_missing.length === 1 ? ' is' : ' are') + ' missing from the weekly entry.'
+      });
+    }
+
     // Mark approved
     await pool.query(
       `UPDATE weekly_prescriptions
@@ -1134,7 +1181,7 @@ app.get('/api/doctor/weekly-queue', authenticateToken, async (req, res) => {
           WHERE patient_id = ANY($1) ORDER BY recorded_at ASC`, [ids]),
       pool.query(
         `SELECT id, patient_id, week_number, status, batch_code, targets, notes,
-                monitoring_log_id, created_at, approved_at,
+                monitoring_log_id, created_at, approved_at, clinical_params,
                 reopened_at, previously_approved_at
            FROM weekly_prescriptions
           WHERE patient_id = ANY($1) ORDER BY week_number ASC`, [ids]),
@@ -1292,7 +1339,9 @@ app.get('/api/doctor/weekly-queue', authenticateToken, async (req, res) => {
           // Set only when this week had already been approved and the log was
           // then edited. The row reads as re-approval rather than first review.
           reopenedAt: pendingRow.reopened_at || null,
-          previouslyApprovedAt: pendingRow.previously_approved_at || null
+          previouslyApprovedAt: pendingRow.previously_approved_at || null,
+          // Which required weekly values are still blank. Empty means approvable.
+          missingFields: missingWeeklyFields(pendingRow.clinical_params)
         } : null,
         lastApproved: lastApproved ? {
           weekNumber: lastApproved.week_number,
