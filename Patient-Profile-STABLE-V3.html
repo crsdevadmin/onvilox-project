@@ -4788,7 +4788,7 @@
             // MUST score
             if (fp.mustTotal !== undefined) {
               const mustColor = fp.mustTotal === 0 ? '#166534' : fp.mustTotal === 1 ? '#92400e' : '#991b1b';
-              trace.push(`<b>MUST Score:</b> <span style="color:${mustColor}; font-weight:800;">${fp.mustTotal} — ${fp.mustRisk || ''}</span> (BMI score + weight-loss score + acute disease effect)`);
+              trace.push(`<b>MUST Score (baseline):</b> <span id="mustBaselineScore" style="color:${mustColor}; font-weight:800;">${fp.mustTotal} — ${fp.mustRisk || ''}</span> (BMI score + weight-loss score + acute disease effect)`);
             }
 
             const baseCal = fp.baseEnergy || Math.round(calcWt * kcalPerKg);
@@ -4864,6 +4864,9 @@
 
             const ctEl = document.getElementById('calcTrace');
             if (ctEl) ctEl.innerHTML = trace.map(x => `<div>${x}</div>`).join('');
+            // Defined in a later script block; guarded so an early render degrades
+            // to the baseline-only trace instead of throwing mid-report.
+            if (ctEl && patient && patient.id && typeof renderMustRescreen === 'function') renderMustRescreen(patient.id);
 
 
             // Protocols Section (NEW: Enteral, Electrolyte, Follow-up)
@@ -5933,6 +5936,69 @@
 
 <script>
 // ── PATIENT MONITORING — standalone global scope ──────────────────────────
+// ── MUST rescreen line in the Calculation Trace ───────────────────────────
+// The trace's MUST score is computed once, from the intake record. A report
+// printed at week six therefore showed the patient's risk on the day they
+// joined. This adds the latest weekly rescreen beside it, from the server's
+// shared MUST calculation — the same one the pilot export uses, so the report
+// and the dataset cannot disagree.
+//
+// Everything here fails quietly: a trace that cannot reach the endpoint keeps
+// showing the baseline rather than breaking a clinical document.
+async function renderMustRescreen(pid) {
+  try {
+    var anchorEl = document.getElementById('mustBaselineScore');
+    if (!anchorEl) return;
+    var base = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : '';
+    var res = await fetch(base + '/api/patients/' + pid + '/must', {
+      headers: { Authorization: 'Bearer ' + (localStorage.getItem('token') || '') }
+    });
+    if (!res.ok) return;
+    var d = await res.json();
+    var row = anchorEl.closest('div');
+    if (!row) return;
+
+    if (!d.latest) return;   // no weekly review yet — nothing to rescreen against
+
+    var when = d.latestAt ? new Date(d.latestAt).toLocaleDateString('en-GB',
+      { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+    var wk = d.latestWeek != null ? ('Week ' + d.latestWeek) : 'latest review';
+    var label = '<b>MUST Score (' + wk + (when ? ', ' + when : '') + '):</b> ';
+
+    if (d.latest.total === null) {
+      // Not scored rather than scored low — a missing height would otherwise
+      // read as a zero BMI component and make the patient look low-risk.
+      row.insertAdjacentHTML('afterend', '<div>' + label +
+        '<span style="color:#6b7280;font-weight:700;">not scored</span> ' +
+        '<span style="color:#6b7280;">— missing ' + (d.latest.missing || []).join(', ') + '</span></div>');
+      return;
+    }
+
+    var t = d.latest.total;
+    var colour = t === 0 ? '#166534' : t === 1 ? '#92400e' : '#991b1b';
+    var parts = 'BMI ' + d.latest.bmiScore + ' + weight loss ' + d.latest.wlScore +
+                ' + acute ' + d.latest.acuteScore;
+    var change = '';
+    if (d.baseline && d.baseline.total !== null) {
+      var delta = t - d.baseline.total;
+      // MUST bands are coarse — anything from 2 upwards reads "High Risk" — so
+      // a real improvement can leave the label unchanged. The delta is stated
+      // explicitly for that reason.
+      change = delta === 0
+        ? ' <span style="color:#6b7280;">— unchanged from baseline</span>'
+        : ' <span style="color:' + (delta < 0 ? '#166534' : '#991b1b') + ';font-weight:700;">— ' +
+          (delta < 0 ? 'improved ' : 'worsened ') + Math.abs(delta) +
+          ' point' + (Math.abs(delta) === 1 ? '' : 's') + ' from baseline</span>';
+    }
+    var smiNote = d.smiCarriedForward
+      ? '<div style="color:#6b7280;font-size:12px;margin-top:2px;">Rescreen uses the weekly weight, oral intake, albumin, CRP and grip. SMI is measured at baseline only and is carried forward.</div>'
+      : '';
+    row.insertAdjacentHTML('afterend', '<div>' + label +
+      '<span style="color:' + colour + ';font-weight:800;">' + t + ' — ' + d.latest.risk + '</span> (' +
+      parts + ')' + change + smiNote + '</div>');
+  } catch (e) { /* keep the baseline trace intact */ }
+}
+
 var _monLogs = [];
 
 function _delta(curr, prev, higherIsBetter) {

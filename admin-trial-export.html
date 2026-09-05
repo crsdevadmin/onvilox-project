@@ -49,6 +49,8 @@
     <p style="color:var(--text-2);margin-top:4px;">Download the complete pilot dataset as a multi-sheet Excel workbook — ready for analysis, or as a formatted PDF report ready to present to a doctor.</p>
 
     <div class="sheet-list" id="sheetList">
+      <div class="sheet-card"><div class="t">Data Analysis</div><div class="d">One row per patient — baseline vs final weight, MUST score, hand grip, MUAC, plus mean intake and days under care</div><div class="c" id="cAnalysis">—</div></div>
+      <div class="sheet-card"><div class="t">Summary</div><div class="d">Cohort means with the n behind each one</div><div class="c" id="cSummary">—</div></div>
       <div class="sheet-card"><div class="t">Enrollment</div><div class="d">Study ID, UHID, diagnosis, all dates, status, formula version, batch</div><div class="c" id="cEnroll">—</div></div>
       <div class="sheet-card"><div class="t">Baseline</div><div class="d">Weight, height, BMI, MUAC, albumin, CRP, hemoglobin</div><div class="c" id="cBase">—</div></div>
       <div class="sheet-card"><div class="t">Weekly</div><div class="d">One row per patient per week (long format)</div><div class="c" id="cWeek">—</div></div>
@@ -94,6 +96,8 @@ async function load(){
     document.getElementById('cBase').textContent = (_data.baseline||[]).length;
     document.getElementById('cWeek').textContent = (_data.weekly||[]).length;
     document.getElementById('cFinal').textContent = (_data.final||[]).length;
+    document.getElementById('cAnalysis').textContent = (_data.analysis||[]).length;
+    document.getElementById('cSummary').textContent = (_data.summary||[]).length;
     const n = (_data.enrollment||[]).length;
     document.getElementById('exportBtn').disabled = n === 0;
     document.getElementById('exportPdfBtn').disabled = n === 0;
@@ -108,6 +112,8 @@ function doExport(){
   if(typeof XLSX === 'undefined'){ document.getElementById('exMsg').textContent = 'Excel library failed to load. Check your connection and reload.'; return; }
   try {
     const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(_data.analysis || []), 'Data Analysis');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(_data.summary || []), 'Summary');
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(_data.enrollment || []), 'Enrollment');
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(_data.baseline || []), 'Baseline');
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(_data.weekly || []), 'Weekly');
@@ -966,6 +972,113 @@ async function doExportPDF(){
         doc.text('(B) = Baseline value at enrollment    (F) = Final / most recent recorded value    Δ = change from baseline', 40, doc.internal.pageSize.getHeight()-32);
       }
     });
+
+    // ── Nutritional status & intake ──────────────────────────────────────
+    // The outcomes table above covers weight and the two labs. MUST, grip and
+    // MUAC are the measures the clinical side asked for and they were only
+    // ever in the Excel, so a reader handed the PDF saw none of them. Split
+    // across two tables rather than widened into one: A4 portrait cannot carry
+    // sixteen columns legibly, and an unreadable table is worse than a
+    // second page.
+    const analysisRows = (_data.analysis || []);
+    if (analysisRows.length) {
+      const sgn = (v, dp) => v === null || v === undefined ? '—' : (v > 0 ? '+' : '') + Number(v).toFixed(dp === undefined ? 1 : dp);
+      const val = (v) => v === null || v === undefined ? '—' : v;
+
+      doc.addPage();
+      doc.setTextColor(14,34,71); doc.setFontSize(18); doc.setFont('helvetica','bold');
+      doc.text('Nutritional Status', 40, 50);
+      doc.setFontSize(10); doc.setTextColor(100,100,100); doc.setFont('helvetica','normal');
+      doc.text('MUST screen, hand grip and MUAC — baseline against the most recent weekly review.', 40, 66);
+
+      doc.autoTable({
+        startY: 80, theme: 'striped', styles: { fontSize: 8, cellPadding: 4 },
+        headStyles: { fillColor: [14,34,71], fontSize: 8 },
+        head: [['Study ID','Patient','MUST (B)','MUST (F)','Δ MUST','Grip (B)','Grip (F)','Δ Grip','MUAC (B)','MUAC (F)','Δ MUAC']],
+        body: analysisRows.map(r => [
+          r['Study ID'] || '—', r['Patient Name'] || '—',
+          val(r['Baseline MUST']), val(r['Final MUST']),
+          r['MUST Change'] === null || r['MUST Change'] === undefined ? '—' : sgn(r['MUST Change'], 0),
+          val(r['Baseline Hand Grip (kg)']), val(r['Final Hand Grip (kg)']), sgn(r['Hand Grip Change (kg)']),
+          val(r['Baseline MUAC (cm)']), val(r['Final MUAC (cm)']), sgn(r['MUAC Change (cm)'])
+        ]),
+        // A falling MUST is improvement, so the usual "green is up" reading is
+        // inverted here and the colouring follows the clinical direction.
+        didParseCell: (data) => {
+          if (data.section !== 'body' || data.column.index !== 4) return;
+          const n = parseFloat(String(data.cell.raw));
+          if (isNaN(n) || n === 0) return;
+          data.cell.styles.textColor = n < 0 ? [22,163,74] : [185,28,28];
+          data.cell.styles.fontStyle = 'bold';
+        }
+      });
+
+      // MUST bands are 0 low, 1 medium, 2+ high. A patient improving from 3 to
+      // 2 keeps the "High Risk" label, so a reader comparing labels alone would
+      // conclude nothing changed. Stated on the page for that reason.
+      doc.setFontSize(8); doc.setTextColor(120,120,120); doc.setFont('helvetica','italic');
+      doc.text(doc.splitTextToSize(
+        'MUST: 0 = low risk, 1 = medium, 2 or above = high. A patient can improve by a point and still sit in the high-risk band, '
+        + 'so read the change column rather than the risk label. The screen is recomputed from the weekly weight, oral intake, albumin, '
+        + 'CRP and grip; SMI is measured at baseline only and carried forward. A blank score means an input was missing and the patient '
+        + 'was not screened — it is not a low score.', 515),
+        40, doc.lastAutoTable.finalY + 16);
+
+      doc.addPage();
+      doc.setTextColor(14,34,71); doc.setFontSize(18); doc.setFont('helvetica','bold');
+      doc.text('Nutritional Intake & Time Under Care', 40, 50);
+      doc.setFontSize(10); doc.setTextColor(100,100,100); doc.setFont('helvetica','normal');
+      doc.text('Estimated intake averaged across each patient’s weekly reviews.', 40, 66);
+
+      // Cohort figures come straight from the Summary sheet so the PDF and the
+      // workbook cannot quote different numbers.
+      const sumBy = {};
+      (_data.summary || []).forEach(r => { sumBy[r['Measure']] = r; });
+      const kcalRow = sumBy['Estimated Calorie Intake (kcal/day)'];
+      const protRow = sumBy['Estimated Protein Intake (g/day)'];
+      const dayRow  = sumBy['Days Under Nutrition Care'];
+      const cohort = [];
+      if (kcalRow && kcalRow['Final Mean'] !== '') cohort.push('Mean calorie intake ' + kcalRow['Final Mean'] + ' kcal/day (n = ' + kcalRow['n (paired)'] + ')');
+      if (protRow && protRow['Final Mean'] !== '') cohort.push('mean protein ' + protRow['Final Mean'] + ' g/day');
+      if (dayRow  && dayRow['Final Mean']  !== '') cohort.push('mean ' + dayRow['Final Mean'] + ' days under care across ' + dayRow['n (paired)'] + ' patient(s) with a recorded endpoint');
+      if (cohort.length) {
+        doc.setFontSize(9); doc.setTextColor(14,34,71); doc.setFont('helvetica','bold');
+        doc.text(doc.splitTextToSize(cohort.join('  ·  ') + '.', 515), 40, 82);
+      }
+
+      doc.autoTable({
+        startY: cohort.length ? 104 : 80, theme: 'striped', styles: { fontSize: 8, cellPadding: 4 },
+        headStyles: { fillColor: [14,34,71], fontSize: 8 },
+        head: [['Study ID','Patient','Mean kcal','% of target','Mean protein (g)','% of target','Weeks w/ data','Days under care','Still under care']],
+        body: analysisRows.map(r => [
+          r['Study ID'] || '—', r['Patient Name'] || '—',
+          val(r['Mean Est. kcal Intake']),
+          r['Mean % kcal Target'] === null || r['Mean % kcal Target'] === undefined ? '—' : r['Mean % kcal Target'] + '%',
+          val(r['Mean Est. Protein Intake (g)']),
+          r['Mean % Protein Target'] === null || r['Mean % Protein Target'] === undefined ? '—' : r['Mean % Protein Target'] + '%',
+          val(r['Weeks With Intake Data']),
+          r['Days Under Care'] === null || r['Days Under Care'] === undefined ? '—'
+            : r['Days Under Care'] + (r['Still Under Care'] === 'Yes' ? '+' : ''),
+          r['Still Under Care'] || '—'
+        ]),
+        // Under 80% of target is the level at which a doctor would want to act,
+        // so it is flagged rather than left to be spotted by eye.
+        didParseCell: (data) => {
+          if (data.section !== 'body' || (data.column.index !== 3 && data.column.index !== 5)) return;
+          const n = parseFloat(String(data.cell.raw));
+          if (!isNaN(n) && n < 80) { data.cell.styles.textColor = [185,28,28]; data.cell.styles.fontStyle = 'bold'; }
+        }
+      });
+
+      doc.setFontSize(8); doc.setTextColor(120,120,120); doc.setFont('helvetica','italic');
+      doc.text(doc.splitTextToSize(
+        'Intake is an estimate: the prescribed calorie and protein split for each week, with the supplement portion scaled by the '
+        + 'recorded compliance. Oral intake is a clinician’s estimate rather than a weighed food record. A week with no compliance '
+        + 'recorded is excluded rather than counted as zero, which is what the weeks-with-data column shows. Days under care runs from '
+        + 'enrolment to the last recorded entry and is not an inpatient length of stay — no admission or discharge date is held in this '
+        + 'system. A "+" marks a patient still under care, whose figure is a floor rather than a result.', 515),
+        40, doc.lastAutoTable.finalY + 16);
+    }
 
     // ── Supplement adherence & gaps — all patients ──
     doc.addPage();

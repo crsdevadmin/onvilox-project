@@ -3,6 +3,9 @@ const { Pool } = require('pg');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+// Shared MUST screen — one implementation for the baseline and discharge ends,
+// so the change between them is a real difference and not two formulas drifting.
+const { computeMust, mustInputs, MUST_PATIENT_COLUMNS } = require('./must');
 require('dotenv').config();
 
 const VAPID_PUBLIC  = 'BP2E-Ogveb92wrIjjciORv_jDJO82jut8m3QSJM_UrwJbVDJCFZdDzSuQZvahxpu_0gw7B-E_bJktm7VKd-qTEo';
@@ -1415,6 +1418,50 @@ app.get('/api/doctor/weekly-queue', authenticateToken, async (req, res) => {
   }
 });
 
+// ── MUST rescreen: the baseline screen and the latest weekly one ──────────
+// The Calculation Trace on the patient report carried a single MUST score,
+// computed once from the intake record, so a report printed at discharge still
+// showed the patient's risk on the day they joined. This returns both ends
+// from the same calculation so the trace can show the rescreen beside it.
+//
+// The weight-loss component is re-derived against usual weight — captured at
+// intake as weight 6 months prior, which is the reference period MUST asks for
+// — so the later score is a genuine rescreen and not an approximation over the
+// pilot window.
+app.get('/api/patients/:id/must', authenticateToken, async (req, res) => {
+  try {
+    const pid = req.params.id;
+    const p = (await pool.query(
+      'SELECT ' + MUST_PATIENT_COLUMNS + ' FROM patients WHERE id = $1', [pid])).rows[0];
+    if (!p) return res.status(404).json({ error: 'Patient not found' });
+
+    const formulas = await loadFormulaConstants(pool);
+    const baseline = computeMust(mustInputs(p), formulas);
+
+    const logs = (await pool.query(
+      `SELECT id, recorded_at, data FROM monitoring_logs
+        WHERE patient_id = $1 AND type = 'weekly' ORDER BY recorded_at ASC`, [pid])).rows;
+    const last = logs.length ? logs[logs.length - 1] : null;
+    let data = last ? last.data : null;
+    if (typeof data === 'string') { try { data = JSON.parse(data); } catch (_) { data = null; } }
+
+    const latest = last ? computeMust(mustInputs(p, data || {}), formulas) : null;
+    const fd = p.full_data || {};
+
+    res.json({
+      patientId: pid,
+      baseline,
+      latest,
+      latestAt: last ? last.recorded_at : null,
+      latestWeek: last ? ((data && data.week != null) ? data.week : logs.length) : null,
+      weeks: logs.length,
+      // Flagged so the report can say the sarcopenia input is not fresh rather
+      // than presenting a stale measurement as a current one.
+      smiCarriedForward: !!(last && (p.smi != null ? p.smi : fd.smi))
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 app.get('/api/patients/:id/monitoring', authenticateToken, async (req, res) => {
   try {
     const result = await pool.query(
@@ -1822,27 +1869,68 @@ app.get('/api/trials/export', authenticateToken, requireAdmin, async (req, res) 
   try {
     const settings = (await pool.query('SELECT * FROM pilot_settings WHERE id=1')).rows[0]
       || { pilot_weeks: 6, lost_threshold_days: 14 };
+    const formulas = await loadFormulaConstants(pool);
     const jobsRes = await pool.query('SELECT patient_id, status, history, mfg_date, batch_no, created_at FROM manufacturing_jobs');
     const jobByPatient = {};
     jobsRes.rows.forEach(j => { const prev = jobByPatient[j.patient_id]; if (!prev || new Date(j.created_at) > new Date(prev.created_at)) jobByPatient[j.patient_id] = j; });
-    const ids = Object.keys(jobByPatient);
-    if (!ids.length) return res.json({ enrollment: [], baseline: [], weekly: [], final: [] });
 
-    const pats = (await pool.query('SELECT id, uhic, name, cancer, sex, age, weight, height, albumin, crp, muac, hemoglobin, created_date FROM patients WHERE id = ANY($1)', [ids])).rows;
+    // Denominator is every enrolled patient, not only those with a dispatched
+    // product. This used to start from manufacturing_jobs alone, which dropped
+    // enrolled patients who never received one — precisely the patients with
+    // the shortest time under care, so any "all patients" figure computed from
+    // the workbook was biased upward.
+    const enrolledRes = await pool.query('SELECT patient_id FROM trial_enrollments');
+    const idSet = new Set(Object.keys(jobByPatient));
+    enrolledRes.rows.forEach(r => { if (r.patient_id) idSet.add(r.patient_id); });
+    const ids = Array.from(idSet);
+    const empty = { enrollment: [], baseline: [], weekly: [], final: [], analysis: [], summary: [] };
+    if (!ids.length) return res.json(empty);
+
+    const pats = (await pool.query(
+      `SELECT id, uhic, name, cancer, cancer_stage, palliative_stage, tumor_burden,
+              sarcopenia_status, regimen, sex, age, weight, usual_weight, height,
+              albumin, crp, muac, hand_grip, smi, hemoglobin,
+              weight_loss_percent, reduced_food_intake, created_date, full_data
+         FROM patients WHERE id = ANY($1)`, [ids])).rows;
     const patById = {}; pats.forEach(p => { patById[p.id] = p; });
     const trials = (await pool.query('SELECT * FROM trial_enrollments WHERE patient_id = ANY($1)', [ids])).rows;
     const trialByPat = {}; trials.forEach(t => { trialByPat[t.patient_id] = t; });
     const plans = (await pool.query('SELECT patient_id, version FROM nutrition_plans WHERE patient_id = ANY($1) ORDER BY version DESC NULLS LAST', [ids])).rows;
     const verByPat = {}; plans.forEach(pl => { if (verByPat[pl.patient_id] === undefined) verByPat[pl.patient_id] = pl.version; });
-    const logs = (await pool.query(`SELECT patient_id, recorded_at, data FROM monitoring_logs WHERE type='weekly' AND patient_id = ANY($1) ORDER BY recorded_at ASC`, [ids])).rows;
+    const logs = (await pool.query(`SELECT id, patient_id, recorded_at, data FROM monitoring_logs WHERE type='weekly' AND patient_id = ANY($1) ORDER BY recorded_at ASC`, [ids])).rows;
     const weeklyByPat = {};
-    logs.forEach(l => { (weeklyByPat[l.patient_id] = weeklyByPat[l.patient_id] || []).push({ recordedAt: l.recorded_at, ...(l.data || {}) }); });
+    logs.forEach(l => { (weeklyByPat[l.patient_id] = weeklyByPat[l.patient_id] || []).push({ logId: l.id, recordedAt: l.recorded_at, ...(l.data || {}) }); });
+
+    // Last contact of ANY kind — daily observations count as an entry even in a
+    // week with no formal review, so the aggregate spans both log types.
+    const lastEntryRows = (await pool.query(
+      `SELECT patient_id, MAX(recorded_at) AS last_at FROM monitoring_logs
+        WHERE patient_id = ANY($1) GROUP BY patient_id`, [ids])).rows;
+    const lastEntryBy = {}; lastEntryRows.forEach(r => { lastEntryBy[r.patient_id] = r.last_at; });
+
+    // Prescribed targets per week, keyed on the monitoring log the week was
+    // generated from — an exact link, unlike matching on week number, which
+    // drifts whenever a review is entered late or out of order.
+    let rxRows = [];
+    try {
+      rxRows = (await pool.query(
+        'SELECT patient_id, week_number, monitoring_log_id, targets FROM weekly_prescriptions WHERE patient_id = ANY($1)', [ids])).rows;
+    } catch (_) { rxRows = []; }
+    const rxByLog = {}, rxByWeek = {};
+    rxRows.forEach(r => {
+      if (r.monitoring_log_id != null) rxByLog[r.monitoring_log_id] = r.targets || {};
+      rxByWeek[r.patient_id + '#' + r.week_number] = r.targets || {};
+    });
 
     const _d = (v) => { if (!v) return ''; const d = new Date(v); return isNaN(d.getTime()) ? String(v).slice(0, 10) : d.toISOString().slice(0, 10); };
     const _num = (v) => (v === null || v === undefined || v === '' || isNaN(parseFloat(v))) ? null : parseFloat(v);
+    const _r1 = (v) => v === null ? null : Math.round(v * 10) / 10;
+    const _r0 = (v) => v === null ? null : Math.round(v);
+    const diff = (a, b, dp) => (a === null || b === null) ? null
+      : (dp === 0 ? Math.round(b - a) : Math.round((b - a) * Math.pow(10, dp)) / Math.pow(10, dp));
     const bmi = (w, h) => { const W = _num(w), H = _num(h); return (W && H) ? Math.round(W / Math.pow(H / 100, 2) * 10) / 10 : null; };
-    const histAt = (job, status) => { const h = Array.isArray(job.history) ? job.history : []; const e = h.find(x => (x.status || '').toUpperCase() === status); return e ? e.at : null; };
-    const isDispatched = (job) => (job.status || '').toUpperCase() === 'DISPATCHED' || (Array.isArray(job.history) && job.history.some(e => (e.status || '').toUpperCase() === 'DISPATCHED'));
+    const histAt = (job, status) => { if (!job) return null; const h = Array.isArray(job.history) ? job.history : []; const e = h.find(x => (x.status || '').toUpperCase() === status); return e ? e.at : null; };
+    const isDispatched = (job) => !!job && ((job.status || '').toUpperCase() === 'DISPATCHED' || (Array.isArray(job.history) && job.history.some(e => (e.status || '').toUpperCase() === 'DISPATCHED')));
     const now = Date.now();
     const statusOf = (id) => {
       const t = trialByPat[id], job = jobByPatient[id];
@@ -1857,50 +1945,223 @@ app.get('/api/trials/export', authenticateToken, requireAdmin, async (req, res) 
       return 'Enrolled';
     };
 
-    const enrollment = [], baseline = [], weekly = [], final = [];
+    // Estimated intake for one week. The prescribed split already reflects the
+    // oral intake % recorded that week, so only the supplement side is scaled
+    // by compliance. Returns nulls unless BOTH the targets and a compliance
+    // figure exist — a week with no compliance recorded is not a week of zero
+    // intake, and averaging it in as one would understate every patient.
+    const weekIntake = (w, targets) => {
+      const t = targets || {};
+      const totalKcal = _num(t.totalKcal), oralKcal = _num(t.oralKcal), suppKcal = _num(t.suppKcal);
+      const totalProt = _num(t.totalProtein), suppProt = _num(t.suppProtein);
+      const comp = _num(w.compliance);
+      if (comp === null || totalKcal === null || oralKcal === null || suppKcal === null) {
+        return { kcal: null, protein: null, pctKcal: null, pctProtein: null, targetKcal: totalKcal, targetProtein: totalProt };
+      }
+      const f = Math.max(0, Math.min(100, comp)) / 100;
+      const kcal = oralKcal + suppKcal * f;
+      const protein = (totalProt !== null && suppProt !== null) ? (totalProt - suppProt) + suppProt * f : null;
+      return {
+        kcal: _r0(kcal),
+        protein: _r1(protein),
+        pctKcal: totalKcal ? _r1(kcal / totalKcal * 100) : null,
+        pctProtein: (protein !== null && totalProt) ? _r1(protein / totalProt * 100) : null,
+        targetKcal: totalKcal, targetProtein: totalProt
+      };
+    };
+
+    const mean = (a) => a.length ? a.reduce((s, v) => s + v, 0) / a.length : null;
+    const median = (a) => {
+      if (!a.length) return null;
+      const s = a.slice().sort((x, y) => x - y), m = Math.floor(s.length / 2);
+      return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+    };
+
+    const enrollment = [], baseline = [], weekly = [], final = [], analysis = [];
     ids.forEach(id => {
       const p = patById[id]; if (!p) return;
       const t = trialByPat[id], job = jobByPatient[id];
+      const fd = p.full_data || {};
       const studyId = t ? t.study_id : '';
+      const wks = weeklyByPat[id] || [];
+      const lastW = wks.length ? wks[wks.length - 1] : null;
+      const enrolledAt = (t && t.enrollment_date) || p.created_date || null;
+      const lastEntry = lastEntryBy[id] || null;
+
+      // Duration under nutrition care. Deliberately NOT called length of stay:
+      // there is no admission or discharge date in this system, and a reader
+      // seeing "length of stay" would take it for inpatient bed days.
+      let daysUnderCare = null;
+      if (enrolledAt) {
+        const start = new Date(enrolledAt).getTime();
+        const end = lastEntry ? new Date(lastEntry).getTime() : start;
+        if (!isNaN(start) && !isNaN(end)) daysUnderCare = Math.max(0, Math.round((end - start) / 86400000));
+      }
+      const status = statusOf(id);
+      // Anyone without a recorded endpoint is still accruing, so their duration
+      // is a floor rather than a result and is kept out of the cohort mean.
+      const stillUnderCare = !(t && t.withdrawn_at) && status !== 'Completed';
+
       enrollment.push({
         'Study ID': studyId, 'UHID': p.uhic || '', 'Patient Name': p.name || '', 'Diagnosis': p.cancer || '',
         'Sex': p.sex || '', 'Age': p.age != null ? p.age : '',
-        'Enrolled Date': _d(t ? t.enrollment_date : p.created_date),
-        'Report/Approval Date': _d(histAt(job, 'APPROVED') || job.created_at),
-        'Manufacturing Date': _d(job.mfg_date),
-        'Dispatch / Start Date': _d(histAt(job, 'DISPATCHED') || job.mfg_date),
-        'Status': statusOf(id), 'Formula Version': verByPat[id] != null ? verByPat[id] : 1, 'Batch No': job.batch_no || ''
+        'Enrolled Date': _d(enrolledAt),
+        'Report/Approval Date': _d(histAt(job, 'APPROVED') || (job ? job.created_at : null)),
+        'Manufacturing Date': _d(job ? job.mfg_date : null),
+        'Dispatch / Start Date': _d(histAt(job, 'DISPATCHED') || (job ? job.mfg_date : null)),
+        'Last Entry Date': _d(lastEntry),
+        'Days Under Care': daysUnderCare,
+        'Still Under Care': stillUnderCare ? 'Yes' : 'No',
+        'Status': status, 'Formula Version': verByPat[id] != null ? verByPat[id] : 1,
+        'Batch No': (job && job.batch_no) || ''
       });
+
+      // Both ends of the MUST screen go through the same mapper and the same
+      // calculation, so the change between them is a real difference.
+      const mustBase  = computeMust(mustInputs(p), formulas);
+      const mustFinal = lastW ? computeMust(mustInputs(p, lastW), formulas) : null;
+      const usualWeight = p.usual_weight != null ? p.usual_weight : fd.usualWeight;
+
       baseline.push({
         'Study ID': studyId, 'Patient Name': p.name || '',
-        'Weight (kg)': _num(p.weight), 'Height (cm)': _num(p.height), 'BMI': bmi(p.weight, p.height),
-        'MUAC (cm)': _num(p.muac), 'Albumin (g/dL)': _num(p.albumin), 'CRP (mg/L)': _num(p.crp), 'Hemoglobin (g/dL)': _num(p.hemoglobin)
+        'Weight (kg)': _num(p.weight), 'Usual Weight (kg)': _num(usualWeight),
+        'Weight Loss %': _num(p.weight_loss_percent), 'Height (cm)': _num(p.height),
+        'BMI': bmi(p.weight, p.height), 'MUAC (cm)': _num(p.muac), 'Hand Grip (kg)': _num(p.hand_grip),
+        'Albumin (g/dL)': _num(p.albumin), 'CRP (mg/L)': _num(p.crp), 'Hemoglobin (g/dL)': _num(p.hemoglobin),
+        'MUST Score': mustBase.total, 'MUST Risk': mustBase.risk || '',
+        'MUST Incomplete — Missing': mustBase.complete ? '' : mustBase.missing.join(', ')
       });
-      const wks = weeklyByPat[id] || [];
+
+      const kcalVals = [], protVals = [], pctKcalVals = [], pctProtVals = [];
       wks.forEach((w, i) => {
+        const wkNo = w.week != null ? w.week : (i + 1);
+        const targets = rxByLog[w.logId] || rxByWeek[id + '#' + wkNo] || null;
+        const intake = weekIntake(w, targets);
+        if (intake.kcal !== null) kcalVals.push(intake.kcal);
+        if (intake.protein !== null) protVals.push(intake.protein);
+        if (intake.pctKcal !== null) pctKcalVals.push(intake.pctKcal);
+        if (intake.pctProtein !== null) pctProtVals.push(intake.pctProtein);
+        const mustWk = computeMust(mustInputs(p, w), formulas);
         weekly.push({
-          'Study ID': studyId, 'Week': w.week != null ? w.week : (i + 1), 'Date': _d(w.recordedAt),
+          'Study ID': studyId, 'Week': wkNo, 'Date': _d(w.recordedAt),
           'Weight (kg)': _num(w.weight), 'BMI': _num(w.bmi), 'MUAC (cm)': _num(w.muac), 'Hand Grip': _num(w.handGrip),
-          'ECOG': w.ecog != null ? w.ecog : '', 'Albumin (g/dL)': _num(w.albumin), 'CRP (mg/L)': _num(w.crp), 'Glucose': _num(w.glucose)
+          'ECOG': w.ecog != null ? w.ecog : '', 'Albumin (g/dL)': _num(w.albumin), 'CRP (mg/L)': _num(w.crp), 'Glucose': _num(w.glucose),
+          'Oral Intake %': _num(w.oralIntake), 'Compliance %': _num(w.compliance),
+          'Target kcal': intake.targetKcal, 'Target Protein (g)': intake.targetProtein,
+          'Est. kcal Intake': intake.kcal, 'Est. Protein Intake (g)': intake.protein,
+          '% kcal Target': intake.pctKcal, '% Protein Target': intake.pctProtein,
+          'MUST Score': mustWk.total, 'MUST Risk': mustWk.risk || ''
         });
       });
-      const lastW = wks.length ? wks[wks.length - 1] : null;
+
       const bW = _num(p.weight), bAlb = _num(p.albumin), bCrp = _num(p.crp);
       const lW = lastW ? _num(lastW.weight) : null, lAlb = lastW ? _num(lastW.albumin) : null, lCrp = lastW ? _num(lastW.crp) : null;
       final.push({
-        'Study ID': studyId, 'Patient Name': p.name || '', 'Status': statusOf(id), 'Weeks Completed': wks.length,
-        'Baseline Weight': bW, 'Final Weight': lW, 'Weight Change': (bW != null && lW != null) ? Math.round((lW - bW) * 10) / 10 : null,
-        'Baseline Albumin': bAlb, 'Final Albumin': lAlb, 'Albumin Change': (bAlb != null && lAlb != null) ? Math.round((lAlb - bAlb) * 10) / 10 : null,
-        'Baseline CRP': bCrp, 'Final CRP': lCrp, 'CRP Change': (bCrp != null && lCrp != null) ? Math.round((lCrp - bCrp) * 10) / 10 : null
+        'Study ID': studyId, 'Patient Name': p.name || '', 'Status': status, 'Weeks Completed': wks.length,
+        'Baseline Weight': bW, 'Final Weight': lW, 'Weight Change': diff(bW, lW, 1),
+        'Baseline Albumin': bAlb, 'Final Albumin': lAlb, 'Albumin Change': diff(bAlb, lAlb, 2),
+        'Baseline CRP': bCrp, 'Final CRP': lCrp, 'CRP Change': diff(bCrp, lCrp, 1)
+      });
+
+      const bGrip = _num(p.hand_grip), lGrip = lastW ? _num(lastW.handGrip) : null;
+      const bMuac = _num(p.muac), lMuac = lastW ? _num(lastW.muac) : null;
+      analysis.push({
+        'Study ID': studyId, 'UHID': p.uhic || '', 'Patient Name': p.name || '', 'Diagnosis': p.cancer || '',
+        'Sex': p.sex || '', 'Age': p.age != null ? p.age : '', 'Height (cm)': _num(p.height),
+        'Status': status, 'Weeks Completed': wks.length,
+        'Baseline Weight (kg)': bW, 'Final Weight (kg)': lW, 'Weight Change (kg)': diff(bW, lW, 1),
+        'Baseline MUST': mustBase.total, 'Final MUST': mustFinal ? mustFinal.total : null,
+        'MUST Change': diff(mustBase.total, mustFinal ? mustFinal.total : null, 0),
+        'Baseline MUST Risk': mustBase.risk || '', 'Final MUST Risk': (mustFinal && mustFinal.risk) || '',
+        'Baseline Hand Grip (kg)': bGrip, 'Final Hand Grip (kg)': lGrip, 'Hand Grip Change (kg)': diff(bGrip, lGrip, 1),
+        'Baseline MUAC (cm)': bMuac, 'Final MUAC (cm)': lMuac, 'MUAC Change (cm)': diff(bMuac, lMuac, 1),
+        'Mean Est. kcal Intake': _r0(mean(kcalVals)),
+        'Mean % kcal Target': _r1(mean(pctKcalVals)),
+        'Mean Est. Protein Intake (g)': _r1(mean(protVals)),
+        'Mean % Protein Target': _r1(mean(pctProtVals)),
+        'Weeks With Intake Data': kcalVals.length,
+        'Days Under Care': daysUnderCare,
+        'Still Under Care': stillUnderCare ? 'Yes' : 'No'
       });
     });
 
-    enrollment.sort((a, b) => String(a['Study ID']).localeCompare(String(b['Study ID'])));
-    baseline.sort((a, b) => String(a['Study ID']).localeCompare(String(b['Study ID'])));
-    weekly.sort((a, b) => String(a['Study ID']).localeCompare(String(b['Study ID'])) || (a['Week'] - b['Week']));
-    final.sort((a, b) => String(a['Study ID']).localeCompare(String(b['Study ID'])));
+    // ── Cohort summary ────────────────────────────────────────────────────
+    // Its own sheet rather than a totals row on the data: a totals row breaks
+    // sorting, filtering and pivots the moment anyone touches the analysis
+    // sheet. Every line carries its own n, because MUAC and grip are recorded
+    // far less consistently than weight and a single average would otherwise
+    // hide how thin some of them are.
+    const paired = (bKey, fKey) => analysis
+      .map(r => ({ b: r[bKey], f: r[fKey] }))
+      .filter(x => x.b !== null && x.b !== undefined && x.f !== null && x.f !== undefined);
+    const summaryRow = (label, bKey, fKey, dp) => {
+      const pr = paired(bKey, fKey);
+      const bs = pr.map(x => x.b), fs = pr.map(x => x.f);
+      const rd = (v) => v === null ? null : Math.round(v * Math.pow(10, dp)) / Math.pow(10, dp);
+      return {
+        'Measure': label, 'n (paired)': pr.length,
+        'Baseline Mean': rd(mean(bs)), 'Final Mean': rd(mean(fs)),
+        'Mean Change': rd(mean(pr.map(x => x.f - x.b))), 'Notes': ''
+      };
+    };
+    const summary = [
+      summaryRow('Weight (kg)', 'Baseline Weight (kg)', 'Final Weight (kg)', 1),
+      summaryRow('MUST Score', 'Baseline MUST', 'Final MUST', 2),
+      summaryRow('Hand Grip (kg)', 'Baseline Hand Grip (kg)', 'Final Hand Grip (kg)', 1),
+      summaryRow('MUAC (cm)', 'Baseline MUAC (cm)', 'Final MUAC (cm)', 1)
+    ];
+    // MUST's bands are coarser than its score: anything from 2 upward reads
+    // "high risk", so a patient improving 3 -> 2 keeps the same label and a
+    // reader comparing labels alone concludes nothing moved. The note travels
+    // with the number rather than living only in whatever email announced it.
+    const mustSummary = summary.find(r => r['Measure'] === 'MUST Score');
+    if (mustSummary) {
+      mustSummary['Notes'] = 'Lower is better. Bands: 0 low, 1 medium, 2+ high — a patient can improve by a point '
+        + 'and stay in the high-risk band, so read the change, not the risk label. Recomputed at each end from the '
+        + 'same screen; weight loss is measured against usual weight (6 months prior), and SMI is baseline-only and '
+        + 'carried forward. Patients whose score could not be computed are excluded — see the Baseline sheet for what was missing.';
+    }
+    const col = (k) => analysis.map(r => r[k]).filter(v => v !== null && v !== undefined);
+    const kc = col('Mean Est. kcal Intake'), pk = col('Mean % kcal Target');
+    const pc = col('Mean Est. Protein Intake (g)'), pp = col('Mean % Protein Target');
+    summary.push({
+      'Measure': 'Estimated Calorie Intake (kcal/day)', 'n (paired)': kc.length,
+      'Baseline Mean': '', 'Final Mean': _r0(mean(kc)), 'Mean Change': '',
+      'Notes': 'Cohort mean of each patient\'s weekly average'
+        + (pk.length ? ' — ' + _r1(mean(pk)) + '% of prescribed target' : '')
+        + '. Estimated from prescribed target x recorded compliance; oral intake % is a clinical estimate, not a weighed food record.'
+    });
+    summary.push({
+      'Measure': 'Estimated Protein Intake (g/day)', 'n (paired)': pc.length,
+      'Baseline Mean': '', 'Final Mean': _r1(mean(pc)), 'Mean Change': '',
+      'Notes': 'Cohort mean of each patient\'s weekly average'
+        + (pp.length ? ' — ' + _r1(mean(pp)) + '% of prescribed target' : '') + '.'
+    });
+    const closed = analysis.filter(r => r['Still Under Care'] === 'No' && r['Days Under Care'] !== null).map(r => r['Days Under Care']);
+    const openN = analysis.filter(r => r['Still Under Care'] === 'Yes').length;
+    summary.push({
+      'Measure': 'Days Under Nutrition Care', 'n (paired)': closed.length,
+      'Baseline Mean': '', 'Final Mean': _r1(mean(closed)), 'Mean Change': '',
+      'Notes': 'Enrolment to last recorded entry. Median ' + (median(closed) !== null ? median(closed) : 'n/a')
+        + '. Excludes ' + openN + ' patient(s) still under care, whose duration is a floor rather than a result.'
+        + ' Not inpatient length of stay — no admission or discharge date is recorded in this system.'
+    });
 
-    res.json({ enrollment, baseline, weekly, final, generatedAt: new Date().toISOString() });
+    // A patient with a manufacturing job but no enrolment record has no study
+    // ID. That is worth seeing — it is a data-integrity signal — but it sorts
+    // to the bottom rather than heading every sheet.
+    const byStudy = (a, b) => {
+      const A = String(a['Study ID'] || ''), B = String(b['Study ID'] || '');
+      if (!A !== !B) return A ? -1 : 1;
+      return A.localeCompare(B);
+    };
+    enrollment.sort(byStudy);
+    baseline.sort(byStudy);
+    weekly.sort((a, b) => byStudy(a, b) || (a['Week'] - b['Week']));
+    final.sort(byStudy);
+    analysis.sort(byStudy);
+
+    res.json({ enrollment, baseline, weekly, final, analysis, summary, generatedAt: new Date().toISOString() });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
