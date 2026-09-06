@@ -4860,6 +4860,7 @@ const cleanRoutes = {
   '/admin/trials/outcomes': 'admin-trial-outcomes.html',
   '/admin/trials/formula': 'admin-trial-formula.html',
   '/admin/trials/impact':  'admin-trial-impact.html',
+  '/admin/trials/analytics': 'admin-trial-analytics.html',
   '/admin/trials/export': 'admin-trial-export.html',
   '/admin/reports':    'admin-reports.html',
   '/admin/rules':      'admin-rules.html',

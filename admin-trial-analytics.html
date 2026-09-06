@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Clinical Trials — Meeting Pack - Gquence</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <link rel="stylesheet" href="/css/app.css">
+  <link rel="stylesheet" href="/css/brand.css?v=1">
+  <style>
+    .subnav { display:flex; gap:6px; margin:0 0 14px; flex-wrap:wrap; }
+    .subnav a { padding:7px 14px; border-radius:20px; font-size:13px; text-decoration:none; color:var(--text-2); background:var(--surface-2); }
+    .subnav a.active { background:#0e2247; color:#fff; }
+    .toolbar { display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin:14px 0 10px; }
+    /* The preview is a white page on any theme - it previews a printed deck,
+       not a screen view, so it must not restyle itself with the app theme. */
+    .paper { background:#fff; border:1px solid var(--border); border-radius:10px; overflow:hidden; }
+    #pv { width:100%; height:72vh; min-height:420px; border:0; display:block; background:#fff; }
+    .hint { font-size:12.5px; color:var(--text-2); }
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">Gquence Admin</div>
+  <div class="nav">
+    <a href="/admin">Dashboard</a>
+    <a href="/admin/stores">Stores</a>
+    <a href="/admin/users">Create Users</a>
+    <a href="/admin/mapping">Mapping</a>
+    <a href="/admin/trials">Clinical Trials</a>
+    <a href="/admin/rules">Rule Engine</a>
+    <a href="#" onclick="auth.logout()">Logout</a>
+    <button id="themeToggleBtn" onclick="toggleTheme()" class="btn-secondary btn-sm" style="margin-left:20px;border-radius:30px;padding:6px 14px;cursor:pointer;">🌙 Dark Mode</button>
+  </div>
+</div>
+
+<div class="container page">
+  <div class="card">
+    <div class="subnav">
+      <a href="/admin/trials">Enrollment Log</a>
+      <a href="/admin/trials/cohort">Cohort Dashboard</a>
+      <a href="/admin/trials/outcomes">Monitoring</a>
+      <a href="/admin/trials/impact">Impact Summary</a>
+      <a href="/admin/trials/analytics" class="active">Meeting Pack</a>
+      <a href="/admin/trials/formula">Formula Tracking</a>
+      <a href="/admin/trials/export">Export Dataset</a>
+    </div>
+
+    <h2 style="margin-bottom:0;">Meeting Pack</h2>
+    <p style="color:var(--text-2);margin-top:4px;max-width:760px;">
+      A slide-shaped summary of the pilot for presenting &mdash; the analysis, not the dataset.
+      Landscape pages, one point each. What you see below is the file you download.
+    </p>
+
+    <div class="toolbar">
+      <button class="btn-primary" id="dlBtn" style="border-radius:8px;padding:11px 22px;font-size:15px;cursor:pointer;" onclick="downloadPack()" disabled>&#11015; Download Meeting Pack (PDF)</button>
+      <button class="btn-secondary" id="tabBtn" style="border-radius:8px;padding:11px 18px;font-size:14px;cursor:pointer;" onclick="openTab()" disabled>Open in new tab</button>
+      <span class="hint" id="msg">Building&hellip;</span>
+    </div>
+
+    <div class="paper"><iframe id="pv" title="Meeting pack preview"></iframe></div>
+    <p class="hint" style="margin-top:10px;">
+      The preview always shows a white page regardless of your dark-mode setting &mdash; it is a preview of print, not of the screen.
+    </p>
+  </div>
+</div>
+
+<script src="/js/config.js"></script>
+<script src="/js/storage.js"></script>
+<script src="/js/seed.js"></script>
+<script src="/js/auth.js"></script>
+<script src="/js/theme.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<script>
+auth.requireRole(['SUPER_ADMIN', 'ADMIN', 'DOCTOR']);
+(function(){ var u=auth.getCurrentUser(); if(u&&u.role==="DOCTOR"){ ["/admin/stores","/admin/users","/admin/mapping","/admin/rules"].forEach(function(h){ var el=document.querySelector('.nav a[href="'+h+'"]'); if(el) el.style.display="none"; }); var dash=document.querySelector('.nav a[href="/admin"]'); if(dash){ dash.href="/dashboard"; dash.textContent="Dashboard"; } } })();
+const me = auth.getCurrentUser();
+const apiBase = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : '';
+
+// -- Palette ---------------------------------------------------------------
+// Chrome is the Gquence navy the rest of the reports use. Data colours are the
+// validated status and sequential steps.
+//
+// One thing this palette CANNOT do: carry improved-vs-worsened by hue. Green
+// #0ca30c against red #d03b3b measures dE 4.1 under deuteranopia - for a
+// red-green colourblind reader, and roughly one man in twelve is, those two
+// fills are the same colour. So every segment is labelled with its own count
+// and word, and the order is fixed (improved, then unchanged, then worsened)
+// on every chart in the deck. The colour is a convenience for everyone else;
+// the label and the position are what actually carry the meaning.
+const C = {
+  navy:'#0e2247', teal:'#25716f', ink:'#0b0b0b', ink2:'#52514e', muted:'#898781',
+  grid:'#e1e0d9', rule:'#c3c2b7', paper:'#ffffff', wash:'#f5f7fa',
+  good:'#0ca30c', warn:'#fab219', bad:'#d03b3b', flat:'#898781',
+  base:'#86b6ef', now:'#2a78d6'
+};
+const rgb = h => [parseInt(h.slice(1,3),16), parseInt(h.slice(3,5),16), parseInt(h.slice(5,7),16)];
+
+let _doc = null, _fname = '';
+
+function num(v){ return (v===null||v===undefined||v===''||isNaN(parseFloat(v))) ? null : parseFloat(v); }
+function mean(a){ return a.length ? a.reduce((s,v)=>s+v,0)/a.length : null; }
+function median(a){ if(!a.length) return null; const s=a.slice().sort((x,y)=>x-y), m=Math.floor(s.length/2); return s.length%2?s[m]:(s[m-1]+s[m])/2; }
+function r1(v){ return v===null?null:Math.round(v*10)/10; }
+
+// -- Build the numbers the deck talks about, once --------------------------
+function buildModel(data, impact) {
+  const analysis = data.analysis || [];
+  const enrol = data.enrollment || [];
+  const sumBy = {}; (data.summary||[]).forEach(r => { sumBy[r['Measure']] = r; });
+
+  const statuses = ['Active','Completed','Withdrawn','Lost to Follow-up','Enrolled'];
+  const statusCounts = statuses.map(s => ({ label:s, n: enrol.filter(r => r['Status']===s).length }))
+                               .filter(x => x.n > 0);
+
+  const closedDays = analysis.filter(r => r['Still Under Care']==='No' && num(r['Days Under Care'])!==null)
+                             .map(r => num(r['Days Under Care']));
+  const openN = analysis.filter(r => r['Still Under Care']==='Yes').length;
+
+  const band = v => v===null ? null : (v<80 ? 'below' : (v<=100 ? 'at' : 'above'));
+  const kcalBands = { below:0, at:0, above:0 }, protBands = { below:0, at:0, above:0 };
+  analysis.forEach(r => {
+    const k = band(num(r['Mean % kcal Target'])); if (k) kcalBands[k]++;
+    const p = band(num(r['Mean % Protein Target'])); if (p) protBands[p]++;
+  });
+
+  const riskCount = key => {
+    const o = { 'Low Risk':0, 'Medium Risk':0, 'High Risk':0 };
+    analysis.forEach(r => { const v = r[key]; if (v && o[v] !== undefined) o[v]++; });
+    return o;
+  };
+  const mustDelta = analysis.map(r => num(r['MUST Change'])).filter(v => v !== null);
+
+  const wt = ((impact && impact.metrics) || []).find(m => m.key === 'weight') || null;
+
+  return {
+    n: analysis.length,
+    withFollowUp: analysis.filter(r => num(r['Weeks Completed']) > 0).length,
+    reviews: (data.weekly || []).length,
+    statusCounts,
+    days: { n: closedDays.length, mean: r1(mean(closedDays)), median: median(closedDays), open: openN },
+    closedDays,
+    // Per-patient change, for the spread behind the mean.
+    weightChanges: analysis.map(r => num(r['Weight Change (kg)'])).filter(v => v !== null),
+    weight: wt,
+    must: {
+      base: riskCount('Baseline MUST Risk'),
+      final: riskCount('Final MUST Risk'),
+      improved: mustDelta.filter(v => v < 0).length,
+      unchanged: mustDelta.filter(v => v === 0).length,
+      worsened: mustDelta.filter(v => v > 0).length,
+      scored: mustDelta.length
+    },
+    mustRow: sumBy['MUST Score'] || null,
+    grip: sumBy['Hand Grip (kg)'] || null,
+    muac: sumBy['MUAC (cm)'] || null,
+    wtRow: sumBy['Weight (kg)'] || null,
+    noIntake: analysis.filter(r => !num(r['Weeks With Intake Data'])).length,
+    kcalAbs: sumBy['Estimated Calorie Intake (kcal/day)'] || null,
+    protAbs: sumBy['Estimated Protein Intake (g/day)'] || null,
+    kcal: { bands: kcalBands,
+            mean: r1(mean(analysis.map(r => num(r['Mean % kcal Target'])).filter(v => v !== null))) },
+    prot: { bands: protBands,
+            mean: r1(mean(analysis.map(r => num(r['Mean % Protein Target'])).filter(v => v !== null))) }
+  };
+}
+</script>
+
+<script>
+// -- Drawing primitives ----------------------------------------------------
+const W = 842, H = 595, M = 52, CW = W - M*2;
+let doc = null, pageNo = 0, LOGO = null, MARK = null;
+
+function setFill(hex){ const c=rgb(hex); doc.setFillColor(c[0],c[1],c[2]); }
+function setDraw(hex){ const c=rgb(hex); doc.setDrawColor(c[0],c[1],c[2]); }
+function setText(hex){ const c=rgb(hex); doc.setTextColor(c[0],c[1],c[2]); }
+function t(str, x, y, size, weight, hex, align){
+  doc.setFont('helvetica', weight||'normal'); doc.setFontSize(size); setText(hex||C.ink);
+  doc.text(String(str), x, y, align ? { align:align } : undefined);
+}
+
+function slide(title, standfirst){
+  doc.addPage('a4','landscape'); pageNo++;
+  // A thin brand rule at the very top, rather than a heavy banner — the page
+  // should read as a document, not a template.
+  setFill(C.teal); doc.rect(0, 0, W, 4, 'F');
+  t(title, M, 66, 23, 'bold', C.navy);
+  if (standfirst) t(standfirst, M, 88, 11.5, 'normal', C.ink2);
+  setDraw(C.grid); doc.setLineWidth(0.7); doc.line(M, 100, W-M, 100);
+  setDraw(C.grid); doc.line(M, H-40, W-M, H-40);
+  if (MARK) { try { doc.addImage(MARK, 'PNG', M, H-34, 13, 13); } catch(e){} }
+  t('GQUENCE Clinical Nutrition Pilot', M + (MARK ? 19 : 0), H-25, 8.5, 'normal', C.muted);
+  t(String(pageNo), W-M, H-25, 8.5, 'normal', C.muted, 'right');
+  return standfirst ? 126 : 116;
+}
+
+function footnote(lines, y){
+  doc.setFont('helvetica','italic'); doc.setFontSize(8.5); setText(C.muted);
+  doc.text(doc.splitTextToSize(lines, CW), M, y);
+}
+
+// A panel behind a chart or a group of figures. Keeps the eye inside one idea
+// per region instead of letting marks float on white.
+function panel(x, y, w, h, title){
+  setFill(C.wash); doc.roundedRect(x, y, w, h, 8, 8, 'F');
+  if (title) t(title, x+18, y+26, 11.5, 'bold', C.ink);
+  return y + (title ? 42 : 18);
+}
+
+// Stat tile — the form for a headline number. Never a one-bar bar chart.
+function tile(x, y, w, h, value, label, sub, hex){
+  setFill(C.wash); doc.roundedRect(x, y, w, h, 8, 8, 'F');
+  setFill(hex || C.navy); doc.rect(x, y+14, 3.5, h-28, 'F');
+  t(value, x+18, y+h/2+4, 28, 'bold', hex || C.navy);
+  t(label, x+18, y+h/2+24, 10.5, 'bold', C.ink2);
+  if (sub) t(sub, x+18, y+h/2+38, 8.5, 'normal', C.muted);
+}
+
+// Stacked share bar. Segment order is FIXED and every segment carries its own
+// count — hue is never the only cue (see the palette note).
+function shareBar(x, y, w, h, segs, total, small){
+  if (!total) { t('No paired data', x, y+h/2+4, 10, 'italic', C.muted); return y+h+18; }
+  let cx = x;
+  segs.forEach((s, i) => {
+    const sw = s.n / total * w;
+    if (sw > 0) {
+      setFill(s.color);
+      doc.rect(cx, y, Math.max(1, sw - (i < segs.length-1 ? 2 : 0)), h, 'F');
+    }
+    cx += sw;
+  });
+  let lx = x;
+  const fs = small ? 9 : 11;
+  doc.setFont('helvetica','normal'); doc.setFontSize(fs);
+  segs.forEach(s => {
+    setFill(s.color); doc.rect(lx, y+h+11, fs, fs, 'F');
+    setText(C.ink2);
+    const label = s.n + ' ' + s.label;
+    doc.text(label, lx+fs+5, y+h+11+fs-1);
+    lx += doc.getTextWidth(label) + fs + 28;
+  });
+  return y + h + fs + 24;
+}
+
+// Donut — part-to-whole at a glance only, and only while the segment count
+// stays small. jsPDF has no arc primitive, so each segment is a polygon fan
+// approximated in ~4 degree steps; a small angular gap stands in for the 2pt
+// surface gap the flat bars use.
+function donut(cx, cy, rOut, rIn, segs, total){
+  if (!total) return;
+  let a = -Math.PI/2;
+  const gap = Math.min(0.03, (Math.PI*2) / Math.max(24, segs.filter(s=>s.n).length * 12));
+  segs.forEach(s => {
+    if (!s.n) return;
+    const sweep = (s.n/total) * Math.PI*2 - gap;
+    const steps = Math.max(2, Math.ceil(sweep / (Math.PI/45)));
+    const pts = [];
+    for (let i=0;i<=steps;i++){ const th=a+sweep*i/steps; pts.push([cx+Math.cos(th)*rOut, cy+Math.sin(th)*rOut]); }
+    for (let i=steps;i>=0;i--){ const th=a+sweep*i/steps; pts.push([cx+Math.cos(th)*rIn,  cy+Math.sin(th)*rIn]); }
+    const rel = [];
+    for (let i=1;i<pts.length;i++) rel.push([pts[i][0]-pts[i-1][0], pts[i][1]-pts[i-1][1]]);
+    setFill(s.color);
+    doc.lines(rel, pts[0][0], pts[0][1], [1,1], 'F', true);
+    a += sweep + gap;
+  });
+}
+
+// Grouped columns — two series over a few ordered categories.
+function groupedColumns(x, y, w, h, cats, seriesA, seriesB, labelA, labelB){
+  const maxV = Math.max(1, ...cats.map(c => Math.max(seriesA[c.key]||0, seriesB[c.key]||0)));
+  const bandW = w / cats.length;
+  const barW = Math.min(46, (bandW - 26) / 2);
+  setDraw(C.grid); doc.setLineWidth(0.7);
+  // Three recessive gridlines, solid hairlines — never dashed.
+  for (let g=1; g<=3; g++){ const gy = y + h - h*g/3; doc.line(x, gy, x+w, gy); }
+  setDraw(C.rule); doc.setLineWidth(1); doc.line(x, y+h, x+w, y+h);
+  cats.forEach((c, i) => {
+    const bx = x + bandW*i + (bandW - barW*2 - 6)/2;
+    [[seriesA[c.key]||0, C.base, bx], [seriesB[c.key]||0, C.now, bx+barW+6]].forEach(([v, col, px]) => {
+      const bh = v / maxV * h;
+      if (bh > 0) { setFill(col); doc.roundedRect(px, y+h-bh, barW, bh, 3, 3, 'F'); }
+      t(String(v), px + barW/2, y+h-bh-7, 10, 'bold', C.ink2, 'center');
+    });
+    t(c.label, x + bandW*i + bandW/2, y+h+18, 10, 'normal', C.ink2, 'center');
+  });
+  // Legend — always present for two series.
+  doc.setFontSize(9.5); doc.setFont('helvetica','normal');
+  setFill(C.base); doc.rect(x, y+h+30, 10, 10, 'F'); setText(C.ink2); doc.text(labelA, x+15, y+h+39);
+  const off = doc.getTextWidth(labelA) + 40;
+  setFill(C.now); doc.rect(x+off, y+h+30, 10, 10, 'F'); setText(C.ink2); doc.text(labelB, x+off+15, y+h+39);
+  return y + h + 52;
+}
+
+// Per-patient change, sorted. One column per patient about a zero baseline —
+// shows the spread behind a mean instead of hiding it.
+function changeColumns(x, y, w, h, values, unit, betterUp){
+  const vals = values.filter(v => v !== null && v !== undefined).sort((a,b) => b-a);
+  if (!vals.length) { t('No paired data', x, y+h/2, 10, 'italic', C.muted); return y+h+20; }
+  const mx = Math.max(...vals.map(Math.abs)) || 1;
+  const zero = y + h/2;
+  const bw = Math.max(2, Math.min(22, w / vals.length - 3));
+  const step = vals.length > 1 ? (w - bw) / (vals.length - 1) : 0;
+  setDraw(C.rule); doc.setLineWidth(1); doc.line(x, zero, x+w, zero);
+  t('0', x-10, zero+3, 9, 'normal', C.muted, 'right');
+  vals.forEach((v, i) => {
+    const bh = Math.abs(v) / mx * (h/2 - 12);
+    const up = v > 0;
+    setFill(v === 0 ? C.flat : ((betterUp ? up : !up) ? C.good : C.bad));
+    if (v !== 0) doc.rect(x + step*i, up ? zero-bh : zero, bw, bh, 'F');
+    else doc.rect(x + step*i, zero-1.5, bw, 3, 'F');
+  });
+  t('+' + Math.round(mx*10)/10 + unit, x-10, y+12, 9, 'normal', C.muted, 'right');
+  t('-' + Math.round(mx*10)/10 + unit, x-10, y+h-4, 9, 'normal', C.muted, 'right');
+  t('one column per patient, sorted', x, y+h+16, 9, 'normal', C.muted);
+  return y + h + 30;
+}
+
+// A left-to-right process flow with a return loop. Boxes and drawn arrowheads —
+// no arrow glyphs, because jsPDF's built-in Helvetica cannot encode them.
+function flow(x, y, w, steps, loopFrom, loopTo, loopLabel){
+  const n = steps.length, gap = 16;
+  const bw = (w - gap*(n-1)) / n, bh = 112;
+  const cx = i => x + (bw+gap)*i + bw/2;
+  steps.forEach((st, i) => {
+    const bx = x + (bw+gap)*i;
+    setFill(i === 0 ? C.navy : C.wash);
+    doc.roundedRect(bx, y, bw, bh, 7, 7, 'F');
+    if (i !== 0) { setFill(C.teal); doc.rect(bx, y+12, 3, bh-24, 'F'); }
+    t(String(i+1), bx+12, y+22, 9, 'bold', i === 0 ? '#7fb6b5' : C.muted);
+    t(st.title, bx+12, y+42, 11.5, 'bold', i === 0 ? '#ffffff' : C.navy);
+    doc.setFont('helvetica','normal'); doc.setFontSize(8.5);
+    setText(i === 0 ? '#c9d4e6' : C.ink2);
+    // Clip to the box: a step whose text outgrows its box is a layout bug, so
+    // only the lines that fit are drawn rather than spilling onto the page.
+    const lines = doc.splitTextToSize(st.body, bw-24).slice(0, 6);
+    doc.text(lines, bx+12, y+58, { lineHeightFactor: 1.28 });
+    if (i < n-1) {
+      const ax = bx + bw + 3, ay = y + bh/2;
+      setDraw(C.rule); doc.setLineWidth(1.4); doc.line(ax, ay, ax+gap-9, ay);
+      setFill(C.rule); doc.triangle(ax+gap-9, ay-4, ax+gap-9, ay+4, ax+gap-2, ay, 'F');
+    }
+  });
+  // Return loop, drawn below the row so it reads as a repeat rather than a step.
+  if (loopFrom !== undefined && loopTo !== undefined) {
+    const y2 = y + bh + 40, xa = cx(loopFrom), xb = cx(loopTo);
+    setDraw(C.teal); doc.setLineWidth(1.4);
+    doc.line(xa, y+bh+2, xa, y2); doc.line(xa, y2, xb, y2); doc.line(xb, y2, xb, y+bh+10);
+    setFill(C.teal); doc.triangle(xb-4.5, y+bh+10, xb+4.5, y+bh+10, xb, y+bh+2, 'F');
+    // Knock the label out of the line rather than letting the rule run through it.
+    doc.setFont('helvetica','bold'); doc.setFontSize(10);
+    const lw = doc.getTextWidth(loopLabel);
+    setFill(C.paper); doc.rect((xa+xb)/2 - lw/2 - 8, y2-9, lw+16, 16, 'F');
+    t(loopLabel, (xa+xb)/2, y2+3, 10, 'bold', C.teal, 'center');
+  }
+  return y + bh + 66;
+}
+
+// Plain columns for a magnitude series - no polarity, so no zero-crossing and
+// no good/bad colour. One hue, baseline at the foot, sorted.
+function magnitudeColumns(x, y, w, h, values, unit){
+  const vals = values.filter(v => v !== null && v !== undefined).sort((a,b) => b-a);
+  if (!vals.length) { t('No data', x, y+h/2, 10, 'italic', C.muted); return y+h+20; }
+  const mx = Math.max(...vals) || 1;
+  const bw = Math.max(2, Math.min(24, w / vals.length - 3));
+  const step = vals.length > 1 ? (w - bw) / (vals.length - 1) : 0;
+  setDraw(C.grid); doc.setLineWidth(0.7);
+  for (let gi=1; gi<=2; gi++){ const gy = y + h - h*gi/3; doc.line(x, gy, x+w, gy); }
+  setDraw(C.rule); doc.setLineWidth(1); doc.line(x, y+h, x+w, y+h);
+  setFill(C.now);
+  vals.forEach((v, i) => {
+    const bh = Math.max(1, v / mx * h);
+    doc.rect(x + step*i, y+h-bh, bw, bh, 'F');
+  });
+  t(Math.round(mx) + unit, x-8, y+10, 9, 'normal', C.muted, 'right');
+  t('0', x-8, y+h+3, 9, 'normal', C.muted, 'right');
+  t('one column per patient, longest first', x, y+h+20, 9, 'normal', C.muted);
+  return y + h + 32;
+}
+
+// A single ratio against a limit — a meter, not a two-slice pie.
+function meter(x, y, w, value, label, sub){
+  const h = 18, cap = 120;
+  t(label, x, y-9, 11.5, 'bold', C.ink);
+  setFill(C.grid); doc.roundedRect(x, y, w, h, 4, 4, 'F');
+  if (value !== null) {
+    const fw = Math.max(4, Math.min(value, cap) / cap * w);
+    setFill(value >= 90 ? C.good : value >= 80 ? C.warn : C.bad);
+    doc.roundedRect(x, y, fw, h, 4, 4, 'F');
+    const tx = x + (100 / cap) * w;
+    setDraw(C.ink2); doc.setLineWidth(1); doc.line(tx, y-6, tx, y+h+6);
+    t('target', tx+5, y+h+16, 8, 'normal', C.muted);
+  }
+  t(value === null ? '—' : value + '%', x + w + 14, y+14, 16, 'bold', value === null ? C.muted : C.navy);
+  if (sub) t(sub, x, y+h+16, 9, 'normal', C.muted);
+  return y + h + 38;
+}
+
+// Before -> after for one measure. One hue, two shades, both direct-labelled.
+function dumbbell(x, y, w, label, base, now, unit, n, betterUp){
+  if (base === null || now === null) {
+    t(label, x, y+4, 13, 'bold', C.ink);
+    t('not enough paired data', x + 170, y+4, 10, 'italic', C.muted);
+    return y + 34;
+  }
+  const lo = Math.min(base, now), hi = Math.max(base, now);
+  const pad = Math.max((hi - lo) * 1.8, Math.abs(hi) * 0.06, 0.5);
+  const min = lo - pad, max = hi + pad;
+  const sx = v => x + 170 + (v - min) / (max - min) * (w - 265);
+  t(label, x, y+4, 13, 'bold', C.ink);
+  t('n = ' + n, x, y+21, 10, 'normal', C.muted);
+  // Track first: each row has its own scale (different units), so the mark
+  // needs a visible extent or its horizontal position invites a comparison
+  // across rows that does not exist.
+  setDraw(C.grid); doc.setLineWidth(1); doc.line(x+170, y, x+w-95, y);
+  setDraw(C.rule); doc.setLineWidth(3); doc.line(sx(base), y, sx(now), y);
+  setFill(C.base); doc.circle(sx(base), y, 6.5, 'F');
+  setFill(C.now);  doc.circle(sx(now),  y, 6.5, 'F');
+  t(base + unit, sx(base), y-16, 10, 'normal', C.ink2, 'center');
+  t(now  + unit, sx(now),  y-16, 10, 'bold', C.navy, 'center');
+  const d = Math.round((now - base) * 100) / 100;
+  const col = d === 0 ? C.muted : ((betterUp ? d > 0 : d < 0) ? C.good : C.bad);
+  t((d > 0 ? '+' : '') + d + unit, x + w, y+5, 14, 'bold', col, 'right');
+  return y + 40;
+}
+
+</script>
+
+<script>
+// -- The deck --------------------------------------------------------------
+function buildDeck(m, today) {
+  const { jsPDF } = window.jspdf;
+  doc = new jsPDF({ unit:'pt', format:'a4', orientation:'landscape' });
+  doc.deletePage(1); pageNo = 0;
+
+  // 1 - Cover. Light, not a navy slab: the Gquence wordmark is navy, so on a
+  // navy field it disappears. A paper cover lets the real lockup carry the
+  // branding and reads better projected than a dark full-bleed anyway.
+  doc.addPage('a4','landscape'); pageNo++;
+  setFill(C.paper); doc.rect(0, 0, W, H, 'F');
+  setFill(C.navy); doc.rect(0, 0, W, 6, 'F');
+  setFill(C.teal); doc.rect(0, 0, 220, 6, 'F');
+  if (LOGO) { try { doc.addImage(LOGO, 'PNG', M, 78, 230, 44); } catch(e){} }
+  else t('GQUENCE', M, 112, 26, 'bold', C.navy);
+  t('Clinical Nutrition Pilot', M, 232, 42, 'bold', C.navy);
+  t('Interim analysis for clinical review', M, 268, 16, 'normal', C.ink2);
+  setDraw(C.teal); doc.setLineWidth(3); doc.line(M, 296, M+96, 296);
+
+  // Cohort facts as three quiet figures rather than a paragraph.
+  const facts = [[String(m.n), 'patients enrolled'], [String(m.reviews), 'weekly reviews recorded'],
+                 [m.days.median !== null ? String(m.days.median) : '—', 'median days under care']];
+  facts.forEach((f, i) => {
+    const fx = M + i*206;
+    t(f[0], fx, 372, 30, 'bold', C.navy);
+    t(f[1], fx, 392, 10.5, 'normal', C.ink2);
+  });
+
+  setFill(C.navy); doc.rect(0, H-92, W, 92, 'F');
+  t('Generated ' + today, M, H-52, 12, 'normal', '#c9d4e6');
+  t('Single-arm pilot, no control group. Read with the limitations on the final page.',
+     M, H-30, 10, 'italic', '#8fa3c4');
+  if (MARK) { try { doc.addImage(MARK, 'PNG', W-M-46, H-70, 46, 46); } catch(e){} }
+
+  // 2 - What the platform does. The results pages mean little to a room that
+  // does not yet know what produced them, so the mechanism comes first.
+  let y = slide('How it works', 'Every patient runs the same loop, and the loop repeats weekly for as long as they are on the programme.');
+  y += 16;
+  y = flow(M, y, CW, [
+    { title:'Assess',      body:'Diagnosis, regimen, weight history, labs, toxicity grades and function, captured at intake.' },
+    { title:'Prescribe',   body:'The engine sets calorie and protein targets and derives the daily formula for that patient.' },
+    { title:'Approve',     body:'A doctor reviews the targets and signs the week off. Nothing is made without it.' },
+    { title:'Manufacture', body:'The recipe becomes a batch with its own code, manufacture and expiry dates.' },
+    { title:'Dispatch',    body:'The store labels and dispatches it. The patient can scan the pack for their own sheet.' },
+    { title:'Monitor',     body:'Weight, intake, compliance, labs and function recorded at the weekly review.' }
+  ], 5, 1, 'every week, the targets are recalculated from the new measurements');
+
+  y += 8;
+  const fcolW = (CW - 24) / 2;
+  panel(M, y, fcolW, 118, 'Personalised to the patient, not to a product');
+  doc.setFont('helvetica','normal'); doc.setFontSize(10); setText(C.ink2);
+  doc.text(doc.splitTextToSize('Targets are set per kilogram against the correct weight basis, then split between what the patient '
+    + 'eats and what the supplement must supply. Four formulations — standard, diabetic, anti-inflammatory and hydrolysed — are '
+    + 'selected by the patient\u2019s own labs and symptoms.', fcolW-36), M+18, y+58);
+  panel(M+fcolW+24, y, fcolW, 118, 'The prescription changes as the patient does');
+  doc.setFont('helvetica','normal'); doc.setFontSize(10); setText(C.ink2);
+  doc.text(doc.splitTextToSize('A week of measurements produces a new set of targets and a new batch. The patient is not held on the '
+    + 'formula they were given at enrolment — which is why the same patient can appear at different calorie targets across the dataset.', fcolW-36), M+fcolW+42, y+58);
+  footnote('This is the workflow the pilot data below came out of. Every figure in this pack is a by-product of care being delivered, not a separate research exercise.', H-58);
+
+  // 3 - Safety and governance. This is the page a clinical audience will test.
+  y = slide('Safety and governance', 'What stops the system from producing a confident-looking number that is wrong.');
+  const q = [
+    ['136 guideline-sourced constants',
+     'Every threshold the engine uses is a named, editable constant with its source recorded — ESPEN Oncology 2021 for calorie and protein targets, KDIGO 2012 for the renal protein cap, Devine for ideal body weight, BAPEN for MUST. Changing clinical practice means editing a value, not rewriting the engine.'],
+    ['19 automated safety checks',
+     'Renal impairment caps protein regardless of every other rule. Neutropenia switches the diet. Low platelets restrict omega-3. Hyperkalaemia, hyponatraemia, hyperglycaemia and liver derangement each carry their own protocol. The checks run on every prescription, not on request.'],
+    ['A doctor signs every week',
+     'A weekly prescription cannot be approved until weight, ECOG, oral intake, supplement compliance, albumin, glucose, creatinine and urea are all present. An incomplete week is still visible — it simply cannot be signed, so a thin work-up never reaches manufacturing looking complete.'],
+    ['Everything is traceable',
+     'Each prescription carries the calculation trace that produced it: the inputs used, the weight basis, the rules that fired and the guideline behind them. Each batch carries its own code, manufacture and expiry date, and the patient can scan the pack for their own sheet.']
+  ];
+  const qw = (CW - 24) / 2, qh = 152;
+  q.forEach((row, i) => {
+    const qx = M + (i % 2) * (qw + 24), qy = y + Math.floor(i/2) * (qh + 18);
+    setFill(C.wash); doc.roundedRect(qx, qy, qw, qh, 8, 8, 'F');
+    setFill(C.teal); doc.rect(qx, qy+16, 3.5, qh-32, 'F');
+    t(row[0], qx+20, qy+30, 12.5, 'bold', C.navy);
+    doc.setFont('helvetica','normal'); doc.setFontSize(9.5); setText(C.ink2);
+    doc.text(doc.splitTextToSize(row[1], qw-40), qx+20, qy+50);
+  });
+  footnote('None of this makes a single-arm pilot into evidence of effect — see the final page. It is what makes the numbers in between trustworthy as a record of what was actually prescribed and given.', H-58);
+
+  // 4 - The cohort: donut left, figures right.
+  y = slide('The cohort', 'Who is in the pilot, and how far through it they are.');
+  const colW = (CW - 26) / 2;
+  const pTop = y, pH = 336;
+  panel(M, pTop, colW, pH, 'Status of every enrolled patient');
+  const stCols = { 'Active':C.now, 'Completed':C.good, 'Enrolled':C.base, 'Withdrawn':C.muted, 'Lost to Follow-up':C.warn };
+  const segs = m.statusCounts.map(s => ({ n:s.n, label:s.label, color:stCols[s.label] || C.muted }));
+  const dcx = M + 122, dcy = pTop + 168;
+  donut(dcx, dcy, 84, 52, segs, m.n);
+  t(String(m.n), dcx, dcy+4, 26, 'bold', C.navy, 'center');
+  t('enrolled', dcx, dcy+20, 9.5, 'normal', C.muted, 'center');
+  // Legend beside the ring, one row per slice with its own count.
+  let ly = pTop + 96;
+  segs.forEach(s => {
+    setFill(s.color); doc.rect(M + 226, ly-9, 11, 11, 'F');
+    t(s.label, M + 243, ly, 10.5, 'normal', C.ink2);
+    t(String(s.n), M + colW - 18, ly, 11.5, 'bold', C.navy, 'right');
+    ly += 26;
+  });
+
+  const rx = M + colW + 26;
+  const tH = (pH - 24) / 3;
+  tile(rx, pTop, colW, tH-4, String(m.withFollowUp), 'With follow-up', 'at least one weekly review');
+  tile(rx, pTop + tH + 12, colW, tH-4, m.days.median !== null ? String(m.days.median) : '—',
+       'Median days under care', m.days.n + ' with a recorded endpoint');
+  tile(rx, pTop + (tH+12)*2, colW, tH-4, String(m.reviews), 'Weekly reviews recorded', 'across the whole cohort');
+  footnote('Every enrolled patient is counted here, including those who never received a product — the denominator is enrolment, not dispatch.', H-58);
+
+  // 3 - Weight: headline left, the spread behind it on the right.
+  y = slide('Weight', 'In advanced cancer the untreated trajectory is continued loss, so holding weight is itself a result.');
+  const wt = m.weight;
+  const held = wt ? wt.improved + wt.stable : 0;
+  const heldPct = (wt && wt.n) ? Math.round(held / wt.n * 100) : null;
+  panel(M, y, colW, 336);
+  t(heldPct !== null ? heldPct + '%' : '—', M+22, y+96, 62, 'bold', (heldPct !== null && heldPct >= 50) ? C.good : C.navy);
+  t('of patients held or gained weight', M+22, y+126, 15, 'normal', C.ink);
+  t(wt ? held + ' of ' + wt.n + ' patients with paired measurements' : 'no paired data',
+    M+22, y+146, 10.5, 'normal', C.muted);
+  if (wt) {
+    shareBar(M+22, y+172, colW-44, 30, [
+      { n:wt.improved, label:'gained', color:C.good },
+      { n:wt.stable,   label:'held',   color:C.flat },
+      { n:wt.worsened, label:'lost',   color:C.bad  }
+    ], wt.n, true);
+    t('Mean change ' + (wt.meanChange > 0 ? '+' : '') + wt.meanChange + ' kg'
+      + (wt.semChange != null ? '   ±' + wt.semChange + ' SE' : ''), M+22, y+254, 13, 'bold', C.navy);
+  }
+  const wrow = m.wtRow;
+  if (wrow && wrow['Baseline Mean'] !== null && wrow['Final Mean'] !== null) {
+    setDraw(C.grid); doc.setLineWidth(0.7); doc.line(M+22, y+272, M+colW-22, y+272);
+    t('Cohort mean weight', M+22, y+294, 10.5, 'bold', C.ink2);
+    t(wrow['Baseline Mean'] + ' kg at enrolment', M+22, y+316, 12, 'normal', C.ink2);
+    setDraw(C.rule); doc.setLineWidth(1.5); doc.line(M+152, y+312, M+178, y+312);
+    setFill(C.rule); doc.triangle(M+178, y+308, M+178, y+316, M+186, y+312, 'F');
+    t(wrow['Final Mean'] + ' kg at latest', M+196, y+316, 12, 'bold', C.navy);
+  }
+  const wp = panel(rx, y, colW, 336, 'Change per patient');
+  changeColumns(rx+30, wp+22, colW-56, 232, m.weightChanges, ' kg', true);
+  footnote('"Held" means within 2% of baseline — the band that separates real change from scale noise. Patients also received concurrent '
+    + 'oncological treatment, which moves weight independently of nutrition.', H-58);
+
+  // 4 - MUST: grouped columns left, per-patient change right.
+  y = slide('Nutritional risk (MUST)', 'Screened at enrolment and rescreened at the most recent weekly review.');
+  const mp = panel(M, y, colW, 336, 'Patients in each risk band');
+  groupedColumns(M+34, mp+22, colW-68, 200,
+    [{key:'Low Risk',label:'Low'},{key:'Medium Risk',label:'Medium'},{key:'High Risk',label:'High'}],
+    m.must.base, m.must.final, 'at enrolment', 'at latest review');
+  const mp2 = panel(rx, y, colW, 336, 'Change per patient');
+  let my = shareBar(rx+22, mp2+18, colW-44, 34, [
+    { n:m.must.improved,  label:'improved',  color:C.good },
+    { n:m.must.unchanged, label:'unchanged', color:C.flat },
+    { n:m.must.worsened,  label:'worsened',  color:C.bad  }
+  ], m.must.scored, true);
+  if (m.mustRow && m.mustRow['Mean Change'] !== null && m.mustRow['Mean Change'] !== '') {
+    const mc = m.mustRow['Mean Change'];
+    t('Mean change ' + (mc > 0 ? '+' : '') + mc + ' points', rx+22, my+26, 15, 'bold',
+      mc < 0 ? C.good : (mc > 0 ? C.bad : C.navy));
+    t('across ' + m.mustRow['n (paired)'] + ' patients screened at both ends', rx+22, my+44, 10, 'normal', C.muted);
+  }
+  doc.setFont('helvetica','italic'); doc.setFontSize(10); setText(C.ink2);
+  doc.text(doc.splitTextToSize('A lower score is better. The change above, not the band counts opposite, is what moved.', colW-44),
+    rx+22, y+292);
+  footnote('MUST bands are coarse: 0 low, 1 medium, 2 or above high. A patient can improve by a point and stay in the high-risk band, so the '
+    + 'change panel carries the signal, not the band counts. Weight loss is measured against usual weight six months before enrolment, the '
+    + 'reference period MUST specifies. Patients whose screen could not be completed are excluded rather than scored as low risk.', H-64);
+
+  // 5 - Function and body composition
+  y = slide('Function and body composition', 'Cohort means, baseline against the latest review. Each row counts only patients with a value at both ends.');
+  panel(M, y, CW, 320);
+  y += 74;
+  const wr = m.wtRow, g = m.grip, u = m.muac;
+  y = dumbbell(M+34, y, CW-68, 'Weight',    wr ? num(wr['Baseline Mean']) : null, wr ? num(wr['Final Mean']) : null, ' kg', wr ? wr['n (paired)'] : 0, true) + 44;
+  y = dumbbell(M+34, y, CW-68, 'Hand grip', g  ? num(g['Baseline Mean'])  : null, g  ? num(g['Final Mean'])  : null, ' kg', g  ? g['n (paired)']  : 0, true) + 44;
+  y = dumbbell(M+34, y, CW-68, 'MUAC',      u  ? num(u['Baseline Mean'])  : null, u  ? num(u['Final Mean'])  : null, ' cm', u  ? u['n (paired)']  : 0, true);
+  doc.setFont('helvetica','normal'); doc.setFontSize(9.5); setText(C.ink2);
+  setFill(C.base); doc.circle(M+40, H-84, 4.5, 'F'); doc.text('baseline', M+51, H-81);
+  setFill(C.now);  doc.circle(M+130, H-84, 4.5, 'F'); doc.text('latest review', M+141, H-81);
+  footnote('n differs by row: grip and MUAC are recorded less consistently than weight, so their denominators are smaller and their means '
+    + 'correspondingly less certain. A mean over a handful of patients describes those patients; it is not an estimate of an effect.', H-58);
+
+  // 6 - Intake
+  y = slide('Intake achieved against prescription', 'How much of the prescribed calorie and protein target patients actually took.');
+  const ip = panel(M, y, colW, 336, 'Cohort mean, as % of target');
+  let iy = ip + 40;
+  iy = meter(M+26, iy, colW-118, m.kcal.mean, 'Calories', 'mean of each patient’s weekly average');
+  iy += 24;
+  iy = meter(M+26, iy, colW-118, m.prot.mean, 'Protein', 'mean of each patient’s weekly average');
+  const ka = m.kcalAbs, pa = m.protAbs;
+  if (ka || pa) {
+    setDraw(C.grid); doc.setLineWidth(0.7); doc.line(M+26, iy+26, M+colW-26, iy+26);
+    t('In absolute terms', M+26, iy+50, 10.5, 'bold', C.ink2);
+    if (ka && ka['Final Mean'] !== '') {
+      t(ka['Final Mean'] + ' kcal', M+26, iy+82, 22, 'bold', C.navy);
+      t('per day', M+26, iy+98, 9.5, 'normal', C.muted);
+    }
+    if (pa && pa['Final Mean'] !== '') {
+      t(pa['Final Mean'] + ' g', M+186, iy+82, 22, 'bold', C.navy);
+      t('protein per day', M+186, iy+98, 9.5, 'normal', C.muted);
+    }
+  }
+  const ip2 = panel(rx, y, colW, 336, 'Patients by target achieved');
+  let by = ip2 + 22;
+  const bandSegs = b => [
+    { n:b.above, label:'above target',   color:C.good },
+    { n:b.at,    label:'80-100%',        color:C.flat },
+    { n:b.below, label:'below 80%',      color:C.bad  }
+  ];
+  const kb = m.kcal.bands, pb = m.prot.bands;
+  t('Calories', rx+22, by+2, 10.5, 'bold', C.ink2);
+  by = shareBar(rx+22, by+10, colW-44, 30, bandSegs(kb), kb.below+kb.at+kb.above, true) + 18;
+  t('Protein', rx+22, by+2, 10.5, 'bold', C.ink2);
+  by = shareBar(rx+22, by+10, colW-44, 30, bandSegs(pb), pb.below+pb.at+pb.above, true);
+  if (m.noIntake) {
+    setDraw(C.grid); doc.setLineWidth(0.7); doc.line(rx+22, by+22, rx+colW-22, by+22);
+    t(m.noIntake + ' of ' + m.n + ' patients are not counted above', rx+22, by+48, 12, 'bold', C.ink2);
+    doc.setFont('helvetica','normal'); doc.setFontSize(10); setText(C.muted);
+    doc.text(doc.splitTextToSize('No week of theirs carries both a prescribed target and a recorded compliance figure, '
+      + 'so there is nothing to estimate an intake from. They are left out rather than counted as zero.', colW-44), rx+22, by+66);
+  }
+  footnote('Estimated, not measured: the prescribed calorie and protein split for each week, with the supplement portion scaled by the recorded '
+    + 'compliance. Oral intake is a clinician’s estimate rather than a weighed food record. Weeks with no compliance recorded are excluded rather '
+    + 'than counted as zero. Adequate as a pilot signal; not a basis for a published intake claim.', H-64);
+
+  // 7 - Time under care
+  y = slide('Time under nutrition care', 'Enrolment to the most recent entry recorded for the patient.');
+  const dp = panel(M, y, colW, 336, 'Days under care, per patient with a recorded endpoint');
+  magnitudeColumns(M+46, dp+34, colW-80, 222, m.closedDays, ' days');
+  const tH2 = (336 - 24) / 3;
+  tile(rx, y, colW, tH2-4, m.days.median !== null ? String(m.days.median) : '—', 'Median days', m.days.n + ' with a recorded endpoint');
+  tile(rx, y + tH2 + 12, colW, tH2-4, m.days.mean !== null ? String(m.days.mean) : '—', 'Mean days', 'same denominator');
+  tile(rx, y + (tH2+12)*2, colW, tH2-4, String(m.days.open), 'Still under care', 'excluded from both figures', C.warn);
+  footnote('A patient still receiving care has no end date — their last entry is simply the most recent one, and their duration is still growing. '
+    + 'Averaging them in with completed patients would understate how long the programme runs, so they are counted separately and the dataset '
+    + 'marks their durations with a "+". This is not an inpatient length of stay: no admission or discharge date is recorded in this system.', H-64);
+
+  // 8 - Limitations
+  y = slide('How to read this', 'What these numbers can and cannot support.');
+  const lim = [
+    ['Single-arm pilot, no control group.', 'Nothing here can be attributed to the supplement alone. Every patient also received oncological treatment, which independently moves weight, albumin, CRP and function.'],
+    ['n varies by measure.', 'A patient counts toward a measure only where both a baseline and a follow-up value exist. Grip and MUAC have smaller denominators than weight; each figure carries its own n.'],
+    ['Intake is estimated, not measured.', 'It is derived from the prescribed target and the recorded compliance. Oral intake is a clinical estimate, not a weighed food record.'],
+    ['MUST bands are coarser than the score.', 'Anything from 2 upward reads high risk, so a patient can improve without changing band. Read the per-patient change, not the band counts alone.'],
+    ['Incomplete screens are excluded, not scored zero.', 'A patient missing height or usual weight is reported as unscreened rather than counted as low risk.'],
+    ['Duration is censored.', 'Patients still under care are excluded from the duration figures rather than treated as finished.']
+  ];
+  const half = Math.ceil(lim.length / 2);
+  lim.forEach((row, i) => {
+    const col = i < half ? 0 : 1;
+    const ly2 = y + 10 + (i - col*half) * 92;
+    const lx2 = M + col * (colW + 26);
+    t(row[0], lx2, ly2, 11.5, 'bold', C.navy);
+    doc.setFont('helvetica','normal'); doc.setFontSize(10); setText(C.ink2);
+    doc.text(doc.splitTextToSize(row[1], colW - 8), lx2, ly2 + 16);
+  });
+
+  return doc;
+}
+
+// jsPDF takes a data URL; fetching keeps it same-origin and avoids a tainted
+// canvas. Resolves to null on any failure so the caller can carry on.
+async function loadImage(url){
+  try {
+    const r = await fetch(url, { cache:'force-cache' });
+    if (!r.ok) return null;
+    const b = await r.blob();
+    return await new Promise(res => {
+      const fr = new FileReader();
+      fr.onload = () => res(fr.result);
+      fr.onerror = () => res(null);
+      fr.readAsDataURL(b);
+    });
+  } catch(e){ return null; }
+}
+
+async function load(){
+  const msg = document.getElementById('msg');
+  try {
+    if (typeof window.jspdf === 'undefined') { msg.textContent = 'PDF library failed to load. Check your connection and reload.'; return; }
+    const hdr = { Authorization: 'Bearer ' + (me.token || '') };
+    const [exRes, impRes] = await Promise.all([
+      fetch(apiBase + '/api/trials/export', { headers: hdr }),
+      fetch(apiBase + '/api/trials/impact', { headers: hdr })
+    ]);
+    if (!exRes.ok) throw new Error('Server error ' + exRes.status);
+    const data = await exRes.json();
+    // The impact endpoint is optional - the deck still builds without it, minus
+    // the weight distribution.
+    const impact = impRes.ok ? await impRes.json() : null;
+
+    if (!(data.analysis || []).length) {
+      msg.textContent = 'No pilot patients yet - nothing to present.';
+      return;
+    }
+    const today = new Date().toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' });
+    // Brand marks. The deck degrades to a text wordmark if either fails to
+    // load - a missing logo must not cost the doctor the whole pack.
+    const [logo, mark] = await Promise.all([
+      loadImage('/assets/logo/gquence-logo.png?v=3'),
+      loadImage('/assets/logo/gquence-mark.png?v=3')
+    ]);
+    LOGO = logo; MARK = mark;
+    const m = buildModel(data, impact);
+    _doc = buildDeck(m, today);
+    _fname = 'GQUENCE_Pilot_Meeting_Pack_' + new Date().toISOString().slice(0,10) + '.pdf';
+
+    document.getElementById('pv').src = _doc.output('bloburl');
+    document.getElementById('dlBtn').disabled = false;
+    document.getElementById('tabBtn').disabled = false;
+    msg.textContent = m.n + ' patients · 8 pages · the preview below is the file you download.';
+  } catch(e){
+    msg.textContent = 'Could not build the pack: ' + e.message;
+  }
+}
+function downloadPack(){ if (_doc) _doc.save(_fname); }
+function openTab(){ if (_doc) window.open(_doc.output('bloburl'), '_blank'); }
+load();
+</script>
+</body>
+</html>
