@@ -1061,8 +1061,20 @@ app.get('/api/patients/:id/weekly-prescriptions', authenticateToken, async (req,
 // Doctor adjusts targets (still PENDING_REVIEW)
 app.put('/api/weekly-prescriptions/:id', authenticateToken, async (req, res) => {
   const { targets, notes } = req.body;
-  // Recompute ingredient recipe from updated targets so store always gets fresh breakdown
-  const updatedTargets = Object.assign({}, targets);
+  // Merge, never replace. The edit panel posts only the fields a doctor can
+  // change; a wholesale replace silently dropped every other key the engine had
+  // computed — oralKcal, suppKcal, suppProtein, oralPct — and with them any
+  // ability to report what was actually delivered. Keys the client did send
+  // still win, so an edit still edits.
+  let prevTargets = {};
+  try {
+    const prev = await pool.query('SELECT targets FROM weekly_prescriptions WHERE id=$1', [req.params.id]);
+    if (prev.rowCount && prev.rows[0].targets) {
+      prevTargets = typeof prev.rows[0].targets === 'string'
+        ? JSON.parse(prev.rows[0].targets) : prev.rows[0].targets;
+    }
+  } catch (e) { prevTargets = {}; }
+  const updatedTargets = Object.assign({}, prevTargets, targets || {});
   if (updatedTargets.suppKcal && updatedTargets.suppProtein) {
     updatedTargets.recipe = calcWeeklyRecipe(
       updatedTargets.suppKcal, updatedTargets.suppProtein, updatedTargets.formulation || 'Standard'
@@ -1952,9 +1964,27 @@ app.get('/api/trials/export', authenticateToken, requireAdmin, async (req, res) 
     // intake, and averaging it in as one would understate every patient.
     const weekIntake = (w, targets) => {
       const t = targets || {};
-      const totalKcal = _num(t.totalKcal), oralKcal = _num(t.oralKcal), suppKcal = _num(t.suppKcal);
-      const totalProt = _num(t.totalProtein), suppProt = _num(t.suppProtein);
+      const totalKcal = _num(t.totalKcal);
+      const totalProt = _num(t.totalProtein);
+      let oralKcal = _num(t.oralKcal), suppKcal = _num(t.suppKcal), suppProt = _num(t.suppProtein);
       const comp = _num(w.compliance);
+
+      // Weeks a doctor edited before the merge fix lost their oral/supplement
+      // split (see PUT /api/weekly-prescriptions/:id). The split is recoverable:
+      // it is the same derivation the engine used — the recorded oral intake %
+      // of the target, with the remainder carried by the supplement. Only used
+      // when the stored value is genuinely absent, never to override one.
+      const oralPct = _num(t.oralPct) !== null ? _num(t.oralPct) : _num(w.oralIntake);
+      if (totalKcal !== null && oralPct !== null && (oralKcal === null || suppKcal === null)) {
+        const f = Math.max(0, Math.min(100, oralPct)) / 100;
+        oralKcal = Math.round(totalKcal * f);
+        suppKcal = Math.max(0, totalKcal - oralKcal);
+      }
+      if (totalProt !== null && oralPct !== null && suppProt === null) {
+        const f = Math.max(0, Math.min(100, oralPct)) / 100;
+        suppProt = Math.max(0, Math.round(totalProt * (1 - f) * 10) / 10);
+      }
+
       if (comp === null || totalKcal === null || oralKcal === null || suppKcal === null) {
         return { kcal: null, protein: null, pctKcal: null, pctProtein: null, targetKcal: totalKcal, targetProtein: totalProt };
       }
@@ -2130,6 +2160,7 @@ app.get('/api/trials/export', authenticateToken, requireAdmin, async (req, res) 
       'Notes': 'Cohort mean of each patient\'s weekly average'
         + (pk.length ? ' — ' + _r1(mean(pk)) + '% of prescribed target' : '')
         + '. Estimated from prescribed target x recorded compliance; oral intake % is a clinical estimate, not a weighed food record.'
+        + ' Where a prescription was edited before 2026-09-06 its oral/supplement split was not retained, so it is re-derived from the recorded oral intake % of that week.'
     });
     summary.push({
       'Measure': 'Estimated Protein Intake (g/day)', 'n (paired)': pc.length,

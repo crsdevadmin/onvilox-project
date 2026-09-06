@@ -534,6 +534,24 @@
       #editPatientSection .form-grid { grid-template-columns: 1fr !important; }
     }
 
+    /* ── Export-time layout (see the note in exportPdf) ──────────────────
+       html2pdf renders the live DOM, so @media print never applies during an
+       export. Anything the PDF needs must be reachable from a class instead. */
+    body.pdf-exporting .mon-entry-form { display: none !important; }
+    body.pdf-exporting .ptc-card,
+    body.pdf-exporting .ptc-lab,
+    body.pdf-exporting .rg,
+    body.pdf-exporting .ai-panel,
+    body.pdf-exporting .rtrace,
+    body.pdf-exporting .clinical-report-grid,
+    body.pdf-exporting .rt tbody tr,
+    body.pdf-exporting table tr {
+      page-break-inside: avoid !important;
+      break-inside: avoid !important;
+    }
+    body.pdf-exporting thead { display: table-header-group; }
+    body.pdf-exporting .rs-title { page-break-after: avoid !important; break-after: avoid !important; }
+
     @media print {
       body { background: #fff !important; }
 
@@ -1388,7 +1406,7 @@
 
           <!-- DAILY TAB: FORM 3 -->
           <div id="monPanelDaily">
-            <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:14px 16px; margin-bottom:14px;">
+            <div class="mon-entry-form" style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:14px 16px; margin-bottom:14px;">
               <div style="font-size:11px; font-weight:800; color:var(--text); text-transform:uppercase; letter-spacing:0.08em; margin-bottom:12px;">Add Daily Entry</div>
               <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px;">
                 <div><label style="font-size:10px;font-weight:700;color:#000;display:block;margin-bottom:3px;">Date</label><input type="date" id="monD_date" style="width:100%;font-size:12px;padding:6px 8px;border:1px solid #cbd5e1;border-radius:5px;box-sizing:border-box;"></div>
@@ -1431,7 +1449,7 @@
           <!-- WEEKLY TAB: FORM 4 -->
           <div id="monPanelWeekly" style="display:none;">
 
-            <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:14px 16px; margin-bottom:14px;">
+            <div class="mon-entry-form" style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:14px 16px; margin-bottom:14px;">
               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
                 <div style="font-size:11px; font-weight:800; color:var(--text); text-transform:uppercase; letter-spacing:0.08em;" id="monWFormTitle">Add Weekly Entry</div>
                 <button id="monWCancelEdit" onclick="cancelEditWeekly()" style="display:none;background:none;border:1px solid #cbd5e1;border-radius:5px;padding:4px 10px;font-size:11px;color:#64748b;cursor:pointer;">✕ Cancel Edit</button>
@@ -5345,8 +5363,14 @@
               const el = document.getElementById(id);
               if (el) {
                 sectionPrevDisplays[id] = el.style.display;
-                // Only show if it has actual content (avoid empty placeholder boxes)
-                if (el.style.display === 'none' && el.innerHTML.trim().length > 20) {
+                // Only show if it actually has data. Measuring innerHTML length
+                // let a section through on its static <thead> alone, which is how
+                // an empty assessments table printed as a lone header row.
+                const bodies = el.querySelectorAll('tbody');
+                const hasRows = bodies.length
+                  ? Array.from(bodies).some(b => b.rows.length > 0)
+                  : el.innerHTML.trim().length > 20;
+                if (el.style.display === 'none' && hasRows) {
                   el.style.display = 'block';
                 }
               }
@@ -5440,6 +5464,15 @@
 
             const gqCover = buildGqCover();
             source.insertBefore(gqCover, source.firstChild);
+            // A4 portrait with 10mm margins leaves 190 x 277mm of usable page.
+            // The cover must be exactly that shape in source pixels or it spills
+            // onto a second page carrying nothing but the foot of its own band.
+            const coverW = gqCover.clientWidth || source.clientWidth;
+            if (coverW) gqCover.style.height = Math.floor(coverW * (277 / 190)) + 'px';
+
+            // html2canvas rasterises the live DOM, so @media print is ignored.
+            // This class carries the rules the PDF needs instead.
+            document.body.classList.add('pdf-exporting');
 
             try {
               await html2pdf().set(opts).from(source).save();
@@ -5448,6 +5481,7 @@
               console.error("PDF Export Failed:", err);
               window.print();
             } finally {
+              document.body.classList.remove('pdf-exporting');
               // Remove the cover page so it never shows on screen
               gqCover.remove();
               // Restore UI
@@ -6392,7 +6426,18 @@ var PTC = {
 };
 var PTC_NS = 'http://www.w3.org/2000/svg';
 function _pv(t, a) { var n = document.createElementNS(PTC_NS, t); for (var k in a) if (a[k] != null) n.setAttribute(k, a[k]); return n; }
-function _pvSvg(w, h) { return _pv('svg', { viewBox: '0 0 ' + w + ' ' + h, preserveAspectRatio: 'xMidYMid meet' }); }
+function _pvSvg(w, h) {
+  return _pv('svg', {
+    viewBox: '0 0 ' + w + ' ' + h,
+    preserveAspectRatio: 'xMidYMid meet',
+    // Intrinsic size is required: html2canvas serialises the SVG on its
+    // own, and without width/height it rasterises into a default box, so
+    // the text renders at full size against a shrunken plot. Screen
+    // layout still scales it via the inline style below.
+    width: w, height: h,
+    style: 'width:100%;height:auto;display:block;max-width:100%'
+  });
+}
 function _pvTxt(s, x, y, str, o) {
   var t = _pv('text', Object.assign({ x: x, y: y, 'font-size': 10, fill: PTC.ink3 }, o || {}));
   t.textContent = str; s.appendChild(t); return t;
