@@ -54,6 +54,7 @@
       <div class="sheet-card"><div class="t">Summary</div><div class="d">Cohort means with the n behind each one</div><div class="c" id="cSummary">—</div></div>
       <div class="sheet-card"><div class="t">Enrollment</div><div class="d">Study ID, UHID, diagnosis, all dates, status, formula version, batch</div><div class="c" id="cEnroll">—</div></div>
       <div class="sheet-card"><div class="t">Baseline</div><div class="d">Weight, height, BMI, MUAC, albumin, CRP, hemoglobin</div><div class="c" id="cBase">—</div></div>
+      <div class="sheet-card"><div class="t">Daily Intake</div><div class="d">One row per patient per day &mdash; oral and supplement kcal and protein, and the day total</div><div class="c" id="cDaily">&mdash;</div></div>
       <div class="sheet-card"><div class="t">Weekly</div><div class="d">One row per patient per week (long format)</div><div class="c" id="cWeek">—</div></div>
       <div class="sheet-card"><div class="t">Final Outcomes</div><div class="d">Last values + change from baseline</div><div class="c" id="cFinal">—</div></div>
     </div>
@@ -99,6 +100,7 @@ async function load(){
     document.getElementById('cFinal').textContent = (_data.final||[]).length;
     document.getElementById('cAnalysis').textContent = (_data.analysis||[]).length;
     document.getElementById('cSummary').textContent = (_data.summary||[]).length;
+    document.getElementById('cDaily').textContent = (_data.daily||[]).length;
     const n = (_data.enrollment||[]).length;
     document.getElementById('exportBtn').disabled = n === 0;
     document.getElementById('exportPdfBtn').disabled = n === 0;
@@ -117,6 +119,7 @@ function doExport(){
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(_data.summary || []), 'Summary');
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(_data.enrollment || []), 'Enrollment');
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(_data.baseline || []), 'Baseline');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(_data.daily || []), 'Daily Intake');
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(_data.weekly || []), 'Weekly');
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(_data.final || []), 'Final Outcomes');
     const fname = 'GQUENCE_Pilot_Dataset_' + new Date().toISOString().slice(0,10) + '.xlsx';

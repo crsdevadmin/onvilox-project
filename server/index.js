@@ -1895,7 +1895,7 @@ app.get('/api/trials/export', authenticateToken, requireAdmin, async (req, res) 
     const idSet = new Set(Object.keys(jobByPatient));
     enrolledRes.rows.forEach(r => { if (r.patient_id) idSet.add(r.patient_id); });
     const ids = Array.from(idSet);
-    const empty = { enrollment: [], baseline: [], weekly: [], final: [], analysis: [], summary: [] };
+    const empty = { enrollment: [], baseline: [], weekly: [], final: [], analysis: [], daily: [], summary: [] };
     if (!ids.length) return res.json(empty);
 
     const pats = (await pool.query(
@@ -1912,6 +1912,12 @@ app.get('/api/trials/export', authenticateToken, requireAdmin, async (req, res) 
     const logs = (await pool.query(`SELECT id, patient_id, recorded_at, data FROM monitoring_logs WHERE type='weekly' AND patient_id = ANY($1) ORDER BY recorded_at ASC`, [ids])).rows;
     const weeklyByPat = {};
     logs.forEach(l => { (weeklyByPat[l.patient_id] = weeklyByPat[l.patient_id] || []).push({ logId: l.id, recordedAt: l.recorded_at, ...(l.data || {}) }); });
+
+    const dailyRows = (await pool.query(
+      `SELECT patient_id, recorded_at, data FROM monitoring_logs
+        WHERE type='daily' AND patient_id = ANY($1) ORDER BY recorded_at ASC`, [ids])).rows;
+    const dailyByPat = {};
+    dailyRows.forEach(l => { (dailyByPat[l.patient_id] = dailyByPat[l.patient_id] || []).push(l.data || {}); });
 
     // Last contact of ANY kind — daily observations count as an entry even in a
     // week with no formal review, so the aggregate spans both log types.
@@ -1962,19 +1968,17 @@ app.get('/api/trials/export', authenticateToken, requireAdmin, async (req, res) 
     // by compliance. Returns nulls unless BOTH the targets and a compliance
     // figure exist — a week with no compliance recorded is not a week of zero
     // intake, and averaging it in as one would understate every patient.
-    const weekIntake = (w, targets) => {
+    // Resolves a week's targets into the four numbers everything downstream
+    // needs. Weeks a doctor edited before the merge fix lost their
+    // oral/supplement split (see PUT /api/weekly-prescriptions/:id); it is
+    // recoverable, because it is the same derivation the engine used — the
+    // recorded oral intake % of the target, with the remainder carried by the
+    // supplement. Only used when the stored value is genuinely absent.
+    const resolveSplit = (w, targets) => {
       const t = targets || {};
-      const totalKcal = _num(t.totalKcal);
-      const totalProt = _num(t.totalProtein);
+      const totalKcal = _num(t.totalKcal), totalProt = _num(t.totalProtein);
       let oralKcal = _num(t.oralKcal), suppKcal = _num(t.suppKcal), suppProt = _num(t.suppProtein);
-      const comp = _num(w.compliance);
-
-      // Weeks a doctor edited before the merge fix lost their oral/supplement
-      // split (see PUT /api/weekly-prescriptions/:id). The split is recoverable:
-      // it is the same derivation the engine used — the recorded oral intake %
-      // of the target, with the remainder carried by the supplement. Only used
-      // when the stored value is genuinely absent, never to override one.
-      const oralPct = _num(t.oralPct) !== null ? _num(t.oralPct) : _num(w.oralIntake);
+      const oralPct = _num(t.oralPct) !== null ? _num(t.oralPct) : _num((w || {}).oralIntake);
       if (totalKcal !== null && oralPct !== null && (oralKcal === null || suppKcal === null)) {
         const f = Math.max(0, Math.min(100, oralPct)) / 100;
         oralKcal = Math.round(totalKcal * f);
@@ -1984,6 +1988,14 @@ app.get('/api/trials/export', authenticateToken, requireAdmin, async (req, res) 
         const f = Math.max(0, Math.min(100, oralPct)) / 100;
         suppProt = Math.max(0, Math.round(totalProt * (1 - f) * 10) / 10);
       }
+      return { totalKcal, totalProt, oralKcal, suppKcal, suppProt };
+    };
+
+    const weekIntake = (w, targets) => {
+      const sp = resolveSplit(w, targets);
+      const totalKcal = sp.totalKcal, totalProt = sp.totalProt;
+      const oralKcal = sp.oralKcal, suppKcal = sp.suppKcal, suppProt = sp.suppProt;
+      const comp = _num(w.compliance);
 
       if (comp === null || totalKcal === null || oralKcal === null || suppKcal === null) {
         return { kcal: null, protein: null, pctKcal: null, pctProtein: null, targetKcal: totalKcal, targetProtein: totalProt };
@@ -2007,7 +2019,7 @@ app.get('/api/trials/export', authenticateToken, requireAdmin, async (req, res) 
       return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
     };
 
-    const enrollment = [], baseline = [], weekly = [], final = [], analysis = [];
+    const enrollment = [], baseline = [], weekly = [], final = [], analysis = [], daily = [];
     ids.forEach(id => {
       const p = patById[id]; if (!p) return;
       const t = trialByPat[id], job = jobByPatient[id];
@@ -2062,6 +2074,74 @@ app.get('/api/trials/export', authenticateToken, requireAdmin, async (req, res) 
         'MUST Incomplete — Missing': mustBase.complete ? '' : mustBase.missing.join(', ')
       });
 
+      // ── Daily intake ────────────────────────────────────────────────────
+      // The daily log records oral intake % and supplement consumed % every
+      // day. Converting those to kcal and grams needs the prescription that
+      // was in force on that date, so each day is matched to the most recent
+      // weekly review on or before it.
+      //   oral      = target x that day's oral intake %
+      //   supplement = prescribed supplement x that day's consumed %
+      //   day total = oral + supplement
+      // A day can exceed 100% of target legitimately: a patient eating well
+      // who also takes a supplement sized for a larger gap.
+      const dayKcalVals = [], dayProtVals = [];
+      const wkByDate = wks
+        .map((w, i) => ({ w, i, at: new Date(w.recordedAt).getTime(),
+                          wkNo: w.week != null ? w.week : (i + 1) }))
+        .filter(x => !isNaN(x.at))
+        .sort((a, b) => a.at - b.at);
+      (dailyByPat[id] || []).forEach(d => {
+        const dDate = d.date || null;
+        const dAt = dDate ? new Date(dDate).getTime() : NaN;
+        // The week in force: latest review on or before this day, else the first.
+        let ref = null;
+        if (wkByDate.length) {
+          ref = wkByDate[0];
+          if (!isNaN(dAt)) {
+            for (const c of wkByDate) { if (c.at <= dAt) ref = c; else break; }
+          }
+        }
+        const tg = ref ? (rxByLog[ref.w.logId] || rxByWeek[id + '#' + ref.wkNo] || null) : null;
+        const sp = resolveSplit(ref ? ref.w : null, tg);
+        const oralPctD = _num(d.oralIntake), suppPctD = _num(d.suppConsumed);
+        const oF = oralPctD === null ? null : Math.max(0, oralPctD) / 100;
+        const sF = suppPctD === null ? null : Math.max(0, suppPctD) / 100;
+        const oralK = (sp.totalKcal !== null && oF !== null) ? sp.totalKcal * oF : null;
+        const suppK = (sp.suppKcal  !== null && sF !== null) ? sp.suppKcal  * sF : null;
+        const oralP = (sp.totalProt !== null && oF !== null) ? sp.totalProt * oF : null;
+        const suppP = (sp.suppProt  !== null && sF !== null) ? sp.suppProt  * sF : null;
+        const totK = (oralK === null && suppK === null) ? null : (oralK || 0) + (suppK || 0);
+        const totP = (oralP === null && suppP === null) ? null : (oralP || 0) + (suppP || 0);
+        if (totK !== null) dayKcalVals.push(totK);
+        if (totP !== null) dayProtVals.push(totP);
+        daily.push({
+          'Study ID': studyId, 'Patient Name': p.name || '', 'Date': _d(dDate),
+          'Week In Force': ref ? ref.wkNo : '',
+          'Oral Intake %': oralPctD, 'Supplement Consumed %': suppPctD,
+          'Supplement Prescribed': d.suppPrescribed || '',
+          'Target kcal': sp.totalKcal, 'Target Protein (g)': sp.totalProt,
+          'Oral kcal': _r0(oralK), 'Supplement kcal': _r0(suppK), 'Day Total kcal': _r0(totK),
+          'Oral Protein (g)': _r1(oralP), 'Supplement Protein (g)': _r1(suppP), 'Day Total Protein (g)': _r1(totP),
+          '% kcal Target': (totK !== null && sp.totalKcal) ? _r1(totK / sp.totalKcal * 100) : null,
+          '% Protein Target': (totP !== null && sp.totalProt) ? _r1(totP / sp.totalProt * 100) : null,
+          'Nausea': d.nausea || '', 'Vomiting': d.vomiting || '', 'Mucositis': d.mucositis != null ? d.mucositis : ''
+        });
+      });
+
+      // Latest recorded albumin and glucose. Taken from the most recent weekly
+      // review that actually carries the value, not simply the last review —
+      // albumin appears in about half of them, so "the last review" would
+      // report blank for most patients. The date says which review it came from.
+      const lastRecorded = (key) => {
+        for (let i = wks.length - 1; i >= 0; i--) {
+          const v = _num(wks[i][key]);
+          if (v !== null) return { v, at: wks[i].recordedAt };
+        }
+        return { v: null, at: null };
+      };
+      const finalAlb = lastRecorded('albumin');
+      const finalGlu = lastRecorded('glucose');
+
       const kcalVals = [], protVals = [], pctKcalVals = [], pctProtVals = [];
       wks.forEach((w, i) => {
         const wkNo = w.week != null ? w.week : (i + 1);
@@ -2110,6 +2190,13 @@ app.get('/api/trials/export', authenticateToken, requireAdmin, async (req, res) 
         'Mean Est. Protein Intake (g)': _r1(mean(protVals)),
         'Mean % Protein Target': _r1(mean(pctProtVals)),
         'Weeks With Intake Data': kcalVals.length,
+        'Mean Daily kcal (oral+supp)': _r0(mean(dayKcalVals)),
+        'Mean Daily Protein (g)': _r1(mean(dayProtVals)),
+        'Days With Intake Data': dayKcalVals.length,
+        'Final Albumin (g/dL)': finalAlb.v,
+        'Final Albumin Date': _d(finalAlb.at),
+        'Final Glucose (mg/dL)': finalGlu.v,
+        'Final Glucose Date': _d(finalGlu.at),
         'Days Under Care': daysUnderCare,
         'Still Under Care': stillUnderCare ? 'Yes' : 'No'
       });
@@ -2168,6 +2255,27 @@ app.get('/api/trials/export', authenticateToken, requireAdmin, async (req, res) 
       'Notes': 'Cohort mean of each patient\'s weekly average'
         + (pp.length ? ' — ' + _r1(mean(pp)) + '% of prescribed target' : '') + '.'
     });
+    const dK = col('Mean Daily kcal (oral+supp)'), dP = col('Mean Daily Protein (g)');
+    summary.push({
+      'Measure': 'Daily Calorie Intake (kcal/day, oral + supplement)', 'n (paired)': dK.length,
+      'Baseline Mean': '', 'Final Mean': _r0(mean(dK)), 'Mean Change': '',
+      'Notes': 'From the daily log: target x that day\'s oral intake %, plus prescribed supplement x that day\'s consumed %. '
+        + 'Finer than the weekly figure above, which uses one compliance number per week.'
+    });
+    summary.push({
+      'Measure': 'Daily Protein Intake (g/day, oral + supplement)', 'n (paired)': dP.length,
+      'Baseline Mean': '', 'Final Mean': _r1(mean(dP)), 'Mean Change': '', 'Notes': ''
+    });
+    const alb = col('Final Albumin (g/dL)'), glu = col('Final Glucose (mg/dL)');
+    summary.push({
+      'Measure': 'Final Albumin (g/dL)', 'n (paired)': alb.length,
+      'Baseline Mean': '', 'Final Mean': _r1(mean(alb)), 'Mean Change': '',
+      'Notes': 'Most recent weekly review that recorded it; the date is on the Data Analysis sheet.'
+    });
+    summary.push({
+      'Measure': 'Final Blood Glucose (mg/dL)', 'n (paired)': glu.length,
+      'Baseline Mean': '', 'Final Mean': _r0(mean(glu)), 'Mean Change': '', 'Notes': ''
+    });
     const closed = analysis.filter(r => r['Still Under Care'] === 'No' && r['Days Under Care'] !== null).map(r => r['Days Under Care']);
     const openN = analysis.filter(r => r['Still Under Care'] === 'Yes').length;
     summary.push({
@@ -2191,8 +2299,9 @@ app.get('/api/trials/export', authenticateToken, requireAdmin, async (req, res) 
     weekly.sort((a, b) => byStudy(a, b) || (a['Week'] - b['Week']));
     final.sort(byStudy);
     analysis.sort(byStudy);
+    daily.sort((a, b) => byStudy(a, b) || String(a['Date']).localeCompare(String(b['Date'])));
 
-    res.json({ enrollment, baseline, weekly, final, analysis, summary, generatedAt: new Date().toISOString() });
+    res.json({ enrollment, baseline, weekly, final, analysis, daily, summary, generatedAt: new Date().toISOString() });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
