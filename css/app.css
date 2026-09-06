@@ -1036,6 +1036,35 @@ textarea:focus {
   border: 1px solid rgba(255, 255, 255, 0.6);
 }
 
+/* A single point of light travelling round the launcher.
+   Deliberately a dot and not a rotating arc: an arc reads as a loading
+   spinner, and on a clinical screen that suggests the assistant is busy
+   working on something when it is simply sitting there. A dot reads as
+   present.
+   The dot is painted at the top edge of a box that surrounds the button, so
+   rotating the box carries it around the true centre whatever size the
+   launcher is — the two pages set 56px and 62px. */
+.ai-chat-launcher::before {
+  content: '';
+  position: absolute;
+  inset: -9px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle 3.5px at 50% 0%, var(--cyan) 0 3.5px, transparent 4px),
+    radial-gradient(circle 7px at 50% 0%, var(--cyan-glow) 0 7px, transparent 7.5px),
+    radial-gradient(circle 12px at 50% 0%, var(--cyan-dim) 0 12px, transparent 12.5px);
+  animation: aiOrbit 5.5s linear infinite;
+  pointer-events: none;
+}
+@keyframes aiOrbit { to { transform: rotate(360deg); } }
+
+/* Motion is decoration here, so it goes away for anyone who has asked their
+   system for less of it. The dot stays put rather than disappearing — it is
+   part of the mark's composition, not just the animation. */
+@media (prefers-reduced-motion: reduce) {
+  .ai-chat-launcher::before { animation: none; }
+}
+
 .ai-chat-header .ai-chat-brand {
   width: 22px;
   height: 22px;

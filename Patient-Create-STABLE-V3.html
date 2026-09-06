@@ -121,6 +121,15 @@
     .ai-chat-launcher:hover { transform: translateY(-3px) scale(1.04) !important;
       box-shadow: 0 16px 40px rgba(34,211,238,.4) !important; }
     .ai-chat-launcher svg { width: 30px !important; height: 30px !important; fill: #051018 !important; }
+    /* The launcher now carries the Gquence mark, which is navy and teal on a
+       transparent ground — on the cyan/violet gradient above, the navy half of
+       it disappears. So the circle goes white whenever it holds the logo, and
+       the coloured glow moves to the ring and the shadow instead. */
+    .ai-chat-launcher:has(img) {
+      background: #fff !important;
+      box-shadow: 0 10px 30px rgba(34,211,238,.34), 0 0 0 1px rgba(255,255,255,.5) inset !important;
+    }
+    .ai-chat-launcher img { width: 38px !important; height: 38px !important; object-fit: contain; display: block; }
     /* A quiet ring, so the assistant reads as present without nagging. */
     .ai-chat-launcher::after {
       content:''; position:absolute; inset:-6px; border-radius:50%;
@@ -156,9 +165,12 @@
     }
     .aih { display:flex; align-items:center; gap:10px; min-width:0; }
     .aih-av { width:34px; height:34px; border-radius:11px; flex:none;
-      background:linear-gradient(135deg, var(--cyan), var(--violet));
+      background:#fff; border:1px solid rgba(255,255,255,.6);
       display:flex; align-items:center; justify-content:center; }
     .aih-av svg { width:19px; height:19px; fill:#051018; }
+    /* The mark is navy and teal on transparent, so it needs a light tile
+       behind it — on the old gradient the navy half disappeared. */
+    .aih-av img { width:24px; height:24px; object-fit:contain; display:block; }
     .aih-t { min-width:0; }
     .aih-t h4 { font-size:13.5px !important; font-weight:800; margin:0; color:var(--text); }
     .aih-t .s { font-size:10.5px; color:var(--text-3); display:flex; align-items:center; gap:5px; margin-top:1px; }
@@ -220,13 +232,13 @@
 </div>
 
 <div class="ai-chat-launcher" onclick="toggleChat()" title="AI Assistance">
-  <svg viewBox="0 0 24 24"><path d="M12 2a1 1 0 0 1 .93.64l1.06 2.77 2.77 1.06a1 1 0 0 1 0 1.86l-2.77 1.06-1.06 2.77a1 1 0 0 1-1.86 0L9.99 9.39 7.22 8.33a1 1 0 0 1 0-1.86l2.77-1.06 1.06-2.77A1 1 0 0 1 12 2Z"/><path d="M5 13a.7.7 0 0 1 .65.45l.62 1.62 1.62.62a.7.7 0 0 1 0 1.3l-1.62.62-.62 1.62a.7.7 0 0 1-1.3 0l-.62-1.62-1.62-.62a.7.7 0 0 1 0-1.3l1.62-.62.62-1.62A.7.7 0 0 1 5 13Z"/><path d="M17.5 14a.6.6 0 0 1 .56.38l.5 1.31 1.31.5a.6.6 0 0 1 0 1.12l-1.31.5-.5 1.31a.6.6 0 0 1-1.12 0l-.5-1.31-1.31-.5a.6.6 0 0 1 0-1.12l1.31-.5.5-1.31A.6.6 0 0 1 17.5 14Z"/></svg>
+  <img src="/assets/logo/gquence-mark.png?v=3" alt="Gquence AI Assistance">
 </div>
 
 <div class="ai-chat-window" id="aiChatWindow">
   <div class="ai-chat-header">
     <div class="aih">
-      <div class="aih-av"><svg viewBox="0 0 24 24"><path d="M12 2a1 1 0 0 1 .93.64l1.06 2.77 2.77 1.06a1 1 0 0 1 0 1.86l-2.77 1.06-1.06 2.77a1 1 0 0 1-1.86 0L9.99 9.39 7.22 8.33a1 1 0 0 1 0-1.86l2.77-1.06 1.06-2.77A1 1 0 0 1 12 2Z"/><path d="M5 13a.7.7 0 0 1 .65.45l.62 1.62 1.62.62a.7.7 0 0 1 0 1.3l-1.62.62-.62 1.62a.7.7 0 0 1-1.3 0l-.62-1.62-1.62-.62a.7.7 0 0 1 0-1.3l1.62-.62.62-1.62A.7.7 0 0 1 5 13Z"/><path d="M17.5 14a.6.6 0 0 1 .56.38l.5 1.31 1.31.5a.6.6 0 0 1 0 1.12l-1.31.5-.5 1.31a.6.6 0 0 1-1.12 0l-.5-1.31-1.31-.5a.6.6 0 0 1 0-1.12l1.31-.5.5-1.31A.6.6 0 0 1 17.5 14Z"/></svg></div>
+      <div class="aih-av"><img src="/assets/logo/gquence-mark.png?v=3" alt=""></div>
       <div class="aih-t">
         <h4>AI Assistance</h4>
         <div class="s"><span class="dot"></span> Fills only what you tell it</div>
