@@ -2157,6 +2157,11 @@ app.get('/api/trials/export', authenticateToken, requireAdmin, async (req, res) 
           'Weight (kg)': _num(w.weight), 'BMI': _num(w.bmi), 'MUAC (cm)': _num(w.muac), 'Hand Grip': _num(w.handGrip),
           'ECOG': w.ecog != null ? w.ecog : '', 'Albumin (g/dL)': _num(w.albumin), 'CRP (mg/L)': _num(w.crp), 'Glucose': _num(w.glucose),
           'Oral Intake %': _num(w.oralIntake), 'Compliance %': _num(w.compliance),
+          // Captured every week (None / Dose Delay / Dose Reduction / RT
+          // Interruption / Treatment Held / Hospitalisation) and, until now,
+          // never exported. These are the outcomes the muscle-mass literature
+          // uses as its endpoint, so they belong in the dataset.
+          'Treatment Interruption': w.interruptions || '',
           'Target kcal': intake.targetKcal, 'Target Protein (g)': intake.targetProtein,
           'Est. kcal Intake': intake.kcal, 'Est. Protein Intake (g)': intake.protein,
           '% kcal Target': intake.pctKcal, '% Protein Target': intake.pctProtein,

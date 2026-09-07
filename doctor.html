@@ -814,6 +814,25 @@
             : '<span class="status processing" style="background:#fef9c3; color:#854d0e; font-size:10px; margin-left:5px; animation: pulse 1.5s infinite;">ANALYZING...</span>';
 
         // CSD button — only when APPROVED (doctor role or assistant)
+        // _closed is declared further down the script; a render that runs
+        // before that line would hit the temporal dead zone, so this reads it
+        // defensively rather than assuming order.
+        let _clo = null;
+        try { _clo = (_closed || []).find(c => String(c.id) === String(p.id)) || null; } catch (e) { _clo = null; }
+        const _nm = String(p.name || '').replace(/'/g, "\\'");
+        const dischargeBtn = _clo
+          ? `<button class="btn-secondary" title="This patient is closed — put them back in the queue" onclick="event.stopPropagation(); reopenPatient('${p.id}')" style="padding:6px 10px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;">Reopen</button>`
+          : `<button class="btn-secondary" title="Record that this patient has been discharged" onclick="event.stopPropagation(); closePatient('${p.id}','DISCHARGED',null,'${_nm}')" style="padding:6px 10px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;">Discharge</button>`;
+        // The Status column carries the manufacturing state. A closure is a
+        // different fact about the same patient, so it sits beside it rather
+        // than overwriting it.
+        const _cd = (_clo && _clo.closure) || null;
+        const _cLabel = (_cd && (_cd.label || _cd.reason)) || 'Closed';
+        const _cWhen = _cd && _cd.closedAt ? new Date(_cd.closedAt).toLocaleDateString('en-GB') : '';
+        const closedBadge = _clo
+          ? `<span class="status" style="background:#e2e8f0;color:#334155;font-size:10px;margin-left:5px;" title="${_cLabel}${_cWhen ? ' — ' + _cWhen : ''}${_cd && _cd.needsConfirmation ? ' (awaiting doctor confirmation)' : ''}">${_cLabel}${_cd && _cd.needsConfirmation ? ' *' : ''}</span>`
+          : '';
+
         const csdBtn = (status !== 'CREATED')
           ? `<button class="btn-csd" onclick="event.stopPropagation(); printCSD('${p.id}')" title="Print Clinical Source Document (CSD)">
                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" fill="currentColor" viewBox="0 0 16 16"><path d="M5 1a2 2 0 0 0-2 2v1h10V3a2 2 0 0 0-2-2H5zm6 8H5a1 1 0 0 0-1 1v3a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-3a1 1 0 0 0-1-1z"/><path d="M0 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2h-1v-2a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v2H2a2 2 0 0 1-2-2V7zm2.5 1a.5.5 0 1 0 0-1 .5.5 0 0 0 0 1z"/></svg>
@@ -938,7 +957,7 @@
       <td>${weekCell(p.id)}</td>
       <td>${nextReviewCell(p.id)}</td>
       <td>${productCell(p.id)}</td>
-      <td><span class="status ${statusClass}">${status}</span>${aiStatus}</td>
+      <td><span class="status ${statusClass}">${status}</span>${aiStatus}${closedBadge}</td>
       <td>
         <div class="action-row" onclick="event.stopPropagation();" style="display:flex; gap:8px;">
           ${approveBtn}
@@ -949,6 +968,7 @@
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/><path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/></svg>
           </button>
           ${csdBtn}
+          ${dischargeBtn}
           <button class="btn-secondary" onclick="confirmDelete('${p.id}', '${p.name.replace(/'/g, "\\'")}')" style="padding: 6px 10px; border-radius: 6px; display:flex; align-items:center; justify-content:center; color:#dc2626;" title="Delete Patient Record">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg>
           </button>
@@ -2004,10 +2024,10 @@
       renderQueue();
     }
 
-    async function closePatient(pid, reason, note){
+    async function closePatient(pid, reason, note, nameHint){
       const p = _queue.find(x => String(x.id) === String(pid));
       const label = (ALL_CLOSE.find(r => r[0] === reason) || [,reason])[1];
-      if (!confirm('Close ' + ((p && p.name) || 'this patient') + ' as:\n\n' + label
+      if (!confirm('Close ' + ((p && p.name) || nameHint || 'this patient') + ' as:\n\n' + label
         + '\n\nThey will leave your queue. You can reopen them at any time.')) return;
       try {
         const res = await fetch(_api() + '/api/patients/' + encodeURIComponent(pid) + '/close', {
