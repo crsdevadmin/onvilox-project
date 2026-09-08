@@ -3685,6 +3685,81 @@ app.get('/api/list-models', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// ── Weekly entry dictation ───────────────────────────────────────────────────
+// Speech gives us a raw transcript; this turns it into weekly monitoring fields.
+// The client NEVER writes these straight into the form — a mis-heard "fifteen"
+// for "fifty" would otherwise become a manufactured prescription. The response
+// is a proposal the doctor confirms field by field.
+const weeklyDictationPrompt = `You transcribe spoken clinical notes into weekly monitoring fields. You transcribe; you do not diagnose, estimate or complete.
+Return ONLY valid JSON. START with '{' and END with '}'. NO preamble, NO markdown, NO code fences.
+
+THE ONE RULE THAT OVERRIDES EVERYTHING ELSE:
+Return a value ONLY if the speaker actually said it. Never infer, estimate, carry over, or supply a typical value. If it was not said, return null.
+These values drive a nutrition prescription that is manufactured and dispensed. A null is safe; a plausible guess is not.
+
+SPOKEN NUMBER HANDLING:
+- Words become digits: "three point five" -> 3.5, "fifty five point seven" -> 55.7, "one twenty" -> 120.
+- Strip spoken units: "fifty five point seven kilos" -> 55.7, "albumin three point two grams per decilitre" -> 3.2.
+- "percent" is a unit, not part of the number: "intake sixty percent" -> 60.
+- If a number is genuinely ambiguous between two readings, return null rather than choosing.
+
+FIELD NOTES:
+- week: the week number of the assessment ("week four" -> 4).
+- weight: body weight in kg.
+- muac: mid-upper arm circumference in cm.
+- handGrip: hand grip / dynamometer strength in kg.
+- ecog: ECOG performance status, integer 0 to 4 only.
+- albumin g/dL, crp mg/L, glucose mg/dL, creatinine mg/dL, urea mg/dL.
+- oralIntake: oral intake as a PERCENTAGE OF REQUIREMENT. "eating about half" -> 50. If the speaker describes a deficit ("intake down forty percent"), convert to the remaining intake -> 60.
+- compliance: supplement adherence percentage.
+- interruptions: one of exactly "None", "Dose Delay", "Dose Reduction", "RT Interruption", "Treatment Held", "Hospitalisation", else null.
+- notes: any remaining clinical remark, verbatim, as a short string. Null if none.
+
+Schema, all keys always present:
+{"week":null,"weight":null,"muac":null,"handGrip":null,"ecog":null,"albumin":null,"crp":null,"glucose":null,"creatinine":null,"urea":null,"oralIntake":null,"compliance":null,"interruptions":null,"notes":null}`;
+
+app.post('/api/dictate-weekly', authenticateToken, async (req, res) => {
+  const { transcript } = req.body || {};
+  if (!transcript || !String(transcript).trim()) {
+    return res.status(400).json({ error: 'No transcript supplied.' });
+  }
+  try {
+    const msg = await anthropic.messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 700,
+      system: [{ type: "text", text: weeklyDictationPrompt, cache_control: { type: "ephemeral" } }],
+      messages: [{ role: "user", content: String(transcript).slice(0, 4000) }]
+    });
+    let raw = (msg.content[0] && msg.content[0].text) || '';
+    raw = raw.replace(/^```(?:json)?\s*/m, '').replace(/```\s*$/m, '').trim();
+    const start = raw.indexOf('{');
+    if (start < 0) throw new Error('No JSON in model response');
+    const fields = JSON.parse(raw.slice(start));
+
+    // Anything outside physiological range is returned flagged, not dropped —
+    // the doctor sees it and decides. Silently discarding a real reading is as
+    // bad as accepting a mis-heard one.
+    const RANGE = {
+      week: [1, 60], weight: [20, 250], muac: [10, 60], handGrip: [1, 90],
+      ecog: [0, 4], albumin: [1, 6], crp: [0, 400], glucose: [30, 600],
+      creatinine: [0.1, 15], urea: [2, 300], oralIntake: [0, 100], compliance: [0, 100]
+    };
+    const suspect = [];
+    Object.keys(RANGE).forEach(k => {
+      const v = fields[k];
+      if (v === null || v === undefined || v === '') return;
+      const n = parseFloat(v);
+      if (isNaN(n)) { fields[k] = null; return; }
+      if (n < RANGE[k][0] || n > RANGE[k][1]) suspect.push(k);
+      fields[k] = n;
+    });
+    res.json({ fields, suspect, heard: String(transcript).trim() });
+  } catch (e) {
+    console.error('[dictate-weekly]', e.message);
+    res.status(500).json({ error: 'Could not read that back. Please try again or type it in.' });
+  }
+});
+
 // In-memory job store for async AI report generation
 const __aiJobs = {};
 

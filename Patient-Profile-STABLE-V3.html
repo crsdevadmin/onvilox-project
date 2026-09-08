@@ -1452,7 +1452,25 @@
             <div class="mon-entry-form" style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:14px 16px; margin-bottom:14px;">
               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
                 <div style="font-size:11px; font-weight:800; color:var(--text); text-transform:uppercase; letter-spacing:0.08em;" id="monWFormTitle">Add Weekly Entry</div>
-                <button id="monWCancelEdit" onclick="cancelEditWeekly()" style="display:none;background:none;border:1px solid #cbd5e1;border-radius:5px;padding:4px 10px;font-size:11px;color:#64748b;cursor:pointer;">✕ Cancel Edit</button>
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <button id="dictBtn" type="button" onclick="toggleDictation()"
+                    style="display:none;align-items:center;gap:6px;background:#fff;border:1px solid #0d7a80;border-radius:5px;padding:5px 12px;font-size:11px;font-weight:700;color:#0d7a80;cursor:pointer;">
+                    <span id="dictIcon">🎙</span> <span id="dictLabel">Dictate</span>
+                  </button>
+                  <button id="monWCancelEdit" onclick="cancelEditWeekly()" style="display:none;background:none;border:1px solid #cbd5e1;border-radius:5px;padding:4px 10px;font-size:11px;color:#64748b;cursor:pointer;">✕ Cancel Edit</button>
+                </div>
+              </div>
+
+              <!-- Dictation: live transcript, then a review step. Values are never
+                   written into the form until the doctor confirms them. -->
+              <div id="dictPanel" style="display:none;border:1px solid #0d7a80;border-left-width:3px;border-radius:6px;background:#f7fbfb;padding:12px 14px;margin-bottom:12px;">
+                <div style="font-size:10px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:#0d7a80;margin-bottom:6px;" id="dictStage">Listening</div>
+                <div id="dictHeard" style="font-size:13px;color:#0d2340;line-height:1.55;min-height:20px;"></div>
+                <div id="dictReview" style="display:none;margin-top:12px;"></div>
+                <div id="dictActions" style="display:none;gap:8px;margin-top:12px;">
+                  <button type="button" onclick="applyDictation()" style="background:#0d7a80;color:#fff;border:0;border-radius:5px;padding:7px 16px;font-size:12px;font-weight:700;cursor:pointer;">Fill these fields</button>
+                  <button type="button" onclick="discardDictation()" style="background:none;border:1px solid #cbd5e1;border-radius:5px;padding:7px 14px;font-size:12px;color:#52627a;cursor:pointer;">Discard</button>
+                </div>
               </div>
               <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px;">
                 <div><label style="font-size:10px;font-weight:700;color:#000;display:block;margin-bottom:3px;">Week Number</label><input type="number" id="monW_week" min="1" placeholder="e.g. 3" style="width:100%;font-size:12px;padding:6px 8px;border:1px solid #cbd5e1;border-radius:5px;box-sizing:border-box;"></div>
@@ -6378,6 +6396,227 @@ async function saveMonitorLog(type) {
     }
   } catch(e) { alert('Failed to save. Please try again.'); }
 }
+
+// ══ Weekly entry dictation ═══════════════════════════════════════════════
+// Speech recognition runs in the browser; Claude turns the transcript into
+// fields. The doctor confirms before anything lands in the form — a mis-heard
+// "fifteen" for "fifty" would otherwise become a manufactured prescription.
+var _rec = null, _recActive = false, _dictText = '', _dictProposal = null;
+
+var DICT_LABELS = {
+  week: 'Week number', weight: 'Weight (kg)', muac: 'MUAC (cm)',
+  handGrip: 'Hand grip (kg)', ecog: 'ECOG', albumin: 'Albumin (g/dL)',
+  crp: 'CRP (mg/L)', glucose: 'Blood glucose (mg/dL)',
+  creatinine: 'Creatinine (mg/dL)', urea: 'Urea (mg/dL)',
+  oralIntake: 'Oral intake (%)', compliance: 'Supp compliance (%)',
+  interruptions: 'Treatment interruptions', notes: 'Remarks'
+};
+var DICT_FIELD_IDS = {
+  week: 'monW_week', weight: 'monW_weight', muac: 'monW_muac',
+  handGrip: 'monW_handGrip', ecog: 'monW_ecog', albumin: 'monW_albumin',
+  crp: 'monW_crp', glucose: 'monW_glucose', creatinine: 'monW_creatinine',
+  urea: 'monW_urea', oralIntake: 'monW_oralIntake', compliance: 'monW_compliance',
+  interruptions: 'monW_interruptions', notes: 'monW_notes'
+};
+
+// This page has no _esc helper — that one lives in doctor.html. The transcript
+// is user-spoken text going into innerHTML, so it must be escaped here.
+function _dictEsc(v) {
+  return String(v === null || v === undefined ? '' : v)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function _speechSupported() {
+  return !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+}
+
+// The button only appears where dictation can actually work. Showing a mic
+// that silently does nothing is worse than not offering it.
+function initDictation() {
+  var btn = document.getElementById('dictBtn');
+  if (!btn) return;
+  if (_speechSupported()) btn.style.display = 'inline-flex';
+}
+
+// Reveal the button once the DOM exists. Without this the control is defined
+// but stays hidden, which is how a feature ships and nobody ever sees it.
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initDictation);
+} else {
+  initDictation();
+}
+
+function _dictSet(stage, heard) {
+  var p = document.getElementById('dictPanel');
+  var st = document.getElementById('dictStage');
+  var hd = document.getElementById('dictHeard');
+  if (p) p.style.display = 'block';
+  if (st) st.textContent = stage;
+  if (hd && heard !== undefined) hd.textContent = heard;
+}
+
+window.toggleDictation = function toggleDictation() {
+  if (_recActive) { _stopDictation(); return; }
+  if (!_speechSupported()) {
+    alert('Speech input needs Chrome or Edge. Please type the values instead.');
+    return;
+  }
+  var Ctor = window.SpeechRecognition || window.webkitSpeechRecognition;
+  _rec = new Ctor();
+  _rec.lang = 'en-IN';
+  _rec.continuous = true;
+  _rec.interimResults = true;
+
+  _dictText = '';
+  _dictProposal = null;
+  document.getElementById('dictReview').style.display = 'none';
+  document.getElementById('dictActions').style.display = 'none';
+  _dictSet('Listening — say the values, then press Stop', '');
+  _dictBtnState(true);
+
+  _rec.onresult = function (ev) {
+    var finalTxt = '', interim = '';
+    for (var i = ev.resultIndex; i < ev.results.length; i++) {
+      var r = ev.results[i];
+      if (r.isFinal) finalTxt += r[0].transcript + ' ';
+      else interim += r[0].transcript;
+    }
+    if (finalTxt) _dictText += finalTxt;
+    _dictSet('Listening — say the values, then press Stop', (_dictText + interim).trim());
+  };
+  _rec.onerror = function (ev) {
+    _dictBtnState(false);
+    _recActive = false;
+    if (ev.error === 'not-allowed' || ev.error === 'service-not-allowed') {
+      _dictSet('Microphone blocked', 'Allow microphone access for this site, then try again.');
+    } else if (ev.error === 'no-speech') {
+      _dictSet('Nothing heard', 'No speech detected. Press Dictate and try again.');
+    } else {
+      _dictSet('Speech error', 'Could not capture audio (' + ev.error + '). Please type the values instead.');
+    }
+  };
+  _rec.onend = function () {
+    _recActive = false;
+    _dictBtnState(false);
+    if (_dictText.trim()) _sendDictation(_dictText.trim());
+  };
+  try { _rec.start(); _recActive = true; }
+  catch (e) { _dictBtnState(false); _recActive = false; }
+};
+
+function _stopDictation() {
+  if (_rec) { try { _rec.stop(); } catch (e) {} }
+  _recActive = false;
+  _dictBtnState(false);
+}
+
+function _dictBtnState(on) {
+  var b = document.getElementById('dictBtn');
+  var i = document.getElementById('dictIcon');
+  var l = document.getElementById('dictLabel');
+  if (!b) return;
+  if (on) {
+    b.style.background = '#0d7a80'; b.style.color = '#fff';
+    if (i) i.textContent = '⏹'; if (l) l.textContent = 'Stop';
+  } else {
+    b.style.background = '#fff'; b.style.color = '#0d7a80';
+    if (i) i.textContent = '🎙'; if (l) l.textContent = 'Dictate';
+  }
+}
+
+async function _sendDictation(text) {
+  _dictSet('Reading it back…', text);
+  var u = (typeof auth !== 'undefined') ? auth.getCurrentUser() : {};
+  var token = u && u.token ? 'Bearer ' + u.token : '';
+  var apiBase = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : '';
+  try {
+    var res = await fetch(apiBase + '/api/dictate-weekly', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': token },
+      body: JSON.stringify({ transcript: text })
+    });
+    var body = await res.json();
+    if (!res.ok) throw new Error(body.error || 'Extraction failed');
+    _dictProposal = body;
+    _renderDictReview(body);
+  } catch (e) {
+    _dictSet('Could not read that back', e.message + ' — the words above are still here, so you can type the values in.');
+  }
+}
+
+function _renderDictReview(body) {
+  var f = body.fields || {}, suspect = body.suspect || [];
+  var rows = Object.keys(DICT_LABELS).filter(function (k) {
+    return f[k] !== null && f[k] !== undefined && f[k] !== '';
+  });
+  var host = document.getElementById('dictReview');
+  var acts = document.getElementById('dictActions');
+
+  if (!rows.length) {
+    _dictSet('Nothing recognised', body.heard || '');
+    host.style.display = 'block';
+    host.innerHTML = '<div style="font-size:12.5px;color:#9c6200;">No clinical values were picked out of that. '
+      + 'Try naming each value plainly &mdash; &ldquo;weight fifty five point seven, albumin three point five, '
+      + 'oral intake sixty percent&rdquo;.</div>';
+    acts.style.display = 'none';
+    return;
+  }
+
+  _dictSet('Heard this — check before filling', body.heard || '');
+  host.style.display = 'block';
+  host.innerHTML =
+    '<div style="font-size:10px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:#52627a;margin-bottom:6px;">'
+    + rows.length + ' value' + (rows.length === 1 ? '' : 's') + ' to fill</div>'
+    + '<table style="width:100%;border-collapse:collapse;font-size:12.5px;">'
+    + rows.map(function (k) {
+        var odd = suspect.indexOf(k) >= 0;
+        return '<tr>'
+          + '<td style="padding:4px 8px 4px 0;color:#52627a;white-space:nowrap;">' + _dictEsc(DICT_LABELS[k]) + '</td>'
+          + '<td style="padding:4px 0;font-weight:700;color:' + (odd ? '#9c6200' : '#0d2340') + ';">'
+          + _dictEsc(f[k])
+          + (odd ? ' <span style="font-weight:600;font-size:11px;">— outside the usual range, check this</span>' : '')
+          + '</td></tr>';
+      }).join('')
+    + '</table>';
+  acts.style.display = 'flex';
+}
+
+// Only here does anything reach the form, and only what was shown above.
+window.applyDictation = function applyDictation() {
+  if (!_dictProposal) return;
+  var f = _dictProposal.fields || {}, n = 0;
+  Object.keys(DICT_FIELD_IDS).forEach(function (k) {
+    var v = f[k];
+    if (v === null || v === undefined || v === '') return;
+    var el = document.getElementById(DICT_FIELD_IDS[k]);
+    if (!el) return;
+    el.value = v;
+    el.style.transition = 'background .4s';
+    el.style.background = '#e6f6f7';
+    setTimeout(function () { el.style.background = ''; }, 2500);
+    n++;
+  });
+  // BMI is derived from weight and height, never dictated.
+  if (typeof calcWeeklyBMI === 'function') { try { calcWeeklyBMI(); } catch (e) {} }
+  var w = document.getElementById('monW_weight');
+  if (w) { try { w.dispatchEvent(new Event('input', { bubbles: true })); } catch (e) {} }
+  discardDictation();
+  var t = document.getElementById('monWFormTitle');
+  if (t) {
+    var prev = t.textContent;
+    t.textContent = n + ' field' + (n === 1 ? '' : 's') + ' filled — review and save';
+    setTimeout(function () { t.textContent = prev; }, 4000);
+  }
+};
+
+window.discardDictation = function discardDictation() {
+  _dictProposal = null; _dictText = '';
+  var p = document.getElementById('dictPanel');
+  if (p) p.style.display = 'none';
+  document.getElementById('dictReview').style.display = 'none';
+  document.getElementById('dictActions').style.display = 'none';
+};
 
 async function loadMonitoringLogs() {
   var p = window.patient;
