@@ -6430,21 +6430,31 @@ function _dictEsc(v) {
 function _speechSupported() {
   return !!(window.SpeechRecognition || window.webkitSpeechRecognition);
 }
-
-// The button only appears where dictation can actually work. Showing a mic
-// that silently does nothing is worse than not offering it.
-function initDictation() {
-  var btn = document.getElementById('dictBtn');
-  if (!btn) return;
-  if (_speechSupported()) btn.style.display = 'inline-flex';
+function _recorderSupported() {
+  return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder);
 }
 
-// Reveal the button once the DOM exists. Without this the control is defined
-// but stays hidden, which is how a feature ships and nobody ever sees it.
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initDictation);
-} else {
-  initDictation();
+// Which engine we use is decided once, by asking the server whether a
+// transcription key is configured. Server-side is preferred because it can be
+// primed with clinical vocabulary; browser recognition is the fallback so
+// dictation still works if the key is missing.
+var _sttEngine = 'browser';
+var _sttChecked = false;
+var _mediaRec = null, _mediaChunks = [], _mediaStream = null, _mediaTimer = null;
+var MAX_DICT_SECONDS = 55;   // Google sync recognition caps at 60s
+
+async function _resolveEngine() {
+  if (_sttChecked) return _sttEngine;
+  _sttChecked = true;
+  if (!_recorderSupported()) { _sttEngine = 'browser'; return _sttEngine; }
+  try {
+    var u = (typeof auth !== 'undefined') ? auth.getCurrentUser() : {};
+    var token = u && u.token ? 'Bearer ' + u.token : '';
+    var apiBase = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : '';
+    var r = await fetch(apiBase + '/api/speech-status', { headers: { Authorization: token } });
+    if (r.ok) { var d = await r.json(); _sttEngine = d.available ? 'server' : 'browser'; }
+  } catch (e) { _sttEngine = 'browser'; }
+  return _sttEngine;
 }
 
 function _dictSet(stage, heard) {
@@ -6456,10 +6466,108 @@ function _dictSet(stage, heard) {
   if (hd && heard !== undefined) hd.textContent = heard;
 }
 
-window.toggleDictation = function toggleDictation() {
+window.toggleDictation = async function toggleDictation() {
   if (_recActive) { _stopDictation(); return; }
+  _dictText = '';
+  _dictProposal = null;
+  var rv = document.getElementById('dictReview');
+  var ac = document.getElementById('dictActions');
+  if (rv) rv.style.display = 'none';
+  if (ac) ac.style.display = 'none';
+
+  var engine = await _resolveEngine();
+  if (engine === 'server') return _startRecording();
+  return _startBrowserSpeech();
+};
+
+// ── Server path: record here, transcribe via the API ──────────────────────
+async function _startRecording() {
+  try {
+    _mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch (e) {
+    _dictSet('Microphone blocked', 'Allow microphone access for this site, then try again.');
+    return;
+  }
+  var mime = '';
+  ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus'].some(function (m) {
+    if (window.MediaRecorder && MediaRecorder.isTypeSupported(m)) { mime = m; return true; }
+    return false;
+  });
+  try {
+    _mediaRec = mime ? new MediaRecorder(_mediaStream, { mimeType: mime }) : new MediaRecorder(_mediaStream);
+  } catch (e) {
+    _releaseMic();
+    return _startBrowserSpeech();
+  }
+  _mediaChunks = [];
+  _mediaRec.ondataavailable = function (ev) { if (ev.data && ev.data.size) _mediaChunks.push(ev.data); };
+  _mediaRec.onstop = function () {
+    _releaseMic();
+    var blob = new Blob(_mediaChunks, { type: _mediaRec.mimeType || 'audio/webm' });
+    if (!blob.size) { _dictSet('Nothing recorded', 'No audio captured. Press Dictate and try again.'); return; }
+    _transcribeBlob(blob);
+  };
+  _mediaRec.start();
+  _recActive = true;
+  _dictBtnState(true);
+  _dictSet('Listening — say the values, then press Stop', '');
+  // Sync recognition refuses anything over a minute, so stop before that
+  // rather than letting the doctor speak into a request that will be rejected.
+  _mediaTimer = setTimeout(function () { if (_recActive) _stopDictation(); }, MAX_DICT_SECONDS * 1000);
+}
+
+function _releaseMic() {
+  if (_mediaTimer) { clearTimeout(_mediaTimer); _mediaTimer = null; }
+  if (_mediaStream) {
+    try { _mediaStream.getTracks().forEach(function (t) { t.stop(); }); } catch (e) {}
+    _mediaStream = null;
+  }
+  _recActive = false;
+  _dictBtnState(false);
+}
+
+async function _transcribeBlob(blob) {
+  _dictSet('Transcribing…', '');
+  var b64 = await new Promise(function (resolve) {
+    var fr = new FileReader();
+    fr.onloadend = function () { resolve(String(fr.result).split(',')[1] || ''); };
+    fr.readAsDataURL(blob);
+  });
+  var u = (typeof auth !== 'undefined') ? auth.getCurrentUser() : {};
+  var token = u && u.token ? 'Bearer ' + u.token : '';
+  var apiBase = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : '';
+  try {
+    var res = await fetch(apiBase + '/api/transcribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': token },
+      body: JSON.stringify({ audio: b64, mimeType: blob.type, language: 'en-IN' })
+    });
+    if (res.status === 503) {           // key removed since we checked
+      _sttEngine = 'browser';
+      _dictSet('Switching to browser speech', 'Press Dictate again.');
+      return;
+    }
+    var body = await res.json();
+    if (!res.ok) throw new Error(body.detail || body.error || 'Transcription failed');
+    if (!body.transcript) {
+      _dictSet('Nothing heard', 'No speech detected in that recording. Press Dictate and try again.');
+      return;
+    }
+    _dictText = body.transcript;
+    // Confidence is the recogniser's own doubt — surface it rather than hide it.
+    if (body.confidence != null && body.confidence < 0.75) {
+      _dictSet('Heard this, but not clearly — check every value', body.transcript);
+    }
+    _sendDictation(body.transcript);
+  } catch (e) {
+    _dictSet('Could not transcribe', e.message + ' — please type the values instead.');
+  }
+}
+
+// ── Fallback path: browser recognition ────────────────────────────────────
+function _startBrowserSpeech() {
   if (!_speechSupported()) {
-    alert('Speech input needs Chrome or Edge. Please type the values instead.');
+    _dictSet('Speech not available', 'This browser cannot capture speech. Please type the values, or use Chrome.');
     return;
   }
   var Ctor = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -6467,11 +6575,6 @@ window.toggleDictation = function toggleDictation() {
   _rec.lang = 'en-IN';
   _rec.continuous = true;
   _rec.interimResults = true;
-
-  _dictText = '';
-  _dictProposal = null;
-  document.getElementById('dictReview').style.display = 'none';
-  document.getElementById('dictActions').style.display = 'none';
   _dictSet('Listening — say the values, then press Stop', '');
   _dictBtnState(true);
 
@@ -6503,9 +6606,10 @@ window.toggleDictation = function toggleDictation() {
   };
   try { _rec.start(); _recActive = true; }
   catch (e) { _dictBtnState(false); _recActive = false; }
-};
+}
 
 function _stopDictation() {
+  if (_mediaRec && _mediaRec.state === 'recording') { try { _mediaRec.stop(); } catch (e) {} return; }
   if (_rec) { try { _rec.stop(); } catch (e) {} }
   _recActive = false;
   _dictBtnState(false);
@@ -6610,6 +6714,14 @@ window.applyDictation = function applyDictation() {
   }
 };
 
+// Reveal the button. Shown when either engine could work — Google needs only a
+// recorder, the fallback needs the browser speech API.
+function initDictation() {
+  var btn = document.getElementById('dictBtn');
+  if (!btn) return;
+  if (_speechSupported() || _recorderSupported()) btn.style.display = 'inline-flex';
+}
+
 window.discardDictation = function discardDictation() {
   _dictProposal = null; _dictText = '';
   var p = document.getElementById('dictPanel');
@@ -6617,6 +6729,15 @@ window.discardDictation = function discardDictation() {
   document.getElementById('dictReview').style.display = 'none';
   document.getElementById('dictActions').style.display = 'none';
 };
+
+// Run last, and defensively: this block must never abort the script around it.
+try {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initDictation);
+  } else {
+    initDictation();
+  }
+} catch (e) { console.warn('dictation init:', e); }
 
 async function loadMonitoringLogs() {
   var p = window.patient;

@@ -3718,6 +3718,199 @@ FIELD NOTES:
 Schema, all keys always present:
 {"week":null,"weight":null,"muac":null,"handGrip":null,"ecog":null,"albumin":null,"crp":null,"glucose":null,"creatinine":null,"urea":null,"oralIntake":null,"compliance":null,"interruptions":null,"notes":null}`;
 
+// ── Speech-to-Text ───────────────────────────────────────────────────────────
+// OpenAI rather than Google: Speech-to-Text has no API-key auth at all, and the
+// organisation blocks service-account key creation, so Google would have needed
+// workload identity federation. OpenAI authenticates with one header, costs
+// about a fifth as much, and takes a vocabulary prompt that does the same job as
+// Google's phrase boost.
+//
+// No SDK — Node 20+ has fetch, FormData and Blob, so this is one HTTP call.
+const OPENAI_KEY = process.env.OPENAI_API_KEY || '';
+const STT_MODEL  = process.env.OPENAI_STT_MODEL || 'gpt-4o-transcribe';
+
+// Say so at boot. Without this the only symptom of a missing key is dictation
+// quietly using the worse engine, which looks like "the upgrade did nothing".
+console.log(OPENAI_KEY
+  ? 'Speech-to-Text ready (' + STT_MODEL + ')'
+  : 'Speech-to-Text: OPENAI_API_KEY not set — browser speech will be used');
+
+// Seeds the recogniser's vocabulary. Without this, "albumin" comes back as
+// "albumen" and "ECOG" as "eco". Written as a sentence because the prompt is
+// interpreted as preceding context, not as a word list.
+const STT_VOCAB_PROMPT = [
+  'Clinical dictation for an oncology nutrition weekly assessment.',
+  'Expect these terms: albumin, prealbumin, creatinine, urea, CRP, MUAC,',
+  'mid-upper arm circumference, hand grip strength, dynamometer, ECOG,',
+  'oral intake, supplement compliance, adherence, sarcopenia, cachexia,',
+  'enteral, parenteral, nasogastric, kilocalories per kilogram,',
+  'grams per kilogram, grams per decilitre, milligrams per decilitre.',
+  'Regimens: FOLFOX, FOLFIRINOX, AC, oxaliplatin, cisplatin, carboplatin,',
+  'doxorubicin, cyclophosphamide, paclitaxel, docetaxel, pemetrexed,',
+  'pembrolizumab, nivolumab, atezolizumab, durvalumab, bortezomib,',
+  'capecitabine, gemcitabine, trastuzumab, anthracycline, taxane,',
+  'alpha-lipoic acid.',
+  'Numbers are spoken plainly, for example "weight fifty five point seven",',
+  '"albumin three point five", "week four", "oral intake sixty percent".'
+].join(' ');
+
+app.post('/api/transcribe', authenticateToken, async (req, res) => {
+  if (!OPENAI_KEY) {
+    // 503 rather than 500: the client reads this as "fall back to the browser
+    // engine", not "something is broken".
+    return res.status(503).json({ error: 'STT_UNAVAILABLE', detail: 'OPENAI_API_KEY is not set' });
+  }
+  const { audio, mimeType } = req.body || {};
+  if (!audio) return res.status(400).json({ error: 'No audio supplied.' });
+
+  try {
+    const buf = Buffer.from(audio, 'base64');
+    if (!buf.length) return res.status(400).json({ error: 'Empty audio.' });
+    // OpenAI caps uploads at 25MB; a minute of opus is a few hundred KB, so
+    // hitting this means something is wrong with the recording, not the speech.
+    if (buf.length > 24 * 1024 * 1024) {
+      return res.status(413).json({ error: 'Recording too long. Please dictate in shorter bursts.' });
+    }
+    const type = (mimeType && String(mimeType).split(';')[0]) || 'audio/webm';
+    const ext  = type.indexOf('ogg') >= 0 ? 'ogg' : type.indexOf('mp4') >= 0 ? 'mp4' : 'webm';
+
+    const form = new FormData();
+    form.append('file', new Blob([buf], { type }), 'dictation.' + ext);
+    form.append('model', STT_MODEL);
+    form.append('language', 'en');
+    form.append('prompt', STT_VOCAB_PROMPT);
+    form.append('response_format', 'json');
+
+    const r = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + OPENAI_KEY },
+      body: form
+    });
+    const body = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      const detail = (body && body.error && body.error.message) || ('HTTP ' + r.status);
+      console.error('[transcribe]', detail);
+      return res.status(502).json({ error: 'Transcription failed', detail });
+    }
+    const transcript = (body.text || '').trim();
+    if (!transcript) return res.json({ transcript: '', confidence: null, empty: true });
+    // This API returns no confidence score, so there is nothing honest to report.
+    // The review step is what catches errors here, not a number.
+    res.json({ transcript, confidence: null });
+  } catch (e) {
+    console.error('[transcribe]', e.message);
+    res.status(500).json({ error: 'Transcription failed', detail: e.message });
+  }
+});
+
+// Lets the client pick an engine before recording a single byte.
+app.get('/api/speech-status', authenticateToken, (req, res) => {
+  res.json({
+    available: !!OPENAI_KEY,
+    provider: OPENAI_KEY ? 'openai' : null,
+    model: OPENAI_KEY ? STT_MODEL : null,
+    reason: OPENAI_KEY ? null : 'OPENAI_API_KEY is not set'
+  });
+});
+
+// Free-form dictation from the assistant. One utterance may declare an intent
+// ("I want to fill the weekly report"), carry values, or both. This works out
+// which and pulls out whatever was actually said.
+const dictateRouterPrompt = `You route and transcribe spoken clinical input for an oncology nutrition platform. You transcribe; you never diagnose, estimate or complete.
+Return ONLY valid JSON. START with '{' and END with '}'. NO preamble, NO markdown, NO code fences.
+
+THE ONE RULE THAT OVERRIDES EVERYTHING ELSE:
+Return a value ONLY if the speaker actually said it. Never infer, estimate, carry over or supply a typical value. If it was not said, return null.
+These values drive a nutrition prescription that is manufactured and dispensed. A null is safe; a plausible guess is not.
+
+STEP 1 — INTENT. Set "intent" to exactly one of:
+- "weekly"  : they want to record, or are reciting, a WEEKLY monitoring assessment (week number, weight, MUAC, grip, ECOG, labs, intake, adherence).
+- "profile" : they want to record, or are reciting, the patient's CLINICAL PROFILE / intake details (diagnosis, regimen, stage, height, baseline labs).
+- "chat"    : anything else — a question, a request, small talk, or unclear.
+If they only announce an intention ("I want to fill the weekly report") with no values yet, still set intent to "weekly" and leave every field null.
+
+STEP 2 — EXTRACT whatever values were spoken, into the matching object.
+
+SPOKEN NUMBER HANDLING:
+- Words become digits: "three point five" -> 3.5, "fifty five point seven" -> 55.7, "one twenty" -> 120.
+- Strip spoken units: "fifty five point seven kilos" -> 55.7.
+- "percent" is a unit, not part of the number: "intake sixty percent" -> 60.
+- If a number is genuinely ambiguous between two readings, return null rather than choosing.
+- oralIntake is a PERCENTAGE OF REQUIREMENT. "eating about half" -> 50. A stated deficit ("intake down forty percent") converts to the remainder -> 60.
+- ecog is an integer 0 to 4 only.
+- interruptions must be exactly one of "None","Dose Delay","Dose Reduction","RT Interruption","Treatment Held","Hospitalisation", else null.
+
+STEP 3 — "reply": one short sentence to show the clinician, in plain British English. If intent is "weekly" or "profile" and no values were spoken, invite them to dictate the values. If values were spoken, say what you captured in general terms. If intent is "chat", answer or acknowledge briefly. Never invent clinical advice here.
+
+Schema, all keys always present:
+{"intent":"weekly|profile|chat",
+ "reply":"string",
+ "weekly":{"week":null,"weight":null,"muac":null,"handGrip":null,"ecog":null,"albumin":null,"crp":null,"glucose":null,"creatinine":null,"urea":null,"oralIntake":null,"compliance":null,"interruptions":null,"notes":null},
+ "profile":{"name":null,"age":null,"sex":null,"weight":null,"height":null,"muac":null,"cancer":null,"regimen":null,"cancerStage":null,"ecogStatus":null,"albumin":null,"crp":null,"creatinine":null,"urea":null,"bloodSugar":null,"hemoglobin":null,"reducedFoodIntake":null}}`;
+
+const DICTATE_RANGE = {
+  week: [1, 60], weight: [20, 250], muac: [10, 60], handGrip: [1, 90],
+  ecog: [0, 4], albumin: [1, 6], crp: [0, 400], glucose: [30, 600],
+  creatinine: [0.1, 15], urea: [2, 300], oralIntake: [0, 100], compliance: [0, 100],
+  age: [0, 120], height: [50, 250], ecogStatus: [0, 4], bloodSugar: [30, 600],
+  hemoglobin: [2, 25], reducedFoodIntake: [0, 100]
+};
+
+// Implausible values are flagged for the clinician, never silently dropped —
+// discarding a real reading is as bad as accepting a mis-heard one.
+function _sanitiseDictated(obj) {
+  const suspect = [];
+  if (!obj || typeof obj !== 'object') return { fields: {}, suspect };
+  Object.keys(obj).forEach(k => {
+    const v = obj[k];
+    if (v === null || v === undefined || v === '') return;
+    if (!DICTATE_RANGE[k]) return;              // free-text field, leave as-is
+    const n = parseFloat(v);
+    if (isNaN(n)) { obj[k] = null; return; }
+    if (n < DICTATE_RANGE[k][0] || n > DICTATE_RANGE[k][1]) suspect.push(k);
+    obj[k] = n;
+  });
+  return { fields: obj, suspect };
+}
+
+app.post('/api/dictate', authenticateToken, async (req, res) => {
+  const { transcript } = req.body || {};
+  if (!transcript || !String(transcript).trim()) {
+    return res.status(400).json({ error: 'No transcript supplied.' });
+  }
+  try {
+    const msg = await anthropic.messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 900,
+      system: [{ type: "text", text: dictateRouterPrompt, cache_control: { type: "ephemeral" } }],
+      messages: [{ role: "user", content: String(transcript).slice(0, 4000) }]
+    });
+    let raw = (msg.content[0] && msg.content[0].text) || '';
+    raw = raw.replace(/^```(?:json)?\s*/m, '').replace(/```\s*$/m, '').trim();
+    const start = raw.indexOf('{');
+    if (start < 0) throw new Error('No JSON in model response');
+    const out = JSON.parse(raw.slice(start));
+
+    const intent = ['weekly', 'profile', 'chat'].includes(out.intent) ? out.intent : 'chat';
+    const picked = intent === 'weekly' ? out.weekly : intent === 'profile' ? out.profile : null;
+    const { fields, suspect } = _sanitiseDictated(picked || {});
+    const filled = Object.keys(fields).filter(k =>
+      fields[k] !== null && fields[k] !== undefined && fields[k] !== '');
+
+    res.json({
+      intent,
+      reply: out.reply || '',
+      fields,
+      suspect,
+      filledCount: filled.length,
+      heard: String(transcript).trim()
+    });
+  } catch (e) {
+    console.error('[dictate]', e.message);
+    res.status(500).json({ error: 'Could not read that back. Please try again or type it in.' });
+  }
+});
+
 app.post('/api/dictate-weekly', authenticateToken, async (req, res) => {
   const { transcript } = req.body || {};
   if (!transcript || !String(transcript).trim()) {
