@@ -87,7 +87,7 @@ const isApprover = (me.role === 'STORE_APPROVER');
 const params = new URLSearchParams(window.location.search);
 const jobId = params.get('job');
 
-initStore().then(() => {
+initStore({ plans: false }).then(() => {
 const jobs = (typeof manufacturingService !== 'undefined') ? manufacturingService.getJobs() : [];
 const job = jobs.find(j => j.id === jobId);
 

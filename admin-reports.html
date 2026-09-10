@@ -49,7 +49,7 @@
 
 <script>
 auth.requireRole(['SUPER_ADMIN', 'ADMIN']);
-initStore().then(() => {
+initStore({ plans: false }).then(() => {
   const patients = getPatients();
   const jobs = (typeof manufacturingService !== 'undefined') ? manufacturingService.getJobs() : [];
   document.getElementById('rpPatients').innerText = patients.length;

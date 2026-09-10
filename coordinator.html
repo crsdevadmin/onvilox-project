@@ -73,7 +73,7 @@ function render() {
   const tbody = document.getElementById('jobTable');
   tbody.innerHTML = '';
 
-  initStore().then(() => {
+  initStore({ plans: false }).then(() => {
     const allJobs = manufacturingService.getJobs();
     const dispatched = allJobs.filter(j => j.status === 'DISPATCHED');
 

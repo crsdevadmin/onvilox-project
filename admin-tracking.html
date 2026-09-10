@@ -359,7 +359,7 @@ function renderAndRefresh(){ render(); if(_trackDt) _trackDt.refresh(); }
 
 function _dbg(msg){ var m=document.getElementById('meta'); if(m) m.textContent=msg; console.log('[tracking] '+msg); }
 _dbg('Starting…');
-initStore().then(async function(){
+initStore({ plans: false }).then(async function(){
   _dbg('Data loaded. Patients in cache: ' + (typeof getPatients==='function' ? getPatients().length : 'getPatients missing'));
   try { if (typeof userService !== 'undefined' && userService.initUsers) await userService.initUsers(); } catch(e){ _dbg('initUsers error: '+e.message); }
   try { if (typeof storeService !== 'undefined' && storeService.initStores) await storeService.initStores(); } catch(e){ _dbg('initStores error: '+e.message); }

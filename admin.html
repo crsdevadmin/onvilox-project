@@ -88,7 +88,7 @@
 auth.requireRole(['SUPER_ADMIN', 'ADMIN']);
 
 // Load DB data first, then populate dashboard
-initStore().then(() => {
+initStore({ plans: false }).then(() => {
 const doctors = (typeof userService !== 'undefined') ? userService.getUsersByRole('DOCTOR') : [];
 const stores = (typeof storeService !== 'undefined') ? storeService.getStores() : [];
 const patients = getPatients();

@@ -6489,7 +6489,9 @@ async function _startRecording() {
     return;
   }
   var mime = '';
-  ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus'].some(function (m) {
+  // OpenAI's transcription endpoint accepts webm/mp4/m4a/mp3/wav but not ogg,
+  // so try mp4 before the ogg fallback Firefox would otherwise land on.
+  ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg;codecs=opus'].some(function (m) {
     if (window.MediaRecorder && MediaRecorder.isTypeSupported(m)) { mime = m; return true; }
     return false;
   });

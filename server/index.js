@@ -22,6 +22,13 @@ try {
 
 const path = require('path');
 
+// gzip every response. The app ships ~300 KB of HTML/CSS/JS per page load and the
+// JSON payloads are large too; text compresses ~70%. Wrapped in try/catch so a
+// missing module degrades to "uncompressed" rather than taking the server down.
+let compression = null;
+try { compression = require('compression'); }
+catch(e) { console.warn('compression unavailable — responses will be sent uncompressed:', e.message); }
+
 const app = express();
 const corsOptions = {
   origin: '*',
@@ -30,6 +37,7 @@ const corsOptions = {
 };
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
+if (compression) app.use(compression());
 app.use(express.json({ limit: '2mb' }));
 
 // Serve frontend static files (HTML, JS, CSS) from the project root.
@@ -3735,7 +3743,7 @@ Schema, all keys always present:
 // organisation's ban on service-account keys is satisfied rather than bypassed.
 const GCP_WIF_CONFIG = process.env.GCP_WIF_CONFIG || '';
 const OPENAI_KEY     = process.env.OPENAI_API_KEY || '';
-const STT_MODEL      = process.env.OPENAI_STT_MODEL || 'gpt-4o-transcribe';
+const STT_MODEL      = process.env.OPENAI_STT_MODEL || 'gpt-transcribe';
 
 let _gspeech = null, _sttProvider = null, _sttWhy = '';
 (function initSpeech() {

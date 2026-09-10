@@ -172,7 +172,7 @@ function fmtDate(d){
 function num(v){ const n = Math.round(parseFloat(v)); return isNaN(n) ? '—' : n; }
 function num1(v){ const n = Math.round(parseFloat(v)*10)/10; return isNaN(n) ? '—' : n; }
 
-initStore().then(() => {
+initStore({ plans: false }).then(() => {
   _job = manufacturingService.getJobs().find(j => j.id === jobId);
   if(!_job){ showErr('Job not found. Open this page from the store dashboard.'); return; }
   if(me.storeId && _job.storeId && _job.storeId !== me.storeId){ showErr('This job belongs to another store.'); return; }

@@ -19,12 +19,21 @@
 
   // Load all data from server into memory cache.
   // Call this once on page load before reading any data.
-  async function initStore() {
+  //
+  // opts.plans === false skips the /api/nutrition-plans fetch. That endpoint returns
+  // EVERY plan ever generated, each carrying the full engine output and the Claude
+  // report text, so it is the largest payload in the app and it grows forever. Only
+  // pages that call getPlans() / getLatestPlanForPatient() need it — currently
+  // doctor.html, Patient-Profile and patient-qr. Everywhere else it is dead weight
+  // on every page load. With it skipped, getPlans() falls back to localStorage, which
+  // is exactly where unsynced local plans live, so savePlan() and syncPending() keep
+  // working unchanged.
+  async function initStore(opts) {
+    const wantPlans = !(opts && opts.plans === false);
     try {
-      const [pRes, plRes] = await Promise.all([
-        fetch(_apiBase() + '/api/patients', { headers: _headers() }),
-        fetch(_apiBase() + '/api/nutrition-plans', { headers: _headers() })
-      ]);
+      const reqs = [fetch(_apiBase() + '/api/patients', { headers: _headers() })];
+      if (wantPlans) reqs.push(fetch(_apiBase() + '/api/nutrition-plans', { headers: _headers() }));
+      const [pRes, plRes] = await Promise.all(reqs);
       if (pRes.ok) {
         const apiPatients = await pRes.json();
         // Merge: include any locally-saved patients not yet confirmed by the API
@@ -42,19 +51,19 @@
       } else {
         _cache.patients = db.getTable('patients', []);
       }
-      if (plRes.ok) {
+      if (wantPlans && plRes && plRes.ok) {
         const apiPlans = await plRes.json();
         const localPlans = db.getTable('nutrition_plans', []);
         const apiPlanIds = new Set(apiPlans.map(p => p.id));
         const pendingLocalPlans = localPlans.filter(p => !apiPlanIds.has(p.id));
         _cache.plans = apiPlans.concat(pendingLocalPlans);
-      } else {
+      } else if (wantPlans) {
         _cache.plans = db.getTable('nutrition_plans', []);
       }
     } catch (e) {
       console.warn('initStore: server unreachable, falling back to localStorage:', e.message);
       _cache.patients = db.getTable('patients', []);
-      _cache.plans = db.getTable('nutrition_plans', []);
+      if (wantPlans) _cache.plans = db.getTable('nutrition_plans', []);
     }
     // Also init users, stores, jobs, mappings
     const inits = [];

@@ -82,41 +82,41 @@
     .b3-foot .mfgby { text-align:right;font-size:8px; } .b3-foot .mfgby .t { color:#64748b;text-transform:uppercase;font-size:7.5px; } .b3-foot .mfgby .n { font-weight:800;font-size:9px; }
 
     /* ---- Artwork pouch label 100 x 75 mm (single panel, matches print artwork) ---- */
-    .lbl2 { width:100mm; height:75mm; box-sizing:border-box; background:#fff; color:#111827; padding:2mm; font-family:Arial,Helvetica,sans-serif; margin:10px auto; overflow:hidden; }
+    .lbl2 { --a2s:1; width:100mm; height:75mm; box-sizing:border-box; background:#fff; color:#000; padding:2mm; font-family:Arial,Helvetica,sans-serif; margin:10px auto; overflow:hidden; }
     .lbl2 * { line-height:1.16; }
     .a2-bleed { height:100%; box-sizing:border-box; border:1.1px dashed #2f6f72; border-radius:2.5mm; padding:1.5mm; }
-    .a2-frame { height:100%; box-sizing:border-box; border:0.8px solid #b9aca4; padding:2mm 2.4mm; display:flex; gap:2.8mm; }
+    .a2-frame { height:100%; box-sizing:border-box; border:0.8px solid #8a8a8a; padding:2mm 2.4mm; display:flex; gap:2.8mm; }
     .a2-l { flex:1 1 0; min-width:0; display:flex; flex-direction:column; }
     .a2-r { width:38mm; flex:none; display:flex; flex-direction:column; }
-    .a2-h { font-size:8px; font-weight:800; letter-spacing:.05em; text-transform:uppercase; color:#111827; border-bottom:1px solid #111827; padding-bottom:0.5mm; margin-bottom:1mm; }
-    .a2-brand { font-size:6.5px; font-weight:800; letter-spacing:.14em; text-transform:uppercase; color:#111827; margin-bottom:1.5mm; }
-    .a2-name { font-size:11px; font-weight:800; margin-bottom:0.6mm; }
-    .a2-kv { display:grid; grid-template-columns:auto 1fr; gap:0.45mm 1.8mm; font-size:7.2px; }
-    .a2-kv .k { color:#555f6b; white-space:nowrap; }
-    .a2-kv .v { font-weight:700; color:#111827; }
+    .a2-h { font-size:calc(9.5px * var(--a2s)); font-weight:800; letter-spacing:.05em; text-transform:uppercase; color:#000; border-bottom:1.2px solid #000; padding-bottom:0.5mm; margin-bottom:1mm; }
+    .a2-brand { font-size:calc(8px * var(--a2s)); font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:#000; margin-bottom:1.5mm; }
+    .a2-name { font-size:calc(13px * var(--a2s)); font-weight:800; margin-bottom:0.8mm; }
+    .a2-kv { display:grid; grid-template-columns:auto 1fr; gap:0.7mm 1.8mm; font-size:calc(9px * var(--a2s)); }
+    .a2-kv .k { color:#000; white-space:nowrap; }
+    .a2-kv .v { font-weight:700; color:#000; }
     /* app.css styles bare th/td globally (font-size:13.5px, padding, colour). A rule on the
        bare element always beats a value inherited from .a2-nt, so the label has to restate
        its own type scale or the nutrition table renders ~2x too big and overflows 75mm. */
     .lbl2 table { width:100%; border-collapse:collapse; border-spacing:0; }
-    .lbl2 th, .lbl2 td { padding:0; margin:0; background:none; border:none; color:#111827;
-      font-size:7.2px; font-weight:400; letter-spacing:normal; text-transform:none;
+    .lbl2 th, .lbl2 td { padding:0; margin:0; background:none; border:none; color:#000;
+      font-size:calc(9px * var(--a2s)); font-weight:400; letter-spacing:normal; text-transform:none;
       white-space:normal; vertical-align:baseline; text-align:left; }
-    .a2-nt { width:100%; border-collapse:collapse; font-size:7.2px; margin-top:0.4mm; }
-    .a2-nt th { font-size:6.4px; font-weight:800; text-transform:uppercase; letter-spacing:.03em; color:#555f6b; text-align:right; padding:0 0 0.4mm; border-bottom:0.9px solid #111827; }
+    .a2-nt { width:100%; border-collapse:collapse; font-size:calc(9px * var(--a2s)); margin-top:0.4mm; }
+    .a2-nt th { font-size:calc(7.6px * var(--a2s)); font-weight:800; text-transform:uppercase; letter-spacing:.02em; color:#000; text-align:right; padding:0 0 0.5mm; border-bottom:1.2px solid #000; }
     .a2-nt th:first-child { text-align:left; }
-    .a2-nt td { padding:0.5mm 0; border-bottom:0.5px solid #e3e3e3; text-align:right; font-weight:800; }
-    .a2-nt td:first-child { text-align:left; font-weight:400; color:#333b45; }
+    .a2-nt td { padding:0.7mm 0; border-bottom:0.6px solid #9a9a9a; text-align:right; font-weight:800; }
+    .a2-nt td:first-child { text-align:left; font-weight:400; color:#000; }
     .a2-nt tr:last-child td { border-bottom:none; }
-    .a2-ing { font-size:6.9px; color:#111827; }
-    .a2-note { font-size:6.2px; color:#555f6b; margin-top:1mm; }
+    .a2-ing { font-size:calc(8.6px * var(--a2s)); color:#000; }
+    .a2-note { font-size:calc(7.6px * var(--a2s)); color:#000; margin-top:1.6mm; }
     .a2-reg { margin-top:auto; }
-    .a2-flav { font-size:6.6px; font-weight:800; letter-spacing:.01em; text-transform:uppercase; text-align:center; border-top:1.1px solid #111827; border-bottom:1.1px solid #111827; padding:0.6mm 0; margin-bottom:1.2mm; }
-    .a2-row { display:grid; grid-template-columns:auto 2.4mm 1fr; align-items:baseline; font-size:7px; margin-bottom:0.4mm; }
-    .a2-row .k { color:#111827; }
-    .a2-row .c { text-align:center; color:#111827; }
+    .a2-flav { font-size:calc(7.8px * var(--a2s)); font-weight:800; letter-spacing:.01em; text-transform:uppercase; text-align:center; border-top:1.2px solid #000; border-bottom:1.2px solid #000; padding:0.7mm 0; margin-bottom:1.3mm; }
+    .a2-row { display:grid; grid-template-columns:auto 2.4mm 1fr; align-items:baseline; font-size:calc(9px * var(--a2s)); margin-bottom:0.6mm; }
+    .a2-row .k { color:#000; }
+    .a2-row .c { text-align:center; color:#000; }
     .a2-row .v { font-weight:800; overflow-wrap:anywhere; }
     .a2-row.bold .k { font-weight:800; }
-    .a2-fine { font-size:5.9px; color:#555f6b; grid-column:1 / -1; }
+    .a2-fine { font-size:calc(7.6px * var(--a2s)); color:#000; grid-column:1 / -1; }
 
     /* Printing is handled entirely by JS (see _printLabels): it injects a fresh
        @page size + a static #__printRoot each time, so no @media print rules live
@@ -334,12 +334,12 @@
                 <tr><td>Fat (g)</td><td id="a2_ps_f">&mdash;</td><td id="a2_d_f">&mdash;</td></tr>
               </tbody>
             </table>
-            <div class="a2-note">Store in a cool, dry place, away from sunlight. Use under medical supervision. Not for parenteral use.</div>
           </div>
 
           <div class="a2-r">
             <div class="a2-h">Ingredients</div>
             <div class="a2-ing" id="a2_ing">&mdash;</div>
+            <div class="a2-note">Store in a cool, dry place, away from sunlight. Use under medical supervision. Not for parenteral use.</div>
             <div class="a2-reg">
               <div class="a2-flav">Contains permitted synthetic flavours</div>
               <div class="a2-row"><span class="k">FSSAI Lic. No.</span><span class="c">:</span><span class="v" id="a2_fssai">&mdash;</span></div>
@@ -1133,7 +1133,15 @@ function renderLabelModal(){
 // preview. The labels are copied with their already-rendered values via outerHTML.
 function _labelCss(){
   // Reuse the page's label styling, dropping any @media print block.
-  const css = (document.querySelector('style') || {}).textContent || '';
+  //
+  // Strip /* comments */ FIRST. This stylesheet mentions the words "@media print"
+  // inside a comment, and searching the raw text matched there: the sheet was cut
+  // mid-comment, leaving a dangling "/*" that swallowed every rule appended after
+  // it — the forced-black colour rule, the die-guide reset and @page size all went
+  // silently missing, so labels printed grey (which a thermal head dithers into
+  // broken speckle) at the wrong page size.
+  const css = ((document.querySelector('style') || {}).textContent || '')
+    .replace(/\/\*[\s\S]*?\*\//g, '');
   const i = css.indexOf('@media print');
   if(i < 0) return css;
   let depth = 1, k = css.indexOf('{', i) + 1;
@@ -1309,6 +1317,23 @@ function renderArtworkLabel(){
   const sName = (store && store.name) || '';
   const sAddr = (store && (store.address || store.location)) || '';
   _lblSet('a2_mfgby', sName ? ('Mfd by: ' + sName + (sAddr ? ', ' + sAddr : '')) : ' ');
+
+  _fitArtLabel();
+}
+
+// Ordinary labels print at full size. A label with an unusually long ingredient
+// declaration or indication steps the type down rather than clipping — the scale is
+// an inline style, so outerHTML carries it into the print window unchanged.
+function _fitArtLabel(){
+  const lbl = document.getElementById('lblArt');
+  const frame = lbl && lbl.querySelector('.a2-frame');
+  if(!frame) return;
+  const steps = [1, 0.94, 0.88, 0.82, 0.76];
+  for(let i = 0; i < steps.length; i++){
+    lbl.style.setProperty('--a2s', steps[i]);
+    // Reading scrollHeight forces the reflow, so every step is measured for real.
+    if(frame.scrollHeight <= frame.clientHeight + 1) return;
+  }
 }
 
 function printArtworkLabel(){ _ensureBatchThenPrint(() => _printLabels(['lblArt'], 100, 75)); }
@@ -1626,7 +1651,7 @@ if ('serviceWorker' in navigator) {
 }
 
 // Start polling after page loads
-initStore().then(() => {
+initStore({ plans: false }).then(() => {
   render();
   // Rows exist now — jump back to the patient the user came from.
   setTimeout(restoreQueueScroll, 60);
