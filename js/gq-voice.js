@@ -54,7 +54,7 @@
     var CAL = 400,
         QUIET = opts.quietMs || 1500,
         MIN_SPEECH = 500,
-        NOSPEECH = opts.noSpeechMs || 10000;
+        NOSPEECH = opts.noSpeechMs || 7000;
     var started = Date.now(), last = started, dead = false, timer = null;
     var fSum = 0, fN = 0, floor = null, on = 0.012, off = 0.007;
     var spokeMs = 0, quietSince = null;
@@ -78,12 +78,21 @@
         fSum += rms; fN++;
         if (now - started >= CAL) {
           floor = fN ? fSum / fN : 0;
-          on  = Math.max(0.012, floor * 3.0);
-          off = Math.max(0.007, floor * 1.7);
+          // Was floor*3.0 / 0.012, which a normal speaking voice on a laptop mic
+          // often never reached — so the turn only ended on the no-speech timeout
+          // and it felt like it was ignoring you unless you shouted.
+          on  = Math.max(0.006, floor * 2.0);
+          off = Math.max(0.0035, floor * 1.3);
         }
         if (onLevel) onLevel(rms, on);
         timer = setTimeout(tick, 80);
         return;
+      }
+      // Adapt downward: if nothing has crossed the bar yet but the level is
+      // consistently above the room, the bar is simply set too high for this mic.
+      if (spokeMs === 0 && rms > floor * 1.5 && now - started > 1200) {
+        on  = Math.max(0.005, Math.min(on, rms * 0.75));
+        off = Math.max(0.003, on * 0.6);
       }
       if (rms > on) { spokeMs += dt; quietSince = null; }
       else if (rms < off) {
@@ -144,7 +153,18 @@
     _abort = false;
     return available().then(function (ok) {
       if (!ok) throw new Error('Speech is not available on this account or browser.');
-      return navigator.mediaDevices.getUserMedia({ audio: true });
+      // autoGainControl is the single biggest win for a quiet speaker: the browser
+      // lifts a soft voice to a usable level before we ever see it, so the doctor
+      // does not have to raise their voice for the level detector to notice them.
+      return navigator.mediaDevices.getUserMedia({
+        audio: {
+          autoGainControl: true,
+          noiseSuppression: true,
+          echoCancellation: true
+        }
+      }).catch(function () {
+        return navigator.mediaDevices.getUserMedia({ audio: true });   // older browsers
+      });
     }).then(function (stream) {
       _stream = stream;
       var mime = '';

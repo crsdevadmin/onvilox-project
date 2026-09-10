@@ -103,12 +103,16 @@
   }
 
   function matchOption(text, options) {
-    var t = String(text || '').toLowerCase();
+    var t = String(text || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ');
     var best = null, bestLen = 0;
     options.forEach(function (o) {
       (o.match || [o.value]).forEach(function (k) {
-        var kk = String(k).toLowerCase();
-        if (t.indexOf(kk) >= 0 && kk.length > bestLen) { best = o.value; bestLen = kk.length; }
+        var kk = String(k).toLowerCase().trim();
+        if (!kk) return;
+        // Whole words only. A plain substring test matches "male" inside
+        // "female", which is the wrong answer to a question about sex.
+        var re = new RegExp('(^|\\s)' + kk.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '($|\\s)');
+        if (re.test(t) && kk.length > bestLen) { best = o.value; bestLen = kk.length; }
       });
     });
     return best;
@@ -120,8 +124,10 @@
     { id: 'uhic',        ask: 'What is the U-H-I-C number?', type: 'id', optional: true },
     { id: 'age',         ask: 'Age?',        type: 'number', min: 0,  max: 120 },
     { id: 'sex',         ask: 'Male or female?', type: 'option',
-      options: [{ value: 'Male', match: ['male', 'man', 'gentleman'] },
-                { value: 'Female', match: ['female', 'woman', 'lady'] }] },
+      // "male" and "mail" are homophones and transcribers pick either; "m"/"f"
+      // are what people actually say when re-asked.
+      options: [{ value: 'Male', match: ['male', 'mail', 'man', 'gentleman', 'boy', 'm', 'he'] },
+                { value: 'Female', match: ['female', 'femail', 'woman', 'lady', 'girl', 'f', 'she'] }] },
     { id: 'weight',      ask: 'Current weight in kilograms?', type: 'number', min: 20, max: 250 },
     { id: 'height',      ask: 'Height in centimetres?',       type: 'number', min: 50, max: 250 },
     { id: 'cancerInput', ask: 'What is the diagnosis?', type: 'text' },
@@ -213,6 +219,7 @@
       heard = await GqVoice.listen({
         quietMs: 1500,
         maxMs: 20000,
+        noSpeechMs: 6000,
         onStatus: function (s) { _status(s === 'listening' ? 'Listening…' : 'Transcribing…'); },
         onLevel: function (rms, on) { _status('Listening  ' + GqVoice.levelBar(rms, on)); }
       });
