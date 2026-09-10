@@ -1513,19 +1513,23 @@ function _pollJobs() {
 // Browsers won't let Notifications play a custom sound, so we synthesize our
 // own tone. 'pending' = an urgent rising 3-note chime that signals "something
 // needs YOUR action"; 'info' = a softer 2-note ping for status updates.
-let _audioCtx = null;
+let _audioCtx = null, _audioGesture = false;
 function _ensureAudio() {
   try {
     const Ctx = window.AudioContext || window.webkitAudioContext;
-    if (!Ctx) return null;
+    // Chrome's autoplay policy blocks an AudioContext built before the first user
+    // gesture, and logs a console warning for it. The poller can fire a chime while
+    // the page is still untouched, so wait for a gesture rather than build a context
+    // that is guaranteed to stay suspended and make no sound anyway.
+    if (!Ctx || !_audioGesture) return null;
     if (!_audioCtx) _audioCtx = new Ctx();
     if (_audioCtx.state === 'suspended') _audioCtx.resume();
     return _audioCtx;
   } catch(e) { return null; }
 }
-// Resume audio on the first user interaction (autoplay policy requirement).
+// First user interaction unlocks audio for the rest of the session.
 ['click','keydown','touchstart'].forEach(ev =>
-  window.addEventListener(ev, _ensureAudio, { once: true }));
+  window.addEventListener(ev, function(){ _audioGesture = true; _ensureAudio(); }, { once: true }));
 
 function _playChime(kind) {
   const ctx = _ensureAudio();
