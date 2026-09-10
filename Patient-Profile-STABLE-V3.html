@@ -3856,7 +3856,16 @@
             const latest = getLatestPlanForPatient(window.patient.id);
             if (latest) {
               const fp = latest.finalPlan || latest.engineOutput || latest;
-              const hasRecipe = fp.recipe && Array.isArray(fp.recipe) && fp.recipe.length > 0;
+              // buildFormulationOptions() returns an OBJECT ({protein, carb, fat, omega,
+              // bcaa, glutamine, recipeKcal...}), never an array — store.html and
+              // label-print.html both read it that way. Testing Array.isArray() here
+              // could therefore never be true, so EVERY page load decided the plan was
+              // broken, regenerated it, overwrote finalPlan, appended to overrideNotes
+              // and PUT the whole thing back to the server. Accept either shape.
+              const _rcp = fp.recipe;
+              const hasRecipe = !!_rcp && (Array.isArray(_rcp)
+                ? _rcp.length > 0
+                : Object.keys(_rcp).length > 0);
               const hasSafety = fp.safetyAlerts && Array.isArray(fp.safetyAlerts) && fp.safetyAlerts.length > 0;
 
               // Only return if it has calories AND a valid recipe/safety (unless it's a 0-calorie edge case)
@@ -3867,7 +3876,10 @@
               const engineOutput = generateNutritionPlan(window.patient);
               latest.finalPlan = Object.assign({}, engineOutput);
               latest.engineOutput = engineOutput;
-              latest.overrideNotes = (latest.overrideNotes || '') + '; Auto-repair: Engine hardening applied';
+              var _note = 'Auto-repair: Engine hardening applied';
+              if ((latest.overrideNotes || '').indexOf(_note) < 0) {
+                latest.overrideNotes = (latest.overrideNotes ? latest.overrideNotes + '; ' : '') + _note;
+              }
               updatePlan(latest);
               return latest;
             }
