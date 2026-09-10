@@ -81,43 +81,6 @@
     .b3-foot .reg .r .k { color:#64748b; } .b3-foot .reg .r .vv { font-weight:800; }
     .b3-foot .mfgby { text-align:right;font-size:8px; } .b3-foot .mfgby .t { color:#64748b;text-transform:uppercase;font-size:7.5px; } .b3-foot .mfgby .n { font-weight:800;font-size:9px; }
 
-    /* ---- Artwork pouch label 100 x 75 mm (single panel, matches print artwork) ---- */
-    .lbl2 { width:100mm; height:75mm; box-sizing:border-box; background:#fff; color:#111827; padding:2mm; font-family:Arial,Helvetica,sans-serif; margin:10px auto; overflow:hidden; }
-    .lbl2 * { line-height:1.16; }
-    .a2-bleed { height:100%; box-sizing:border-box; border:1.1px dashed #2f6f72; border-radius:2.5mm; padding:1.5mm; }
-    .a2-frame { height:100%; box-sizing:border-box; border:0.8px solid #b9aca4; padding:2mm 2.4mm; display:flex; gap:2.8mm; }
-    .a2-l { flex:1 1 0; min-width:0; display:flex; flex-direction:column; }
-    .a2-r { width:38mm; flex:none; display:flex; flex-direction:column; }
-    .a2-h { font-size:8px; font-weight:800; letter-spacing:.05em; text-transform:uppercase; color:#111827; border-bottom:1px solid #111827; padding-bottom:0.5mm; margin-bottom:1mm; }
-    .a2-brand { font-size:6.5px; font-weight:800; letter-spacing:.14em; text-transform:uppercase; color:#111827; margin-bottom:1.5mm; }
-    .a2-name { font-size:11px; font-weight:800; margin-bottom:0.6mm; }
-    .a2-kv { display:grid; grid-template-columns:auto 1fr; gap:0.45mm 1.8mm; font-size:7.2px; }
-    .a2-kv .k { color:#555f6b; white-space:nowrap; }
-    .a2-kv .v { font-weight:700; color:#111827; }
-    /* app.css styles bare th/td globally (font-size:13.5px, padding, colour). A rule on the
-       bare element always beats a value inherited from .a2-nt, so the label has to restate
-       its own type scale or the nutrition table renders ~2x too big and overflows 75mm. */
-    .lbl2 table { width:100%; border-collapse:collapse; border-spacing:0; }
-    .lbl2 th, .lbl2 td { padding:0; margin:0; background:none; border:none; color:#111827;
-      font-size:7.2px; font-weight:400; letter-spacing:normal; text-transform:none;
-      white-space:normal; vertical-align:baseline; text-align:left; }
-    .a2-nt { width:100%; border-collapse:collapse; font-size:7.2px; margin-top:0.4mm; }
-    .a2-nt th { font-size:6.4px; font-weight:800; text-transform:uppercase; letter-spacing:.03em; color:#555f6b; text-align:right; padding:0 0 0.4mm; border-bottom:0.9px solid #111827; }
-    .a2-nt th:first-child { text-align:left; }
-    .a2-nt td { padding:0.5mm 0; border-bottom:0.5px solid #e3e3e3; text-align:right; font-weight:800; }
-    .a2-nt td:first-child { text-align:left; font-weight:400; color:#333b45; }
-    .a2-nt tr:last-child td { border-bottom:none; }
-    .a2-ing { font-size:6.9px; color:#111827; }
-    .a2-note { font-size:6.2px; color:#555f6b; margin-top:1mm; }
-    .a2-reg { margin-top:auto; }
-    .a2-flav { font-size:6.6px; font-weight:800; letter-spacing:.01em; text-transform:uppercase; text-align:center; border-top:1.1px solid #111827; border-bottom:1.1px solid #111827; padding:0.6mm 0; margin-bottom:1.2mm; }
-    .a2-row { display:grid; grid-template-columns:auto 2.4mm 1fr; align-items:baseline; font-size:7px; margin-bottom:0.4mm; }
-    .a2-row .k { color:#111827; }
-    .a2-row .c { text-align:center; color:#111827; }
-    .a2-row .v { font-weight:800; overflow-wrap:anywhere; }
-    .a2-row.bold .k { font-weight:800; }
-    .a2-fine { font-size:5.9px; color:#555f6b; grid-column:1 / -1; }
-
     /* Printing is handled entirely by JS (see _printLabels): it injects a fresh
        @page size + a static #__printRoot each time, so no @media print rules live
        here. Keeping rules here previously fought the injected ones and forced the
@@ -240,22 +203,6 @@
       <button class="btn-primary" id="lblGenBtn" onclick="generateLabelBatch()" style="padding:8px 14px;border-radius:6px;">Save Date &amp; Generate Batch</button>
       <button class="btn-secondary" id="lblPrintBtn" onclick="printLabelsSmall()" style="padding:8px 14px;border-radius:6px;" disabled>🖨️ Print Pouch Labels (100×75)</button>
       <button class="btn-secondary" id="lblPrintBoxBtn" onclick="printBoxLabel()" style="padding:8px 14px;border-radius:6px;" disabled>🖨️ Print Box Label</button>
-      <button class="btn-secondary" id="lblPrintArtBtn" onclick="printArtworkLabel()" style="padding:8px 14px;border-radius:6px;" disabled>🖨️ Print Pouch Label (Artwork)</button>
-    </div>
-    <div class="lbl-modal-chrome" style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:6px;border-top:1px solid #e2e8f0;padding-top:10px;">
-      <div style="display:flex;flex-direction:column;gap:3px;">
-        <label style="font-size:11px;color:#334155;font-weight:600;">Net weight (g)</label>
-        <input id="lblNetWt" type="number" min="0" step="1" oninput="artInputChanged('net')" style="width:96px;padding:7px;border:1px solid #cbd5e1;border-radius:6px;">
-      </div>
-      <div style="display:flex;flex-direction:column;gap:3px;">
-        <label style="font-size:11px;color:#334155;font-weight:600;">M.R.P (Rs.)</label>
-        <input id="lblMrp" type="number" min="0" step="0.01" oninput="artInputChanged('mrp')" style="width:96px;padding:7px;border:1px solid #cbd5e1;border-radius:6px;">
-      </div>
-      <div style="display:flex;flex-direction:column;gap:3px;">
-        <label style="font-size:11px;color:#334155;font-weight:600;">U.S.P per g (Rs.)</label>
-        <input id="lblUsp" type="number" min="0" step="0.01" oninput="artInputChanged('usp')" style="width:110px;padding:7px;border:1px solid #cbd5e1;border-radius:6px;">
-      </div>
-      <div style="font-size:11px;color:#64748b;max-width:210px;line-height:1.35;">Printed on the artwork pouch label. U.S.P fills itself from M.R.P ÷ net weight until you type your own.</div>
     </div>
     <div class="lbl-modal-chrome" id="lblBatchInfo" style="font-size:12.5px;color:#0f172a;margin-bottom:6px;"></div>
 
@@ -302,56 +249,6 @@
             <div class="t">Manufactured by</div>
             <div class="n" id="lb_storename">—</div>
             <div id="lb_storeaddr"></div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ARTWORK POUCH LABEL 100 x 75 mm (single panel) -->
-    <div class="lbl-cap lbl-modal-chrome">Pouch label (artwork) &middot; 100 &times; 75 mm</div>
-    <div class="lbl2" id="lblArt">
-      <div class="a2-bleed">
-        <div class="a2-frame">
-          <div class="a2-l">
-            <div class="a2-brand">Gquence &middot; Therapeutic Nutrition</div>
-            <div class="a2-h">Patient Information</div>
-            <div class="a2-name" id="a2_name">&mdash;</div>
-            <div class="a2-kv">
-              <div class="k">UHIC</div><div class="v" id="a2_uhic">&mdash;</div>
-              <div class="k">Age / Sex</div><div class="v" id="a2_agesex">&mdash;</div>
-              <div class="k">Indication</div><div class="v" id="a2_cancer">&mdash;</div>
-              <div class="k">Route</div><div class="v" id="a2_route">&mdash;</div>
-              <div class="k">Servings / day</div><div class="v" id="a2_serv">&mdash;</div>
-              <div class="k">Prescription</div><div class="v" id="a2_rx">&mdash;</div>
-            </div>
-            <div class="a2-h" style="margin-top:1.6mm;">Nutrition Column</div>
-            <table class="a2-nt">
-              <thead><tr><th>Nutrient</th><th>Per serving</th><th>Per day</th></tr></thead>
-              <tbody>
-                <tr><td>Energy (kcal)</td><td id="a2_ps_e">&mdash;</td><td id="a2_d_e">&mdash;</td></tr>
-                <tr><td>Protein (g)</td><td id="a2_ps_p">&mdash;</td><td id="a2_d_p">&mdash;</td></tr>
-                <tr><td>Carbohydrate (g)</td><td id="a2_ps_c">&mdash;</td><td id="a2_d_c">&mdash;</td></tr>
-                <tr><td>Fat (g)</td><td id="a2_ps_f">&mdash;</td><td id="a2_d_f">&mdash;</td></tr>
-              </tbody>
-            </table>
-            <div class="a2-note">Store in a cool, dry place, away from sunlight. Use under medical supervision. Not for parenteral use.</div>
-          </div>
-
-          <div class="a2-r">
-            <div class="a2-h">Ingredients</div>
-            <div class="a2-ing" id="a2_ing">&mdash;</div>
-            <div class="a2-reg">
-              <div class="a2-flav">Contains permitted synthetic flavours</div>
-              <div class="a2-row"><span class="k">FSSAI Lic. No.</span><span class="c">:</span><span class="v" id="a2_fssai">&mdash;</span></div>
-              <div class="a2-row"><span class="k">Batch No.</span><span class="c">:</span><span class="v" id="a2_batch">&mdash;</span></div>
-              <div class="a2-row"><span class="k">Mfg. Date</span><span class="c">:</span><span class="v" id="a2_mfg">&mdash;</span></div>
-              <div class="a2-row"><span class="k">Exp. Date</span><span class="c">:</span><span class="v" id="a2_exp">&mdash;</span></div>
-              <div class="a2-row bold"><span class="k">Net weight</span><span class="c">:</span><span class="v" id="a2_net">&mdash;</span></div>
-              <div class="a2-row bold"><span class="k">Max. Retail Price</span><span class="c">:</span><span class="v" id="a2_mrp">&mdash;</span></div>
-              <div class="a2-row"><span class="a2-fine">(inclusive of all taxes)</span></div>
-              <div class="a2-row bold"><span class="k">U.S.P / g</span><span class="c">:</span><span class="v" id="a2_usp">&mdash;</span></div>
-              <div class="a2-row"><span class="a2-fine" id="a2_mfgby">&nbsp;</span></div>
-            </div>
           </div>
         </div>
       </div>
@@ -1034,8 +931,6 @@ async function openLabelModal(jobId){
   // Always enable print buttons — batch will be auto-assigned on first print if not yet done
   document.getElementById('lblPrintBtn').disabled = false;
   document.getElementById('lblPrintBoxBtn').disabled = false;
-  document.getElementById('lblPrintArtBtn').disabled = false;
-  _artFillInputs(); _artRecalcUsp(); renderArtworkLabel();
   if(job.batchNo) showLblBatchInfo();
   document.getElementById('labelOverlay').style.display = 'flex';
 }
@@ -1055,9 +950,6 @@ function renderLabelModal(){
                                   : (_r && _r.recipeKcal ? _r.recipeKcal : Math.round(_onsKcal / _servings));
   const _psProtein = (_r && _r.wheyProtein != null) ? Math.round(_r.wheyProtein / _servings) : plan.perServingProtein;
   const _dailyProtein = (_r && _r.wheyProtein != null) ? _r.wheyProtein : plan.dailyProtein;
-
-  _lblDerived = { psEnergy:_psEnergy, dEnergy:_heroKcal, psProtein:_psProtein, dProtein:_dailyProtein,
-                  psCarb:plan.macroCarbs, dCarb:plan.dailyCarbs, psFat:plan.macroFat, dFat:plan.dailyFat };
 
   _lblSet('lf_name', p.name || '—');
   document.getElementById('lf_meta').innerHTML =
@@ -1123,8 +1015,6 @@ function renderLabelModal(){
   _lblSet('x_exp', _lblFmtDate(job.expDate));
   _lblSet('x_storename', (store && store.name) || '—');
   document.getElementById('x_storeaddr').textContent = (store && (store.address || store.location)) || '';
-
-  renderArtworkLabel();
 }
 
 // Robust printing via a dedicated pop-up window. This is the most reliable method
@@ -1175,11 +1065,9 @@ function _printLabels(elementIds, w, h){
       // no trailing blank page — so the pouch always prints front + back as 2 pages.
       '.pg + .pg{page-break-before:always;break-before:page;}' +
       '.fit{width:' + w + 'mm;}' +
-      '.lbl,.lbl2,.lbl3{margin:0 !important;border:none !important;box-shadow:none !important;border-radius:0;' +
+      '.lbl,.lbl3{margin:0 !important;border:none !important;box-shadow:none !important;border-radius:0;' +
         'width:' + w + 'mm !important;height:auto !important;overflow:visible !important;}' +
-      '.lbl,.lbl2,.lbl3,.lbl *,.lbl2 *,.lbl3 *{color:#000 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}' +
-      // The dashed teal outline is a die/bleed guide for the screen only — never ink.
-      '.lbl2 .a2-bleed{border:none !important;border-radius:0 !important;padding:0 !important;}' +
+      '.lbl,.lbl3,.lbl *,.lbl3 *{color:#000 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}' +
       '@page{size:' + w + 'mm ' + h + 'mm;margin:0;}' +
     '</style></head><body>' + pages +
       '<scr' + 'ipt>' + fitScript + '</scr' + 'ipt>' +
@@ -1218,101 +1106,6 @@ async function _ensureBatchThenPrint(printFn){
   }
   printFn();
 }
-
-// ===== Artwork pouch label (single 100x75 panel) =====
-// Net weight / MRP / U.S.P per gram are typed at print time and remembered per job.
-let _lblDerived = null, _uspTouched = false;
-
-function _artKey(){ return 'gq_artlbl_' + (_lblJob ? _lblJob.id : 'x'); }
-function _artLoad(){
-  try { return JSON.parse(localStorage.getItem(_artKey()) || '{}'); } catch(e){ return {}; }
-}
-function _artSave(){
-  try {
-    localStorage.setItem(_artKey(), JSON.stringify({
-      net: document.getElementById('lblNetWt').value,
-      mrp: document.getElementById('lblMrp').value,
-      usp: document.getElementById('lblUsp').value
-    }));
-  } catch(e){}
-}
-function _artFillInputs(){
-  const s = _artLoad();
-  const netEl = document.getElementById('lblNetWt');
-  const mrpEl = document.getElementById('lblMrp');
-  const uspEl = document.getElementById('lblUsp');
-  if(!netEl) return;
-  // Prefill net weight from the batch recipe when the store hasn't typed one yet.
-  let suggested = '';
-  const r = (_lblPlan && _lblPlan.recipe && !Array.isArray(_lblPlan.recipe)) ? _lblPlan.recipe : null;
-  const ing = (r && Array.isArray(r.ingredients)) ? r.ingredients
-            : (r ? [r.protein, r.carb, r.fat, r.omega, r.bcaa, r.glutamine].filter(Boolean) : []);
-  const g = ing.reduce((a, c) => a + (parseFloat(c && c.grams) || 0), 0);
-  if(g > 0) suggested = String(Math.round(g));
-  netEl.value = s.net || suggested;
-  mrpEl.value = s.mrp || '';
-  uspEl.value = s.usp || '';
-  _uspTouched = !!s.usp;
-}
-function _artRecalcUsp(){
-  if(_uspTouched) return;
-  const net = parseFloat(document.getElementById('lblNetWt').value);
-  const mrp = parseFloat(document.getElementById('lblMrp').value);
-  document.getElementById('lblUsp').value =
-    (net > 0 && mrp > 0) ? (Math.round(mrp / net * 100) / 100).toFixed(2) : '';
-}
-function artInputChanged(which){
-  if(which === 'usp') _uspTouched = !!document.getElementById('lblUsp').value;
-  else _artRecalcUsp();
-  _artSave();
-  renderArtworkLabel();
-}
-
-function renderArtworkLabel(){
-  if(!_lblDerived || !document.getElementById('lblArt')) return;
-  const d = _lblDerived, p = _lblPatient, plan = _lblPlan, job = _lblJob, store = _lblStore;
-
-  _lblSet('a2_name', p.name || '—');
-  _lblSet('a2_uhic', p.uhic || '—');
-  _lblSet('a2_agesex', `${p.age ? p.age + ' yr' : '—'} / ${p.sex || '—'}`);
-  _lblSet('a2_cancer', p.cancer || '—');
-  _lblSet('a2_route', plan.prescribedRoute || 'Oral Feeding');
-  _lblSet('a2_serv', plan.servingsPerDay || '—');
-  _lblSet('a2_rx', _lblWeeklyRx ? ('Week ' + _lblWeeklyRx.week_number) : 'Initial plan');
-
-  _lblSet('a2_ps_e', _lblNum(d.psEnergy));   _lblSet('a2_d_e', _lblNum(d.dEnergy));
-  _lblSet('a2_ps_p', _lblNum(d.psProtein));  _lblSet('a2_d_p', _lblNum(d.dProtein));
-  _lblSet('a2_ps_c', _lblNum1(d.psCarb));    _lblSet('a2_d_c', _lblNum1(d.dCarb));
-  _lblSet('a2_ps_f', _lblNum1(d.psFat));     _lblSet('a2_d_f', _lblNum1(d.dFat));
-
-  // Ingredient declaration: names in descending order of weight, as the FSSAI rule expects.
-  const r = (plan && plan.recipe && !Array.isArray(plan.recipe)) ? plan.recipe : {};
-  const arr = (Array.isArray(r.ingredients) && r.ingredients.length)
-    ? r.ingredients.slice()
-    : [r.protein, r.carb, r.fat, r.omega, r.bcaa, r.glutamine].filter(Boolean);
-  arr.sort((a, b) => (parseFloat(b && b.grams) || 0) - (parseFloat(a && a.grams) || 0));
-  const names = arr.map(x => x && x.name).filter(Boolean);
-  _lblSet('a2_ing', names.length ? names.join(', ') + '.' : '—');
-
-  _lblSet('a2_fssai', (store && (store.fssai_number || store.fssai)) || '—');
-  _lblSet('a2_batch', job.batchNo || '—');
-  _lblSet('a2_mfg', _lblFmtDate(job.mfgDate));
-  _lblSet('a2_exp', _lblFmtDate(job.expDate));
-
-  const net = document.getElementById('lblNetWt') ? document.getElementById('lblNetWt').value : '';
-  const mrp = document.getElementById('lblMrp') ? document.getElementById('lblMrp').value : '';
-  const usp = document.getElementById('lblUsp') ? document.getElementById('lblUsp').value : '';
-  _lblSet('a2_net', net ? net + ' g' : '—');
-  _lblSet('a2_mrp', mrp ? 'Rs. ' + mrp : '—');
-  _lblSet('a2_usp', usp ? 'Rs. ' + usp : '—');
-
-  const sName = (store && store.name) || '';
-  const sAddr = (store && (store.address || store.location)) || '';
-  _lblSet('a2_mfgby', sName ? ('Mfd by: ' + sName + (sAddr ? ', ' + sAddr : '')) : ' ');
-}
-
-function printArtworkLabel(){ _ensureBatchThenPrint(() => _printLabels(['lblArt'], 100, 75)); }
-
 function printLabelsSmall(){ _ensureBatchThenPrint(() => _printLabels(['lblFront', 'lblBack'], 100, 75)); }
 function printBoxLabel(){ _ensureBatchThenPrint(() => { const s = _boxSize(); _printLabels(['lblBox'], s[0], s[1]); }); }
 

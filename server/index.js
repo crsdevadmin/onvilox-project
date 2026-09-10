@@ -3719,97 +3719,154 @@ Schema, all keys always present:
 {"week":null,"weight":null,"muac":null,"handGrip":null,"ecog":null,"albumin":null,"crp":null,"glucose":null,"creatinine":null,"urea":null,"oralIntake":null,"compliance":null,"interruptions":null,"notes":null}`;
 
 // ── Speech-to-Text ───────────────────────────────────────────────────────────
-// OpenAI rather than Google: Speech-to-Text has no API-key auth at all, and the
-// organisation blocks service-account key creation, so Google would have needed
-// workload identity federation. OpenAI authenticates with one header, costs
-// about a fifth as much, and takes a vocabulary prompt that does the same job as
-// Google's phrase boost.
+// Two providers, chosen at boot. Google is preferred when configured.
 //
-// No SDK — Node 20+ has fetch, FormData and Blob, so this is one HTTP call.
-const OPENAI_KEY = process.env.OPENAI_API_KEY || '';
-const STT_MODEL  = process.env.OPENAI_STT_MODEL || 'gpt-4o-transcribe';
+// GOOGLE, VIA WORKLOAD IDENTITY FEDERATION — worth understanding, because it is
+// how cloud-to-cloud auth should work and it needs no secret at all:
+//   1. This server runs on an EC2 instance that carries an AWS IAM role.
+//   2. google-auth-library reads temporary AWS credentials from the instance
+//      metadata service (169.254.169.254) — the same ones the AWS SDK uses.
+//   3. It signs an AWS GetCallerIdentity request with them and posts that to
+//      Google's STS, which verifies with AWS "is this really your role?".
+//   4. Google returns a federated token, which is exchanged for a short-lived
+//      access token impersonating a GCP service account.
+// Nothing downloadable exists. GCP_WIF_CONFIG holds no key — only the names of
+// the pool, provider and service account — so it is not a secret, and the
+// organisation's ban on service-account keys is satisfied rather than bypassed.
+const GCP_WIF_CONFIG = process.env.GCP_WIF_CONFIG || '';
+const OPENAI_KEY     = process.env.OPENAI_API_KEY || '';
+const STT_MODEL      = process.env.OPENAI_STT_MODEL || 'gpt-4o-transcribe';
 
-// Say so at boot. Without this the only symptom of a missing key is dictation
-// quietly using the worse engine, which looks like "the upgrade did nothing".
-console.log(OPENAI_KEY
-  ? 'Speech-to-Text ready (' + STT_MODEL + ')'
-  : 'Speech-to-Text: OPENAI_API_KEY not set — browser speech will be used');
+let _gspeech = null, _sttProvider = null, _sttWhy = '';
+(function initSpeech() {
+  if (GCP_WIF_CONFIG) {
+    try {
+      const speech = require('@google-cloud/speech');
+      const { GoogleAuth } = require('google-auth-library');
+      const cfg = JSON.parse(GCP_WIF_CONFIG);
+      if (cfg.type !== 'external_account') {
+        throw new Error('GCP_WIF_CONFIG is not an external_account config (type=' + cfg.type + ')');
+      }
+      const auth = new GoogleAuth({
+        credentials: cfg,
+        scopes: ['https://www.googleapis.com/auth/cloud-platform']
+      });
+      _gspeech = new speech.SpeechClient({ auth });
+      _sttProvider = 'google';
+      console.log('Speech-to-Text ready (Google, workload identity federation)');
+      return;
+    } catch (e) {
+      _sttWhy = 'Google WIF failed: ' + e.message;
+      console.warn('Speech-to-Text:', _sttWhy);
+    }
+  }
+  if (OPENAI_KEY) {
+    _sttProvider = 'openai';
+    console.log('Speech-to-Text ready (OpenAI, ' + STT_MODEL + ')');
+    return;
+  }
+  _sttWhy = _sttWhy || 'neither GCP_WIF_CONFIG nor OPENAI_API_KEY is set';
+  console.log('Speech-to-Text: ' + _sttWhy + ' — browser speech will be used');
+})();
 
-// Seeds the recogniser's vocabulary. Without this, "albumin" comes back as
-// "albumen" and "ECOG" as "eco". Written as a sentence because the prompt is
-// interpreted as preceding context, not as a word list.
-const STT_VOCAB_PROMPT = [
-  'Clinical dictation for an oncology nutrition weekly assessment.',
-  'Expect these terms: albumin, prealbumin, creatinine, urea, CRP, MUAC,',
-  'mid-upper arm circumference, hand grip strength, dynamometer, ECOG,',
-  'oral intake, supplement compliance, adherence, sarcopenia, cachexia,',
-  'enteral, parenteral, nasogastric, kilocalories per kilogram,',
-  'grams per kilogram, grams per decilitre, milligrams per decilitre.',
-  'Regimens: FOLFOX, FOLFIRINOX, AC, oxaliplatin, cisplatin, carboplatin,',
-  'doxorubicin, cyclophosphamide, paclitaxel, docetaxel, pemetrexed,',
-  'pembrolizumab, nivolumab, atezolizumab, durvalumab, bortezomib,',
-  'capecitabine, gemcitabine, trastuzumab, anthracycline, taxane,',
-  'alpha-lipoic acid.',
-  'Numbers are spoken plainly, for example "weight fifty five point seven",',
-  '"albumin three point five", "week four", "oral intake sixty percent".'
-].join(' ');
+// Primes the recogniser's vocabulary. Without it "albumin" comes back as
+// "albumen" and "ECOG" as "eco". Google takes a phrase list with a boost;
+// OpenAI takes a sentence of context. Same job, different shape.
+const SPEECH_PHRASES = [
+  'albumin', 'prealbumin', 'creatinine', 'urea', 'CRP', 'C reactive protein',
+  'MUAC', 'mid upper arm circumference', 'hand grip', 'dynamometer',
+  'ECOG', 'ECOG zero', 'ECOG one', 'ECOG two', 'ECOG three', 'ECOG four',
+  'oral intake', 'supplement compliance', 'adherence', 'sarcopenia', 'cachexia',
+  'enteral', 'parenteral', 'nasogastric', 'kilocalories per kilogram',
+  'grams per kilogram', 'grams per decilitre', 'milligrams per decilitre',
+  'FOLFOX', 'FOLFIRINOX', 'oxaliplatin', 'cisplatin', 'carboplatin',
+  'doxorubicin', 'cyclophosphamide', 'paclitaxel', 'docetaxel', 'pemetrexed',
+  'pembrolizumab', 'nivolumab', 'atezolizumab', 'durvalumab', 'bortezomib',
+  'capecitabine', 'gemcitabine', 'trastuzumab', 'anthracycline', 'taxane',
+  'alpha lipoic acid', 'week one', 'week two', 'week three', 'week four',
+  'week five', 'week six', 'week seven', 'week eight'
+];
+const STT_VOCAB_PROMPT =
+  'Clinical dictation for an oncology nutrition weekly assessment. Expect: ' +
+  SPEECH_PHRASES.join(', ') + '. Numbers are spoken plainly, for example ' +
+  '"weight fifty five point seven", "albumin three point five", "week four", ' +
+  '"oral intake sixty percent".';
+
+async function _transcribeGoogle(buf, type) {
+  const enc = type.indexOf('ogg') >= 0 ? 'OGG_OPUS' : 'WEBM_OPUS';
+  const [result] = await _gspeech.recognize({
+    config: {
+      encoding: enc,
+      sampleRateHertz: 48000,
+      languageCode: 'en-IN',
+      alternativeLanguageCodes: ['en-GB', 'en-US'],
+      model: 'latest_long',
+      useEnhanced: true,
+      enableAutomaticPunctuation: true,
+      speechContexts: [{ phrases: SPEECH_PHRASES, boost: 18 }]
+    },
+    audio: { content: buf.toString('base64') }
+  });
+  const transcript = (result.results || [])
+    .map(r => (r.alternatives && r.alternatives[0] && r.alternatives[0].transcript) || '')
+    .join(' ').trim();
+  const confidence = (result.results || []).reduce((m, r) => {
+    const c = r.alternatives && r.alternatives[0] && r.alternatives[0].confidence;
+    return (c != null && (m === null || c < m)) ? c : m;
+  }, null);
+  return { transcript, confidence };
+}
+
+async function _transcribeOpenAI(buf, type) {
+  const ext = type.indexOf('ogg') >= 0 ? 'ogg' : type.indexOf('mp4') >= 0 ? 'mp4' : 'webm';
+  const form = new FormData();
+  form.append('file', new Blob([buf], { type }), 'dictation.' + ext);
+  form.append('model', STT_MODEL);
+  form.append('language', 'en');
+  form.append('prompt', STT_VOCAB_PROMPT);
+  form.append('response_format', 'json');
+  const r = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+    method: 'POST', headers: { Authorization: 'Bearer ' + OPENAI_KEY }, body: form
+  });
+  const body = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error((body && body.error && body.error.message) || ('HTTP ' + r.status));
+  // This API returns no confidence, so report none rather than invent one.
+  return { transcript: (body.text || '').trim(), confidence: null };
+}
 
 app.post('/api/transcribe', authenticateToken, async (req, res) => {
-  if (!OPENAI_KEY) {
+  if (!_sttProvider) {
     // 503 rather than 500: the client reads this as "fall back to the browser
     // engine", not "something is broken".
-    return res.status(503).json({ error: 'STT_UNAVAILABLE', detail: 'OPENAI_API_KEY is not set' });
+    return res.status(503).json({ error: 'STT_UNAVAILABLE', detail: _sttWhy });
   }
   const { audio, mimeType } = req.body || {};
   if (!audio) return res.status(400).json({ error: 'No audio supplied.' });
-
   try {
     const buf = Buffer.from(audio, 'base64');
     if (!buf.length) return res.status(400).json({ error: 'Empty audio.' });
-    // OpenAI caps uploads at 25MB; a minute of opus is a few hundred KB, so
-    // hitting this means something is wrong with the recording, not the speech.
     if (buf.length > 24 * 1024 * 1024) {
       return res.status(413).json({ error: 'Recording too long. Please dictate in shorter bursts.' });
     }
     const type = (mimeType && String(mimeType).split(';')[0]) || 'audio/webm';
-    const ext  = type.indexOf('ogg') >= 0 ? 'ogg' : type.indexOf('mp4') >= 0 ? 'mp4' : 'webm';
-
-    const form = new FormData();
-    form.append('file', new Blob([buf], { type }), 'dictation.' + ext);
-    form.append('model', STT_MODEL);
-    form.append('language', 'en');
-    form.append('prompt', STT_VOCAB_PROMPT);
-    form.append('response_format', 'json');
-
-    const r = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-      method: 'POST',
-      headers: { Authorization: 'Bearer ' + OPENAI_KEY },
-      body: form
-    });
-    const body = await r.json().catch(() => ({}));
-    if (!r.ok) {
-      const detail = (body && body.error && body.error.message) || ('HTTP ' + r.status);
-      console.error('[transcribe]', detail);
-      return res.status(502).json({ error: 'Transcription failed', detail });
-    }
-    const transcript = (body.text || '').trim();
-    if (!transcript) return res.json({ transcript: '', confidence: null, empty: true });
-    // This API returns no confidence score, so there is nothing honest to report.
-    // The review step is what catches errors here, not a number.
-    res.json({ transcript, confidence: null });
+    const out = _sttProvider === 'google'
+      ? await _transcribeGoogle(buf, type)
+      : await _transcribeOpenAI(buf, type);
+    if (!out.transcript) return res.json({ transcript: '', confidence: null, empty: true });
+    res.json(out);
   } catch (e) {
     console.error('[transcribe]', e.message);
-    res.status(500).json({ error: 'Transcription failed', detail: e.message });
+    res.status(502).json({ error: 'Transcription failed', detail: e.message });
   }
 });
 
 // Lets the client pick an engine before recording a single byte.
 app.get('/api/speech-status', authenticateToken, (req, res) => {
   res.json({
-    available: !!OPENAI_KEY,
-    provider: OPENAI_KEY ? 'openai' : null,
-    model: OPENAI_KEY ? STT_MODEL : null,
-    reason: OPENAI_KEY ? null : 'OPENAI_API_KEY is not set'
+    available: !!_sttProvider,
+    provider: _sttProvider,
+    model: _sttProvider === 'openai' ? STT_MODEL : (_sttProvider === 'google' ? 'latest_long' : null),
+    reason: _sttProvider ? null : _sttWhy
   });
 });
 
