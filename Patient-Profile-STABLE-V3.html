@@ -695,6 +695,7 @@
       <div class="msg msg-ai">👋 Hi! I'm your <b>AI Assistance</b>. What can I do for you?<br><br>
         📋 <b>Paste clinical notes</b> and I'll fill the form automatically.<br>
         📎 <b>Upload a PDF report</b> using the 📎 button.<br>
+        🎙 <b>Or just talk</b> &mdash; tap the mic and say &ldquo;I want to fill the weekly report&rdquo;.<br>
         💬 <b>Ask me anything</b> about this patient's nutrition plan!
       </div>
     </div>
@@ -702,6 +703,8 @@
       <input type="file" id="pdfUpload" accept=".pdf" style="display:none;" onchange="handlePdfUpload(event)">
       <button class="ai-chat-send" onclick="triggerFileUpload()" title="Upload Medical Report (PDF)"
         style="font-size:16px; margin-right:5px;">📎</button>
+      <button class="ai-chat-send" id="chatDictBtn" onclick="toggleChatDictation()" title="Dictate"
+        style="font-size:16px; margin-right:5px; display:none;">🎙</button>
       <input type="text" class="ai-chat-input" id="chatInput" placeholder="Type or paste notes..."
         onkeypress="if(event.key==='Enter') sendChatMessage()">
       <button class="ai-chat-send" onclick="sendChatMessage()">➤</button>
@@ -6457,7 +6460,24 @@ async function _resolveEngine() {
   return _sttEngine;
 }
 
+// When dictation is driven from the AI Assistance chat the weekly panel may not
+// even be on screen, so progress is reported into the chat instead.
+var _chatDict = false, _chatStatusEl = null;
+
+function _chatDictSay(stage, heard) {
+  var host = document.getElementById('chatMsgs');
+  if (!host) return;
+  if (!_chatStatusEl || !_chatStatusEl.parentNode) {
+    _chatStatusEl = document.createElement('div');
+    _chatStatusEl.className = 'msg msg-ai';
+    host.appendChild(_chatStatusEl);
+  }
+  _chatStatusEl.innerText = heard ? (stage + '\n\u201C' + heard + '\u201D') : stage;
+  host.scrollTop = host.scrollHeight;
+}
+
 function _dictSet(stage, heard) {
+  if (_chatDict) { _chatDictSay(stage, heard); return; }
   var p = document.getElementById('dictPanel');
   var st = document.getElementById('dictStage');
   var hd = document.getElementById('dictHeard');
@@ -6560,10 +6580,100 @@ async function _transcribeBlob(blob) {
     if (body.confidence != null && body.confidence < 0.75) {
       _dictSet('Heard this, but not clearly — check every value', body.transcript);
     }
+    if (_chatDict) return _routeChatDictation(body.transcript);
     _sendDictation(body.transcript);
   } catch (e) {
     _dictSet('Could not transcribe', e.message + ' — please type the values instead.');
   }
+}
+
+// ── Free-style dictation from AI Assistance ─────────────────────
+// The mic in the chat is deliberately open-ended: the doctor may announce an
+// intention ("I want to fill the weekly report"), recite values, ask a question,
+// or all three. /api/dictate decides which, and only weekly values are ever
+// routed into the form — always through the same confirm step, never written
+// straight to fields.
+window.toggleChatDictation = async function toggleChatDictation() {
+  if (_recActive) { _chatDict ? _stopDictation() : null; return; }
+  _chatDict = true;
+  _chatStatusEl = null;
+  _dictText = '';
+  _dictProposal = null;
+
+  var engine = await _resolveEngine();
+  if (engine === 'server') return _startRecording();
+  return _startBrowserSpeech();
+};
+
+async function _routeChatDictation(text) {
+  _chatDictSay('Reading that back\u2026', text);
+  var u = (typeof auth !== 'undefined') ? auth.getCurrentUser() : {};
+  var token = u && u.token ? 'Bearer ' + u.token : '';
+  var apiBase = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : '';
+  var body;
+  try {
+    var res = await fetch(apiBase + '/api/dictate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': token },
+      body: JSON.stringify({ transcript: text })
+    });
+    body = await res.json();
+    if (!res.ok) throw new Error(body.error || 'Could not read that back');
+  } catch (e) {
+    // Never lose the words — drop them in the message box so nothing is retyped.
+    _chatDictSay(e.message + ' \u2014 the words are in the box below, send or edit them.', text);
+    _putInChatInput(text);
+    _chatDict = false;
+    return;
+  }
+
+  var input = document.getElementById('chatInput');
+
+  if (body.intent === 'weekly' && body.filledCount > 0) {
+    _chatDictSay(body.reply || ('Heard ' + body.filledCount + ' value'
+      + (body.filledCount === 1 ? '' : 's') + ' \u2014 opening the weekly form to check them.'), text);
+    if (input) input.value = '';
+    _dictProposal = body;
+    _chatDict = false;                 // the review panel is the weekly one again
+    _openWeeklyReview(body);
+  } else if (body.intent === 'weekly') {
+    // Intention announced, nothing said yet. Stay ready.
+    _chatDictSay(body.reply || 'Go ahead \u2014 press the mic again and say the values.', '');
+    _chatDict = false;
+  } else if (body.intent === 'profile') {
+    // No confirm-and-apply screen exists for the profile, so this is read back
+    // only. Putting it in the box beats silently discarding it.
+    _chatDictSay((body.reply || 'That sounds like profile detail.')
+      + ' Profile values are not filled by voice yet \u2014 the words are in the box below.', text);
+    _putInChatInput(text);
+    _chatDict = false;
+  } else {
+    // An ordinary question. Hand it to the assistant proper, which has the
+    // patient context this router does not — the doctor presses send.
+    _chatDictSay('Heard you. Press send to ask the assistant.', text);
+    _putInChatInput(text);
+    _chatDict = false;
+  }
+}
+
+function _putInChatInput(text) {
+  var input = document.getElementById('chatInput');
+  if (!input) return;
+  input.value = text;
+  try { input.focus(); } catch (e) {}
+}
+
+// Bring the weekly form into view and show the usual review panel, so the
+// confirm step a doctor sees is identical however dictation was started.
+function _openWeeklyReview(body) {
+  try { if (typeof showMonitorTab === 'function') showMonitorTab('weekly'); } catch (e) {}
+  var panel = document.getElementById('monPanelWeekly');
+  if (panel) panel.style.display = 'block';
+  var win = document.getElementById('aiChatWindow');
+  if (win) win.style.display = 'none';
+  _renderDictReview(body);
+  var p = document.getElementById('dictPanel');
+  if (p && p.scrollIntoView) p.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
 // ── Fallback path: browser recognition ────────────────────────────────────
@@ -6604,7 +6714,10 @@ function _startBrowserSpeech() {
   _rec.onend = function () {
     _recActive = false;
     _dictBtnState(false);
-    if (_dictText.trim()) _sendDictation(_dictText.trim());
+    if (_dictText.trim()) {
+      if (_chatDict) _routeChatDictation(_dictText.trim());
+      else _sendDictation(_dictText.trim());
+    }
   };
   try { _rec.start(); _recActive = true; }
   catch (e) { _dictBtnState(false); _recActive = false; }
@@ -6618,6 +6731,11 @@ function _stopDictation() {
 }
 
 function _dictBtnState(on) {
+  if (_chatDict) {
+    var cb = document.getElementById('chatDictBtn');
+    if (cb) { cb.innerText = on ? '\u23F9' : '\uD83C\uDF99'; cb.title = on ? 'Stop' : 'Dictate'; }
+    return;
+  }
   var b = document.getElementById('dictBtn');
   var i = document.getElementById('dictIcon');
   var l = document.getElementById('dictLabel');
@@ -6719,13 +6837,20 @@ window.applyDictation = function applyDictation() {
 // Reveal the button. Shown when either engine could work — Google needs only a
 // recorder, the fallback needs the browser speech API.
 function initDictation() {
+  // Both mics appear only where speech can actually work, so a doctor is never
+  // offered a button that does nothing. The weekly-form one and the AI Assistance
+  // one are independent — either may be absent on a given page state.
+  var ok = _speechSupported() || _recorderSupported();
+  if (!ok) return;
   var btn = document.getElementById('dictBtn');
-  if (!btn) return;
-  if (_speechSupported() || _recorderSupported()) btn.style.display = 'inline-flex';
+  if (btn) btn.style.display = 'inline-flex';
+  var cbtn = document.getElementById('chatDictBtn');
+  if (cbtn) cbtn.style.display = 'inline-flex';
 }
 
 window.discardDictation = function discardDictation() {
   _dictProposal = null; _dictText = '';
+  _chatDict = false; _chatStatusEl = null;
   var p = document.getElementById('dictPanel');
   if (p) p.style.display = 'none';
   document.getElementById('dictReview').style.display = 'none';
