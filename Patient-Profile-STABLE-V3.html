@@ -6532,6 +6532,7 @@ function _startSilenceWatch(stream, onDone) {
     var Ctx = window.AudioContext || window.webkitAudioContext;
     if (!Ctx || !stream) return null;
     var ctx = new Ctx();
+    if (ctx.state === 'suspended' && ctx.resume) { try { ctx.resume(); } catch (e) {} }
     var src = ctx.createMediaStreamSource(stream);
     var an = ctx.createAnalyser();
     an.fftSize = 2048;
@@ -6602,7 +6603,7 @@ async function _startRecording() {
   _mediaRec.start();
   _recActive = true;
   _dictBtnState(true);
-  _dictSet(_convo ? 'Listening… just pause when you have finished.'
+  _dictSet(_convo ? 'Listening… pause when you are done, or press the button to finish.'
                   : 'Listening — say the values, then press Stop', '');
   if (_convo) {
     _vad = _startSilenceWatch(_mediaStream, function () {
@@ -6838,18 +6839,28 @@ window.toggleChatDictation = async function toggleChatDictation() {
   if (_convo || _recActive || _speaking) { stopConversation(); return; }
   _convo = true;
   _chatStatusEl = null;
-  _chatDictSay('Listening… say what you need, or press the button to stop.', '');
+  _chatDictSay('Listening…', '');
   _listenOnce();
 };
 
+// Pressing the button while recording means "I have finished speaking", not
+// "throw away what I just said". The first version discarded the audio, so a
+// doctor who spoke and then pressed stop — the obvious thing to do — lost every
+// word. Flush the recording and let it transcribe; just do not reopen the mic.
 window.stopConversation = function stopConversation() {
+  var wasRecording = _recActive;
   _convo = false;
-  _dictCancelled = true;          // discard audio already on its way back
-  try { if (window.speechSynthesis) window.speechSynthesis.cancel(); } catch (e) {}
-  _speaking = false;
-  if (_recActive) _stopDictation();
-  _chatDict = false;
   _chatMicIcon(false);
+  if (_speaking) {
+    try { if (window.speechSynthesis) window.speechSynthesis.cancel(); } catch (e) {}
+    _speaking = false;
+  }
+  if (wasRecording) {
+    _chatDictSay('Transcribing…', '');
+    _stopDictation();     // -> onstop -> _transcribeBlob -> answer, then stops
+    return;               // _chatDict stays true so the answer still routes
+  }
+  _chatDict = false;
   _chatDictSay('Stopped listening.', '');
   _chatStatusEl = null;
 };
@@ -6890,7 +6901,8 @@ function _emptyTurn() {
 function _convoReply(text, spoken) {
   _chatDictSay(text, '');
   _chatStatusEl = null;
-  if (!_convo) return;
+  // Always answer — a doctor who pressed stop still wants the reply. Only the
+  // reopening of the mic is conditional on the conversation still running.
   _speak(spoken || text, function () {
     // A short gap so the microphone does not capture the tail of our own voice.
     setTimeout(function () { if (_convo) _listenOnce(); }, 400);
