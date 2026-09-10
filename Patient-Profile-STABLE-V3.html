@@ -6523,11 +6523,20 @@ window.toggleDictation = async function toggleDictation() {
 // the audio away, so every spoken turn was silently discarded. Watch the level and
 // stop shortly after the doctor stops talking.
 var _vad = null, _emptyTurns = 0;
-var VAD_SPEAK = 0.015;     // RMS above this counts as speech
-var VAD_QUIET_MS = 1300;   // silence this long after speech ends the turn
-var VAD_NOSPEECH_MS = 9000;// nothing said at all — give up on this turn
 
-function _startSilenceWatch(stream, onDone) {
+// End-of-speech detection. The first version used one fixed loudness threshold,
+// which cannot work across rooms: in a quiet clinic a soft voice never crossed it
+// (so the turn ran to the timeout), and a thinking pause mid-sentence crossed it
+// downwards (so the turn ended early and only half the sentence was transcribed).
+// That is the "sometimes it does not recognise" — it was hearing half a sentence.
+// So: measure the room first, set the threshold relative to it, and require a real
+// stretch of speech before any pause is allowed to end the turn.
+var VAD_CALIBRATE_MS  = 400;   // listen to the room before judging anything
+var VAD_QUIET_MS      = 1500;  // silence this long after speech ends the turn
+var VAD_MIN_SPEECH_MS = 500;   // ...but only once this much speech was heard
+var VAD_NOSPEECH_MS   = 10000; // nothing at all — stop and send what we have
+
+function _startSilenceWatch(stream, onDone, onLevel) {
   try {
     var Ctx = window.AudioContext || window.webkitAudioContext;
     if (!Ctx || !stream) return null;
@@ -6538,34 +6547,72 @@ function _startSilenceWatch(stream, onDone) {
     an.fftSize = 2048;
     src.connect(an);
     var buf = new Uint8Array(an.fftSize);
-    var spoke = false, quietSince = null, started = Date.now(), timer = null, dead = false;
+
+    var started = Date.now(), timer = null, dead = false;
+    var floorSum = 0, floorN = 0, floor = null;
+    var speakOn = 0.012, speakOff = 0.008;   // replaced once the room is measured
+    var spokeMs = 0, lastTick = Date.now(), quietSince = null;
 
     function cleanup() {
-      // Called twice by design: once when the turn ends itself, once by
-      // _releaseMic. Closing an already-closed context throws, so guard it.
       if (dead) return;
       dead = true;
       if (timer) { clearTimeout(timer); timer = null; }
       try { src.disconnect(); } catch (e) {}
       try { if (ctx.state !== 'closed') ctx.close(); } catch (e) {}
     }
-    function tick() {
-      if (dead) return;
+    function rmsNow() {
       an.getByteTimeDomainData(buf);
       var sum = 0;
       for (var i = 0; i < buf.length; i++) { var v = (buf[i] - 128) / 128; sum += v * v; }
-      var rms = Math.sqrt(sum / buf.length);
-      var now = Date.now();
-      if (rms > VAD_SPEAK) { spoke = true; quietSince = null; }
-      else if (spoke) {
-        if (quietSince === null) quietSince = now;
-        else if (now - quietSince > VAD_QUIET_MS) { cleanup(); return onDone(true); }
-      } else if (now - started > VAD_NOSPEECH_MS) { cleanup(); return onDone(false); }
-      timer = setTimeout(tick, 100);
+      return Math.sqrt(sum / buf.length);
+    }
+    function tick() {
+      if (dead) return;
+      var rms = rmsNow(), now = Date.now(), dt = now - lastTick;
+      lastTick = now;
+
+      if (floor === null) {
+        // Still measuring the room.
+        floorSum += rms; floorN++;
+        if (now - started >= VAD_CALIBRATE_MS) {
+          floor = floorN ? (floorSum / floorN) : 0;
+          // Speech has to stand clearly above the room; the release threshold sits
+          // lower so a brief dip inside a word cannot end the turn.
+          speakOn  = Math.max(0.012, floor * 3.0);
+          speakOff = Math.max(0.007, floor * 1.7);
+        }
+        if (onLevel) onLevel(rms, 0);
+        timer = setTimeout(tick, 80);
+        return;
+      }
+
+      if (rms > speakOn) { spokeMs += dt; quietSince = null; }
+      else if (rms < speakOff) {
+        if (spokeMs >= VAD_MIN_SPEECH_MS) {
+          if (quietSince === null) quietSince = now;
+          else if (now - quietSince > VAD_QUIET_MS) { cleanup(); return onDone(true); }
+        }
+      } else {
+        // Between the two thresholds: treat as "still going", not as silence.
+        quietSince = null;
+      }
+      if (spokeMs < VAD_MIN_SPEECH_MS && now - started > VAD_NOSPEECH_MS) {
+        cleanup(); return onDone(false);
+      }
+      if (onLevel) onLevel(rms, speakOn);
+      timer = setTimeout(tick, 80);
     }
     tick();
     return { cancel: cleanup };
   } catch (e) { return null; }
+}
+
+// A five-block meter, so it is obvious the microphone is hearing you — the
+// difference between "it is listening" and "it has frozen".
+function _levelBar(rms, speakOn) {
+  var ref = Math.max(speakOn * 3, 0.05);
+  var n = Math.max(0, Math.min(5, Math.round((rms / ref) * 5)));
+  return '▁▂▄▆█'.slice(0, n) + '·'.repeat(5 - n);
 }
 
 async function _startRecording() {
@@ -6610,6 +6657,8 @@ async function _startRecording() {
   if (_convo) {
     _vad = _startSilenceWatch(_mediaStream, function () {
       if (_recActive) _stopDictation();
+    }, function (rms, speakOn) {
+      if (_recActive) _chatDictSay('Listening  ' + _levelBar(rms, speakOn), '');
     });
   }
   // Sync recognition refuses anything over a minute, so stop before that

@@ -274,6 +274,10 @@
     <button class="chat-tool demo" onclick="generateDemoCase()" data-tip="Synthetic demo case (not real)" aria-label="Generate a demo case">
       <svg viewBox="0 0 24 24"><path d="M9 2h6v2h-1v4.2l4.4 8.6A3 3 0 0 1 15.7 21H8.3a3 3 0 0 1-2.7-4.2L10 8.2V4H9V2Zm3 2v4.7L8.6 15h6.8L12 8.7V4Z"/></svg>
     </button>
+    <button class="chat-tool" id="voiceIntakeBtn" onclick="toggleVoiceIntake()"
+            data-tip="Voice intake — I ask, you answer" aria-label="Voice intake" style="display:none;">
+      <svg viewBox="0 0 24 24"><path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.9V21h2v-3.1A7 7 0 0 0 19 11h-2Z"/></svg>
+    </button>
     <input type="text" class="ai-chat-input" id="chatInput" placeholder="Describe the patient, or paste notes…" onkeypress="if(event.key==='Enter') sendChatMessage()">
     <button class="chat-send" onclick="sendChatMessage()" aria-label="Send">
       <svg viewBox="0 0 24 24"><path d="M3.4 20.4 21 12 3.4 3.6 3.39 10.1 15.6 12 3.39 13.9 3.4 20.4Z"/></svg>
@@ -917,6 +921,59 @@
 <script src="/js/seed.js"></script>
 <script src="/js/auth.js"></script>
 <script src="/js/mappings.js"></script>
+<script>
+// ── Voice intake glue ──────────────────────────────────────────────────────
+// The interview lives in js/voice-intake.js; this only decides how it talks to
+// the page — a message in the assistant panel, and a live status line.
+var _viStatusEl = null;
+
+function _viBubble(text, cls) {
+  var host = document.getElementById('chatMessages') || document.getElementById('chatMsgs');
+  if (!host) { console.log('[voice]', text); return null; }
+  var d = document.createElement('div');
+  d.className = cls || 'msg msg-ai';
+  d.innerText = text;
+  host.appendChild(d);
+  host.scrollTop = host.scrollHeight;
+  return d;
+}
+function _viStatus(text) {
+  if (!text) { if (_viStatusEl && _viStatusEl.parentNode) _viStatusEl.parentNode.removeChild(_viStatusEl); _viStatusEl = null; return; }
+  var host = document.getElementById('chatMessages') || document.getElementById('chatMsgs');
+  if (!host) return;
+  if (!_viStatusEl || !_viStatusEl.parentNode) { _viStatusEl = document.createElement('div'); _viStatusEl.className = 'msg msg-ai'; host.appendChild(_viStatusEl); }
+  _viStatusEl.innerText = text;
+  host.scrollTop = host.scrollHeight;
+}
+function _viBtn(on) {
+  var b = document.getElementById('voiceIntakeBtn');
+  if (b) { b.classList.toggle('recording', !!on); b.setAttribute('data-tip', on ? 'Stop voice intake' : 'Voice intake — I ask, you answer'); }
+}
+
+window.toggleVoiceIntake = function toggleVoiceIntake() {
+  if (typeof VoiceIntake === 'undefined') return;
+  if (VoiceIntake.isRunning()) { VoiceIntake.stop(); return; }
+  var win = document.getElementById('aiChatWindow');
+  if (win && win.style.display !== 'flex') { try { toggleChat(); } catch (e) {} }
+  _viBtn(true);
+  VoiceIntake.start({
+    say: function (m) { _viStatus(''); _viBubble(m); },
+    status: _viStatus,
+    done: function () { _viStatus(''); _viBtn(false); }
+  });
+};
+
+// Only offer the button where speech can actually work.
+window.addEventListener('DOMContentLoaded', function () {
+  try {
+    if (typeof GqVoice === 'undefined') return;
+    GqVoice.available().then(function (ok) {
+      var b = document.getElementById('voiceIntakeBtn');
+      if (b && ok) b.style.display = '';
+    });
+  } catch (e) { console.warn('voice intake init:', e); }
+});
+</script>
 <script src="/js/master-data.js"></script>
 <script src="/js/form-loader.js"></script>
 <script src="/js/patient-store.js?v=3.2"></script>
@@ -2661,6 +2718,8 @@ window.onload = function() {
   <script src="/js/nutrition-engine-v4.js?v=4.0"></script>
   <script src="/js/engine-config.js"></script>
   <script src="/js/ai-report-service.js"></script>
+  <script src="/js/gq-voice.js?v=1"></script>
+  <script src="/js/voice-intake.js?v=1"></script>
   <script src="/js/theme.js"></script>
 </body>
 </html>
