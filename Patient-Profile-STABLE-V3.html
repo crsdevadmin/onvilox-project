@@ -6461,7 +6461,7 @@ function _recorderSupported() {
 var _sttEngine = 'browser';
 var _sttChecked = false;
 var _mediaRec = null, _mediaChunks = [], _mediaStream = null, _mediaTimer = null;
-var MAX_DICT_SECONDS = 55;   // Google sync recognition caps at 60s
+var MAX_DICT_SECONDS = 45;   // keeps a single turn well inside every limit
 
 async function _resolveEngine() {
   if (_sttChecked) return _sttEngine;
@@ -6583,7 +6583,9 @@ async function _startRecording() {
     return false;
   });
   try {
-    _mediaRec = mime ? new MediaRecorder(_mediaStream, { mimeType: mime }) : new MediaRecorder(_mediaStream);
+    var _recOpts = { audioBitsPerSecond: 24000 };   // speech-grade opus, ~180 KB/min
+    if (mime) _recOpts.mimeType = mime;
+    _mediaRec = new MediaRecorder(_mediaStream, _recOpts);
   } catch (e) {
     _releaseMic();
     return _startBrowserSpeech();
@@ -6647,7 +6649,19 @@ async function _transcribeBlob(blob) {
       _dictSet('Switching to browser speech', 'Press Dictate again.');
       return;
     }
-    var body = await res.json();
+    var body = null, rawText = '';
+    try { body = await res.clone().json(); }
+    catch (e) { rawText = await res.text().catch(function () { return ''; }); }
+    if (!body) {
+      // An HTML body here is nginx or a proxy answering, not the application —
+      // typically a rejected upload or a gateway error.
+      var why = /^\s*<(!doctype|html)/i.test(rawText)
+        ? ('The server rejected the recording (HTTP ' + res.status + '). '
+           + (res.status === 413 ? 'It was too long — try a shorter burst.'
+                                 : 'This is a gateway error, not your microphone.'))
+        : ('Unexpected reply from the server (HTTP ' + res.status + ').');
+      throw new Error(why);
+    }
     if (!res.ok) throw new Error(body.detail || body.error || 'Transcription failed');
     if (!body.transcript) {
       if (_convo) return _emptyTurn();
