@@ -6518,6 +6518,55 @@ window.toggleDictation = async function toggleDictation() {
 };
 
 // ── Server path: record here, transcribe via the API ──────────────────────
+// A conversation turn has to end by itself. Without this the only way to finish
+// speaking was to press the button — which ends the whole conversation and throws
+// the audio away, so every spoken turn was silently discarded. Watch the level and
+// stop shortly after the doctor stops talking.
+var _vad = null, _emptyTurns = 0;
+var VAD_SPEAK = 0.015;     // RMS above this counts as speech
+var VAD_QUIET_MS = 1300;   // silence this long after speech ends the turn
+var VAD_NOSPEECH_MS = 9000;// nothing said at all — give up on this turn
+
+function _startSilenceWatch(stream, onDone) {
+  try {
+    var Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx || !stream) return null;
+    var ctx = new Ctx();
+    var src = ctx.createMediaStreamSource(stream);
+    var an = ctx.createAnalyser();
+    an.fftSize = 2048;
+    src.connect(an);
+    var buf = new Uint8Array(an.fftSize);
+    var spoke = false, quietSince = null, started = Date.now(), timer = null, dead = false;
+
+    function cleanup() {
+      // Called twice by design: once when the turn ends itself, once by
+      // _releaseMic. Closing an already-closed context throws, so guard it.
+      if (dead) return;
+      dead = true;
+      if (timer) { clearTimeout(timer); timer = null; }
+      try { src.disconnect(); } catch (e) {}
+      try { if (ctx.state !== 'closed') ctx.close(); } catch (e) {}
+    }
+    function tick() {
+      if (dead) return;
+      an.getByteTimeDomainData(buf);
+      var sum = 0;
+      for (var i = 0; i < buf.length; i++) { var v = (buf[i] - 128) / 128; sum += v * v; }
+      var rms = Math.sqrt(sum / buf.length);
+      var now = Date.now();
+      if (rms > VAD_SPEAK) { spoke = true; quietSince = null; }
+      else if (spoke) {
+        if (quietSince === null) quietSince = now;
+        else if (now - quietSince > VAD_QUIET_MS) { cleanup(); return onDone(true); }
+      } else if (now - started > VAD_NOSPEECH_MS) { cleanup(); return onDone(false); }
+      timer = setTimeout(tick, 100);
+    }
+    tick();
+    return { cancel: cleanup };
+  } catch (e) { return null; }
+}
+
 async function _startRecording() {
   try {
     _mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -6543,19 +6592,30 @@ async function _startRecording() {
   _mediaRec.onstop = function () {
     _releaseMic();
     var blob = new Blob(_mediaChunks, { type: _mediaRec.mimeType || 'audio/webm' });
-    if (!blob.size) { _dictSet('Nothing recorded', 'No audio captured. Press Dictate and try again.'); return; }
+    if (!blob.size) {
+      if (_convo) return _emptyTurn();
+      _dictSet('Nothing recorded', 'No audio captured. Press Dictate and try again.');
+      return;
+    }
     _transcribeBlob(blob);
   };
   _mediaRec.start();
   _recActive = true;
   _dictBtnState(true);
-  _dictSet('Listening — say the values, then press Stop', '');
+  _dictSet(_convo ? 'Listening… just pause when you have finished.'
+                  : 'Listening — say the values, then press Stop', '');
+  if (_convo) {
+    _vad = _startSilenceWatch(_mediaStream, function () {
+      if (_recActive) _stopDictation();
+    });
+  }
   // Sync recognition refuses anything over a minute, so stop before that
   // rather than letting the doctor speak into a request that will be rejected.
   _mediaTimer = setTimeout(function () { if (_recActive) _stopDictation(); }, MAX_DICT_SECONDS * 1000);
 }
 
 function _releaseMic() {
+  if (_vad) { try { _vad.cancel(); } catch (e) {} _vad = null; }
   if (_mediaTimer) { clearTimeout(_mediaTimer); _mediaTimer = null; }
   if (_mediaStream) {
     try { _mediaStream.getTracks().forEach(function (t) { t.stop(); }); } catch (e) {}
@@ -6589,6 +6649,7 @@ async function _transcribeBlob(blob) {
     var body = await res.json();
     if (!res.ok) throw new Error(body.detail || body.error || 'Transcription failed');
     if (!body.transcript) {
+      if (_convo) return _emptyTurn();
       _dictSet('Nothing heard', 'No speech detected in that recording. Press Dictate and try again.');
       return;
     }
@@ -6806,6 +6867,25 @@ async function _listenOnce() {
   return _startBrowserSpeech();
 }
 
+// Two silent turns in a row means the room is quiet or the mic is not working.
+// Stop rather than listening into an empty room indefinitely.
+function _emptyTurn() {
+  _emptyTurns++;
+  if (_emptyTurns >= 2) {
+    _emptyTurns = 0;
+    _chatDict = false;
+    var m = 'I could not hear anything. Stopping — press the mic to try again.';
+    _convo = false;
+    _chatMicIcon(false);
+    _chatDictSay(m, '');
+    _chatStatusEl = null;
+    _speak(m);
+    return;
+  }
+  _chatDict = false;
+  return _convoReply('I did not catch that — say it again.', 'I did not catch that.');
+}
+
 // Say it, show it, then reopen the mic for the follow-up.
 function _convoReply(text, spoken) {
   _chatDictSay(text, '');
@@ -6818,6 +6898,7 @@ function _convoReply(text, spoken) {
 }
 
 async function _routeChatDictation(text) {
+  _emptyTurns = 0;
   _chatDictSay('You said', text);
   _chatStatusEl = null;
   var u = (typeof auth !== 'undefined') ? auth.getCurrentUser() : {};
@@ -6920,7 +7001,9 @@ function _startBrowserSpeech() {
   var Ctor = window.SpeechRecognition || window.webkitSpeechRecognition;
   _rec = new Ctor();
   _rec.lang = 'en-IN';
-  _rec.continuous = true;
+  // In a conversation the recogniser must end the utterance itself; continuous
+  // mode waits for an explicit stop, which is what broke the loop.
+  _rec.continuous = !_convo;
   _rec.interimResults = true;
   _dictSet('Listening — say the values, then press Stop', '');
   _dictBtnState(true);
