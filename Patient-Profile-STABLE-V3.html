@@ -6580,11 +6580,144 @@ async function _transcribeBlob(blob) {
     if (body.confidence != null && body.confidence < 0.75) {
       _dictSet('Heard this, but not clearly — check every value', body.transcript);
     }
+    if (_dictCancelled) { _dictCancelled = false; return; }
     if (_chatDict) return _routeChatDictation(body.transcript);
     _sendDictation(body.transcript);
   } catch (e) {
     _dictSet('Could not transcribe', e.message + ' — please type the values instead.');
   }
+}
+
+// ── Answering questions from the patient's own record ───────────
+// Deliberately NOT an AI call. Everything below is read straight out of the
+// weekly logs already on this page, so a spoken albumin is the albumin in the
+// chart. A language model reciting lab values back to a doctor is a category of
+// error worth designing out rather than monitoring for.
+var ASK_UNITS = {
+  week: '', weight: ' kilos', muac: ' centimetres', handGrip: ' kilos', ecog: '',
+  albumin: ' grams per decilitre', crp: ' milligrams per litre',
+  glucose: ' milligrams per decilitre', creatinine: ' milligrams per decilitre',
+  urea: ' milligrams per decilitre', oralIntake: ' percent', compliance: ' percent'
+};
+var ASK_SPOKEN = {
+  week: 'week', weight: 'weight', muac: 'MUAC', handGrip: 'hand grip', ecog: 'ECOG',
+  albumin: 'albumin', crp: 'CRP', glucose: 'blood glucose', creatinine: 'creatinine',
+  urea: 'urea', oralIntake: 'oral intake', compliance: 'supplement compliance'
+};
+
+function _weeklyLogs() {
+  return (_monLogs || [])
+    .filter(function (l) { return (l.type || '') === 'weekly' && l.data; })
+    .slice()
+    .sort(function (a, b) {
+      var wa = parseFloat(a.data.week), wb = parseFloat(b.data.week);
+      if (!isNaN(wa) && !isNaN(wb) && wa !== wb) return wa - wb;
+      return new Date(a.recorded_at || 0) - new Date(b.recorded_at || 0);
+    });
+}
+function _askNum(v) {
+  if (v === null || v === undefined || v === '') return null;
+  var n = parseFloat(v);
+  return isNaN(n) ? null : n;
+}
+function _askDate(iso) {
+  if (!iso) return '';
+  var d = new Date(iso);
+  if (isNaN(d)) return '';
+  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+}
+function _askDaysAgo(iso) {
+  var d = new Date(iso);
+  if (isNaN(d)) return null;
+  return Math.floor((Date.now() - d.getTime()) / 86400000);
+}
+
+// Returns { text, spoken } or null when the question isn't one we can answer
+// from the record — in which case the caller falls back to the assistant.
+function _answerFromRecord(q) {
+  var logs = _weeklyLogs();
+  var topic = (q && q.topic) || 'other';
+  var field = (q && q.field) || null;
+
+  if (!logs.length) {
+    var none = 'There are no weekly assessments recorded for this patient yet.';
+    return { text: none, spoken: none };
+  }
+
+  var pick = logs[logs.length - 1];
+  if (q && q.week != null) {
+    var want = parseFloat(q.week);
+    var found = logs.filter(function (l) { return parseFloat(l.data.week) === want; })[0];
+    if (!found) {
+      var m = 'There is no week ' + want + ' recorded. The latest is week '
+            + (pick.data.week || '?') + '.';
+      return { text: m, spoken: m };
+    }
+    pick = found;
+  }
+  var d = pick.data || {};
+
+  if (topic === 'latest_weekly') {
+    var order = ['week','weight','muac','handGrip','ecog','albumin','crp','glucose','creatinine','urea','oralIntake','compliance'];
+    var present = order.filter(function (k) { return _askNum(d[k]) !== null; });
+    var when = _askDate(pick.recorded_at);
+    var head = 'Week ' + (d.week != null ? d.week : '?') + (when ? ', recorded ' + when : '');
+    var lines = present.filter(function (k) { return k !== 'week'; }).map(function (k) {
+      return '• ' + DICT_LABELS[k] + ': ' + d[k];
+    });
+    var missing = order.filter(function (k) { return k !== 'week' && _askNum(d[k]) === null; });
+    var text = head + '\n' + (lines.length ? lines.join('\n') : 'No values recorded.')
+      + (missing.length ? '\nNot recorded: ' + missing.map(function (k) { return DICT_LABELS[k]; }).join(', ') : '');
+    // Spoken form stays short — a doctor does not want twelve numbers read out.
+    var spokenBits = ['weight','albumin','ecog','oralIntake','compliance']
+      .filter(function (k) { return _askNum(d[k]) !== null; })
+      .map(function (k) { return ASK_SPOKEN[k] + ' ' + d[k] + (ASK_UNITS[k] || ''); });
+    var spoken = head + '. ' + (spokenBits.length ? spokenBits.join(', ') + '.' : 'No values recorded.')
+      + (missing.length ? ' ' + missing.length + ' other field'
+         + (missing.length === 1 ? '' : 's') + ' not recorded — they are on screen.' : '');
+    return { text: text, spoken: spoken };
+  }
+
+  if (topic === 'value' && field && DICT_LABELS[field]) {
+    var v = _askNum(d[field]);
+    if (v === null) {
+      var t = DICT_LABELS[field] + ' was not recorded in week ' + (d.week != null ? d.week : '?') + '.';
+      return { text: t, spoken: t };
+    }
+    var t2 = DICT_LABELS[field] + ' in week ' + (d.week != null ? d.week : '?') + ' is ' + d[field] + '.';
+    return { text: t2, spoken: ASK_SPOKEN[field] + ' in week ' + (d.week != null ? d.week : '?')
+             + ' is ' + d[field] + (ASK_UNITS[field] || '') + '.' };
+  }
+
+  if (topic === 'trend' && field && DICT_LABELS[field]) {
+    var series = logs.filter(function (l) { return _askNum(l.data[field]) !== null; });
+    if (series.length < 2) {
+      var t3 = 'Only ' + series.length + ' reading of ' + DICT_LABELS[field]
+             + ' is recorded, so there is no trend yet.';
+      return { text: t3, spoken: t3 };
+    }
+    var first = series[0], last = series[series.length - 1];
+    var a = _askNum(first.data[field]), b = _askNum(last.data[field]);
+    var diff = Math.round((b - a) * 100) / 100;
+    var dir = diff > 0 ? 'up' : diff < 0 ? 'down' : 'unchanged';
+    var body = DICT_LABELS[field] + ' is ' + dir
+      + (diff !== 0 ? ' ' + Math.abs(diff) + (ASK_UNITS[field] || '') : '')
+      + ' from week ' + (first.data.week != null ? first.data.week : '?') + ' (' + a + ')'
+      + ' to week ' + (last.data.week != null ? last.data.week : '?') + ' (' + b + ')'
+      + ', across ' + series.length + ' readings.';
+    return { text: body, spoken: body };
+  }
+
+  if (topic === 'monitoring_status') {
+    var days = _askDaysAgo(pick.recorded_at);
+    var t4 = 'The last weekly assessment was week ' + (d.week != null ? d.week : '?')
+      + (days === null ? '' : ', ' + (days === 0 ? 'today' : days === 1 ? 'yesterday' : days + ' days ago'))
+      + '. ' + logs.length + ' weekly assessment' + (logs.length === 1 ? '' : 's')
+      + ' recorded in total.';
+    return { text: t4, spoken: t4 };
+  }
+
+  return null;   // not answerable from the record — hand it on
 }
 
 // ── Free-style dictation from AI Assistance ─────────────────────
@@ -6593,20 +6726,83 @@ async function _transcribeBlob(blob) {
 // or all three. /api/dictate decides which, and only weekly values are ever
 // routed into the form — always through the same confirm step, never written
 // straight to fields.
+// A conversation, not a one-shot: listen, answer, speak, listen again. The loop
+// keeps going until the doctor stops it, so a follow-up needs no button press.
+var _convo = false, _speaking = false, _dictCancelled = false;
+
+function _canSpeak() { return !!(window.speechSynthesis && window.SpeechSynthesisUtterance); }
+
+// Set the chat mic's face directly. _dictBtnState is gated on _chatDict/_convo,
+// which the exit paths have already cleared by the time they need to reset it.
+function _chatMicIcon(live) {
+  var cb = document.getElementById('chatDictBtn');
+  if (!cb) return;
+  cb.innerText = live ? '\u23F9' : '\uD83C\uDF99';
+  cb.title = live ? 'Stop' : 'Dictate';
+}
+
+function _speak(text, done) {
+  if (!_canSpeak() || !text) { if (done) done(); return; }
+  try {
+    window.speechSynthesis.cancel();
+    var u = new SpeechSynthesisUtterance(text);
+    u.lang = 'en-IN';
+    u.rate = 1.02;
+    _speaking = true;
+    u.onend = function () { _speaking = false; if (done) done(); };
+    // If the voice engine dies mid-sentence the loop must not stall.
+    u.onerror = function () { _speaking = false; if (done) done(); };
+    window.speechSynthesis.speak(u);
+  } catch (e) { _speaking = false; if (done) done(); }
+}
+
 window.toggleChatDictation = async function toggleChatDictation() {
-  if (_recActive) { _chatDict ? _stopDictation() : null; return; }
-  _chatDict = true;
+  if (_convo || _recActive || _speaking) { stopConversation(); return; }
+  _convo = true;
   _chatStatusEl = null;
+  _chatDictSay('Listening… say what you need, or press the button to stop.', '');
+  _listenOnce();
+};
+
+window.stopConversation = function stopConversation() {
+  _convo = false;
+  _dictCancelled = true;          // discard audio already on its way back
+  try { if (window.speechSynthesis) window.speechSynthesis.cancel(); } catch (e) {}
+  _speaking = false;
+  if (_recActive) _stopDictation();
+  _chatDict = false;
+  _chatMicIcon(false);
+  _chatDictSay('Stopped listening.', '');
+  _chatStatusEl = null;
+};
+
+async function _listenOnce() {
+  if (!_convo) return;
+  _dictCancelled = false;
+  _chatDict = true;
   _dictText = '';
   _dictProposal = null;
-
+  _chatStatusEl = null;                     // each turn gets its own bubble
+  _chatDictSay('Listening…', '');
   var engine = await _resolveEngine();
   if (engine === 'server') return _startRecording();
   return _startBrowserSpeech();
-};
+}
+
+// Say it, show it, then reopen the mic for the follow-up.
+function _convoReply(text, spoken) {
+  _chatDictSay(text, '');
+  _chatStatusEl = null;
+  if (!_convo) return;
+  _speak(spoken || text, function () {
+    // A short gap so the microphone does not capture the tail of our own voice.
+    setTimeout(function () { if (_convo) _listenOnce(); }, 400);
+  });
+}
 
 async function _routeChatDictation(text) {
-  _chatDictSay('Reading that back\u2026', text);
+  _chatDictSay('You said', text);
+  _chatStatusEl = null;
   var u = (typeof auth !== 'undefined') ? auth.getCurrentUser() : {};
   var token = u && u.token ? 'Bearer ' + u.token : '';
   var apiBase = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : '';
@@ -6621,39 +6817,61 @@ async function _routeChatDictation(text) {
     if (!res.ok) throw new Error(body.error || 'Could not read that back');
   } catch (e) {
     // Never lose the words — drop them in the message box so nothing is retyped.
-    _chatDictSay(e.message + ' \u2014 the words are in the box below, send or edit them.', text);
     _putInChatInput(text);
     _chatDict = false;
-    return;
+    return _convoReply(e.message + ' — the words are in the box below.', 'Sorry, I could not read that back.');
   }
 
   var input = document.getElementById('chatInput');
 
+  if (body.intent === 'ask') {
+    var ans = _answerFromRecord(body.query || {});
+    if (ans) {
+      _chatDict = false;
+      return _convoReply(ans.text, ans.spoken);
+    }
+    // Nothing in the record covers it — let the doctor send it to the assistant.
+    _putInChatInput(text);
+    _chatDict = false;
+    return _convoReply(
+      'I cannot answer that from her record. The question is in the box below — press send to ask the assistant.',
+      'I cannot answer that from her record.');
+  }
+
   if (body.intent === 'weekly' && body.filledCount > 0) {
-    _chatDictSay(body.reply || ('Heard ' + body.filledCount + ' value'
-      + (body.filledCount === 1 ? '' : 's') + ' \u2014 opening the weekly form to check them.'), text);
     if (input) input.value = '';
     _dictProposal = body;
-    _chatDict = false;                 // the review panel is the weekly one again
-    _openWeeklyReview(body);
-  } else if (body.intent === 'weekly') {
-    // Intention announced, nothing said yet. Stay ready.
-    _chatDictSay(body.reply || 'Go ahead \u2014 press the mic again and say the values.', '');
     _chatDict = false;
-  } else if (body.intent === 'profile') {
-    // No confirm-and-apply screen exists for the profile, so this is read back
-    // only. Putting it in the box beats silently discarding it.
-    _chatDictSay((body.reply || 'That sounds like profile detail.')
-      + ' Profile values are not filled by voice yet \u2014 the words are in the box below.', text);
-    _putInChatInput(text);
-    _chatDict = false;
-  } else {
-    // An ordinary question. Hand it to the assistant proper, which has the
-    // patient context this router does not — the doctor presses send.
-    _chatDictSay('Heard you. Press send to ask the assistant.', text);
-    _putInChatInput(text);
-    _chatDict = false;
+    _convo = false;                     // stop talking; the doctor is now checking values
+    _chatMicIcon(false);                // ...so the mic must stop offering "Stop"
+    try { if (window.speechSynthesis) window.speechSynthesis.cancel(); } catch (e) {}
+    _chatDictSay(body.reply || ('Heard ' + body.filledCount + ' value'
+      + (body.filledCount === 1 ? '' : 's') + ' — opening the weekly form to check them.'), text);
+    _chatStatusEl = null;
+    _speak('I heard ' + body.filledCount + ' value' + (body.filledCount === 1 ? '' : 's')
+      + '. Please check them before saving.');
+    return _openWeeklyReview(body);
   }
+
+  if (body.intent === 'weekly') {
+    _chatDict = false;
+    return _convoReply(body.reply || 'Go ahead — say the values.',
+                       body.reply || 'Go ahead, say the values.');
+  }
+
+  if (body.intent === 'profile') {
+    _putInChatInput(text);
+    _chatDict = false;
+    return _convoReply((body.reply || 'That sounds like profile detail.')
+      + ' Profile values are not filled by voice yet — the words are in the box below.',
+      'Profile values cannot be filled by voice yet.');
+  }
+
+  // An open clinical question. The assistant proper has the context this router
+  // does not, so the doctor sends it.
+  _putInChatInput(text);
+  _chatDict = false;
+  return _convoReply('Press send to ask the assistant.', 'Press send to ask the assistant.');
 }
 
 function _putInChatInput(text) {
@@ -6714,6 +6932,7 @@ function _startBrowserSpeech() {
   _rec.onend = function () {
     _recActive = false;
     _dictBtnState(false);
+    if (_dictCancelled) { _dictCancelled = false; return; }
     if (_dictText.trim()) {
       if (_chatDict) _routeChatDictation(_dictText.trim());
       else _sendDictation(_dictText.trim());
@@ -6731,9 +6950,10 @@ function _stopDictation() {
 }
 
 function _dictBtnState(on) {
-  if (_chatDict) {
+  if (_chatDict || _convo) {
     var cb = document.getElementById('chatDictBtn');
-    if (cb) { cb.innerText = on ? '\u23F9' : '\uD83C\uDF99'; cb.title = on ? 'Stop' : 'Dictate'; }
+    var live = on || _convo;
+    if (cb) { cb.innerText = live ? '\u23F9' : '\uD83C\uDF99'; cb.title = live ? 'Stop' : 'Dictate'; }
     return;
   }
   var b = document.getElementById('dictBtn');

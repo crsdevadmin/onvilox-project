@@ -3888,11 +3888,27 @@ THE ONE RULE THAT OVERRIDES EVERYTHING ELSE:
 Return a value ONLY if the speaker actually said it. Never infer, estimate, carry over or supply a typical value. If it was not said, return null.
 These values drive a nutrition prescription that is manufactured and dispensed. A null is safe; a plausible guess is not.
 
-STEP 1 — INTENT. Set "intent" to exactly one of:
-- "weekly"  : they want to record, or are reciting, a WEEKLY monitoring assessment (week number, weight, MUAC, grip, ECOG, labs, intake, adherence).
-- "profile" : they want to record, or are reciting, the patient's CLINICAL PROFILE / intake details (diagnosis, regimen, stage, height, baseline labs).
-- "chat"    : anything else — a question, a request, small talk, or unclear.
-If they only announce an intention ("I want to fill the weekly report") with no values yet, still set intent to "weekly" and leave every field null.
+STEP 1 — INTENT. The first question is always RECORD or RETRIEVE. Recording puts new
+values into the chart; retrieving reads back what is already there. "Fill the weekly
+report" and "show me the weekly report" differ only in that verb, and confusing them is
+the single most likely mistake here. When the verb is show / read / tell / what / which /
+when / how much / is she / did she, it is RETRIEVE, no matter which form is named.
+
+Set "intent" to exactly one of:
+- "weekly"  : they want to RECORD, or are reciting, a WEEKLY monitoring assessment (week number, weight, MUAC, grip, ECOG, labs, intake, adherence).
+- "profile" : they want to RECORD, or are reciting, the patient's CLINICAL PROFILE / intake details (diagnosis, regimen, stage, height, baseline labs).
+- "ask"     : they want to RETRIEVE or be told something about THIS patient — "show me the latest weekly report", "what was her weight last week", "when was she last monitored", "is she overdue", "how is her albumin trending".
+- "chat"    : anything else — an open clinical question, a request, small talk, or unclear.
+If they only announce an intention to RECORD ("I want to fill the weekly report") with no values yet, still set intent to "weekly" and leave every field null.
+
+For intent "ask", also fill "query": {"topic":..., "field":..., "week":...}
+- topic: "latest_weekly" | "value" | "trend" | "monitoring_status" | "prescription" | "other"
+- field: the field they named, one of week, weight, muac, handGrip, ecog, albumin, crp, glucose, creatinine, urea, oralIntake, compliance — else null
+- week: an explicit week number if they named one, else null
+"show me the latest weekly report" -> {"topic":"latest_weekly","field":null,"week":null}
+"what was her albumin last week"   -> {"topic":"value","field":"albumin","week":null}
+"how is her weight trending"       -> {"topic":"trend","field":"weight","week":null}
+"when was she last monitored"      -> {"topic":"monitoring_status","field":null,"week":null}
 
 STEP 2 — EXTRACT whatever values were spoken, into the matching object.
 
@@ -3906,10 +3922,15 @@ SPOKEN NUMBER HANDLING:
 - interruptions must be exactly one of "None","Dose Delay","Dose Reduction","RT Interruption","Treatment Held","Hospitalisation", else null.
 
 STEP 3 — "reply": one short sentence to show the clinician, in plain British English. If intent is "weekly" or "profile" and no values were spoken, invite them to dictate the values. If values were spoken, say what you captured in general terms. If intent is "chat", answer or acknowledge briefly. Never invent clinical advice here.
+If intent is "ask", "reply" must NOT contain any clinical number. The application reads
+the real values out of the patient's record and answers from those; anything you state
+here would be a guess competing with the record. Acknowledge only — "Fetching her latest
+weekly now." 
 
 Schema, all keys always present:
-{"intent":"weekly|profile|chat",
+{"intent":"weekly|profile|ask|chat",
  "reply":"string",
+ "query":{"topic":null,"field":null,"week":null},
  "weekly":{"week":null,"weight":null,"muac":null,"handGrip":null,"ecog":null,"albumin":null,"crp":null,"glucose":null,"creatinine":null,"urea":null,"oralIntake":null,"compliance":null,"interruptions":null,"notes":null},
  "profile":{"name":null,"age":null,"sex":null,"weight":null,"height":null,"muac":null,"cancer":null,"regimen":null,"cancerStage":null,"ecogStatus":null,"albumin":null,"crp":null,"creatinine":null,"urea":null,"bloodSugar":null,"hemoglobin":null,"reducedFoodIntake":null}}`;
 
@@ -3956,7 +3977,7 @@ app.post('/api/dictate', authenticateToken, async (req, res) => {
     if (start < 0) throw new Error('No JSON in model response');
     const out = JSON.parse(raw.slice(start));
 
-    const intent = ['weekly', 'profile', 'chat'].includes(out.intent) ? out.intent : 'chat';
+    const intent = ['weekly', 'profile', 'ask', 'chat'].includes(out.intent) ? out.intent : 'chat';
     const picked = intent === 'weekly' ? out.weekly : intent === 'profile' ? out.profile : null;
     const { fields, suspect } = _sanitiseDictated(picked || {});
     const filled = Object.keys(fields).filter(k =>
@@ -3965,6 +3986,7 @@ app.post('/api/dictate', authenticateToken, async (req, res) => {
     res.json({
       intent,
       reply: out.reply || '',
+      query: (intent === 'ask' && out.query && typeof out.query === 'object') ? out.query : null,
       fields,
       suspect,
       filledCount: filled.length,
