@@ -3627,7 +3627,8 @@
               // generation. This covers the case where labs (e.g. urea) were only entered
               // in a monitoring entry and not in the patient profile form.
               try {
-                const monRes = await fetch(`/api/patients/${patient.id}/monitoring`, { headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') } });
+                const _mu = (typeof auth !== 'undefined') ? auth.getCurrentUser() : null;
+                const monRes = await fetch(`/api/patients/${patient.id}/monitoring`, { headers: { 'Authorization': 'Bearer ' + ((_mu && _mu.token) || '') } });
                 if (monRes.ok) {
                   const logs = await monRes.json();
                   // Sort descending by recorded_at and pick the most recent weekly/labs entry
@@ -6000,13 +6001,17 @@
 //
 // Everything here fails quietly: a trace that cannot reach the endpoint keeps
 // showing the baseline rather than breaking a clinical document.
+function _mustUser() {
+  return (typeof auth !== 'undefined') ? auth.getCurrentUser() : null;
+}
+
 async function renderMustRescreen(pid) {
   try {
     var anchorEl = document.getElementById('mustBaselineScore');
     if (!anchorEl) return;
     var base = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : '';
     var res = await fetch(base + '/api/patients/' + pid + '/must', {
-      headers: { Authorization: 'Bearer ' + (localStorage.getItem('token') || '') }
+      headers: { Authorization: 'Bearer ' + ((_mustUser() && _mustUser().token) || '') }
     });
     if (!res.ok) return;
     var d = await res.json();
