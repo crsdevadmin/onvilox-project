@@ -275,7 +275,7 @@
       <svg viewBox="0 0 24 24"><path d="M9 2h6v2h-1v4.2l4.4 8.6A3 3 0 0 1 15.7 21H8.3a3 3 0 0 1-2.7-4.2L10 8.2V4H9V2Zm3 2v4.7L8.6 15h6.8L12 8.7V4Z"/></svg>
     </button>
     <button class="chat-tool" id="voiceIntakeBtn" onclick="toggleVoiceIntake()"
-            data-tip="Voice intake — I ask, you answer" aria-label="Voice intake" style="display:none;">
+            data-tip="Voice intake — describe the patient, I fill the form" aria-label="Voice intake" style="display:none;">
       <svg viewBox="0 0 24 24"><path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.9V21h2v-3.1A7 7 0 0 0 19 11h-2Z"/></svg>
     </button>
     <input type="text" class="ai-chat-input" id="chatInput" placeholder="Describe the patient, or paste notes…" onkeypress="if(event.key==='Enter') sendChatMessage()">
@@ -947,7 +947,7 @@ function _viStatus(text) {
 }
 function _viBtn(on) {
   var b = document.getElementById('voiceIntakeBtn');
-  if (b) { b.classList.toggle('recording', !!on); b.setAttribute('data-tip', on ? 'Stop voice intake' : 'Voice intake — I ask, you answer'); }
+  if (b) { b.classList.toggle('recording', !!on); b.setAttribute('data-tip', on ? 'Stop voice intake' : 'Voice intake — describe the patient, I fill the form'); }
 }
 
 window.toggleVoiceIntake = function toggleVoiceIntake() {
@@ -956,7 +956,9 @@ window.toggleVoiceIntake = function toggleVoiceIntake() {
   var win = document.getElementById('aiChatWindow');
   if (win && win.style.display !== 'flex') { try { toggleChat(); } catch (e) {} }
   _viBtn(true);
-  VoiceIntake.start({
+  // Free-style by default: say everything in one go, and only the required
+  // fields still empty afterwards get asked about one by one.
+  VoiceIntake.startFreeStyle({
     say: function (m) { _viStatus(''); _viBubble(m); },
     status: _viStatus,
     done: function () { _viStatus(''); _viBtn(false); }

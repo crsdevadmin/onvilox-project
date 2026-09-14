@@ -3920,6 +3920,10 @@ SPOKEN NUMBER HANDLING:
 - oralIntake is a PERCENTAGE OF REQUIREMENT. "eating about half" -> 50. A stated deficit ("intake down forty percent") converts to the remainder -> 60.
 - ecog is an integer 0 to 4 only.
 - interruptions must be exactly one of "None","Dose Delay","Dose Reduction","RT Interruption","Treatment Held","Hospitalisation", else null.
+- sex must be exactly "Male" or "Female", else null.
+- uhic is a hospital record number, dictated digit by digit with spoken separators: "ten four two six slash twenty six" is "10426/26". Return it as a plain string, digits and separators only. If no record number was spoken, null.
+- feedingMethod must be EXACTLY one of "Oral Feeding (Normal Diet)","Enteral Feeding - Nasogastric Tube (NG)","Enteral Feeding - PEG Tube","Enteral Feeding - Jejunostomy (J-Tube)","Parenteral Nutrition (TPN)","Combination Feeding (Oral + Enteral)","Combination Feeding (Enteral + Parenteral)", else null. "eating normally" or "taking orally" is the first one.
+- usualWeight is the patient's weight BEFORE illness, only if stated separately from the current weight.
 
 STEP 3 — "reply": one short sentence to show the clinician, in plain British English. If intent is "weekly" or "profile" and no values were spoken, invite them to dictate the values. If values were spoken, say what you captured in general terms. If intent is "chat", answer or acknowledge briefly. Never invent clinical advice here.
 If intent is "ask", "reply" must NOT contain any clinical number. The application reads
@@ -3932,13 +3936,13 @@ Schema, all keys always present:
  "reply":"string",
  "query":{"topic":null,"field":null,"week":null},
  "weekly":{"week":null,"weight":null,"muac":null,"handGrip":null,"ecog":null,"albumin":null,"crp":null,"glucose":null,"creatinine":null,"urea":null,"oralIntake":null,"compliance":null,"interruptions":null,"notes":null},
- "profile":{"name":null,"age":null,"sex":null,"weight":null,"height":null,"muac":null,"cancer":null,"regimen":null,"cancerStage":null,"ecogStatus":null,"albumin":null,"crp":null,"creatinine":null,"urea":null,"bloodSugar":null,"hemoglobin":null,"reducedFoodIntake":null}}`;
+ "profile":{"name":null,"uhic":null,"age":null,"sex":null,"weight":null,"usualWeight":null,"height":null,"muac":null,"cancer":null,"regimen":null,"cancerStage":null,"feedingMethod":null,"ecogStatus":null,"albumin":null,"crp":null,"creatinine":null,"urea":null,"bloodSugar":null,"hemoglobin":null,"reducedFoodIntake":null}}`;
 
 const DICTATE_RANGE = {
   week: [1, 60], weight: [20, 250], muac: [10, 60], handGrip: [1, 90],
   ecog: [0, 4], albumin: [1, 6], crp: [0, 400], glucose: [30, 600],
   creatinine: [0.1, 15], urea: [2, 300], oralIntake: [0, 100], compliance: [0, 100],
-  age: [0, 120], height: [50, 250], ecogStatus: [0, 4], bloodSugar: [30, 600],
+  age: [0, 120], height: [50, 250], usualWeight: [20, 250], ecogStatus: [0, 4], bloodSugar: [30, 600],
   hemoglobin: [2, 25], reducedFoodIntake: [0, 100]
 };
 

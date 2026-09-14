@@ -129,6 +129,7 @@
       options: [{ value: 'Male', match: ['male', 'mail', 'man', 'gentleman', 'boy', 'm', 'he'] },
                 { value: 'Female', match: ['female', 'femail', 'woman', 'lady', 'girl', 'f', 'she'] }] },
     { id: 'weight',      ask: 'Current weight in kilograms?', type: 'number', min: 20, max: 250 },
+    { id: 'usualWeight', ask: 'What was the weight before illness?', type: 'number', min: 20, max: 250 },
     { id: 'height',      ask: 'Height in centimetres?',       type: 'number', min: 50, max: 250 },
     { id: 'cancerInput', ask: 'What is the diagnosis?', type: 'text' },
     { id: 'regimenInput',ask: 'Which treatment regimen?', type: 'text', optional: true },
@@ -163,6 +164,27 @@
   var BACK = /\b(go back|previous|back one)\b/i;
 
   var _running = false, _i = 0, _filled = 0, _ui = null;
+  var _queue = null;      // when set, only these questions are asked
+
+  // What the router calls a field -> what the form calls it.
+  var PROFILE_MAP = {
+    name: 'patientName', uhic: 'uhic', age: 'age', sex: 'sex',
+    weight: 'weight', usualWeight: 'usualWeight', height: 'height', muac: 'muac',
+    cancer: 'cancerInput', regimen: 'regimenInput', cancerStage: 'cancerStage',
+    feedingMethod: 'feedingMethod', ecogStatus: 'ecogStatus',
+    albumin: 'albumin', crp: 'crp', creatinine: 'creatinine', urea: 'urea',
+    bloodSugar: 'bloodSugar', hemoglobin: 'hemoglobin',
+    reducedFoodIntake: 'reducedFoodIntake'
+  };
+  // The form marks these required; free-style dictation rarely covers them all,
+  // and the gaps are exactly what is worth asking about afterwards.
+  var REQUIRED = ['patientName', 'uhic', 'age', 'sex', 'weight', 'usualWeight',
+                  'height', 'feedingMethod'];
+
+  function _empty(id) {
+    var el = document.getElementById(id);
+    return !el || el.value === '' || el.value === null;
+  }
 
   function _set(id, value) {
     var el = document.getElementById(id);
@@ -193,6 +215,7 @@
 
   function stop(quiet) {
     _running = false;
+    _queue = null;
     GqVoice.cancel();
     if (!quiet) {
       var m = _filled
@@ -206,10 +229,13 @@
     if (_ui && _ui.done) _ui.done();
   }
 
+  function _plan() { return _queue || SCRIPT; }
+
   async function _step() {
     if (!_running) return;
-    if (_i >= SCRIPT.length) return stop();
-    var q = SCRIPT[_i];
+    var plan = _plan();
+    if (_i >= plan.length) return stop();
+    var q = plan[_i];
     _say('❓ ' + q.ask);
     await GqVoice.speak(q.ask);
     if (!_running) return;
@@ -278,8 +304,99 @@
     return _step();
   }
 
+  // ── free-style: say everything, then fill the gaps ───────────────────────
+  // The doctor describes the patient in one go; the router extracts what was
+  // actually said; only the missing REQUIRED fields are then asked about.
+  // Nothing is inferred — a field the doctor did not mention stays empty and
+  // becomes a question, never a plausible default.
+  async function startFreeStyle(ui) {
+    if (_running) return;
+    var ok = await GqVoice.available();
+    _ui = ui;
+    if (!ok) { _say('Voice is not available here — please type the details.'); return; }
+    _running = true; _i = 0; _filled = 0; _queue = null;
+
+    var opener = 'Tell me about the patient — name, record number, age, sex, weight, height, '
+               + 'diagnosis and anything else you have. Take your time.';
+    _say('❓ ' + opener);
+    await GqVoice.speak(opener);
+    if (!_running) return;
+
+    var heard = '';
+    try {
+      heard = await GqVoice.listen({
+        quietMs: 2800,        // a long dictation has long pauses in it
+        maxMs: 60000,
+        noSpeechMs: 12000,
+        onStatus: function (st) { _status(st === 'listening' ? 'Listening…' : 'Transcribing…'); },
+        onLevel: function (rms, on) { _status('Listening  ' + GqVoice.levelBar(rms, on)); }
+      });
+    } catch (e) { _say('⚠️ ' + e.message); return stop(true); }
+    if (!_running) return;
+    _status('');
+
+    if (!heard) { _say('I did not hear anything. Press the button and try again.'); return stop(true); }
+    _say('🗣 ' + heard);
+    _status('Reading that back…');
+
+    var body;
+    try {
+      var u = (typeof auth !== 'undefined' && auth.getCurrentUser) ? auth.getCurrentUser() : null;
+      var base = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : '';
+      var res = await fetch(base + '/api/dictate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json',
+                   Authorization: (u && u.token) ? 'Bearer ' + u.token : '' },
+        body: JSON.stringify({ transcript: heard })
+      });
+      body = await res.json();
+      if (!res.ok) throw new Error(body.error || 'Could not read that back');
+    } catch (e) {
+      _status(''); _say('⚠️ ' + e.message);
+      return stop(true);
+    }
+    _status('');
+
+    var f = (body && body.fields) || {};
+    var suspect = (body && body.suspect) || [];
+    Object.keys(PROFILE_MAP).forEach(function (k) {
+      var v = f[k];
+      if (v === null || v === undefined || v === '') return;
+      if (suspect.indexOf(k) >= 0) {
+        // Out of range: show it, do not fill it. A wrong lab is worse than a blank.
+        _say('⚠️ Heard ' + k + ' as ' + v + ', which looks out of range — left blank.');
+        return;
+      }
+      if (_set(PROFILE_MAP[k], v)) { _filled++; _say('✓ ' + PROFILE_MAP[k] + ': ' + v); }
+    });
+
+    if (!_filled) _say('I could not pick any patient details out of that.');
+
+    // Now ask only about the required fields still empty.
+    var askable = SCRIPT.map(function (q) { return q.id; });
+    REQUIRED.forEach(function (id) {
+      if (askable.indexOf(id) < 0) console.warn('[voice-intake] required field has no question:', id);
+    });
+    var gaps = SCRIPT.filter(function (q) {
+      return REQUIRED.indexOf(q.id) >= 0 && _empty(q.id);
+    });
+    if (!gaps.length) {
+      var done = _filled + ' field' + (_filled === 1 ? '' : 's') + ' filled, and nothing required is missing.';
+      _say('✓ ' + done);
+      await GqVoice.speak(done + ' Please check them before saving.');
+      return stop(true);
+    }
+    _queue = gaps;
+    _i = 0;
+    var msg = _filled + ' filled. ' + gaps.length + ' required field'
+            + (gaps.length === 1 ? '' : 's') + ' still missing — let me ask.';
+    _say('— ' + msg);
+    await GqVoice.speak(msg);
+    return _step();
+  }
+
   global.VoiceIntake = {
-    start: start, stop: stop,
+    start: start, startFreeStyle: startFreeStyle, stop: stop,
     isRunning: function () { return _running; },
     // exported for testing
     parseSpokenNumber: parseSpokenNumber, parseSpokenId: parseSpokenId,
