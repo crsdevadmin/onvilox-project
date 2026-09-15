@@ -6107,6 +6107,32 @@ function calcWeeklyBMI() {
   else bEl.value = '';
 }
 
+// Take the doctor to the weekly entry itself. Reading twelve values into the
+// chat answers the question but leaves them looking at a transcript; the row has
+// the Rx state, the renal flags and the edit button, which the transcript does not.
+function showWeeklyEntry(logId) {
+  try {
+    var win = document.getElementById('aiChatWindow');
+    if (win) win.style.display = 'none';
+    var panel = document.getElementById('monPanelWeekly');
+    if (panel) panel.style.display = 'block';
+    if (typeof showMonitorTab === 'function') showMonitorTab('weekly');
+  } catch (e) {}
+
+  var row = document.getElementById('monWkRow_' + logId);
+  if (!row) return false;
+  try { row.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) { row.scrollIntoView(); }
+
+  // Flash it, then put the row's own background back rather than a guessed one.
+  var was = row.style.background;
+  var step = 0;
+  var flash = setInterval(function () {
+    row.style.background = (step % 2 === 0) ? '#fde68a' : was;
+    if (++step > 5) { clearInterval(flash); row.style.background = was; }
+  }, 260);
+  return true;
+}
+
 function renderMonitorTables() {
   var daily  = _monLogs.filter(function(l){return l.type==='daily';}).map(function(l){return Object.assign({},l,{data:typeof l.data==='string'?JSON.parse(l.data):l.data});});
   var weekly = _monLogs.filter(function(l){return l.type==='weekly';}).map(function(l){return Object.assign({},l,{data:typeof l.data==='string'?JSON.parse(l.data):l.data});});
@@ -6140,7 +6166,10 @@ function renderMonitorTables() {
   } else {
     wtBody.innerHTML = weekly.map(function(row, i) {
       var d = row.data, prev = weekly[i+1] ? weekly[i+1].data : null;
-      return '<tr style="background:' + (i===0?'#f0f9ff':'') + '">' +
+      // id + data-week so the assistant can take the doctor to this exact entry
+      // rather than reciting its contents into the chat.
+      return '<tr id="monWkRow_' + row.id + '" data-week="' + (d.week != null ? d.week : '') + '"'
+        + ' style="background:' + (i===0?'#f0f9ff':'') + '">' +
         '<td style="padding:6px 8px;border:1px solid #e2e8f0;font-weight:700;color:#0f172a;">' + (d.week ? 'Week '+d.week : '—') + (i===0?' <span style="background:#e0f2fe;color:#0369a1;font-size:9px;padding:1px 5px;border-radius:3px;">NEW</span>':'') + '</td>' +
         (function(){ var ds = d.date || (row.recorded_at ? new Date(row.recorded_at).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}) : null); return td(ds); })() +
         td(d.weight!=null ? d.weight+' kg' : null) +
@@ -6799,7 +6828,7 @@ function _answerFromRecord(q) {
   }
   var d = pick.data || {};
 
-  if (topic === 'latest_weekly') {
+  if (topic === 'latest_weekly' || (q && q.week != null && topic !== 'trend')) {
     var order = ['week','weight','muac','handGrip','ecog','albumin','crp','glucose','creatinine','urea','oralIntake','compliance'];
     var present = order.filter(function (k) { return _askNum(d[k]) !== null; });
     var when = _askDate(pick.recorded_at);
@@ -6808,16 +6837,11 @@ function _answerFromRecord(q) {
       return '• ' + DICT_LABELS[k] + ': ' + d[k];
     });
     var missing = order.filter(function (k) { return k !== 'week' && _askNum(d[k]) === null; });
-    var text = head + '\n' + (lines.length ? lines.join('\n') : 'No values recorded.')
-      + (missing.length ? '\nNot recorded: ' + missing.map(function (k) { return DICT_LABELS[k]; }).join(', ') : '');
-    // Spoken form stays short — a doctor does not want twelve numbers read out.
-    var spokenBits = ['weight','albumin','ecog','oralIntake','compliance']
-      .filter(function (k) { return _askNum(d[k]) !== null; })
-      .map(function (k) { return ASK_SPOKEN[k] + ' ' + d[k] + (ASK_UNITS[k] || ''); });
-    var spoken = head + '. ' + (spokenBits.length ? spokenBits.join(', ') + '.' : 'No values recorded.')
-      + (missing.length ? ' ' + missing.length + ' other field'
-         + (missing.length === 1 ? '' : 's') + ' not recorded — they are on screen.' : '');
-    return { text: text, spoken: spoken };
+    // The entry itself is the answer. Say which one it is, then show it.
+    var summary = head + ' — ' + present.filter(function (k) { return k !== 'week'; }).length
+      + ' value' + (present.length === 2 ? '' : 's') + ' recorded'
+      + (missing.length ? ', ' + missing.length + ' not recorded' : '') + '.';
+    return { text: summary + ' Opening the entry below.', spoken: summary, goto: pick.id };
   }
 
   if (topic === 'value' && field && DICT_LABELS[field]) {
@@ -7001,6 +7025,18 @@ async function _routeChatDictation(text) {
     var ans = _answerFromRecord(body.query || {});
     if (ans) {
       _chatDict = false;
+      // Some answers ARE a place in the record, not a sentence. Go there.
+      if (ans.goto != null) {
+        _convo = false;                 // the doctor is now reading the entry
+        _chatMicIcon(false);
+        _chatDictSay(ans.text, '');
+        _chatStatusEl = null;
+        _speak(ans.spoken);
+        if (!showWeeklyEntry(ans.goto)) {
+          _chatDictSay(ans.text + ' (The entry is in the Weekly tab.)', '');
+        }
+        return;
+      }
       return _convoReply(ans.text, ans.spoken);
     }
     // Nothing in the record covers it — let the doctor send it to the assistant.
