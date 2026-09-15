@@ -77,6 +77,9 @@
     .qnum { font-size:9.5px; font-weight:800; letter-spacing:.09em; text-transform:uppercase;
             color:var(--cyan); display:block; margin-bottom:5px; }
     .qhelp { font-size:11.5px; color:var(--text-3); display:block; margin-top:5px; }
+    .qrange { display:block; margin-top:5px; font-size:11px; line-height:1.45;
+      color:var(--text-3, #7c8ba1); border-left:2px solid var(--border, #2a3550);
+      padding-left:7px; }
     /* Confirmation chip for a value that just landed on the form */
     .vchip { display:inline-block; font-size:10.5px; font-weight:800; border-radius:6px;
              padding:2px 8px; border:1px solid var(--green); color:var(--green);
@@ -195,7 +198,6 @@
       border: 1px solid var(--border-2); border-radius: 7px; padding: 4px 9px;
       font-size: 10.5px; font-weight: 700; white-space: nowrap; z-index: 5;
     }
-    .chat-tool.demo:hover { color: var(--rose); border-color: var(--rose); background: var(--rose-dim); }
     .ai-chat-input { border-radius: 10px !important; padding: 10px 13px !important;
       background: var(--surface-2) !important; border: 1px solid var(--border-2) !important; }
     .ai-chat-input:focus { outline: none; border-color: var(--cyan) !important; }
@@ -268,11 +270,6 @@
     <input type="file" id="pdfUpload" accept=".pdf" style="display:none;" onchange="handlePdfUpload(event)">
     <button class="chat-tool" onclick="triggerFileUpload()" data-tip="Attach a report (PDF)" aria-label="Attach a report">
       <svg viewBox="0 0 24 24"><path d="M16.5 6v11.5a4.5 4.5 0 0 1-9 0V5a3 3 0 0 1 6 0v10.5a1.5 1.5 0 0 1-3 0V6H9v9.5a3 3 0 0 0 6 0V5a4.5 4.5 0 0 0-9 0v12.5a6 6 0 0 0 12 0V6h-1.5Z"/></svg>
-    </button>
-    <!-- Generating a synthetic case is a deliberate act, not something the
-         model can decide to do because a message sounded like a case prompt. -->
-    <button class="chat-tool demo" onclick="generateDemoCase()" data-tip="Synthetic demo case (not real)" aria-label="Generate a demo case">
-      <svg viewBox="0 0 24 24"><path d="M9 2h6v2h-1v4.2l4.4 8.6A3 3 0 0 1 15.7 21H8.3a3 3 0 0 1-2.7-4.2L10 8.2V4H9V2Zm3 2v4.7L8.6 15h6.8L12 8.7V4Z"/></svg>
     </button>
     <button class="chat-tool" id="voiceIntakeBtn" onclick="toggleVoiceIntake()"
             data-tip="Voice intake — describe the patient, I fill the form" aria-label="Voice intake" style="display:none;">
@@ -2018,13 +2015,27 @@ function _nextUnanswered(){
   return null;
 }
 
+// The reference range already sits under every lab input as .range-hint. Asking
+// for a value without it makes the doctor look away from the conversation to
+// check what "normal" is, so the question carries it too. Read from the form
+// rather than re-typed here, so the two can never disagree.
+function _rangeHintFor(fieldId){
+  const el = document.getElementById(fieldId);
+  if (!el) return '';
+  const group = el.closest('.form-group');
+  const hint = group ? group.querySelector('.range-hint') : null;
+  return hint ? hint.innerHTML.trim() : '';
+}
+
 function askIntakeQuestion(){
   const q = _nextUnanswered();
   _intakeProgress();
   if (!q) return finishIntake();
+  const range = _rangeHintFor(q.f);
   addMessageHtml(
     `<span class="qnum">Question ${_intakeAnswered() + 1} of ${INTAKE_QUESTIONS.length - 1}</span>`
-    + q.q + (q.help ? `<span class="qhelp">${q.help}</span>` : ''), 'ai');
+    + q.q + (q.help ? `<span class="qhelp">${q.help}</span>` : '')
+    + (range ? `<span class="qrange">${range}</span>` : ''), 'ai');
   renderChatPicker(q);
 }
 
@@ -2315,41 +2326,6 @@ async function sendChatMessage() {
     typing.remove();
     addMessage('Sorry, I couldn\'t reach the AI. Please check server connection.', 'ai');
   }
-}
-
-/* Synthetic demo cases still exist, but only when explicitly asked for — and
-   the values arrive marked as generated, in red, so they can never be mistaken
-   for measurements. */
-async function generateDemoCase(){
-  if (!confirm('Generate a SYNTHETIC demonstration patient?\n\n'
-    + 'Every value will be invented by the AI and marked in red as "generated". '
-    + 'Do not use this for a real patient.')) return;
-  openChat();
-  addMessage('Generate a demonstration case', 'user');
-  const typing = addTyping();
-  try {
-    const apiBase = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : '';
-    const res = await fetch(`${apiBase}/api/chat`, {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ message:'Generate a demonstration oncology nutrition case.', mode:'generate' })
-    });
-    const data = await res.json();
-    typing.remove();
-    if (!res.ok) return addMessage('AI error: ' + (data.error || res.status), 'ai');
-    if (data.reply) addMessageHtml(data.reply, 'ai');
-    if (data.extractedData){
-      applyExtractionData(data.extractedData);
-      window._fieldSources = window._fieldSources || {};
-      Object.keys(data.extractedData).forEach(k => {
-        const el = document.getElementById(k);
-        if (el){ window._fieldSources[el.id] = 'generated';
-                 el.classList.remove('ai-filled','ai-na'); el.classList.add('ai-generated');
-                 setFieldTag(el.id, 'generated'); }
-      });
-      addMessageHtml('⚠ <b>Synthetic case.</b> Every red field was invented for demonstration '
-        + 'and none of it was measured.', 'ai');
-    }
-  } catch(e){ typing.remove(); addMessage('Could not reach the AI.', 'ai'); }
 }
 
 function addMessageHtml(htmlText, type) {

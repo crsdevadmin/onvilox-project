@@ -142,12 +142,17 @@
   }
 
   // The last thing the assistant said, which is the question to read aloud.
+  // The bubble also carries the question number and the reference range; both
+  // belong on screen, neither is worth hearing before every single lab value.
   function _lastAiText() {
     var msgs = document.querySelectorAll('#chatMsgs .msg');
     for (var i = msgs.length - 1; i >= 0; i--) {
-      if (/msg-ai/.test(msgs[i].className)) {
-        return (msgs[i].innerText || '').replace(/\s+/g, ' ').trim();
-      }
+      if (!/msg-ai/.test(msgs[i].className)) continue;
+      var clone = msgs[i].cloneNode(true);
+      Array.prototype.forEach.call(clone.querySelectorAll('.qnum, .qrange'), function (el) {
+        if (el.parentNode) el.parentNode.removeChild(el);
+      });
+      return (clone.innerText || clone.textContent || '').replace(/\s+/g, ' ').trim();
     }
     return '';
   }
