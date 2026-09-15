@@ -3117,6 +3117,14 @@
 
             addMessage(text, 'user');
             input.value = '';
+
+            // Questions about this patient are answered from her record, by the
+            // same code the mic uses. Checked before the panel is toggled so a
+            // written answer is not rendered into a chat that just closed.
+            try {
+              if (typeof _tryAnswerQuestion === 'function' && await _tryAnswerQuestion(text)) return;
+            } catch (e) { /* fall through to the assistant */ }
+
             window.toggleChat();
 
             const typing = addTyping();
@@ -6884,6 +6892,49 @@ function _answerFromRecord(q) {
   }
 
   return null;   // not answerable from the record — hand it on
+}
+
+// A typed question must behave exactly like a spoken one. Until now
+// _answerFromRecord was reachable only from the voice router, so typing "show me
+// the latest weekly report" went to /api/chat — the field EXTRACTOR — which tried
+// to pull patient values out of the question and answered with nothing useful.
+//
+// The gate is deliberately a cheap local regex: pasted clinical notes must keep
+// going to the extractor, and they do not open with "show" or "what".
+var ASK_HINT = /^\s*(show|what|which|when|how|is|was|are|did|does|has|have|tell me|give me|open|go to|display)\b/i;
+
+async function _tryAnswerQuestion(text) {
+  if (!text || !ASK_HINT.test(text)) return false;
+  var u = (typeof auth !== 'undefined') ? auth.getCurrentUser() : null;
+  var base = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : '';
+  var body;
+  try {
+    var res = await fetch(base + '/api/dictate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json',
+                 Authorization: (u && u.token) ? 'Bearer ' + u.token : '' },
+      body: JSON.stringify({ transcript: text })
+    });
+    body = await res.json();
+    if (!res.ok || !body || body.intent !== 'ask') return false;
+  } catch (e) { return false; }      // fall through to the normal assistant
+
+  var ans = _answerFromRecord(body.query || {});
+  if (!ans) return false;
+
+  _chatStatusEl = null;
+  if (ans.goto != null) {
+    _chatDictSay(ans.text, '');
+    _chatStatusEl = null;
+    if (!showWeeklyEntry(ans.goto)) {
+      _chatStatusEl = null;
+      _chatDictSay(ans.text + ' (The entry is in the Weekly tab.)', '');
+    }
+    return true;
+  }
+  _chatDictSay(ans.text, '');
+  _chatStatusEl = null;
+  return true;
 }
 
 // ── Free-style dictation from AI Assistance ─────────────────────
