@@ -44,6 +44,72 @@ const IngredientLibrary = [
     tags: ['LactoseFree', 'Plant-based', 'Vegan'],
     healingRationale: "Plant-based isolate for patients with lactose intolerance or specific dietary preferences."
   },
+  // Protein-plan base ingredients (P1–P5, see js/protein-plans.js — keep values in sync)
+  {
+    id: 'mpc70',
+    name: 'Milk Protein Concentrate (MPC 70)',
+    category: 'PROTEIN',
+    kcalPerGram: 3.6,
+    pPerGram: 0.7,
+    fPerGram: 0.015,
+    cPerGram: 0.18,
+    costPerGram: 0.04,
+    inStock: true,
+    tags: ['Casein-rich', 'SustainedRelease', 'Animal-based'],
+    healingRationale: "Sustained-release milk protein that supports high volume tolerance."
+  },
+  {
+    id: 'mpc85',
+    name: 'Milk Protein Concentrate — concentrated (MPC 85)',
+    category: 'PROTEIN',
+    kcalPerGram: 3.6,
+    pPerGram: 0.85,
+    fPerGram: 0.015,
+    cPerGram: 0.05,
+    costPerGram: 0.05,
+    inStock: true,
+    tags: ['Casein-rich', 'LowLactose', 'Concentrated'],
+    healingRationale: "Concentrated, lower-lactose milk protein — more protein per serving, gentler on digestion."
+  },
+  {
+    id: 'wpc80',
+    name: 'Whey Protein Concentrate (WPC 80)',
+    category: 'PROTEIN',
+    kcalPerGram: 4.0,
+    pPerGram: 0.8,
+    fPerGram: 0.06,
+    cPerGram: 0.07,
+    costPerGram: 0.04,
+    inStock: true,
+    tags: ['HighLeucine', 'FastActing', 'Animal-based'],
+    healingRationale: "Fast-acting whey with the highest leucine content for muscle protein synthesis."
+  },
+  {
+    id: 'soy_isolate',
+    name: 'Soya Protein Isolate (SPI)',
+    category: 'PROTEIN',
+    kcalPerGram: 3.7,
+    pPerGram: 0.9,
+    fPerGram: 0.01,
+    cPerGram: 0.01,
+    costPerGram: 0.03,
+    inStock: true,
+    tags: ['Plant-based', 'DairyFree'],
+    healingRationale: "Plant protein that lowers phosphorus / acid load; excluded for female patients."
+  },
+  {
+    id: 'rice_protein',
+    name: 'Brown Rice Protein',
+    category: 'PROTEIN',
+    kcalPerGram: 3.9,
+    pPerGram: 0.8,
+    fPerGram: 0.03,
+    cPerGram: 0.08,
+    costPerGram: 0.04,
+    inStock: true,
+    tags: ['Plant-based', 'DairyFree', 'Vegan', 'SoyFree'],
+    healingRationale: "Complements pea protein's amino-acid profile (methionine) in the dairy-free blend."
+  },
 
   // FATS
   {

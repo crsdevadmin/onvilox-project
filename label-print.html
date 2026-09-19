@@ -153,6 +153,7 @@
 <script src="/js/stores.js"></script>
 <script src="/js/patient-store.js?v=3.2"></script>
 <script src="/js/ingredients.js"></script>
+<script src="/js/protein-plans.js"></script>
 <script src="/js/nutrition-engine-v4.js"></script>
 <script src="/js/manufacturing.js?v=labels1"></script>
 
@@ -245,7 +246,7 @@ function renderLabels(){
 
   // BACK — batch formulation (names only)
   const r = _plan && _plan.recipe ? _plan.recipe : {};
-  const names = [r.protein, r.carb, r.fat, r.omega, r.bcaa, r.glutamine]
+  const names = (window.ProteinPlans ? ProteinPlans.recipeRows(r) : [r.protein, r.carb, r.fat, r.omega, r.bcaa, r.glutamine])
     .filter(Boolean).map(x => x.name).filter(Boolean);
   document.getElementById('bFormula').innerHTML = names.length
     ? names.map(n => `<span>• ${n}</span>`).join('<br>')

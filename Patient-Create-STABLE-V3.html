@@ -799,6 +799,7 @@
         <select id="isVegetarian">
           <option value="false">Non-Vegetarian</option>
           <option value="true">Vegetarian</option>
+          <option value="vegan">Vegan (no dairy)</option>
         </select>
       </div>
       <div class="form-group">
@@ -1313,7 +1314,8 @@ async function submitPatient(){
     tumorBurden: document.getElementById('tumorBurden').value,
     ecogStatus: parseInt(document.getElementById('ecogStatus').value || 0),
     cancerStage: document.getElementById('cancerStage').value,
-    vegetarian: (document.getElementById('isVegetarian').value === 'true'),
+    vegetarian: (document.getElementById('isVegetarian').value !== 'false'),
+    vegan: (document.getElementById('isVegetarian').value === 'vegan'),
     culturalPreferences: document.getElementById('culturalPreferences').value,
     notes: document.getElementById('notes').value,
     hospitalName: document.getElementById('hospitalName') ? document.getElementById('hospitalName').value : '',
@@ -2693,6 +2695,7 @@ window.onload = function() {
     <style>@keyframes spin { 0% { transform:rotate(0deg); } 100% { transform:rotate(360deg); } }</style>
   </div>
   
+  <script src="/js/protein-plans.js"></script>
   <script src="/js/nutrition-engine-v4.js?v=4.0"></script>
   <script src="/js/engine-config.js"></script>
   <script src="/js/ai-report-service.js"></script>

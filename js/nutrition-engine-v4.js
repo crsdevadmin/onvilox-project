@@ -909,6 +909,36 @@ function generateNutritionPlan(patient, engineConfig) {
   else if (tolerance === 'mucositis' || hasMucositis || (patient.feedingMethod || '').toLowerCase().includes('enteral')) proteinType = 'Peptide formulas';
   else if (tolerance === 'lactose') proteinType = 'Plant proteins (pea / rice)';
 
+  // ── Protein Formulation Plan (P1–P5) — js/protein-plans.js ──────────────
+  // The plan decides the protein blend the store weighs out; the engine's
+  // g/kg targets (incl. the renal cap) still decide how much protein.
+  let proteinPlan = null;
+  if (typeof ProteinPlans !== 'undefined') {
+    const pelvicGI = treatmentTypes.some(t => t.includes('pelvic') || t.includes('abdominal'))
+      || lowerComorbidities.some(c => c.includes('enteritis'))
+      || (hasAnyRadiation && /pelv|abdom|rectum|bladder|cervix|prostate|bowel/.test(rtSubSite));
+    const sel = ProteinPlans.select(patient, {
+      renal: hasRenalIssue,
+      gi: !!patient.giIssues || hasIBD || hasGIDiarrhea || pelvicGI || tolerance === 'gi',
+      lowVolume: hasAppetiteLoss || hasNausea
+    });
+    if (tolerance === 'lactose' && sel.code !== 'P4') { sel.code = 'P4'; sel.dairyFree = true; sel.reasons.unshift('Lactose tolerance issue recorded'); }
+    const _override = ProteinPlans.normCode(patient.proteinPlanOverride);
+    proteinPlan = {
+      code: _override || sel.code,
+      autoCode: sel.code,
+      overridden: !!(_override && _override !== sel.code),
+      name: ProteinPlans.PLANS[_override || sel.code].name,
+      soyFree: sel.soyFree,
+      soyFreeReason: sel.soyFreeReason,
+      dairyFree: sel.dairyFree,
+      reasons: sel.reasons,
+      label: ProteinPlans.label(_override || sel.code, sel.soyFree),
+      blendText: ProteinPlans.blendText(_override || sel.code, sel.soyFree)
+    };
+    proteinType = proteinPlan.label;
+  }
+
 
   const flavorProfile = (() => {
     if (hasNausea || sideEffects.some(s => s.includes('taste'))) {
@@ -918,6 +948,9 @@ function generateNutritionPlan(patient, engineConfig) {
   })();
 
   const rationale = [];
+  if (proteinPlan) {
+    rationale.push(`<b>Protein Plan ${proteinPlan.code} (${proteinPlan.name}):</b> ${proteinPlan.blendText}${proteinPlan.overridden ? ' — doctor override (auto: ' + proteinPlan.autoCode + ')' : ' — ' + proteinPlan.reasons.join('; ')}.${proteinPlan.soyFreeReason && ProteinPlans.PLANS[proteinPlan.code].soyFree ? ' SPI removed: ' + proteinPlan.soyFreeReason + '.' : ''}`);
+  }
   if (hasRenalIssue) {
     rationale.push(`<b>Renal Safety (Strict):</b> Protein capped at ${proteinPerKg} g/kg to protect kidney function (KDIGO), prioritizing safety over aggressive muscle loading.`);
   } else if (cachexia) {
@@ -977,7 +1010,7 @@ function generateNutritionPlan(patient, engineConfig) {
 
   function buildFormulationOptions(targets) {
     if (typeof IngredientLibrary === 'undefined') return null;
-    const { macroProtein, macroCarbs, macroFat, proteinType, bloodSugar, cachexia, crp } = targets;
+    const { macroProtein, macroCarbs, macroFat, proteinType, bloodSugar, cachexia, crp, proteinPlan } = targets;
     
     // Null safety for Library lookups
     const getIng = (id) => IngredientLibrary.find(i => i.id === id) || { name: id, pPerGram: 1, cPerGram: 1, fPerGram: 1, healingRationale: '' };
@@ -1012,10 +1045,13 @@ function generateNutritionPlan(patient, engineConfig) {
     const bcaaProtein = bcaaDailyGrams;
 
     // All ingredient grams calculated from DAILY totals — round once, no per-serving compounding error
-    // Step 1: whey protein — sized to deliver daily formula protein target
-    const pGrams = Math.round(dailyProtein / (selectedProtein.pPerGram || 1));
-    const carbsFromProtein = pGrams * (selectedProtein.cPerGram || 0);
-    const fatFromProtein = pGrams * (selectedProtein.fPerGram || 0);
+    // Step 1: protein — sized to deliver daily formula protein target.
+    // With a protein plan the blend (P1–P5) replaces the single protein source.
+    const blend = (proteinPlan && typeof ProteinPlans !== 'undefined')
+      ? ProteinPlans.build(proteinPlan.code, dailyProtein, proteinPlan.soyFree) : null;
+    const pGrams = blend ? blend.grams : Math.round(dailyProtein / (selectedProtein.pPerGram || 1));
+    const carbsFromProtein = blend ? blend.carbs : pGrams * (selectedProtein.cPerGram || 0);
+    const fatFromProtein = blend ? blend.fat : pGrams * (selectedProtein.fPerGram || 0);
 
     // Step 2: fat grams (MCT daily)
     const neededFat = Math.max(0, dailyFat - fatFromProtein);
@@ -1029,16 +1065,21 @@ function generateNutritionPlan(patient, engineConfig) {
 
     // Step 4: daily batch kcal — ground truth, rounded once from daily grams
     const recipeKcal = Math.round(
-      pGrams * selectedProtein.kcalPerGram +
+      (blend ? blend.kcal : pGrams * selectedProtein.kcalPerGram) +
       cGrams * selectedCarb.kcalPerGram +
       fGrams * selectedFat.kcalPerGram +
       oGrams * selectedOmega.kcalPerGram
     );
-    const wheyProtein = Math.round(pGrams * selectedProtein.pPerGram);
+    const wheyProtein = blend ? Math.round(blend.protein) : Math.round(pGrams * selectedProtein.pPerGram);
     const recipeProtein = wheyProtein + glutamineProtein + bcaaProtein;
 
     return {
-      protein: { id: selectedProtein.id, name: selectedProtein.name, grams: pGrams, deliveredProtein: wheyProtein, rationale: selectedProtein.healingRationale },
+      protein: blend
+        ? { id: 'protein_blend_' + blend.code, name: 'Protein Blend ' + blend.label, grams: pGrams, deliveredProtein: wheyProtein,
+            rationale: ProteinPlans.PLANS[blend.code].use, planCode: blend.code, soyFree: blend.soyFree,
+            components: blend.rows.map(r => ({ id: r.id, name: r.name, pct: r.pct, grams: r.grams, deliveredProtein: r.deliveredProtein, rationale: r.rationale })) }
+        : { id: selectedProtein.id, name: selectedProtein.name, grams: pGrams, deliveredProtein: wheyProtein, rationale: selectedProtein.healingRationale },
+      proteinPlan: proteinPlan || null,
       carb: { id: selectedCarb.id, name: selectedCarb.name, grams: cGrams, rationale: selectedCarb.healingRationale },
       fat: { id: selectedFat.id, name: selectedFat.name, grams: fGrams, rationale: "Metabolic energy without glycemic load" },
       omega: (oGrams > 0) ? { id: 'omega3_powder', name: 'Omega-3 Powder', grams: oGrams, rationale: "Anti-inflammatory / EPA support." } : null,
@@ -1298,7 +1339,7 @@ function generateNutritionPlan(patient, engineConfig) {
     estimatedDietaryProtein, totalProteinDelivery,
     onsCalories, onsFloorKcal, prescribedProtein,
     dailyCalories, dailyProtein, perServingCalories, perServingProtein,
-    proteinType, dailyCarbs, dailyFat, macroProtein, macroCarbs, macroFat,
+    proteinType, proteinPlan, dailyCarbs, dailyFat, macroProtein, macroCarbs, macroFat,
     micronutrients, rationale, nutritionRisk, nutritionRiskScore: riskScore,
     nutritionRiskReasons, safetyAlerts,
     patientInstructions,
@@ -1324,7 +1365,7 @@ function generateNutritionPlan(patient, engineConfig) {
     baseEnergy: baseDailyCalories,
     baseProtein: baseDailyProtein,
     outcomePrediction: outcomePredictionData,
-    recipe: buildFormulationOptions({ macroProtein, macroCarbs, macroFat, proteinType, bloodSugar, cachexia, crp }),
+    recipe: buildFormulationOptions({ macroProtein, macroCarbs, macroFat, proteinType, bloodSugar, cachexia, crp, proteinPlan }),
     auditContext: {
       calorieGap: baseDailyCalories - totalDailyCalories,
       proteinGap: baseDailyProtein - totalDailyProtein,

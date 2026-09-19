@@ -331,6 +331,7 @@
       sarcopeniaStatus: patient.sarcopeniaStatus, leanBodyMass: patient.leanBodyMass,
       fatPercent: patient.fatPercent, smi: patient.smi, handGrip: patient.handGrip,
       bsa: patient.bsa, vegetarian: patient.vegetarian,
+      vegan: patient.vegan || undefined, proteinPlanOverride: patient.proteinPlanOverride || undefined,
       culturalPreferences: patient.culturalPreferences, allergies: patient.allergies,
       sideEffects: patient.sideEffects, existingSupplements: patient.existingSupplements,
       treatmentTypes: patient.treatmentTypes

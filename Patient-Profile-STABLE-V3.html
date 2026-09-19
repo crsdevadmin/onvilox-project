@@ -1577,6 +1577,17 @@
                   </select>
                 </div>
                 <div>
+                  <label style="font-size:10px;font-weight:700;color:#64748b;display:block;margin-bottom:3px;">Protein Plan</label>
+                  <select id="wxRx_proteinPlan" onchange="recomputeWxRxRecipe()" style="width:100%;font-size:13px;padding:6px 8px;border:1px solid #cbd5e1;border-radius:5px;box-sizing:border-box;">
+                    <option value="P1">P1 · Standard</option>
+                    <option value="P2">P2 · Low-Volume</option>
+                    <option value="P3">P3 · GI-Sensitive</option>
+                    <option value="P4">P4 · Dairy-Free</option>
+                    <option value="P5">P5 · Renal Support</option>
+                  </select>
+                  <div id="wxRx_proteinPlanNote" style="font-size:10px;color:#64748b;margin-top:3px;line-height:1.35;"></div>
+                </div>
+                <div>
                   <label style="font-size:10px;font-weight:700;color:#64748b;display:block;margin-bottom:3px;">Supplement Kcal</label>
                   <input id="wxRx_suppKcal" type="number" step="10" style="width:100%;font-size:12px;padding:6px 8px;border:1px solid #cbd5e1;border-radius:5px;box-sizing:border-box;">
                 </div>
@@ -2361,6 +2372,18 @@
                     <select id="epVegetarian">
                       <option value="false">Non-Vegetarian</option>
                       <option value="true">Vegetarian</option>
+                      <option value="vegan">Vegan (no dairy)</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label>Protein plan</label>
+                    <select id="epProteinPlan">
+                      <option value="">Auto (recommended)</option>
+                      <option value="P1">P1 · Standard</option>
+                      <option value="P2">P2 · Low-Volume</option>
+                      <option value="P3">P3 · GI-Sensitive</option>
+                      <option value="P4">P4 · Dairy-Free (pea + rice)</option>
+                      <option value="P5">P5 · Renal Support</option>
                     </select>
                   </div>
                   <div class="form-group">
@@ -2487,6 +2510,7 @@
         <script src="/js/manufacturing.js"></script>
         <script src="/js/master-data.js"></script>
         <script src="/js/ingredients.js"></script>
+        <script src="/js/protein-plans.js"></script>
         <script src="/js/patient-store.js?v=3.2"></script>
         <script src="/js/nutrition-engine-v4.js?v=4.0"></script>
         <script src="/js/engine-config.js"></script>
@@ -2730,7 +2754,7 @@
                     if (t.totalProtein) t.suppProtein = t.totalProtein;
                     t.feedingRoute = (window.patient && window.patient.feedingMethod) || t.feedingRoute;
                     if (typeof calcWxRecipe === 'function' && t.suppKcal && t.suppProtein) {
-                      r = calcWxRecipe(t.suppKcal, t.suppProtein, t.formulation || 'Standard') || r;
+                      r = calcWxRecipe(t.suppKcal, t.suppProtein, t.formulation || 'Standard', _wxProteinSel(t)) || r;
                     }
                   }
                   var srv = r.servingsPerDay || 3;
@@ -2769,7 +2793,7 @@
                     +'</div>'
                     // Summary cards — same style as sectionProduction
                     +'<div class="rg rg4" style="margin-bottom:12px">'
-                    +'<div class="rf"><div class="rf-lbl">Formulation</div><div class="rf-val">'+(t.formulation||'Standard')+'</div></div>'
+                    +'<div class="rf"><div class="rf-lbl">Formulation</div><div class="rf-val">'+(t.formulation||'Standard')+(r.proteinPlan?'<br><span style="font-size:10px;font-weight:600;color:#475569">Protein '+r.proteinPlan.code+' · '+r.proteinPlan.name+' — '+r.proteinPlan.blendText+'</span>':'')+'</div></div>'
                     +'<div class="rf"><div class="rf-lbl">Route</div><div class="rf-val">'+(t.feedingRoute||'Oral Feeding')+'</div></div>'
                     +'<div class="rf"><div class="rf-lbl">Per Serving Energy</div><div class="rf-val big">'+perSrvKcal+(t.suppKcal?' kcal':'')+'</div></div>'
                     +'<div class="rf"><div class="rf-lbl">Per Serving Protein</div><div class="rf-val big">'+perSrvProt+'</div></div>'
@@ -3044,7 +3068,8 @@
               document.getElementById('epBSA').value = patient.bsa ?? '';
 
               // Dietary
-              document.getElementById('epVegetarian').value = String(!!patient.vegetarian);
+              document.getElementById('epVegetarian').value = patient.vegan ? 'vegan' : String(!!patient.vegetarian);
+              document.getElementById('epProteinPlan').value = patient.proteinPlanOverride || '';
               document.getElementById('epCultural').value = patient.culturalPreferences ?? '';
 
               // Tags
@@ -3566,7 +3591,9 @@
             patient.smi = parseFloat(document.getElementById('epSMI').value || 0);
             patient.handGrip = parseFloat(document.getElementById('epHandGrip').value || 0);
             patient.bsa = parseFloat(document.getElementById('epBSA').value || 0);
-            patient.vegetarian = document.getElementById('epVegetarian').value === 'true';
+            patient.vegan = document.getElementById('epVegetarian').value === 'vegan';
+            patient.vegetarian = patient.vegan || document.getElementById('epVegetarian').value === 'true';
+            patient.proteinPlanOverride = document.getElementById('epProteinPlan').value || null;
             patient.culturalPreferences = document.getElementById('epCultural').value.trim();
             patient.notes = document.getElementById('epNotes').value.trim();
 
@@ -3990,7 +4017,7 @@
                 if (_bfEstimated) _bfEl.innerHTML += ' <span style="font-size:9px;color:#94a3b8;">(est.)</span>';
             }
             setVal('pActivity', patient.activityLevel || '-');
-            setVal('pVegetarian', (patient.vegetarian ? 'Vegetarian' : 'Non-Vegetarian'));
+            setVal('pVegetarian', (patient.vegan ? 'Vegan' : patient.vegetarian ? 'Vegetarian' : 'Non-Vegetarian'));
             setVal('pBSA', (patient.bsa ? patient.bsa + ' m²' : '-'));
             setVal('pLBM', (patient.leanBodyMass ? patient.leanBodyMass + ' kg' : '-'));
             // Sarcopenia badge
@@ -4655,7 +4682,7 @@
               // Look up macro contributions from IngredientLibrary for transparency
               const getLib = id => (typeof IngredientLibrary !== 'undefined' ? IngredientLibrary.find(i => i.id === id) : null) || {};
               let totalPowderGrams = 0, totalProtein = 0, totalCarbs = 0, totalFat = 0;
-              [r.protein, r.carb, r.fat, r.omega, r.bcaa, r.glutamine].forEach(ing => {
+              ProteinPlans.recipeRows(r).forEach(ing => {
                 if (!ing || !ing.grams) return;
                 const lib = getLib(ing.id);
                 const carbContrib = lib.cPerGram > 0 ? Math.round(ing.grams * lib.cPerGram * 10) / 10 : 0;
@@ -4699,7 +4726,8 @@
               // Protein breakdown: the batch total includes free amino acids (glutamine / BCAA),
               // which is why it exceeds the formula protein target. Show the split for clarity.
               const _protOf = (ing) => { if (!ing || !ing.grams) return 0; const lib = getLib(ing.id); return lib.pPerGram > 0 ? Math.round(ing.grams * lib.pPerGram * 10) / 10 : 0; };
-              const _formulaP = _protOf(r.protein);
+              const _formulaP = Math.round(((r.protein && r.protein.components) ? r.protein.components : [r.protein])
+                .reduce((a, c) => a + _protOf(c), 0) * 10) / 10;
               const _gluP = _protOf(r.glutamine);
               const _bcaaP = _protOf(r.bcaa);
               const _pParts = [`Formula ${_formulaP}g`];
@@ -7875,6 +7903,7 @@ async function generateRxFromLog(logId, weekNo) {
           ibw: fbPlan.ibw || null, weightBasis: fbPlan.weightBasis || '',
           feedingRoute: (window.patient && window.patient.feedingMethod) || '',
           formulation: (fbPlan.recommendedFormulation || 'Standard').replace(/\s*\(.*?\)/,'').trim(),
+          proteinPlan: (fbPlan.proteinPlan && fbPlan.proteinPlan.overridden && fbPlan.proteinPlan.code) || null,
           _clientGenerated: true
         }
       };
@@ -7902,21 +7931,19 @@ var _wxRxCurMonLogId = null;
 var _wxRxCurWeekNo   = null;
 
 // ── Client-side recipe calculator (mirrors server calcWeeklyRecipe) ─────────
-function calcWxRecipe(suppKcal, suppProtein, formulation) {
+// proteinOpts = { plan: 'P1'…'P5', soyFree: bool } — see js/protein-plans.js
+function calcWxRecipe(suppKcal, suppProtein, formulation, proteinOpts) {
   if (!suppKcal || !suppProtein || suppKcal <= 0 || suppProtein <= 0) return null;
   var isHydrolyzed = formulation === 'Hydrolyzed';
   var isDiabetic   = formulation === 'Diabetic';
   var isAntiInflam = formulation === 'Anti-inflammatory';
-  var pPerGram = isHydrolyzed ? 0.85 : 0.90;
-  var protName = isHydrolyzed ? 'Hydrolyzed Whey Protein' : 'Whey Protein Isolate (90%)';
-  var protGrams = Math.round(suppProtein / pPerGram);
-  var protDeliv = Math.round(protGrams * pPerGram * 10) / 10;
-  var protRationale = isHydrolyzed
-    ? 'Hydrolyzed peptides for rapid absorption and reduced osmotic load in patients with GI toxicity.'
-    : 'High Leucine content to stimulate muscle protein synthesis during treatment.';
+  var po = proteinOpts || {};
+  var planCode = ProteinPlans.normCode(po.plan) || (isHydrolyzed ? 'P3' : 'P1');
+  var blend = ProteinPlans.build(planCode, suppProtein, !!po.soyFree);
+  var protDeliv = blend.protein;
   var fatPct  = isDiabetic ? 0.57 : 0.45;
   var carbPct = isDiabetic ? 0.25 : 0.37;
-  var mctGrams = Math.max(0, Math.round(suppKcal * fatPct / 9 / 0.70));
+  var mctGrams = Math.max(0, Math.round(Math.max(0, suppKcal * fatPct / 9 - blend.fat) / 0.70));
   var mctFat   = Math.round(mctGrams * 0.70 * 10) / 10;
   var mctCarbs = Math.round(mctGrams * 0.30 * 10) / 10;
   var omega3Grams = isAntiInflam ? 6 : 3.9;
@@ -7926,7 +7953,7 @@ function calcWxRecipe(suppKcal, suppProtein, formulation) {
     ? 'High EPA/DHA (6 g/day) to downregulate pro-inflammatory cytokines and stabilize lean mass.'
     : 'Anti-inflammatory / EPA support.';
   var carbGramsTotal  = suppKcal * carbPct / 4;
-  var carbSourceGrams = Math.max(0, Math.round((carbGramsTotal - mctCarbs - omega3Carbs) * 10) / 10);
+  var carbSourceGrams = Math.max(0, Math.round((carbGramsTotal - mctCarbs - omega3Carbs - blend.carbs) * 10) / 10);
   var carbName = isDiabetic ? 'Palatinose (Slow Release)' : 'Maltodextrin (DE 19)';
   var carbRationale = isDiabetic
     ? 'Slow-release carbohydrate to maintain stable blood glucose levels in diabetic oncology patients.'
@@ -7934,9 +7961,11 @@ function calcWxRecipe(suppKcal, suppProtein, formulation) {
   var glutGrams = 16;
   return {
     servingsPerDay: 3,
-    ingredients: [
-      { name: protName, grams: protGrams, deliveredProtein: protDeliv, rationale: protRationale,
-        contrib: { protein: protDeliv, carbs: Math.round(protGrams*0.02*10)/10, fat: Math.round(protGrams*0.01*10)/10 } },
+    proteinPlan: { code: blend.code, name: blend.name, soyFree: blend.soyFree, label: blend.label, blendText: blend.blendText },
+    ingredients: blend.rows.map(function (r) {
+      return { id: r.id, name: r.name, pct: r.pct, grams: r.grams, deliveredProtein: r.deliveredProtein,
+               rationale: r.rationale, contrib: r.contrib };
+    }).concat([
       { name: carbName, grams: carbSourceGrams, rationale: carbRationale,
         contrib: { protein: 0, carbs: carbSourceGrams, fat: 0 } },
       { name: 'MCT Powder (70%)', grams: mctGrams, rationale: 'Metabolic energy without glycemic load',
@@ -7945,15 +7974,43 @@ function calcWxRecipe(suppKcal, suppProtein, formulation) {
         contrib: { protein: 0, carbs: omega3Carbs, fat: omega3Fat } },
       { name: 'L-Glutamine powder', grams: glutGrams, rationale: 'Mucosal protection.',
         contrib: { protein: glutGrams, carbs: 0, fat: 0 } }
-    ],
+    ]),
     totals: {
-      powder:  Math.round((protGrams + carbSourceGrams + mctGrams + omega3Grams + glutGrams) * 10) / 10,
+      powder:  Math.round((blend.grams + carbSourceGrams + mctGrams + omega3Grams + glutGrams) * 10) / 10,
       protein: Math.round((protDeliv + glutGrams) * 10) / 10,
-      carbs:   Math.round((mctCarbs + omega3Carbs + carbSourceGrams) * 10) / 10,
-      fat:     Math.round((mctFat + omega3Fat) * 10) / 10
+      carbs:   Math.round((blend.carbs + mctCarbs + omega3Carbs + carbSourceGrams) * 10) / 10,
+      fat:     Math.round((blend.fat + mctFat + omega3Fat) * 10) / 10
     },
-    proteinBreakdown: 'Formula ' + protDeliv + 'g + Glutamine ' + glutGrams + 'g'
+    proteinBreakdown: blend.code + ' blend ' + protDeliv + 'g + Glutamine ' + glutGrams + 'g'
   };
+}
+
+// Protein plan for a weekly Rx. Stored targets win; older Rx without a plan
+// fall back to what the patient's profile selects today.
+function _wxProteinSel(t) {
+  t = t || {};
+  var pat = window.patient || {};
+  var auto = ProteinPlans.select(pat, { renal: !!t.renalCap || (t.flags || []).some(function (f) { return /RENAL/.test(f); }) });
+  return {
+    plan: ProteinPlans.normCode(t.proteinPlan) || ProteinPlans.normCode(pat.proteinPlanOverride) || auto.code,
+    auto: ProteinPlans.normCode(t.proteinPlanAuto) || auto.code,
+    soyFree: t.proteinSoyFree != null ? !!t.proteinSoyFree : auto.soyFree,
+    dairyFree: t.proteinDairyFree != null ? !!t.proteinDairyFree : auto.dairyFree,
+    reasons: t.proteinPlanReasons || auto.reasons
+  };
+}
+// Current panel choice (dropdown) + the patient's soy/dairy constraints.
+function _wxProteinOptsFromPanel() {
+  var sel = _wxProteinSel(_wxRxTargets);
+  var dd = document.getElementById('wxRx_proteinPlan');
+  var plan = (dd && dd.value) || sel.plan;
+  var note = document.getElementById('wxRx_proteinPlanNote');
+  if (note) {
+    var txt = ProteinPlans.blendText(plan, sel.soyFree) + (plan === sel.auto ? ' · auto' : ' · auto was ' + sel.auto);
+    if (sel.dairyFree && plan !== 'P4') txt = '<span style="color:#b91c1c;font-weight:700;">⚠ Dairy allergy / vegan recorded — ' + plan + ' contains milk protein. </span>' + txt;
+    note.innerHTML = txt;
+  }
+  return { plan: plan, soyFree: sel.soyFree, auto: sel.auto, dairyFree: sel.dairyFree, reasons: sel.reasons };
 }
 
 function renderWxRxRecipe(recipe, targets) {
@@ -7988,7 +8045,8 @@ function renderWxRxRecipe(recipe, targets) {
   }
 
   // Protein Formulation Type label
-  var fmType = recipe.ingredients[0] ? recipe.ingredients[0].name : (t.formulation || 'Standard');
+  var fmType = recipe.proteinPlan ? ('Protein Plan ' + recipe.proteinPlan.label)
+             : (recipe.ingredients[0] ? recipe.ingredients[0].name : (t.formulation || 'Standard'));
   var elFmt  = document.getElementById('wxRxHeroFormType');
   if (elFmt) elFmt.textContent = fmType;
 
@@ -8135,7 +8193,7 @@ function recomputeWxRxRecipe() {
     totalProtein: parseFloat(document.getElementById('wxRx_totalProtein').value) || 0,
     formulation
   };
-  renderWxRxRecipe(calcWxRecipe(suppKcal, suppProtein, formulation), tCurrent);
+  renderWxRxRecipe(calcWxRecipe(suppKcal, suppProtein, formulation, _wxProteinOptsFromPanel()), tCurrent);
 }
 
 function wxRxSwitchWeightBasis(basis) {
@@ -8245,6 +8303,8 @@ function showWxRxPanel(rx) {
   document.getElementById('wxRx_notes').value        = rx.notes        || '';
   var fmSel = document.getElementById('wxRx_formulation');
   if (fmSel) fmSel.value = t.formulation || 'Standard';
+  var ppSel = document.getElementById('wxRx_proteinPlan');
+  if (ppSel) ppSel.value = _wxProteinSel(t).plan;
 
   var flags = t.flags || [];
   var flagDiv = document.getElementById('wxRxFlags');
@@ -8298,7 +8358,11 @@ function showWxRxPanel(rx) {
 
   // Render ingredient breakdown — for non-oral patients, always recompute from corrected suppKcal
   // (cached recipe was built from old oral suppKcal and must be discarded)
-  var recipe = (isNonOral ? null : t.recipe) || calcWxRecipe(t.suppKcal, t.suppProtein, t.formulation || 'Standard');
+  var _ppOpts = _wxProteinOptsFromPanel();
+  // Recipes saved before protein plans existed carry a single whey row — rebuild them.
+  // (Approved Rx keep exactly what was dispensed.)
+  var recipe = (isNonOral || (!(t.recipe && t.recipe.proteinPlan) && rx.status !== 'APPROVED') ? null : t.recipe)
+            || calcWxRecipe(t.suppKcal, t.suppProtein, t.formulation || 'Standard', _ppOpts);
   renderWxRxRecipe(recipe, t);
 
   // Show "Set Full Replacement" banner if suppKcal is less than totalKcal
@@ -8340,6 +8404,7 @@ async function saveWxRxAdjustments() {
   var apiBase = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : '';
   var newCalcWeight = parseFloat(document.getElementById('wxRx_calcWeight').value) || null;
   var t = _wxRxTargets || {};
+  var _ppSave = _wxProteinOptsFromPanel();
   var targets = {
     totalKcal:    parseFloat(document.getElementById('wxRx_totalKcal').value)    || null,
     totalProtein: parseFloat(document.getElementById('wxRx_totalProtein').value) || null,
@@ -8356,10 +8421,16 @@ async function saveWxRxAdjustments() {
     ibw:          t.ibw          || null,
     weight:       t.weight       || null,
     feedingRoute: t.feedingRoute || null,
+    proteinPlan:       _ppSave.plan,
+    proteinPlanAuto:   _ppSave.auto,
+    proteinSoyFree:    _ppSave.soyFree,
+    proteinDairyFree:  _ppSave.dairyFree,
+    proteinPlanReasons: _ppSave.reasons,
     recipe:       calcWxRecipe(
                     parseFloat(document.getElementById('wxRx_suppKcal').value)    || 0,
                     parseFloat(document.getElementById('wxRx_suppProtein').value) || 0,
-                    document.getElementById('wxRx_formulation').value || 'Standard'
+                    document.getElementById('wxRx_formulation').value || 'Standard',
+                    _ppSave
                   )
   };
   var notes = document.getElementById('wxRx_notes').value || null;
@@ -8379,7 +8450,7 @@ async function saveWxRxAdjustments() {
     _wxRxTargets = targets; // keep panel state in sync
     renderWxRxHistory();
     // Re-render the recipe section so the panel reflects the saved values immediately
-    var updatedRecipe = targets.recipe || calcWxRecipe(targets.suppKcal, targets.suppProtein, targets.formulation || 'Standard');
+    var updatedRecipe = targets.recipe || calcWxRecipe(targets.suppKcal, targets.suppProtein, targets.formulation || 'Standard', _ppSave);
     renderWxRxRecipe(updatedRecipe, targets);
     alert('Adjustments saved.');
   } catch(e) { alert('Could not save adjustments: ' + e.message); }
@@ -8512,7 +8583,7 @@ function showRxPreview(rxId, oralIntake) {
   document.getElementById('rxPv_suppKcal').textContent     = t.suppKcal    != null ? Math.round(t.suppKcal) + ' kcal'    : '—';
   document.getElementById('rxPv_suppProtein').textContent  = t.suppProtein != null ? t.suppProtein + ' g'       : '—';
   document.getElementById('rxPv_oralPct').textContent      = t.oralPct     != null ? t.oralPct + '%'            : '—';
-  document.getElementById('rxPv_formulation').textContent  = t.formulation || '—';
+  document.getElementById('rxPv_formulation').textContent  = (t.formulation || '—') + (t.proteinPlan ? ' · ' + t.proteinPlan + ' ' + ((ProteinPlans.PLANS[t.proteinPlan] || {}).name || '') : '');
 
   var openFull = document.getElementById('rxPv_openFull');
   openFull.onclick = function() {

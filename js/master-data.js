@@ -159,6 +159,7 @@ const treatmentsList = [
 
 // Allergies
 const allergiesList = [
+  "Milk / Dairy",
   "Lactose",
   "Soy",
   "Nuts",

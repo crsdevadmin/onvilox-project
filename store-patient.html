@@ -76,6 +76,7 @@
 <script src="/js/auth.js"></script>
 <script src="/js/users.js"></script>
 <script src="/js/patient-store.js?v=3.2"></script>
+<script src="/js/protein-plans.js"></script>
 <script src="/js/nutrition-engine-v4.js"></script>
 <script src="/js/manufacturing.js"></script>
 
@@ -162,7 +163,7 @@ if(!patient){
         +(rx.approved_at?'<span style="font-size:12px;color:#64748b">Approved '+new Date(rx.approved_at).toLocaleDateString()+'</span>':'')
         +'</div>'
         +'<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px">'
-        +[['ENERGY',t.suppKcal||'—','kcal supp'],['PROTEIN',t.suppProtein||'—','g formula'],['SERVINGS',srv,'per day'],['FORMULATION',t.formulation||'—','']].map(function(a){ return '<div style="background:#1e293b;color:#fff;border-radius:8px;padding:8px 14px;text-align:center;min-width:80px"><div style="font-size:10px;opacity:.7">'+a[0]+'</div><div style="font-size:16px;font-weight:700">'+a[1]+'</div><div style="font-size:9px;opacity:.6">'+a[2]+'</div></div>'; }).join('')
+        +[['ENERGY',t.suppKcal||'—','kcal supp'],['PROTEIN',t.suppProtein||'—','g formula'],['SERVINGS',srv,'per day'],['FORMULATION',t.formulation||'—',(r.proteinPlan?'Protein '+r.proteinPlan.code+' · '+r.proteinPlan.name:'')]].map(function(a){ return '<div style="background:#1e293b;color:#fff;border-radius:8px;padding:8px 14px;text-align:center;min-width:80px"><div style="font-size:10px;opacity:.7">'+a[0]+'</div><div style="font-size:16px;font-weight:700">'+a[1]+'</div><div style="font-size:9px;opacity:.6">'+a[2]+'</div></div>'; }).join('')
         +'</div>'
         +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">'
         +'<div style="flex:1;min-width:90px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:7px 10px;text-align:center"><div style="font-size:10px;color:#64748b">Per Serving Energy</div><div style="font-size:15px;font-weight:800;color:#15803d">'+perSrvKcal+(t.suppKcal?' kcal':'')+'</div></div>'

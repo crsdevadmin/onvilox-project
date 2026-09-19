@@ -6,6 +6,7 @@ const jwt = require('jsonwebtoken');
 // Shared MUST screen — one implementation for the baseline and discharge ends,
 // so the change between them is a real difference and not two formulas drifting.
 const { computeMust, mustInputs, MUST_PATIENT_COLUMNS } = require('./must');
+const ProteinPlans = require('../js/protein-plans');
 require('dotenv').config();
 
 const VAPID_PUBLIC  = 'BP2E-Ogveb92wrIjjciORv_jDJO82jut8m3QSJM_UrwJbVDJCFZdDzSuQZvahxpu_0gw7B-E_bJktm7VKd-qTEo';
@@ -578,22 +579,20 @@ app.patch('/api/nutrition-plans/:id/insights', authenticateToken, async (req, re
 // Derives a deterministic ingredient breakdown from supplement kcal + protein targets.
 // Glutamine (16 g) is a clinical adjunct added on top of suppKcal — consistent with
 // how the initial prescription handles it.
-function calcWeeklyRecipe(suppKcal, suppProtein, formulation) {
+// proteinOpts = { plan: 'P1'…'P5', soyFree: bool } — the protein blend (js/protein-plans.js).
+// Without a plan (old callers) GI/Hydrolyzed → P3, otherwise P1.
+function calcWeeklyRecipe(suppKcal, suppProtein, formulation, proteinOpts) {
   if (!suppKcal || !suppProtein || suppKcal <= 0 || suppProtein <= 0) return null;
 
   const isHydrolyzed = formulation === 'Hydrolyzed';
   const isDiabetic   = formulation === 'Diabetic';
   const isAntiInflam = formulation === 'Anti-inflammatory';
 
-  // Protein source
-  const pPerGram  = isHydrolyzed ? 0.85 : 0.90;
-  const protName  = isHydrolyzed ? 'Hydrolyzed Whey Protein' : 'Whey Protein Isolate (90%)';
-  const protId    = isHydrolyzed ? 'whey_hydrolyzed' : 'whey_isolate';
-  const protGrams = Math.round(suppProtein / pPerGram);
-  const protDeliv = Math.round(protGrams * pPerGram * 10) / 10;
-  const protRationale = isHydrolyzed
-    ? 'Hydrolyzed peptides for rapid absorption and reduced osmotic load in patients with GI toxicity.'
-    : 'High Leucine content to stimulate muscle protein synthesis during treatment.';
+  // Protein source — blend from the protein formulation plan
+  const po = proteinOpts || {};
+  const planCode = ProteinPlans.normCode(po.plan) || (isHydrolyzed ? 'P3' : 'P1');
+  const blend = ProteinPlans.build(planCode, suppProtein, !!po.soyFree);
+  const protDeliv = blend.protein;
 
   // Macro targets from suppKcal (standard oncology ratios)
   // Diabetic: lower carbs (25 %), more fat (57 %)   Standard/other: 37 % C / 45 % F
@@ -601,7 +600,7 @@ function calcWeeklyRecipe(suppKcal, suppProtein, formulation) {
   const carbPct = isDiabetic ? 0.25 : 0.37;
 
   // MCT Powder (70 % fat, 30 % carb carrier)
-  const fatGrams = suppKcal * fatPct / 9;
+  const fatGrams = Math.max(0, suppKcal * fatPct / 9 - blend.fat);
   const mctGrams = Math.max(0, Math.round(fatGrams / 0.70));
   const mctFat   = Math.round(mctGrams * 0.70 * 10) / 10;
   const mctCarbs = Math.round(mctGrams * 0.30 * 10) / 10;
@@ -616,7 +615,7 @@ function calcWeeklyRecipe(suppKcal, suppProtein, formulation) {
 
   // Carb source (palatinose for diabetic, maltodextrin otherwise)
   const carbGramsTotal   = suppKcal * carbPct / 4;
-  const carbSourceGrams  = Math.max(0, Math.round((carbGramsTotal - mctCarbs - omega3Carbs) * 10) / 10);
+  const carbSourceGrams  = Math.max(0, Math.round((carbGramsTotal - mctCarbs - omega3Carbs - blend.carbs) * 10) / 10);
   const carbName         = isDiabetic ? 'Palatinose (Slow Release)' : 'Maltodextrin (DE 19)';
   const carbId           = isDiabetic ? 'palatinose' : 'maltodextrin';
   const carbRationale    = isDiabetic
@@ -627,17 +626,17 @@ function calcWeeklyRecipe(suppKcal, suppProtein, formulation) {
   const glutGrams = 16;
 
   // Batch totals
-  const totalPowder  = Math.round((protGrams + carbSourceGrams + mctGrams + omega3Grams + glutGrams) * 10) / 10;
+  const totalPowder  = Math.round((blend.grams + carbSourceGrams + mctGrams + omega3Grams + glutGrams) * 10) / 10;
   const totalProtein = Math.round((protDeliv + glutGrams) * 10) / 10; // glutamine = 1 g protein/g
-  const totalCarbs   = Math.round((mctCarbs + omega3Carbs + carbSourceGrams) * 10) / 10;
-  const totalFat     = Math.round((mctFat + omega3Fat) * 10) / 10;
+  const totalCarbs   = Math.round((blend.carbs + mctCarbs + omega3Carbs + carbSourceGrams) * 10) / 10;
+  const totalFat     = Math.round((blend.fat + mctFat + omega3Fat) * 10) / 10;
 
   return {
     servingsPerDay: 3,
-    ingredients: [
-      { id: protId, name: protName, grams: protGrams, deliveredProtein: protDeliv,
-        rationale: protRationale,
-        contrib: { protein: protDeliv, carbs: Math.round(protGrams*0.02*10)/10, fat: Math.round(protGrams*0.01*10)/10 } },
+    proteinPlan: { code: blend.code, name: blend.name, soyFree: blend.soyFree, label: blend.label, blendText: blend.blendText },
+    ingredients: blend.rows.map(r => ({
+        id: r.id, name: r.name, pct: r.pct, grams: r.grams, deliveredProtein: r.deliveredProtein,
+        rationale: r.rationale, contrib: r.contrib })).concat([
       { id: carbId, name: carbName, grams: carbSourceGrams, rationale: carbRationale,
         contrib: { protein: 0, carbs: carbSourceGrams, fat: 0 } },
       { id: 'mct_powder', name: 'MCT Powder (70%)', grams: mctGrams,
@@ -649,9 +648,9 @@ function calcWeeklyRecipe(suppKcal, suppProtein, formulation) {
       { id: 'glutamine', name: 'L-Glutamine powder', grams: glutGrams,
         rationale: 'Mucosal protection.',
         contrib: { protein: glutGrams, carbs: 0, fat: 0 } }
-    ],
+    ]),
     totals: { powder: totalPowder, protein: totalProtein, carbs: totalCarbs, fat: totalFat },
-    proteinBreakdown: `Formula ${protDeliv}g + Glutamine ${glutGrams}g`
+    proteinBreakdown: `${blend.code} blend ${protDeliv}g + Glutamine ${glutGrams}g`
   };
 }
 
@@ -818,11 +817,29 @@ function calcWeeklyRxTargets(baseline, mon, formulas) {
   if (isDiabetic)   flags.push(`High glucose (${glucose} mg/dL) → diabetic formulation`);
   if (ecog >= 3)    flags.push(`ECOG ${ecog} → reduced calorie target (${kcalPerKg} kcal/kg)`);
 
-  const recipe = calcWeeklyRecipe(suppKcal, suppProtein, formulation);
+  // Protein formulation plan (P1–P5). Weekly signals (renal labs, diarrhoea,
+  // nausea / appetite on this entry) are OR-ed with the baseline profile.
+  const _yes = v => v === true || v === 'true' || (typeof v === 'number' && v > 0)
+                 || (typeof v === 'string' && /^(yes|y|mild|moderate|severe|[1-4])$/i.test(v.trim()));
+  const planSel = ProteinPlans.select(fd, {
+    renal: hasRenalFlag,
+    gi: giIssues || _yes(mon.diarrhea) || _yes(mon.diarrhoea) || /diarr/i.test(String(mon.bowel || '')),
+    lowVolume: _yes(mon.nausea) || _yes(mon.vomiting) || _yes(mon.poorAppetite) || _yes(mon.earlySatiety)
+  });
+  const _fpPlan = (fd.finalPlan && fd.finalPlan.proteinPlan) || null;
+  // A doctor's explicit choice on the initial plan carries forward; otherwise auto.
+  const proteinPlan = (_fpPlan && _fpPlan.overridden && ProteinPlans.normCode(_fpPlan.code)) || planSel.code;
+  const proteinSoyFree = planSel.soyFree;
+  flags.push(`Protein plan ${ProteinPlans.label(proteinPlan, proteinSoyFree)} — ${planSel.reasons.join('; ')}`
+    + (planSel.soyFreeReason ? ` (${planSel.soyFreeReason})` : ''));
+
+  const recipe = calcWeeklyRecipe(suppKcal, suppProtein, formulation, { plan: proteinPlan, soyFree: proteinSoyFree });
 
   return { calcWeight: Math.round(calcWeight*10)/10, ibw: ibw ? Math.round(ibw*10)/10 : null, bsa,
            totalKcal, kcalPerKg, totalProtein, proteinPerKg,
            oralKcal, suppKcal, suppProtein, formulation, flags,
+           proteinPlan, proteinPlanAuto: planSel.code, proteinSoyFree,
+           proteinDairyFree: planSel.dairyFree, proteinPlanReasons: planSel.reasons,
            ecog, albumin, crp, glucose, oralPct, weight, height,
            baseKcalPerKg, baseProteinPerKg,
            feedingRoute, isTubeFeed,
@@ -1085,7 +1102,8 @@ app.put('/api/weekly-prescriptions/:id', authenticateToken, async (req, res) => 
   const updatedTargets = Object.assign({}, prevTargets, targets || {});
   if (updatedTargets.suppKcal && updatedTargets.suppProtein) {
     updatedTargets.recipe = calcWeeklyRecipe(
-      updatedTargets.suppKcal, updatedTargets.suppProtein, updatedTargets.formulation || 'Standard'
+      updatedTargets.suppKcal, updatedTargets.suppProtein, updatedTargets.formulation || 'Standard',
+      { plan: updatedTargets.proteinPlan, soyFree: updatedTargets.proteinSoyFree }
     );
   }
   try {

@@ -438,6 +438,7 @@
 <script src="/js/stores.js"></script>
 <script src="/js/patient-store.js?v=3.2"></script>
 <script src="/js/ingredients.js"></script>
+<script src="/js/protein-plans.js"></script>
 <script src="/js/nutrition-engine-v4.js"></script>
 <script src="/js/manufacturing.js?v=labels1"></script>
 
@@ -969,7 +970,7 @@ async function openLabelModal(jobId){
             macroFat:   r.totals ? Math.round((r.totals.fat   || 0) / srv * 10) / 10 : null,
             dailyCarbs: r.totals ? r.totals.carbs : null,
             dailyFat:   r.totals ? r.totals.fat   : null,
-            proteinType: t.formulation || 'Weekly Custom',
+            proteinType: (r.proteinPlan ? r.proteinPlan.label + ' · ' : '') + (t.formulation || 'Weekly Custom'),
             recipe: {
               isDailyBatch: true,
               recipeKcal: t.suppKcal,
@@ -1075,7 +1076,7 @@ function renderLabelModal(){
   // Weekly Rx uses r.ingredients[]; initial plan uses named r.protein / r.carb / etc.
   const _ingArr = (r.ingredients && Array.isArray(r.ingredients) && r.ingredients.length)
     ? r.ingredients
-    : [r.protein, r.carb, r.fat, r.omega, r.bcaa, r.glutamine].filter(Boolean);
+    : (window.ProteinPlans ? ProteinPlans.recipeRows(r) : [r.protein, r.carb, r.fat, r.omega, r.bcaa, r.glutamine]).filter(Boolean);
   const names = _ingArr.map(x => x.name).filter(Boolean);
   document.getElementById('lb_formula').innerHTML = names.length ? names.map(n => '• ' + n).join('<br>') : '—';
   _lblSet('lb_fssai', (store && (store.fssai_number || store.fssai)) || '—');
@@ -1106,7 +1107,7 @@ function renderLabelModal(){
 
   const comps = (r.ingredients && Array.isArray(r.ingredients) && r.ingredients.length)
     ? r.ingredients
-    : [r.protein, r.carb, r.fat, r.omega, r.bcaa, r.glutamine].filter(Boolean);
+    : (window.ProteinPlans ? ProteinPlans.recipeRows(r) : [r.protein, r.carb, r.fat, r.omega, r.bcaa, r.glutamine]).filter(Boolean);
   const specBody = document.getElementById('x_spec');
   specBody.innerHTML = comps.length
     ? comps.map(c => {
@@ -1254,7 +1255,7 @@ function _artFillInputs(){
   let suggested = '';
   const r = (_lblPlan && _lblPlan.recipe && !Array.isArray(_lblPlan.recipe)) ? _lblPlan.recipe : null;
   const ing = (r && Array.isArray(r.ingredients)) ? r.ingredients
-            : (r ? [r.protein, r.carb, r.fat, r.omega, r.bcaa, r.glutamine].filter(Boolean) : []);
+            : (r ? (window.ProteinPlans ? ProteinPlans.recipeRows(r) : [r.protein, r.carb, r.fat, r.omega, r.bcaa, r.glutamine]).filter(Boolean) : []);
   const g = ing.reduce((a, c) => a + (parseFloat(c && c.grams) || 0), 0);
   if(g > 0) suggested = String(Math.round(g));
   netEl.value = s.net || suggested;
@@ -1297,7 +1298,7 @@ function renderArtworkLabel(){
   const r = (plan && plan.recipe && !Array.isArray(plan.recipe)) ? plan.recipe : {};
   const arr = (Array.isArray(r.ingredients) && r.ingredients.length)
     ? r.ingredients.slice()
-    : [r.protein, r.carb, r.fat, r.omega, r.bcaa, r.glutamine].filter(Boolean);
+    : (window.ProteinPlans ? ProteinPlans.recipeRows(r) : [r.protein, r.carb, r.fat, r.omega, r.bcaa, r.glutamine]).filter(Boolean);
   arr.sort((a, b) => (parseFloat(b && b.grams) || 0) - (parseFloat(a && a.grams) || 0));
   const names = arr.map(x => x && x.name).filter(Boolean);
   _lblSet('a2_ing', names.length ? names.join(', ') + '.' : '—');

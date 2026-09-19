@@ -454,6 +454,7 @@
   <script src="/js/auth.js?v=3.1"></script>
   <script src="/js/mappings.js?v=3.1"></script>
   <script src="/js/patient-store.js?v=3.2"></script>
+  <script src="/js/protein-plans.js"></script>
   <script src="/js/nutrition-engine-v4.js?v=3.9"></script>
   <script src="/js/engine-config.js"></script>
   <script src="/js/manufacturing.js?v=3.1"></script>
@@ -1563,7 +1564,7 @@
           + qMetric('Total', t.totalKcal != null ? Math.round(t.totalKcal).toLocaleString() : '—', 'kcal')
           + (wtDelta !== null ? qMetric('Weight', (wtDelta > 0 ? '+' : '') + wtDelta, 'kg', wtDelta <= -2 ? 'bad' : wtDelta < 0 ? 'warn' : 'ok') : '')
           + (h1.adh != null ? qMetric('Adherence', h1.adh, '%', h1.adh < 70 ? 'bad' : h1.adh < 85 ? 'warn' : 'ok') : '')
-          + qMetric('Formula', t.formulation || 'Standard')
+          + qMetric('Formula', (t.formulation || 'Standard') + (t.proteinPlan ? ' · ' + t.proteinPlan : ''))
         + '</div>'
         + '<div class="qacts">'
           + (incomplete
@@ -1842,7 +1843,7 @@
             + _pm('Total energy', t.totalKcal, 'kcal')
             + _pm('Total protein', t.totalProtein, 'g')
             + _pm('From supplement', t.suppKcal, 'kcal')
-            + '<div class="pm"><span class="k">Formulation</span><span class="v">' + _esc(t.formulation || 'Standard') + '</span></div>'
+            + '<div class="pm"><span class="k">Formulation</span><span class="v">' + _esc((t.formulation || 'Standard') + (t.proteinPlan ? ' · Protein ' + t.proteinPlan + ' ' + (((window.ProteinPlans && ProteinPlans.PLANS[t.proteinPlan]) || {}).name || '') : '')) + '</span></div>'
           + '</div>' : '')
         + '<div class="dsect">All weeks so far</div>' + qHistTable(p)
         + '<div class="dnote">The recipe, ingredient split, micronutrient table and engine trace live in the '
