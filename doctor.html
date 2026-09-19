@@ -76,6 +76,8 @@
     .qbtn-ghost:hover { color:var(--text); border-color:var(--text-2); }
     .qbtn-cyan { background:var(--cyan); color:var(--bg); border-color:var(--cyan); }
     .qbtn-sm { padding:6px 11px; font-size:11.5px; }
+    .pin { width:74px; padding:6px 8px; font-size:13px; font-weight:700; font-family:inherit; border-radius:8px;
+           border:1px solid var(--border-2); background:var(--surface); color:var(--text); }
     .rbadge { display:inline-block; font-size:9px; font-weight:800; letter-spacing:.06em; text-transform:uppercase;
               border:1px solid; border-radius:5px; padding:1px 6px; vertical-align:middle; margin-left:4px; }
 
@@ -386,6 +388,7 @@
           <button class="qtab on" data-b="rx"    onclick="setQBucket('rx')">Awaiting your approval <span class="n" id="qn-rx">0</span></button>
           <button class="qtab"    data-b="asmt"  onclick="setQBucket('asmt')">Weekly assessment due <span class="n" id="qn-asmt">0</span></button>
           <button class="qtab"    data-b="daily" onclick="setQBucket('daily')">Daily logs missing <span class="n" id="qn-daily">0</span></button>
+          <button class="qtab"    data-b="price" onclick="setQBucket('price')">Price approval <span class="n" id="qn-price">0</span></button>
         </div>
       </div>
       <div id="wqBody"><div id="qBucket"></div></div>
@@ -698,7 +701,9 @@
       const chips = jobs.map(j => {
         const cls = manufacturingService.WORKFLOW.badgeClass(j.status);
         const title = productLabel(j) + ' — ' + manufacturingService.WORKFLOW.statusLabel(j.status)
-          + (j.batchNo ? ' · Batch ' + j.batchNo : '');
+          + (j.batchNo ? ' · Batch ' + j.batchNo : '')
+          + (manufacturingService.priceLabel ? ' · ' + manufacturingService.priceLabel(j)
+             + (j.finalPrice != null ? ' ' + _inr(j.finalPrice) : '') : '');
         return `<span class="status ${cls}" style="font-size:9.5px;padding:1px 6px;margin:1px 2px 1px 0;display:inline-block;" title="${title}">${productLabel(j)}</span>`;
       }).join('');
 
@@ -1030,7 +1035,7 @@
     function _jobsSignature() {
       if (typeof manufacturingService === 'undefined') return '';
       return manufacturingService.getJobs()
-        .map(j => (j.id || '') + ':' + (j.status || ''))
+        .map(j => (j.id || '') + ':' + (j.status || '') + ':' + (j.priceStatus || ''))
         .sort()
         .join('|');
     }
@@ -1047,6 +1052,7 @@
             .filter(r => r.style.display !== 'none')
             .map(r => r.id);
           render();
+          try { renderQueue(); } catch (e) {}
           openIds.forEach(id => {
             const el = document.getElementById(id);
             if (el) el.style.display = 'table-row';
@@ -1380,7 +1386,8 @@
         rx:    _queue.filter(p => p.pendingRx && !_rxIncomplete(p)),
         asmt:  _queue.filter(p => _rxIncomplete(p)
                               || (!p.pendingRx && (p.weeklyOverdue || p.neverMonitored))),
-        daily: _queue.filter(p => p.daysSinceDaily === null || p.daysSinceDaily >= DAILY_GAP_DAYS)
+        daily: _queue.filter(p => p.daysSinceDaily === null || p.daysSinceDaily >= DAILY_GAP_DAYS),
+        price: priceJobs()
       };
     }
 
@@ -1479,8 +1486,9 @@
       const b = qBuckets();
       const setN = (id, n) => { const el = document.getElementById(id); if (el) el.textContent = n; };
       setN('qn-rx', b.rx.length); setN('qn-asmt', b.asmt.length); setN('qn-daily', b.daily.length);
+      setN('qn-price', b.price.length);
 
-      const total = b.rx.length + b.asmt.length + b.daily.length;
+      const total = b.rx.length + b.asmt.length + b.daily.length + b.price.length;
       const cnt = document.getElementById('qCount');
       if (cnt) {
         cnt.textContent = total;
@@ -1493,12 +1501,14 @@
       if (!rows.length) {
         const msg = { rx: 'Nothing awaiting your approval.',
                       asmt: 'No weekly assessments are due or unfinished.',
-                      daily: 'Daily logging is up to date.' }[_qBucket];
+                      daily: 'Daily logging is up to date.',
+                      price: 'No product prices are waiting for you.' }[_qBucket];
         host.innerHTML = '<div class="qempty">' + msg + '</div>';
         return;
       }
       host.innerHTML = rows.map(p =>
-        _qBucket === 'rx' ? qRowRx(p) : _qBucket === 'asmt' ? qRowAsmt(p) : qRowDaily(p)
+        _qBucket === 'rx' ? qRowRx(p) : _qBucket === 'asmt' ? qRowAsmt(p)
+          : _qBucket === 'price' ? qRowPrice(p) : qRowDaily(p)
       ).join('');
     }
 
@@ -1629,6 +1639,98 @@
     }
 
     // ── Row: daily logs missing ───────────────────────────────────────────
+    // ── Row: product price awaiting the doctor ────────────────────────────
+    // The store has priced the product; the platform markup is already added.
+    // The doctor adds their own percentage on top of that price and approves —
+    // the result is the final price printed on the label as the MRP.
+    // (The doctor never sees the store's own price or the markup rate.)
+    function _myDoctorId() {
+      if (me.role === 'ASSISTANT' && typeof mappingService !== 'undefined') {
+        return mappingService.getDoctorForAssistant(me.id) || me.id;
+      }
+      return me.id;
+    }
+    function priceJobs() {
+      if (typeof manufacturingService === 'undefined') return [];
+      const did = _myDoctorId();
+      return manufacturingService.getJobs().filter(j => {
+        if (j.priceStatus !== 'AWAITING_DOCTOR' || j.basePrice == null) return false;
+        if (j.doctorId === did) return true;
+        const p = (typeof getPatientById === 'function') ? getPatientById(j.patientId) : null;
+        return !!(p && p.assignedDoctorId === did);
+      }).sort((a, b) => String(a.storePricedAt || '').localeCompare(String(b.storePricedAt || '')));
+    }
+    function _inr(n) { return n == null || isNaN(n) ? '—' : '₹' + Number(n).toLocaleString('en-IN', { maximumFractionDigits: 2 }); }
+    function _lastDoctorPct() { try { return localStorage.getItem('gq_doctor_pct_' + _myDoctorId()) || ''; } catch (e) { return ''; } }
+    function _priceCalc(base, pct) {
+      const amt = Math.round(base * pct / 100 * 100) / 100;
+      return { amt: amt, final: Math.round(base + amt) };
+    }
+    function qRowPrice(j) {
+      const p = (typeof getPatientById === 'function' && getPatientById(j.patientId)) || { id: j.patientId, name: 'Patient' };
+      const label = productLabel(j) === 'Initial' ? 'Initial product' : 'Week ' + productLabel(j).slice(1) + ' batch';
+      const since = j.storePricedAt ? 'priced ' + _agoText(j.storePricedAt) + ' ago' : 'priced by the store';
+      const pct = _lastDoctorPct();
+      const c = pct !== '' ? _priceCalc(j.basePrice, parseFloat(pct)) : null;
+      const isDoc = me.role === 'DOCTOR';
+      const id = _esc(j.id);
+      return '<div class="qrow">'
+        + '<div><div class="qname">' + _esc(p.name) + '</div>'
+        + '<div class="qsub">' + (p.uhic ? 'UHIC ' + _esc(p.uhic) + ' · ' : '') + since + '</div></div>'
+        + '<span class="wkchip">' + _esc(label) + '</span>'
+        + '<div class="qmetrics">'
+          + qMetric('Price', _inr(j.basePrice), '')
+          + '<div class="qm"><div class="k">Your share</div><div class="v">'
+            + (isDoc ? '<input class="pin" type="number" min="0" max="500" step="0.5" id="dp_' + id + '" value="' + _esc(pct) + '" placeholder="%"'
+                 + ' oninput="updPriceRow(\'' + id + '\')" onkeydown="if(event.key===\'Enter\')approvePriceRow(\'' + id + '\')"> <small>%</small>'
+                 + ' <small id="da_' + id + '">' + (c ? '= ' + _inr(c.amt) : '') + '</small>'
+               : '<small>set by the doctor</small>')
+          + '</div></div>'
+          + '<div class="qm"><div class="k">Final price (MRP)</div><div class="v" id="df_' + id + '">' + (c ? _inr(c.final) : '—') + '</div></div>'
+        + '</div>'
+        + '<div class="qacts">'
+          + (isDoc
+              ? '<button class="qbtn qbtn-approve" id="dpb_' + id + '" onclick="approvePriceRow(\'' + id + '\')">Approve price</button>'
+                + '<button class="qbtn qbtn-ghost qbtn-sm" onclick="queryPriceRow(\'' + id + '\')">Send back to store</button>'
+              : '<span class="qsub">Only the doctor can approve prices</span>')
+        + '</div>'
+        + '</div>';
+    }
+    function updPriceRow(id) {
+      const j = manufacturingService.getJobs().find(x => String(x.id) === String(id));
+      const el = document.getElementById('dp_' + id);
+      if (!j || !el) return;
+      const v = parseFloat(el.value);
+      const ok = v >= 0 && v <= 500;
+      const c = ok ? _priceCalc(j.basePrice, v) : null;
+      document.getElementById('da_' + id).textContent = c ? '= ' + _inr(c.amt) : '';
+      document.getElementById('df_' + id).textContent = c ? _inr(c.final) : '—';
+    }
+    async function approvePriceRow(id) {
+      const j = manufacturingService.getJobs().find(x => String(x.id) === String(id));
+      const el = document.getElementById('dp_' + id);
+      if (!j || !el) return;
+      const v = parseFloat(el.value);
+      if (!(v >= 0 && v <= 500)) { alert('Enter your percentage (0 or more) before approving.'); el.focus(); return; }
+      const c = _priceCalc(j.basePrice, v);
+      if (!confirm('Approve the final price of ' + _inr(c.final) + ' for this product?\n\n'
+                 + 'Price ' + _inr(j.basePrice) + ' + your ' + v + '% (' + _inr(c.amt) + ').\n'
+                 + 'This is printed on the label as the MRP.')) return;
+      const btn = document.getElementById('dpb_' + id); if (btn) btn.disabled = true;
+      const r = await manufacturingService.approvePrice(id, v);
+      if (!r.ok) { if (btn) btn.disabled = false; alert(r.error || 'Could not approve the price.'); return; }
+      try { localStorage.setItem('gq_doctor_pct_' + _myDoctorId(), String(v)); } catch (e) {}
+      renderQueue(); render();
+    }
+    async function queryPriceRow(id) {
+      const note = prompt('What should the store change? (sent to the store with the price)');
+      if (note === null) return;
+      if (!note.trim()) { alert('Add a short note so the store knows what to change.'); return; }
+      const r = await manufacturingService.queryPrice(id, note.trim());
+      if (!r.ok) { alert(r.error || 'Could not send the price back.'); return; }
+      renderQueue(); render();
+    }
+
     function qRowDaily(p) {
       const gap = p.daysSinceDaily;
       const h = p.history || [], h1 = h[h.length - 1] || {};

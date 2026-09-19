@@ -1034,7 +1034,7 @@ app.post('/api/patients/:id/generate-weekly-rx', authenticateToken, async (req, 
         // Reset the manufacturing job so store cannot print until re-approved
         await pool.query(
           `UPDATE manufacturing_jobs SET status='APPROVED', batch_no=NULL,
-            mfg_date=NULL, exp_date=NULL, updated_at=NOW()
+            mfg_date=NULL, exp_date=NULL, ${PRICE_RESET_SQL}, updated_at=NOW()
            WHERE id=$1`,
           ['wxjob_' + patId + '_w' + weekNo]
         ).catch(() => {});
@@ -1159,7 +1159,7 @@ app.post('/api/weekly-prescriptions/:id/approve', authenticateToken, async (req,
     await pool.query(
       `INSERT INTO manufacturing_jobs (id, patient_id, store_id, doctor_id, status, batch_no, history)
        VALUES ($1,$2,$3,$4,'APPROVED',$5,$6)
-       ON CONFLICT (id) DO UPDATE SET status='APPROVED', batch_no=$5, updated_at=NOW()`,
+       ON CONFLICT (id) DO UPDATE SET status='APPROVED', batch_no=$5, ${PRICE_RESET_SQL}, updated_at=NOW()`,
       [jobId, rx.patient_id, storeId, doctorId, rx.batch_code,
        JSON.stringify([{ status:'APPROVED', at: new Date().toISOString(), note: `Week ${rx.week_number} prescription` }])]
     );
@@ -3203,7 +3203,8 @@ app.get('/api/manufacturing-jobs', authenticateToken, async (req, res) => {
     const closedBy = {};
     closures.rows.forEach(c => { closedBy[c.patient_id] = c; });
 
-    res.json(result.rows.map(j => {
+    res.json(result.rows.map(j0 => {
+      const j = jobPriceView(j0, req.user);
       const c = closedBy[j.patient_id];
       if (!c) return j;
       return {
@@ -3281,10 +3282,20 @@ app.put('/api/manufacturing-jobs/:id', authenticateToken, async (req, res) => {
     const target = (status || '').toUpperCase();
 
     // Load the current job to validate the transition and ownership.
-    const cur = await pool.query('SELECT status, store_id, patient_id FROM manufacturing_jobs WHERE id=$1', [req.params.id]);
+    const cur = await pool.query('SELECT status, store_id, patient_id, price_status FROM manufacturing_jobs WHERE id=$1', [req.params.id]);
     if (!cur.rows.length) return res.status(404).json({ error: 'Job not found' });
     const currentStatus = (cur.rows[0].status || '').toUpperCase();
     const jobStore = cur.rows[0].store_id;
+
+    // Production cannot start until the doctor has approved the product price.
+    if (currentStatus === 'APPROVED' && target === 'PENDING_PROCESSING'
+        && cur.rows[0].price_status !== 'APPROVED') {
+      return res.status(409).json({
+        error: 'The price for this product has not been approved by the doctor yet. '
+             + 'Enter the store price and wait for the doctor\'s approval before requesting processing.',
+        reason: 'PRICE_NOT_APPROVED'
+      });
+    }
 
     // A withdrawn patient's job must not move FORWARD toward dispatch. The store
     // UI already hides the buttons, but a stale tab still holds them, and the
@@ -3341,7 +3352,7 @@ app.put('/api/manufacturing-jobs/:id', authenticateToken, async (req, res) => {
       [status, JSON.stringify(history || []), req.params.id]
     );
     const job = result.rows[0];
-    res.json(job);
+    res.json(jobPriceView(job, req.user));
 
     // ── Approval-workflow notifications (sent after responding) ──────────────
     // The last history entry carries the action: request | approve | reject.
@@ -3385,6 +3396,144 @@ app.put('/api/manufacturing-jobs/:id', authenticateToken, async (req, res) => {
   }
 });
 
+// ── Product pricing ─────────────────────────────────────────────────────────
+// Flow per job (initial plan and every weekly batch):
+//   store enters its price → platform markup (engine_formulas.platform_markup_pct,
+//   default 40 %) is added → doctor adds their % on top of that → final price,
+//   which is printed on the label as the MRP. Production is blocked until then.
+//   Example: store 1000 → +40 % = 1400 → doctor +40 % of 1400 = 560 → final 1960.
+// price_status: NULL/'AWAITING_STORE' → 'AWAITING_DOCTOR' → 'APPROVED'
+//               ('QUERIED' = doctor sent it back to the store with a note).
+// Visibility: the store never sees the markup or the doctor's share; the doctor
+// never sees the store's own price or the markup rate; admins see everything.
+const PRICE_FIELDS = ['price_status','store_price','markup_pct','base_price','doctor_pct','doctor_amount',
+  'final_price','price_note','store_priced_by','store_priced_at','price_approved_by','price_approved_at'];
+const PRICE_RESET_SQL = PRICE_FIELDS.map(f => f + '=NULL').join(', ');
+const _money = v => Math.round(Number(v) * 100) / 100;
+
+function jobPriceView(job, user) {
+  if (!job) return job;
+  const role = user && user.role;
+  if (role === 'ADMIN' || role === 'SUPER_ADMIN') return job;
+  const keep = {
+    STORE:          ['price_status','store_price','final_price','price_note','store_priced_at','price_approved_at'],
+    STORE_APPROVER: ['price_status','store_price','final_price','price_note','store_priced_at','price_approved_at'],
+    DOCTOR:         ['price_status','base_price','doctor_pct','doctor_amount','final_price','price_note','store_priced_at','price_approved_at']
+  }[role] || ['price_status','final_price'];
+  const out = Object.assign({}, job);
+  PRICE_FIELDS.forEach(f => { if (!keep.includes(f)) delete out[f]; });
+  return out;
+}
+
+async function _loadJobForPricing(id) {
+  const r = await pool.query(
+    `SELECT j.*, p.name AS patient_name, p.assigned_doctor_id
+       FROM manufacturing_jobs j LEFT JOIN patients p ON p.id = j.patient_id
+      WHERE j.id=$1`, [id]);
+  return r.rows[0] || null;
+}
+function _jobProductLabel(id) { const m = String(id).match(/_w(\d+)$/); return m ? 'Week ' + m[1] : 'Initial'; }
+function _appendHistory(job, entry) {
+  const h = Array.isArray(job.history) ? job.history.slice() : [];
+  h.push(Object.assign({ at: new Date().toISOString(), status: job.status }, entry));
+  return JSON.stringify(h);
+}
+
+// Store enters (or re-enters) its price.
+app.post('/api/manufacturing-jobs/:id/store-price', authenticateToken, async (req, res) => {
+  const role = req.user && req.user.role;
+  const isAdmin = role === 'ADMIN' || role === 'SUPER_ADMIN';
+  if (!['STORE', 'STORE_APPROVER'].includes(role) && !isAdmin) return res.status(403).json({ error: 'Only the store can enter the store price.' });
+  const price = parseFloat(req.body && req.body.price);
+  if (!(price > 0) || price > 10000000) return res.status(400).json({ error: 'Enter a valid store price.' });
+  try {
+    const job = await _loadJobForPricing(req.params.id);
+    if (!job) return res.status(404).json({ error: 'Job not found' });
+    if (!isAdmin) {
+      const ur = await pool.query('SELECT store_id FROM users WHERE id=$1', [req.user.id]);
+      const us = ur.rows[0] && ur.rows[0].store_id;
+      if (us && job.store_id && us !== job.store_id) return res.status(403).json({ error: 'This job belongs to another store.' });
+    }
+    if ((job.status || '').toUpperCase() !== 'APPROVED') return res.status(409).json({ error: 'Price can only be set before production starts.' });
+    if (job.price_status === 'APPROVED') return res.status(409).json({ error: 'The doctor has already approved the price for this product.' });
+
+    const F = await loadFormulaConstants(pool);
+    const markup = parseFloat(F.platform_markup_pct);
+    const markupPct = (markup >= 0) ? markup : 40;
+    const base = _money(price * (1 + markupPct / 100));
+    const upd = await pool.query(
+      `UPDATE manufacturing_jobs
+          SET price_status='AWAITING_DOCTOR', store_price=$1, markup_pct=$2, base_price=$3,
+              doctor_pct=NULL, doctor_amount=NULL, final_price=NULL, price_note=NULL,
+              store_priced_by=$4, store_priced_at=NOW(), price_approved_by=NULL, price_approved_at=NULL,
+              history=$5, updated_at=NOW()
+        WHERE id=$6 RETURNING *`,
+      [_money(price), markupPct, base, req.user.id,
+       _appendHistory(job, { action: 'price_set', by: req.user.id, role }), job.id]);
+    res.json(jobPriceView(upd.rows[0], req.user));
+    const doc = job.doctor_id || job.assigned_doctor_id;
+    if (doc) notifyUsers([doc], '💰 Price approval needed',
+      `${job.patient_name || 'A patient'} — ${_jobProductLabel(job.id)}: price ₹${base} is waiting for your approval.`, '/doctor').catch(() => {});
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Doctor adds their percentage on top of the marked-up price and approves.
+app.post('/api/manufacturing-jobs/:id/doctor-price', authenticateToken, async (req, res) => {
+  const role = req.user && req.user.role;
+  const isAdmin = role === 'ADMIN' || role === 'SUPER_ADMIN';
+  if (role !== 'DOCTOR' && !isAdmin) return res.status(403).json({ error: 'Only the doctor can approve the price.' });
+  const pct = parseFloat(req.body && req.body.doctorPct);
+  if (!(pct >= 0) || pct > 500) return res.status(400).json({ error: 'Enter your percentage (0–500).' });
+  try {
+    const job = await _loadJobForPricing(req.params.id);
+    if (!job) return res.status(404).json({ error: 'Job not found' });
+    if (!isAdmin && req.user.id !== job.doctor_id && req.user.id !== job.assigned_doctor_id) {
+      return res.status(403).json({ error: 'This product belongs to another doctor\'s patient.' });
+    }
+    if (job.price_status !== 'AWAITING_DOCTOR' || job.base_price == null) {
+      return res.status(409).json({ error: 'There is no store price waiting for approval on this product.' });
+    }
+    const base = Number(job.base_price);
+    const amount = _money(base * pct / 100);
+    const final = Math.round(base + amount);          // MRP in whole rupees
+    const upd = await pool.query(
+      `UPDATE manufacturing_jobs
+          SET price_status='APPROVED', doctor_pct=$1, doctor_amount=$2, final_price=$3, price_note=NULL,
+              price_approved_by=$4, price_approved_at=NOW(), history=$5, updated_at=NOW()
+        WHERE id=$6 RETURNING *`,
+      [pct, amount, final, req.user.id,
+       _appendHistory(job, { action: 'price_approved', by: req.user.id, role }), job.id]);
+    res.json(jobPriceView(upd.rows[0], req.user));
+    notifyStore(job.store_id, '✅ Price approved',
+      `${job.patient_name || 'A patient'} — ${_jobProductLabel(job.id)}: final price ₹${final}. You can start production.`,
+      '/store', ['STORE', 'STORE_APPROVER']).catch(() => {});
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Doctor sends the price back to the store with a note.
+app.post('/api/manufacturing-jobs/:id/price-query', authenticateToken, async (req, res) => {
+  const role = req.user && req.user.role;
+  const isAdmin = role === 'ADMIN' || role === 'SUPER_ADMIN';
+  if (role !== 'DOCTOR' && !isAdmin) return res.status(403).json({ error: 'Only the doctor can send a price back.' });
+  const note = String((req.body && req.body.note) || '').trim().slice(0, 500);
+  if (!note) return res.status(400).json({ error: 'Add a note so the store knows what to change.' });
+  try {
+    const job = await _loadJobForPricing(req.params.id);
+    if (!job) return res.status(404).json({ error: 'Job not found' });
+    if (!isAdmin && req.user.id !== job.doctor_id && req.user.id !== job.assigned_doctor_id) {
+      return res.status(403).json({ error: 'This product belongs to another doctor\'s patient.' });
+    }
+    if (job.price_status !== 'AWAITING_DOCTOR') return res.status(409).json({ error: 'This price is not waiting for your approval.' });
+    const upd = await pool.query(
+      `UPDATE manufacturing_jobs SET price_status='QUERIED', price_note=$1, history=$2, updated_at=NOW()
+        WHERE id=$3 RETURNING *`,
+      [note, _appendHistory(job, { action: 'price_queried', by: req.user.id, role, note }), job.id]);
+    res.json(jobPriceView(upd.rows[0], req.user));
+    notifyStore(job.store_id, '🔁 Price sent back',
+      `${job.patient_name || 'A patient'} — ${_jobProductLabel(job.id)}: ${note}`, '/store', ['STORE', 'STORE_APPROVER']).catch(() => {});
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // Manufacturing Jobs: Assign batch number + manufacturing/expiry dates (for labels).
 // Batch no is a per-store running sequence, assigned once and reused on reprints.
 // Exp date = mfg date + 18 months.
@@ -3423,7 +3572,7 @@ app.post('/api/manufacturing-jobs/:id/batch', authenticateToken, async (req, res
       'UPDATE manufacturing_jobs SET batch_no=$1, mfg_date=$2, exp_date=$3, updated_at=NOW() WHERE id=$4 RETURNING *',
       [batchNo, mfgDate, expDate, req.params.id]
     );
-    res.json(upd.rows[0]);
+    res.json(jobPriceView(upd.rows[0], req.user));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -4378,6 +4527,20 @@ OUTPUT FORMAT — return ONLY valid JSON, no markdown, no text outside the JSON 
     await pool.query('ALTER TABLE manufacturing_jobs ADD COLUMN IF NOT EXISTS batch_no TEXT');
     await pool.query('ALTER TABLE manufacturing_jobs ADD COLUMN IF NOT EXISTS mfg_date DATE');
     await pool.query('ALTER TABLE manufacturing_jobs ADD COLUMN IF NOT EXISTS exp_date DATE');
+    // Product pricing: store price → platform markup → doctor share → final MRP.
+    await pool.query(`ALTER TABLE manufacturing_jobs
+      ADD COLUMN IF NOT EXISTS price_status      TEXT,
+      ADD COLUMN IF NOT EXISTS store_price       NUMERIC(12,2),
+      ADD COLUMN IF NOT EXISTS markup_pct        NUMERIC(6,2),
+      ADD COLUMN IF NOT EXISTS base_price        NUMERIC(12,2),
+      ADD COLUMN IF NOT EXISTS doctor_pct        NUMERIC(6,2),
+      ADD COLUMN IF NOT EXISTS doctor_amount     NUMERIC(12,2),
+      ADD COLUMN IF NOT EXISTS final_price       NUMERIC(12,2),
+      ADD COLUMN IF NOT EXISTS price_note        TEXT,
+      ADD COLUMN IF NOT EXISTS store_priced_by   TEXT,
+      ADD COLUMN IF NOT EXISTS store_priced_at   TIMESTAMPTZ,
+      ADD COLUMN IF NOT EXISTS price_approved_by TEXT,
+      ADD COLUMN IF NOT EXISTS price_approved_at TIMESTAMPTZ`);
     const bf = await reconcileJobs();
     if (bf.created) console.log('manufacturing_jobs backfill: created ' + bf.created + ' job(s) for approved patients.');
   } catch(e) { console.error('manufacturing_jobs migration:', e.message); }
@@ -5165,6 +5328,8 @@ app.post('/api/drafts/:id/complete', authenticateToken, async (req, res) => {
         { id:'servings_high_threshold',   category:'servings',     name:'servings_high_threshold',   description:'Daily calorie level above which servings increase to 4 (to reduce per-serving volume)',         value:'1800', unit:'kcal',         source:'Clinical' },
         { id:'servings_high_count',       category:'servings',     name:'servings_high_count',       description:'Servings per day when calories ≥1800 or appetite loss/nausea present',                         value:'4',    unit:'servings',     source:'Clinical' },
         { id:'servings_very_high_threshold',category:'servings',   name:'servings_very_high_threshold','description':'Daily calorie level above which servings increase to 5',                                     value:'2400', unit:'kcal',         source:'Clinical' },
+        // ── Pricing ───────────────────────────────────────────────────────────
+        { id:'platform_markup_pct',       category:'pricing',      name:'platform_markup_pct',       description:'Markup added on top of the store price before the doctor adds their share (applies to new prices only)', value:'40', unit:'%', source:'Commercial' },
         { id:'servings_very_high_count',  category:'servings',     name:'servings_very_high_count',  description:'Servings per day when calories ≥2400',                                                          value:'5',    unit:'servings',     source:'Clinical' },
       ];
       for (const f of formulas) {
@@ -5349,6 +5514,13 @@ app.get('/api/engine-formulas', authenticateToken, async (req, res) => {
 app.put('/api/engine-formulas/:id', authenticateToken, async (req, res) => {
   const { value } = req.body;
   if (!value && value !== 0) return res.status(400).json({ error: 'value required' });
+  // Commercial settings are admin-only (clinical constants keep their existing rule).
+  if (/^platform_/.test(req.params.id)) {
+    const role = req.user && req.user.role;
+    if (role !== 'ADMIN' && role !== 'SUPER_ADMIN') return res.status(403).json({ error: 'Admin only' });
+    const n = parseFloat(value);
+    if (!(n >= 0 && n <= 500)) return res.status(400).json({ error: 'Markup must be a percentage between 0 and 500.' });
+  }
   try {
     await pool.query(
       'UPDATE engine_formulas SET value=$1, updated_at=NOW() WHERE id=$2',

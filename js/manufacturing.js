@@ -32,7 +32,12 @@
   // Used by initJobs and by the dashboard's live poll so render() always
   // reflects server truth (e.g. an approval made on another device).
   function applyServerJobs(rows) {
-    _cache.jobs = (rows || []).map(r => ({
+    _cache.jobs = (rows || []).map(_mapRow);
+    db.setTable('manufacturing_jobs', _cache.jobs);
+    return _cache.jobs;
+  }
+  function _mapRow(r) {
+    return ({
       id: r.id,
       patientId: r.patient_id || r.patientId,
       storeId: r.store_id || r.storeId,
@@ -42,6 +47,17 @@
       batchNo: r.batch_no || r.batchNo || null,
       mfgDate: r.mfg_date || r.mfgDate || null,
       expDate: r.exp_date || r.expDate || null,
+      // Pricing — the server only sends the fields this role may see.
+      priceStatus:  r.price_status || null,
+      storePrice:   r.store_price  != null ? Number(r.store_price)  : null,
+      markupPct:    r.markup_pct   != null ? Number(r.markup_pct)   : null,
+      basePrice:    r.base_price   != null ? Number(r.base_price)   : null,
+      doctorPct:    r.doctor_pct   != null ? Number(r.doctor_pct)   : null,
+      doctorAmount: r.doctor_amount!= null ? Number(r.doctor_amount): null,
+      finalPrice:   r.final_price  != null ? Number(r.final_price)  : null,
+      priceNote:    r.price_note || null,
+      storePricedAt:   r.store_priced_at || null,
+      priceApprovedAt: r.price_approved_at || null,
       createdAt: r.created_at || r.createdAt,
       updatedAt: r.updated_at || r.updatedAt,
       // Withdrawal travels with the job so the store can never be the last
@@ -50,9 +66,7 @@
       withdrawnReason: r.withdrawnReason || r.withdrawn_reason || null,
       withdrawnLabel: r.withdrawnLabel || r.withdrawn_label || null,
       withdrawnAt: r.withdrawnAt || r.withdrawn_at || null
-    }));
-    db.setTable('manufacturing_jobs', _cache.jobs);
-    return _cache.jobs;
+    });
   }
 
   // Assign/refresh batch number + manufacturing & expiry dates for a job.
@@ -124,13 +138,57 @@
     db.setTable('manufacturing_jobs', jobs);
 
     try {
-      await fetch(_apiBase() + '/api/manufacturing-jobs/' + jobId, {
+      const res = await fetch(_apiBase() + '/api/manufacturing-jobs/' + jobId, {
         method: 'PUT', headers: _headers(),
         body: JSON.stringify({ status, history: job.history })
       });
+      if (!res.ok) {
+        // The server refused (e.g. price not approved yet) — undo the optimistic
+        // change by reloading server truth, and say why.
+        const data = await res.json().catch(() => ({}));
+        await initJobs();
+        if (typeof alert === 'function') alert(data.error || ('Could not update the job (' + res.status + ').'));
+        return null;
+      }
     } catch(e) { console.warn('updateJobStatus: server unreachable'); }
 
     return job;
+  }
+
+  // ── Pricing ────────────────────────────────────────────────────────────────
+  // Store price → +platform markup → doctor % → final price (label MRP).
+  // Each call returns { ok, job } or { ok:false, error } and refreshes the cache.
+  async function _pricePost(jobId, path, body) {
+    try {
+      const res = await fetch(_apiBase() + '/api/manufacturing-jobs/' + encodeURIComponent(jobId) + '/' + path, {
+        method: 'POST', headers: _headers(), body: JSON.stringify(body || {})
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) return { ok: false, error: data.error || ('Server error (' + res.status + ')') };
+      const jobs = getJobs();
+      const i = jobs.findIndex(j => j.id == jobId);
+      const prev = i >= 0 ? jobs[i] : {};
+      // Keep withdrawal flags the list endpoint adds; take everything else from the server.
+      const mapped = Object.assign(_mapRow(data), {
+        patientWithdrawn: prev.patientWithdrawn || false, withdrawnReason: prev.withdrawnReason || null,
+        withdrawnLabel: prev.withdrawnLabel || null, withdrawnAt: prev.withdrawnAt || null });
+      if (i >= 0) jobs[i] = mapped; else jobs.push(mapped);
+      _cache.jobs = jobs;
+      db.setTable('manufacturing_jobs', jobs);
+      return { ok: true, job: mapped };
+    } catch (e) { return { ok: false, error: e.message }; }
+  }
+  function setStorePrice(jobId, price)   { return _pricePost(jobId, 'store-price',  { price }); }
+  function approvePrice(jobId, doctorPct){ return _pricePost(jobId, 'doctor-price', { doctorPct }); }
+  function queryPrice(jobId, note)       { return _pricePost(jobId, 'price-query',  { note }); }
+  // A job may enter production only once its price is approved.
+  function isPriced(j) { return !!j && (j.priceStatus || j.price_status) === 'APPROVED'; }
+  function priceLabel(j) {
+    const s = j && (j.priceStatus || j.price_status);
+    if (s === 'APPROVED')        return 'Price approved';
+    if (s === 'AWAITING_DOCTOR') return 'Price with doctor';
+    if (s === 'QUERIED')         return 'Price sent back';
+    return 'Price needed';
   }
 
   function getJobsForStore(storeId) {
@@ -186,5 +244,6 @@
     }
   };
 
-  global.manufacturingService = { initJobs, applyServerJobs, getJobs, createJob, updateJobStatus, assignBatch, getJobsForStore, getJobByPatient, WORKFLOW };
+  global.manufacturingService = { initJobs, applyServerJobs, getJobs, createJob, updateJobStatus, assignBatch, getJobsForStore, getJobByPatient, WORKFLOW,
+    setStorePrice, approvePrice, queryPrice, isPriced, priceLabel };
 })(window);

@@ -249,13 +249,13 @@
       </div>
       <div style="display:flex;flex-direction:column;gap:3px;">
         <label style="font-size:11px;color:#334155;font-weight:600;">M.R.P (Rs.)</label>
-        <input id="lblMrp" type="number" min="0" step="0.01" oninput="artInputChanged('mrp')" style="width:96px;padding:7px;border:1px solid #cbd5e1;border-radius:6px;">
+        <input id="lblMrp" type="number" min="0" step="0.01" readonly title="Set by the approved product price" style="width:96px;padding:7px;border:1px solid #cbd5e1;border-radius:6px;background:#f1f5f9;">
       </div>
       <div style="display:flex;flex-direction:column;gap:3px;">
         <label style="font-size:11px;color:#334155;font-weight:600;">U.S.P per g (Rs.)</label>
         <input id="lblUsp" type="number" min="0" step="0.01" oninput="artInputChanged('usp')" style="width:110px;padding:7px;border:1px solid #cbd5e1;border-radius:6px;">
       </div>
-      <div style="font-size:11px;color:#64748b;max-width:210px;line-height:1.35;">Printed on the artwork pouch label. U.S.P fills itself from M.R.P ÷ net weight until you type your own.</div>
+      <div id="lblMrpNote" style="font-size:11px;color:#64748b;max-width:230px;line-height:1.35;">Printed on the artwork pouch label. M.R.P is the price approved by the doctor. U.S.P fills itself from M.R.P ÷ net weight until you type your own.</div>
     </div>
     <div class="lbl-modal-chrome" id="lblBatchInfo" style="font-size:12.5px;color:#0f172a;margin-bottom:6px;"></div>
 
@@ -530,6 +530,58 @@ const _btnGreen = 'padding:5px 10px;font-size:11px;border-radius:5px;border:1px 
 const _btnRed   = 'padding:5px 10px;font-size:11px;border-radius:5px;border:1px solid #dc2626;background:#fef2f2;color:#b91c1c;font-weight:600;cursor:pointer;';
 
 function _esc2(s){return String(s==null?'':s).replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));}
+
+// ── Pricing ───────────────────────────────────────────────────────────────
+// Before production the store enters its price for the product. The doctor
+// then approves the final price (the store does not see the markup or the
+// doctor's share — only the final price that goes on the label as the MRP).
+function _rs(n){ return n == null ? '—' : '₹' + Number(n).toLocaleString('en-IN', { maximumFractionDigits: 2 }); }
+function priceNeedsStore(j){
+  const s = (j.status || 'APPROVED').toUpperCase(), ps = j.priceStatus;
+  return s === 'APPROVED' && (!ps || ps === 'AWAITING_STORE' || ps === 'QUERIED');
+}
+function priceWidget(j){
+  const ps = j.priceStatus;
+  if (ps === 'APPROVED') {
+    return `<span title="Approved by the doctor — printed on the label as the MRP" style="font-size:11px;font-weight:700;color:#15803d;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:5px;padding:3px 8px;">MRP ${_rs(j.finalPrice)}</span>`;
+  }
+  if (ps === 'AWAITING_DOCTOR') {
+    return `<span style="font-size:11px;color:#d97706;font-weight:700;">⏳ Your price ${_rs(j.storePrice)} is with the doctor</span>`
+      + (isApprover ? '' : ` <button onclick="event.stopPropagation(); editStorePrice('${j.id}')" style="${_btnAmber}">Change</button>`);
+  }
+  if (isApprover) return `<span style="font-size:11px;color:#94a3b8;">Awaiting store price</span>`;
+  const note = ps === 'QUERIED' && j.priceNote
+    ? `<div style="font-size:11px;color:#b91c1c;font-weight:600;max-width:260px;">Doctor: ${_esc2(j.priceNote)}</div>` : '';
+  return `<div style="display:flex;flex-direction:column;gap:4px;" onclick="event.stopPropagation();">
+      ${note}
+      <div style="display:flex;gap:6px;align-items:center;">
+        <span style="font-size:11px;font-weight:600;color:#334155;">Store price ₹</span>
+        <input id="sp_${j.id}" type="number" min="1" step="0.01" value="${j.storePrice != null ? j.storePrice : ''}" placeholder="e.g. 1000"
+               onkeydown="if(event.key==='Enter'){event.preventDefault();submitStorePrice('${j.id}');}"
+               style="width:90px;padding:4px 6px;font-size:12px;border:1px solid #cbd5e1;border-radius:5px;">
+        <button onclick="event.stopPropagation(); submitStorePrice('${j.id}')" style="${_btnAmber}">${ps === 'QUERIED' ? 'Resend to doctor' : 'Send to doctor'}</button>
+      </div>
+    </div>`;
+}
+let _editingPrice = {};
+function editStorePrice(jobId){
+  const j = manufacturingService.getJobs().find(x => x.id == jobId);
+  if (!j) return;
+  const v = prompt('New store price (₹) for this product. The doctor will be asked to approve again.', j.storePrice != null ? j.storePrice : '');
+  if (v === null) return;
+  _sendStorePrice(jobId, v);
+}
+function submitStorePrice(jobId){
+  const el = document.getElementById('sp_' + jobId);
+  _sendStorePrice(jobId, el ? el.value : '');
+}
+async function _sendStorePrice(jobId, raw){
+  const price = parseFloat(raw);
+  if (!(price > 0)) { alert('Enter the store price for this product.'); return; }
+  const r = await manufacturingService.setStorePrice(jobId, price);
+  if (!r.ok) { alert(r.error || 'Could not save the price.'); return; }
+  render();
+}
 function _wdTitle(j) {
   return 'Withdrawn' + (j.withdrawnLabel ? ': ' + _esc2(j.withdrawnLabel) : '')
        + (j.withdrawnAt ? ' on ' + _lblFmtDate(j.withdrawnAt) : '');
@@ -564,7 +616,13 @@ function statusActionBtn(j) {
       </div>`;
     }
     if (s === 'DISPATCHED') return `<span style="font-size:11px;color:#16a34a;font-weight:700;">✓ Dispatched</span>`;
+    if (s === 'APPROVED') return priceWidget(j);
     return `<span style="font-size:11px;color:#94a3b8;">Awaiting manager</span>`;
+  }
+
+  // Price first: nothing goes into production until the doctor approves the price.
+  if (s === 'APPROVED' && !manufacturingService.isPriced(j)) {
+    return priceWidget(j);
   }
 
   // ── Store Manager view ───────────────────────────────────────────────
@@ -575,7 +633,8 @@ function statusActionBtn(j) {
   if (req) {
     const label = (req.next === 'PENDING_PROCESSING') ? 'Request Processing' : 'Request Dispatch';
     const style = (req.next === 'PENDING_PROCESSING') ? _btnAmber : _btnGreen;
-    return `<button onclick="event.stopPropagation(); requestStep('${j.id}', '${req.next}')" style="${style}">${label}</button>`;
+    const btn = `<button onclick="event.stopPropagation(); requestStep('${j.id}', '${req.next}')" style="${style}">${label}</button>`;
+    return (s === 'APPROVED') ? priceWidget(j) + ' ' + btn : btn;
   }
   return `<span style="font-size:11px;color:#16a34a;font-weight:700;">✓ Dispatched</span>`;
 }
@@ -904,7 +963,9 @@ function productLabel(j){
 function isActionable(j){
   const W = manufacturingService.WORKFLOW;
   const s = (j.status || 'APPROVED').toUpperCase();
-  return isApprover ? !!W.pending[s] : (!W.isPending(s) && !!W.requestFor(s));
+  if (isApprover) return !!W.pending[s];
+  if (s === 'APPROVED' && !manufacturingService.isPriced(j)) return priceNeedsStore(j);
+  return !W.isPending(s) && !!W.requestFor(s);
 }
 function toggleGroup(gid){
   const rows = document.querySelectorAll('.' + gid + '-row');
@@ -1259,7 +1320,13 @@ function _artFillInputs(){
   const g = ing.reduce((a, c) => a + (parseFloat(c && c.grams) || 0), 0);
   if(g > 0) suggested = String(Math.round(g));
   netEl.value = s.net || suggested;
-  mrpEl.value = s.mrp || '';
+  // MRP = final price approved by the doctor; never typed by hand.
+  const priced = _lblJob && manufacturingService.isPriced(_lblJob) && _lblJob.finalPrice != null;
+  mrpEl.value = priced ? _lblJob.finalPrice : '';
+  const mrpNote = document.getElementById('lblMrpNote');
+  if (mrpNote) mrpNote.innerHTML = priced
+    ? 'Printed on the artwork pouch label. M.R.P is the price approved by the doctor. U.S.P fills itself from M.R.P ÷ net weight until you type your own.'
+    : '<b style="color:#b91c1c;">No approved price yet</b> — M.R.P stays blank until the doctor approves the price for this product.';
   uspEl.value = s.usp || '';
   _uspTouched = !!s.usp;
 }
@@ -1474,6 +1541,7 @@ function openQrLink(){
 // ── NOTIFICATION POLLING ──────────────────────────────────────────────────
 let _knownJobIds = new Set();
 let _jobStatusMap = {}; // jobId -> last seen status, for change detection
+let _jobPriceMap = {};  // jobId -> last seen price_status
 let _notifPermission = false;
 
 function _initNotifications() {
@@ -1525,6 +1593,18 @@ function _pollJobs() {
           }
         }
         _jobStatusMap[j.id] = status;
+
+        // Price decisions made by the doctor
+        const pst = j.price_status || '';
+        if (j.id in _jobPriceMap && _jobPriceMap[j.id] !== pst) {
+          changed = true;
+          if (!isApprover && pst === 'APPROVED') {
+            _showNotification('Price approved', `${name}: MRP ${_rs(j.final_price)} — you can request processing.`, 'pending');
+          } else if (!isApprover && pst === 'QUERIED') {
+            _showNotification('Price sent back', `${name}: ${j.price_note || 'the doctor asked for a new price'}.`, 'pending');
+          }
+        }
+        _jobPriceMap[j.id] = pst;
       });
 
       // Refresh the in-memory job cache with the freshly-fetched rows so that

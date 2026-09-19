@@ -245,7 +245,14 @@ function renderActions(){
     }
   } else {
     title.innerText = 'Update Production Status';
-    if (W.isPending(s)) {
+    if (s === 'APPROVED' && !manufacturingService.isPriced(job)) {
+      // Production waits for the doctor-approved price.
+      const ps = job.priceStatus;
+      const msg = ps === 'AWAITING_DOCTOR' ? '⏳ Price sent — waiting for the doctor to approve it'
+                : ps === 'QUERIED' ? '🔁 The doctor sent the price back' + (job.priceNote ? ': ' + String(job.priceNote).replace(/[<>&"]/g, '') : '')
+                : '💰 Enter the store price on the Store dashboard before production';
+      html += `<span style="align-self:center;color:#d97706;font-weight:700;">${msg}</span>`;
+    } else if (W.isPending(s)) {
       html += `<span style="align-self:center;color:#d97706;font-weight:700;">⏳ Awaiting approver sign-off</span>`;
     } else {
       const req = W.requestFor(s);
@@ -275,7 +282,8 @@ function bind(){
 // Manager requests next step (pending). Patient clinician status is left
 // unchanged until an approver signs off.
 async function requestStep(next){
-  await manufacturingService.updateJobStatus(job.id, next, { by: me.id, role: me.role, action: 'request' });
+  const ok = await manufacturingService.updateJobStatus(job.id, next, { by: me.id, role: me.role, action: 'request' });
+  if (!ok) return;   // refused by the server (reason already shown)
   job.status = next;
   bind();
   alert('Request submitted for approval.');
