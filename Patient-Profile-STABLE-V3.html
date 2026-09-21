@@ -8109,7 +8109,9 @@ function renderWxRxRecipe(recipe, targets) {
         : perSrvG + ' g';
       return '<tr style="border-bottom:1px solid #f1f5f9;">' +
         '<td style="padding:9px 10px;">' +
-          '<div style="font-weight:700;color:#334155;">' + ing.name + '</div>' +
+          '<div style="font-weight:700;color:#334155;">' + ing.name
+            + (ing.pct != null ? ' <span style="font-size:10px;font-weight:700;color:#0e7490;background:#ecfeff;border:1px solid #a5f3fc;border-radius:4px;padding:0 5px;margin-left:4px;">' + ing.pct + '% of protein blend</span>' : '')
+            + '</div>' +
           '<div style="font-size:10px;color:#64748b;font-weight:500;margin-top:2px;">' + (ing.rationale||'') + '</div>' +
           contribNote +
         '</td>' +

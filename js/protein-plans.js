@@ -23,12 +23,14 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  // Per-gram composition of each base ingredient (typical commercial grades).
+  // Per-gram composition of each base ingredient (typical commercial grades:
+  // MPC ≈ 70% protein, MPC-C ≈ 85%, WPC ≈ 80%). The grade is NOT the blend share —
+  // names deliberately omit it so '70' is never read as a percentage of the blend.
   // Keep in sync with js/ingredients.js (same ids).
   var INGREDIENTS = {
-    mpc70:        { id: 'mpc70',        short: 'MPC',   name: 'Milk Protein Concentrate (MPC 70)',           p: 0.70, c: 0.18, f: 0.015, kcal: 3.6 },
-    mpc85:        { id: 'mpc85',        short: 'MPC-C', name: 'Milk Protein Concentrate — concentrated (MPC 85)', p: 0.85, c: 0.05, f: 0.015, kcal: 3.6 },
-    wpc80:        { id: 'wpc80',        short: 'WPC',   name: 'Whey Protein Concentrate (WPC 80)',           p: 0.80, c: 0.07, f: 0.06,  kcal: 4.0 },
+    mpc70:        { id: 'mpc70',        short: 'MPC',   name: 'Milk Protein Concentrate (MPC)',           p: 0.70, c: 0.18, f: 0.015, kcal: 3.6 },
+    mpc85:        { id: 'mpc85',        short: 'MPC-C', name: 'Milk Protein Concentrate — concentrated grade (MPC-C)', p: 0.85, c: 0.05, f: 0.015, kcal: 3.6 },
+    wpc80:        { id: 'wpc80',        short: 'WPC',   name: 'Whey Protein Concentrate (WPC)',           p: 0.80, c: 0.07, f: 0.06,  kcal: 4.0 },
     soy_isolate:  { id: 'soy_isolate',  short: 'SPI',   name: 'Soya Protein Isolate (SPI)',                  p: 0.90, c: 0.01, f: 0.01,  kcal: 3.7 },
     pea_protein:  { id: 'pea_protein',  short: 'Pea',   name: 'Pea Protein Isolate',                         p: 0.80, c: 0.02, f: 0.05,  kcal: 3.8 },
     rice_protein: { id: 'rice_protein', short: 'Rice',  name: 'Brown Rice Protein',                          p: 0.80, c: 0.08, f: 0.03,  kcal: 3.9 }

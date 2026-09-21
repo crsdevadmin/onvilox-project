@@ -3399,9 +3399,10 @@ app.put('/api/manufacturing-jobs/:id', authenticateToken, async (req, res) => {
 // ── Product pricing ─────────────────────────────────────────────────────────
 // Flow per job (initial plan and every weekly batch):
 //   store enters its price → platform markup (engine_formulas.platform_markup_pct,
-//   default 40 %) is added → doctor adds their % on top of that → final price,
+//   default 40 %) is added → doctor adds their own rupee amount on top → final price,
 //   which is printed on the label as the MRP. Production is blocked until then.
-//   Example: store 1000 → +40 % = 1400 → doctor +40 % of 1400 = 560 → final 1960.
+//   Example: store 1000 → +40 % = 1400 → doctor adds ₹500 → final 1900.
+//   (doctor_pct is still stored — derived from the amount — for reporting.)
 // price_status: NULL/'AWAITING_STORE' → 'AWAITING_DOCTOR' → 'APPROVED'
 //               ('QUERIED' = doctor sent it back to the store with a note).
 // Visibility: the store never sees the markup or the doctor's share; the doctor
@@ -3477,13 +3478,18 @@ app.post('/api/manufacturing-jobs/:id/store-price', authenticateToken, async (re
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// Doctor adds their percentage on top of the marked-up price and approves.
+// Doctor adds their own amount (₹) on top of the marked-up price and approves.
+// Older clients may still send doctorPct; it is converted to an amount.
 app.post('/api/manufacturing-jobs/:id/doctor-price', authenticateToken, async (req, res) => {
   const role = req.user && req.user.role;
   const isAdmin = role === 'ADMIN' || role === 'SUPER_ADMIN';
   if (role !== 'DOCTOR' && !isAdmin) return res.status(403).json({ error: 'Only the doctor can approve the price.' });
-  const pct = parseFloat(req.body && req.body.doctorPct);
-  if (!(pct >= 0) || pct > 500) return res.status(400).json({ error: 'Enter your percentage (0–500).' });
+  const body = req.body || {};
+  const rawAmt = body.doctorAmount != null && body.doctorAmount !== '' ? parseFloat(body.doctorAmount) : null;
+  const rawPct = rawAmt == null && body.doctorPct != null ? parseFloat(body.doctorPct) : null;
+  if (rawAmt == null && rawPct == null) return res.status(400).json({ error: 'Enter the amount (₹) you want to add.' });
+  if (rawAmt != null && !(rawAmt >= 0 && rawAmt <= 10000000)) return res.status(400).json({ error: 'Enter a valid amount (₹0 or more).' });
+  if (rawPct != null && !(rawPct >= 0 && rawPct <= 500)) return res.status(400).json({ error: 'Enter a valid percentage (0–500).' });
   try {
     const job = await _loadJobForPricing(req.params.id);
     if (!job) return res.status(404).json({ error: 'Job not found' });
@@ -3494,7 +3500,8 @@ app.post('/api/manufacturing-jobs/:id/doctor-price', authenticateToken, async (r
       return res.status(409).json({ error: 'There is no store price waiting for approval on this product.' });
     }
     const base = Number(job.base_price);
-    const amount = _money(base * pct / 100);
+    const amount = rawAmt != null ? _money(rawAmt) : _money(base * rawPct / 100);
+    const pct = base > 0 ? _money(amount / base * 100) : 0;
     const final = Math.round(base + amount);          // MRP in whole rupees
     const upd = await pool.query(
       `UPDATE manufacturing_jobs
@@ -4533,7 +4540,7 @@ OUTPUT FORMAT — return ONLY valid JSON, no markdown, no text outside the JSON 
       ADD COLUMN IF NOT EXISTS store_price       NUMERIC(12,2),
       ADD COLUMN IF NOT EXISTS markup_pct        NUMERIC(6,2),
       ADD COLUMN IF NOT EXISTS base_price        NUMERIC(12,2),
-      ADD COLUMN IF NOT EXISTS doctor_pct        NUMERIC(6,2),
+      ADD COLUMN IF NOT EXISTS doctor_pct        NUMERIC(10,2),
       ADD COLUMN IF NOT EXISTS doctor_amount     NUMERIC(12,2),
       ADD COLUMN IF NOT EXISTS final_price       NUMERIC(12,2),
       ADD COLUMN IF NOT EXISTS price_note        TEXT,
@@ -4541,6 +4548,8 @@ OUTPUT FORMAT — return ONLY valid JSON, no markdown, no text outside the JSON 
       ADD COLUMN IF NOT EXISTS store_priced_at   TIMESTAMPTZ,
       ADD COLUMN IF NOT EXISTS price_approved_by TEXT,
       ADD COLUMN IF NOT EXISTS price_approved_at TIMESTAMPTZ`);
+    // doctor_pct is now derived from a free rupee amount, so it can exceed 9999 %.
+    await pool.query('ALTER TABLE manufacturing_jobs ALTER COLUMN doctor_pct TYPE NUMERIC(10,2)');
     const bf = await reconcileJobs();
     if (bf.created) console.log('manufacturing_jobs backfill: created ' + bf.created + ' job(s) for approved patients.');
   } catch(e) { console.error('manufacturing_jobs migration:', e.message); }

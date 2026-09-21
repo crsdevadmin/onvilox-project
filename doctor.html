@@ -1641,7 +1641,7 @@
     // ── Row: daily logs missing ───────────────────────────────────────────
     // ── Row: product price awaiting the doctor ────────────────────────────
     // The store has priced the product; the platform markup is already added.
-    // The doctor adds their own percentage on top of that price and approves —
+    // The doctor adds their own amount (₹) on top of that price and approves —
     // the result is the final price printed on the label as the MRP.
     // (The doctor never sees the store's own price or the markup rate.)
     function _myDoctorId() {
@@ -1661,17 +1661,14 @@
       }).sort((a, b) => String(a.storePricedAt || '').localeCompare(String(b.storePricedAt || '')));
     }
     function _inr(n) { return n == null || isNaN(n) ? '—' : '₹' + Number(n).toLocaleString('en-IN', { maximumFractionDigits: 2 }); }
-    function _lastDoctorPct() { try { return localStorage.getItem('gq_doctor_pct_' + _myDoctorId()) || ''; } catch (e) { return ''; } }
-    function _priceCalc(base, pct) {
-      const amt = Math.round(base * pct / 100 * 100) / 100;
+    function _priceCalc(base, amt) {
+      amt = Math.round(amt * 100) / 100;
       return { amt: amt, final: Math.round(base + amt) };
     }
     function qRowPrice(j) {
       const p = (typeof getPatientById === 'function' && getPatientById(j.patientId)) || { id: j.patientId, name: 'Patient' };
       const label = productLabel(j) === 'Initial' ? 'Initial product' : 'Week ' + productLabel(j).slice(1) + ' batch';
       const since = j.storePricedAt ? 'priced ' + _agoText(j.storePricedAt) + ' ago' : 'priced by the store';
-      const pct = _lastDoctorPct();
-      const c = pct !== '' ? _priceCalc(j.basePrice, parseFloat(pct)) : null;
       const isDoc = me.role === 'DOCTOR';
       const id = _esc(j.id);
       return '<div class="qrow">'
@@ -1680,13 +1677,12 @@
         + '<span class="wkchip">' + _esc(label) + '</span>'
         + '<div class="qmetrics">'
           + qMetric('Price', _inr(j.basePrice), '')
-          + '<div class="qm"><div class="k">Your share</div><div class="v">'
-            + (isDoc ? '<input class="pin" type="number" min="0" max="500" step="0.5" id="dp_' + id + '" value="' + _esc(pct) + '" placeholder="%"'
-                 + ' oninput="updPriceRow(\'' + id + '\')" onkeydown="if(event.key===\'Enter\')approvePriceRow(\'' + id + '\')"> <small>%</small>'
-                 + ' <small id="da_' + id + '">' + (c ? '= ' + _inr(c.amt) : '') + '</small>'
+          + '<div class="qm"><div class="k">Your amount</div><div class="v">'
+            + (isDoc ? '<small>₹</small> <input class="pin" style="width:96px" type="number" min="0" step="1" id="dp_' + id + '" placeholder="e.g. 500"'
+                 + ' oninput="updPriceRow(\'' + id + '\')" onkeydown="if(event.key===\'Enter\')approvePriceRow(\'' + id + '\')">'
                : '<small>set by the doctor</small>')
           + '</div></div>'
-          + '<div class="qm"><div class="k">Final price (MRP)</div><div class="v" id="df_' + id + '">' + (c ? _inr(c.final) : '—') + '</div></div>'
+          + '<div class="qm"><div class="k">Final price (MRP)</div><div class="v" id="df_' + id + '">—</div></div>'
         + '</div>'
         + '<div class="qacts">'
           + (isDoc
@@ -1700,26 +1696,23 @@
       const j = manufacturingService.getJobs().find(x => String(x.id) === String(id));
       const el = document.getElementById('dp_' + id);
       if (!j || !el) return;
-      const v = parseFloat(el.value);
-      const ok = v >= 0 && v <= 500;
-      const c = ok ? _priceCalc(j.basePrice, v) : null;
-      document.getElementById('da_' + id).textContent = c ? '= ' + _inr(c.amt) : '';
+      const v = el.value === '' ? NaN : parseFloat(el.value);
+      const c = v >= 0 ? _priceCalc(j.basePrice, v) : null;
       document.getElementById('df_' + id).textContent = c ? _inr(c.final) : '—';
     }
     async function approvePriceRow(id) {
       const j = manufacturingService.getJobs().find(x => String(x.id) === String(id));
       const el = document.getElementById('dp_' + id);
       if (!j || !el) return;
-      const v = parseFloat(el.value);
-      if (!(v >= 0 && v <= 500)) { alert('Enter your percentage (0 or more) before approving.'); el.focus(); return; }
+      const v = el.value === '' ? NaN : parseFloat(el.value);
+      if (!(v >= 0)) { alert('Enter the amount (₹) you want to add — 0 if none — before approving.'); el.focus(); return; }
       const c = _priceCalc(j.basePrice, v);
       if (!confirm('Approve the final price of ' + _inr(c.final) + ' for this product?\n\n'
-                 + 'Price ' + _inr(j.basePrice) + ' + your ' + v + '% (' + _inr(c.amt) + ').\n'
+                 + 'Price ' + _inr(j.basePrice) + ' + your ' + _inr(c.amt) + '.\n'
                  + 'This is printed on the label as the MRP.')) return;
       const btn = document.getElementById('dpb_' + id); if (btn) btn.disabled = true;
-      const r = await manufacturingService.approvePrice(id, v);
+      const r = await manufacturingService.approvePrice(id, c.amt);
       if (!r.ok) { if (btn) btn.disabled = false; alert(r.error || 'Could not approve the price.'); return; }
-      try { localStorage.setItem('gq_doctor_pct_' + _myDoctorId(), String(v)); } catch (e) {}
       renderQueue(); render();
     }
     async function queryPriceRow(id) {

@@ -47,7 +47,7 @@ const IngredientLibrary = [
   // Protein-plan base ingredients (P1–P5, see js/protein-plans.js — keep values in sync)
   {
     id: 'mpc70',
-    name: 'Milk Protein Concentrate (MPC 70)',
+    name: 'Milk Protein Concentrate (MPC)',
     category: 'PROTEIN',
     kcalPerGram: 3.6,
     pPerGram: 0.7,
@@ -60,7 +60,7 @@ const IngredientLibrary = [
   },
   {
     id: 'mpc85',
-    name: 'Milk Protein Concentrate — concentrated (MPC 85)',
+    name: 'Milk Protein Concentrate — concentrated grade (MPC-C)',
     category: 'PROTEIN',
     kcalPerGram: 3.6,
     pPerGram: 0.85,
@@ -73,7 +73,7 @@ const IngredientLibrary = [
   },
   {
     id: 'wpc80',
-    name: 'Whey Protein Concentrate (WPC 80)',
+    name: 'Whey Protein Concentrate (WPC)',
     category: 'PROTEIN',
     kcalPerGram: 4.0,
     pPerGram: 0.8,
