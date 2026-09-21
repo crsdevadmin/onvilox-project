@@ -94,6 +94,41 @@
     if (b) b.remove();
   };
 
+  // iPhone / iPad: Safari never fires 'beforeinstallprompt', so the Install
+  // banner above never appears there. Show the manual steps instead
+  // (Share → Add to Home Screen). Installing is also what enables push
+  // notifications on iOS (16.4+).
+  (function iosInstallHint() {
+    const ua = navigator.userAgent || '';
+    const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    const standalone = window.navigator.standalone === true || (window.matchMedia && matchMedia('(display-mode: standalone)').matches);
+    if (!isIOS || standalone) return;
+    let until = 0;
+    try { until = parseInt(localStorage.getItem('pwa_ios_hint_until') || '0', 10); } catch (e) {}
+    if (Date.now() < until) return;
+    const show = () => {
+      if (document.getElementById('pwaInstallBanner')) return;
+      const banner = document.createElement('div');
+      banner.id = 'pwaInstallBanner';
+      banner.style.cssText = 'position:fixed;bottom:0;left:0;right:0;background:#0e2247;color:#fff;padding:12px 16px calc(12px + env(safe-area-inset-bottom));display:flex;align-items:center;justify-content:space-between;gap:10px;z-index:9999;font-size:14px;box-shadow:0 -2px 12px rgba(0,0,0,0.3);';
+      banner.innerHTML = `
+        <div style="display:flex;align-items:center;gap:12px;">
+          <span style="font-size:24px;">📲</span>
+          <div>
+            <div style="font-weight:700;">Install Gquence on your iPhone</div>
+            <div style="font-size:12px;opacity:0.85;">In Safari tap <b>Share</b> <span style="display:inline-block;border:1px solid rgba(255,255,255,.5);border-radius:4px;padding:0 4px;">⬆︎</span> then <b>Add to Home Screen</b>. Needed for notifications.</div>
+          </div>
+        </div>
+        <button id="pwaIosClose" style="background:transparent;color:#fff;border:1px solid rgba(255,255,255,0.4);border-radius:6px;padding:8px 12px;cursor:pointer;font-size:13px;white-space:nowrap;">Got it</button>`;
+      document.body.appendChild(banner);
+      document.getElementById('pwaIosClose').onclick = () => {
+        try { localStorage.setItem('pwa_ios_hint_until', String(Date.now() + 7 * 864e5)); } catch (e) {}
+        banner.remove();
+      };
+    };
+    if (document.body) show(); else document.addEventListener('DOMContentLoaded', show);
+  })();
+
   // Subscribe to push notifications — roles that receive workflow alerts:
   // store (production requests), doctors (price approvals) and admins (every
   // status change in the flow).

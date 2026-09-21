@@ -155,6 +155,41 @@
     return job;
   }
 
+  // Store records that a dispatched product reached the patient.
+  // delivery = { date: 'YYYY-MM-DD', receivedBy, note }. Returns { ok, error }.
+  async function markDelivered(jobId, delivery, actor) {
+    const jobs = getJobs();
+    const job = jobs.find(j => j.id == jobId);
+    if (!job) return { ok: false, error: 'Job not found' };
+    const history = (job.history || []).concat([{
+      status: 'DELIVERED', at: new Date().toISOString(), action: 'deliver',
+      by: actor && actor.by, role: actor && actor.role
+    }]);
+    try {
+      const res = await fetch(_apiBase() + '/api/manufacturing-jobs/' + encodeURIComponent(jobId), {
+        method: 'PUT', headers: _headers(),
+        body: JSON.stringify({ status: 'DELIVERED', history, delivery: delivery || {} })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) return { ok: false, error: data.error || ('Server error (' + res.status + ')') };
+      const i = jobs.findIndex(j => j.id == jobId);
+      if (i >= 0) {
+        const prev = jobs[i];
+        jobs[i] = Object.assign(_mapRow(data), {
+          patientWithdrawn: prev.patientWithdrawn || false, withdrawnReason: prev.withdrawnReason || null,
+          withdrawnLabel: prev.withdrawnLabel || null, withdrawnAt: prev.withdrawnAt || null });
+        _cache.jobs = jobs; db.setTable('manufacturing_jobs', jobs);
+      }
+      return { ok: true };
+    } catch (e) { return { ok: false, error: e.message }; }
+  }
+  // Delivery details recorded on the job (latest DELIVERED history entry), or null.
+  function deliveryInfo(j) {
+    const h = (j && j.history) || [];
+    for (let i = h.length - 1; i >= 0; i--) if ((h[i].status || '').toUpperCase() === 'DELIVERED') return h[i];
+    return null;
+  }
+
   // ── Pricing ────────────────────────────────────────────────────────────────
   // Store price → +platform markup → doctor % → final price (label MRP).
   // Each call returns { ok, job } or { ok:false, error } and refreshes the cache.
@@ -245,5 +280,5 @@
   };
 
   global.manufacturingService = { initJobs, applyServerJobs, getJobs, createJob, updateJobStatus, assignBatch, getJobsForStore, getJobByPatient, WORKFLOW,
-    setStorePrice, approvePrice, queryPrice, isPriced, priceLabel };
+    setStorePrice, approvePrice, queryPrice, isPriced, priceLabel, markDelivered, deliveryInfo };
 })(window);

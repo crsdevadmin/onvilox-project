@@ -3375,19 +3375,22 @@ const JOB_TRANSITIONS = {
   PROCESSING:         { PENDING_DISPATCH:   'STORE' },
   PENDING_PROCESSING: { PROCESSING: 'STORE_APPROVER', APPROVED:   'STORE_APPROVER' },
   PENDING_DISPATCH:   { DISPATCHED: 'STORE_APPROVER', PROCESSING: 'STORE_APPROVER' },
-  DISPATCHED:         { DELIVERED:  'COORDINATOR' }
+  // Delivery is recorded by the store itself (manager or approver); the
+  // coordinator can still record it too.
+  DISPATCHED:         { DELIVERED:  ['STORE', 'STORE_APPROVER', 'COORDINATOR'] }
 };
 
 // Manufacturing Jobs: Update Status
 app.put('/api/manufacturing-jobs/:id', authenticateToken, async (req, res) => {
-  const { status, history } = req.body;
+  let { status, history } = req.body;
+  const delivery = req.body.delivery || null;   // { date, receivedBy, note } when marking DELIVERED
   try {
     const role = req.user && req.user.role;
     const isAdmin = role === 'ADMIN' || role === 'SUPER_ADMIN';
     const target = (status || '').toUpperCase();
 
     // Load the current job to validate the transition and ownership.
-    const cur = await pool.query('SELECT status, store_id, patient_id, price_status FROM manufacturing_jobs WHERE id=$1', [req.params.id]);
+    const cur = await pool.query('SELECT status, store_id, patient_id, price_status, history FROM manufacturing_jobs WHERE id=$1', [req.params.id]);
     if (!cur.rows.length) return res.status(404).json({ error: 'Job not found' });
     const currentStatus = (cur.rows[0].status || '').toUpperCase();
     const jobStore = cur.rows[0].store_id;
@@ -3447,9 +3450,28 @@ app.put('/api/manufacturing-jobs/:id', authenticateToken, async (req, res) => {
         return res.status(409).json({ error: `Illegal status change: ${currentStatus} → ${target || '(empty)'}.` });
       }
       const requiredRole = allowed[target];
-      if (requiredRole && role !== requiredRole) {
-        return res.status(403).json({ error: `Only a ${requiredRole.replace('_', ' ').toLowerCase()} may perform this action.` });
+      const okRoles = Array.isArray(requiredRole) ? requiredRole : (requiredRole ? [requiredRole] : []);
+      if (okRoles.length && !okRoles.includes(role)) {
+        const who = okRoles.map(r => r.replace('_', ' ').toLowerCase()).join(' or ');
+        return res.status(403).json({ error: `Only a ${who} may perform this action.` });
       }
+    }
+
+    // A caller that sends no history (e.g. the coordinator page) used to wipe
+    // the job's whole history. Keep the stored history and append this step.
+    if (!Array.isArray(history)) {
+      const prev = Array.isArray(cur.rows[0].history) ? cur.rows[0].history : [];
+      history = prev.concat([{ status: target, at: new Date().toISOString(), by: req.user.id, role }]);
+    }
+    if (target === 'DELIVERED' && history.length) {
+      const d = delivery || {};
+      const last = history[history.length - 1] || {};
+      const dd = /^\d{4}-\d{2}-\d{2}$/.test(String(d.date || '')) ? d.date : new Date().toISOString().slice(0, 10);
+      last.deliveredOn = dd;
+      if (d.receivedBy) last.receivedBy = String(d.receivedBy).slice(0, 120);
+      if (d.note) last.deliveryNote = String(d.note).slice(0, 500);
+      last.by = last.by || req.user.id;
+      history[history.length - 1] = last;
     }
 
     const result = await pool.query(
@@ -3465,7 +3487,10 @@ app.put('/api/manufacturing-jobs/:id', authenticateToken, async (req, res) => {
                    PENDING_DISPATCH: '🟠 Dispatch requested', DISPATCHED: '🚚 Dispatched', DELIVERED: '📦 Delivered' }[target]
               || (_act === 'reject' ? '🔴 Request rejected' : 'Production status changed');
       recordEvent({ type: 'job_status', title: _act === 'reject' ? '🔴 Request rejected' : _t,
-        body: `{patient} — ${_jobProductLabel(req.params.id)}: ${_stageLabel(currentStatus)} → ${_stageLabel(target)} (by {actor}).`,
+        body: `{patient} — ${_jobProductLabel(req.params.id)}: ${_stageLabel(currentStatus)} → ${_stageLabel(target)} (by {actor})`
+            + (target === 'DELIVERED' && _last
+                ? ` — delivered on ${_last.deliveredOn}${_last.receivedBy ? ', received by ' + _last.receivedBy : ''}${_last.deliveryNote ? ' · ' + _last.deliveryNote : ''}.`
+                : '.'),
         patientId: job.patient_id, jobId: req.params.id, user: req.user });
 
       // Tell the patient's doctor when their product actually moves stage.

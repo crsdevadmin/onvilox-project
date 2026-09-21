@@ -232,6 +232,19 @@ function renderActions(){
   let html = '';
   const title = document.getElementById('statusCardTitle');
 
+  if (s === 'DISPATCHED') {
+    title.innerText = 'Record Delivery';
+    html += `<button class="btn-primary" onclick="markDeliveredHere()">Mark Delivered</button>`;
+    wrap.innerHTML = html + back;
+    return;
+  }
+  if (s === 'DELIVERED') {
+    const d = manufacturingService.deliveryInfo(job) || {};
+    title.innerText = 'Delivered';
+    html += `<span style="align-self:center;color:#16a34a;font-weight:700;">✓ Delivered${d.deliveredOn ? ' on ' + d.deliveredOn : ''}${d.receivedBy ? ' · received by ' + String(d.receivedBy).replace(/[<>&"]/g, '') : ''}</span>`;
+    wrap.innerHTML = html + back;
+    return;
+  }
   if (isApprover) {
     title.innerText = 'Review Production Request';
     const p = W.pending[s];
@@ -287,6 +300,15 @@ async function requestStep(next){
   job.status = next;
   bind();
   alert('Request submitted for approval.');
+}
+
+async function markDeliveredHere(){
+  if (!confirm('Mark this product as delivered today?')) return;
+  const r = await manufacturingService.markDelivered(job.id, { date: new Date().toISOString().slice(0, 10) }, { by: me.id, role: me.role });
+  if (!r.ok) { alert(r.error || 'Could not mark as delivered.'); return; }
+  const fresh = manufacturingService.getJobs().find(j => j.id == job.id);
+  Object.assign(job, fresh || { status: 'DELIVERED' });
+  bind();
 }
 
 async function approveStep(){

@@ -6,6 +6,11 @@
   <link rel="stylesheet" href="/css/app.css">
   <link rel="stylesheet" href="/css/brand.css?v=1">
   <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Gquence">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="theme-color" content="#0e2247">
   <style>
     /* ===== Withdrawn patient — visible before anything else on the row ===== */
@@ -32,7 +37,8 @@
     .kpi-card.k-open .kpi-val { color:var(--sky); }
     .kpi-card.k-processing .kpi-val { color:var(--cyan); }
     .kpi-card.k-pending .kpi-val { color:var(--amber); }
-    .kpi-card.k-dispatched .kpi-val { color:var(--green); }
+    .kpi-card.k-dispatched .kpi-val { color:var(--violet, #8b5cf6); }
+    .kpi-card.k-delivered .kpi-val { color:var(--green); }
 
     /* ===== Label modal + 100x75mm labels ===== */
     #labelOverlay { position:fixed; inset:0; background:rgba(15,23,42,.55); z-index:9998; display:none; align-items:flex-start; justify-content:center; overflow:auto; padding:24px 12px; }
@@ -158,6 +164,10 @@
     <div class="kpi-card k-dispatched" data-kpi="DISPATCHED" onclick="kpiFilter('DISPATCHED')" role="button" tabindex="0" title="Show dispatched patients">
       <div class="kpi-label">Dispatched</div>
       <div id="kpiDispatched" class="kpi-val">—</div>
+    </div>
+    <div class="kpi-card k-delivered" data-kpi="DELIVERED" onclick="kpiFilter('DELIVERED')" role="button" tabindex="0" title="Show delivered products">
+      <div class="kpi-label">Delivered</div>
+      <div id="kpiDelivered" class="kpi-val">—</div>
     </div>
   </div>
 
@@ -457,6 +467,8 @@ const TAB_DEFS = isApprover
       { k:'NEEDS_APPROVAL',    l:'Needs Approval' },
       { k:'PENDING_PROCESSING', l:'→ Processing' },
       { k:'PENDING_DISPATCH',   l:'→ Dispatch' },
+      { k:'DISPATCHED',         l:'Awaiting delivery' },
+      { k:'DELIVERED',          l:'Delivered' },
       { k:'ALL',                l:'All' }
     ]
   : [
@@ -464,7 +476,8 @@ const TAB_DEFS = isApprover
       { k:'APPROVED',    l:'Open' },
       { k:'PENDING',     l:'Pending Approval' },
       { k:'PROCESSING',  l:'Processing' },
-      { k:'DISPATCHED',  l:'Dispatched' }
+      { k:'DISPATCHED',  l:'Dispatched' },
+      { k:'DELIVERED',   l:'Delivered' }
     ];
 
 function buildTabs() {
@@ -575,6 +588,28 @@ function submitStorePrice(jobId){
   const el = document.getElementById('sp_' + jobId);
   _sendStorePrice(jobId, el ? el.value : '');
 }
+// ── Delivery ──────────────────────────────────────────────────────────────
+// Once a product is dispatched the store records when it reached the patient.
+function deliveryWidget(j){
+  const s = (j.status || '').toUpperCase();
+  if (s === 'DELIVERED') {
+    const d = manufacturingService.deliveryInfo(j) || {};
+    const when = d.deliveredOn ? _lblFmtDate(d.deliveredOn) : '';
+    return `<span title="${_esc2([d.receivedBy ? 'Received by ' + d.receivedBy : '', d.deliveryNote || ''].filter(Boolean).join(' · '))}" style="font-size:11px;color:#15803d;font-weight:700;">✓ Delivered${when ? ' ' + when : ''}${d.receivedBy ? ' · ' + _esc2(d.receivedBy) : ''}</span>`;
+  }
+  return `<span style="font-size:11px;color:#7c3aed;font-weight:700;">🚚 Dispatched</span>
+    <button onclick="event.stopPropagation(); openDeliveryModal('${j.id}')" style="${_btnGreen}">Mark Delivered</button>`;
+}
+// One click: records today's date as the delivery date.
+async function openDeliveryModal(jobId){
+  const j = manufacturingService.getJobs().find(x => x.id == jobId);
+  const p = j ? getPatientById(j.patientId) : null;
+  if (!confirm('Mark ' + ((p && p.name) || 'this product') + (j ? ' — ' + productLabel(j) : '') + ' as delivered today?')) return;
+  const r = await manufacturingService.markDelivered(jobId, { date: new Date().toISOString().slice(0, 10) }, { by: me.id, role: me.role });
+  if (!r.ok) { alert(r.error || 'Could not mark as delivered.'); return; }
+  render();
+}
+
 async function _sendStorePrice(jobId, raw){
   const price = parseFloat(raw);
   if (!(price > 0)) { alert('Enter the store price for this product.'); return; }
@@ -615,10 +650,12 @@ function statusActionBtn(j) {
         <button onclick="event.stopPropagation(); rejectStep('${j.id}')" style="${_btnRed}">Reject</button>
       </div>`;
     }
-    if (s === 'DISPATCHED') return `<span style="font-size:11px;color:#16a34a;font-weight:700;">✓ Dispatched</span>`;
+    if (s === 'DISPATCHED' || s === 'DELIVERED') return deliveryWidget(j);
     if (s === 'APPROVED') return priceWidget(j);
     return `<span style="font-size:11px;color:#94a3b8;">Awaiting manager</span>`;
   }
+
+  if (s === 'DISPATCHED' || s === 'DELIVERED') return deliveryWidget(j);
 
   // Price first: nothing goes into production until the doctor approves the price.
   if (s === 'APPROVED' && !manufacturingService.isPriced(j)) {
@@ -674,6 +711,7 @@ function render(){
   _kpi('kpiProcessing', jobs.filter(j => (j.status||'').toUpperCase() === 'PROCESSING').length);
   _kpi('kpiPending',    jobs.filter(j => manufacturingService.WORKFLOW.isPending(j.status)).length);
   _kpi('kpiDispatched', jobs.filter(j => (j.status||'').toUpperCase() === 'DISPATCHED').length);
+  _kpi('kpiDelivered',  jobs.filter(j => (j.status||'').toUpperCase() === 'DELIVERED').length);
 
   // Apply filter
   if (_activeFilter === 'PENDING' || _activeFilter === 'NEEDS_APPROVAL') {
@@ -963,6 +1001,7 @@ function productLabel(j){
 function isActionable(j){
   const W = manufacturingService.WORKFLOW;
   const s = (j.status || 'APPROVED').toUpperCase();
+  if (s === 'DISPATCHED') return true;          // waiting for the store to record delivery
   if (isApprover) return !!W.pending[s];
   if (s === 'APPROVED' && !manufacturingService.isPriced(j)) return priceNeedsStore(j);
   return !W.isPending(s) && !!W.requestFor(s);
