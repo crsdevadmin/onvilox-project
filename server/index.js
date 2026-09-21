@@ -3399,10 +3399,10 @@ app.put('/api/manufacturing-jobs/:id', authenticateToken, async (req, res) => {
 // ── Product pricing ─────────────────────────────────────────────────────────
 // Flow per job (initial plan and every weekly batch):
 //   store enters its price → platform markup (engine_formulas.platform_markup_pct,
-//   default 40 %) is added → doctor adds their own rupee amount on top → final price,
+//   default 40 %) is added → doctor enters the FINAL price (≥ that price) →
 //   which is printed on the label as the MRP. Production is blocked until then.
-//   Example: store 1000 → +40 % = 1400 → doctor adds ₹500 → final 1900.
-//   (doctor_pct is still stored — derived from the amount — for reporting.)
+//   Example: store 1000 → +40 % = 1400 → doctor enters 1900 → final 1900.
+//   doctor_amount (1900 − 1400 = 500) and doctor_pct are derived and stored for reporting.
 // price_status: NULL/'AWAITING_STORE' → 'AWAITING_DOCTOR' → 'APPROVED'
 //               ('QUERIED' = doctor sent it back to the store with a note).
 // Visibility: the store never sees the markup or the doctor's share; the doctor
@@ -3478,16 +3478,20 @@ app.post('/api/manufacturing-jobs/:id/store-price', authenticateToken, async (re
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// Doctor adds their own amount (₹) on top of the marked-up price and approves.
-// Older clients may still send doctorPct; it is converted to an amount.
+// Doctor enters the final price (MRP) directly and approves. It may not be
+// below the marked-up price. Older clients may still send doctorAmount or
+// doctorPct; those are converted.
 app.post('/api/manufacturing-jobs/:id/doctor-price', authenticateToken, async (req, res) => {
   const role = req.user && req.user.role;
   const isAdmin = role === 'ADMIN' || role === 'SUPER_ADMIN';
   if (role !== 'DOCTOR' && !isAdmin) return res.status(403).json({ error: 'Only the doctor can approve the price.' });
   const body = req.body || {};
-  const rawAmt = body.doctorAmount != null && body.doctorAmount !== '' ? parseFloat(body.doctorAmount) : null;
-  const rawPct = rawAmt == null && body.doctorPct != null ? parseFloat(body.doctorPct) : null;
-  if (rawAmt == null && rawPct == null) return res.status(400).json({ error: 'Enter the amount (₹) you want to add.' });
+  const has = v => v != null && v !== '';
+  const rawFinal = has(body.finalPrice) ? parseFloat(body.finalPrice) : null;
+  const rawAmt = rawFinal == null && has(body.doctorAmount) ? parseFloat(body.doctorAmount) : null;
+  const rawPct = rawFinal == null && rawAmt == null && has(body.doctorPct) ? parseFloat(body.doctorPct) : null;
+  if (rawFinal == null && rawAmt == null && rawPct == null) return res.status(400).json({ error: 'Enter the final price (₹).' });
+  if (rawFinal != null && !(rawFinal > 0 && rawFinal <= 10000000)) return res.status(400).json({ error: 'Enter a valid final price (₹).' });
   if (rawAmt != null && !(rawAmt >= 0 && rawAmt <= 10000000)) return res.status(400).json({ error: 'Enter a valid amount (₹0 or more).' });
   if (rawPct != null && !(rawPct >= 0 && rawPct <= 500)) return res.status(400).json({ error: 'Enter a valid percentage (0–500).' });
   try {
@@ -3500,9 +3504,13 @@ app.post('/api/manufacturing-jobs/:id/doctor-price', authenticateToken, async (r
       return res.status(409).json({ error: 'There is no store price waiting for approval on this product.' });
     }
     const base = Number(job.base_price);
-    const amount = rawAmt != null ? _money(rawAmt) : _money(base * rawPct / 100);
+    const final = Math.round(rawFinal != null ? rawFinal
+                : base + (rawAmt != null ? rawAmt : base * rawPct / 100));   // MRP in whole rupees
+    if (final < Math.ceil(base)) {
+      return res.status(400).json({ error: `The final price cannot be below ₹${Math.ceil(base)} (the price sent by the store).` });
+    }
+    const amount = _money(final - base);
     const pct = base > 0 ? _money(amount / base * 100) : 0;
-    const final = Math.round(base + amount);          // MRP in whole rupees
     const upd = await pool.query(
       `UPDATE manufacturing_jobs
           SET price_status='APPROVED', doctor_pct=$1, doctor_amount=$2, final_price=$3, price_note=NULL,

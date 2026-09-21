@@ -179,7 +179,7 @@
     } catch (e) { return { ok: false, error: e.message }; }
   }
   function setStorePrice(jobId, price)   { return _pricePost(jobId, 'store-price',  { price }); }
-  function approvePrice(jobId, doctorAmount){ return _pricePost(jobId, 'doctor-price', { doctorAmount }); }
+  function approvePrice(jobId, finalPrice){ return _pricePost(jobId, 'doctor-price', { finalPrice }); }
   function queryPrice(jobId, note)       { return _pricePost(jobId, 'price-query',  { note }); }
   // A job may enter production only once its price is approved.
   function isPriced(j) { return !!j && (j.priceStatus || j.price_status) === 'APPROVED'; }
