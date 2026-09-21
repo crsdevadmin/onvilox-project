@@ -783,7 +783,16 @@
       }
 
       const patients = getPatients().filter(p => p.assignedDoctorId === doctorId);
-      patients.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+      // Newest first. Parse the dates (they are not always ISO strings) and keep
+      // the server's order (created_at DESC) for records without a date, instead
+      // of pushing them to the bottom.
+      const _ts = p => { const t = Date.parse(p.createdAt || p.created_at || p.createdDate || ''); return isNaN(t) ? null : t; };
+      patients.forEach((p, i) => { p.__ord = i; });
+      patients.sort((a, b) => {
+        const ta = _ts(a), tb = _ts(b);
+        if (ta != null && tb != null && ta !== tb) return tb - ta;
+        return a.__ord - b.__ord;
+      });
 
       // KPI counts (based on all patients for this doctor)
       const total = patients.length;

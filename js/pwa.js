@@ -94,11 +94,14 @@
     if (b) b.remove();
   };
 
-  // Subscribe to push notifications (store managers only)
+  // Subscribe to push notifications — roles that receive workflow alerts:
+  // store (production requests), doctors (price approvals) and admins (every
+  // status change in the flow).
+  const PUSH_ROLES = ['STORE', 'STORE_APPROVER', 'DOCTOR', 'ADMIN', 'SUPER_ADMIN'];
   function _subscribePush(reg) {
     if (!('PushManager' in window)) return;
     const u = (typeof auth !== 'undefined') ? auth.getCurrentUser() : null;
-    if (!u || u.role !== 'STORE') return; // only store managers need push
+    if (!u || !PUSH_ROLES.includes(u.role)) return;
     Notification.requestPermission().then(permission => {
       if (permission !== 'granted') return;
       reg.pushManager.getSubscription().then(existing => {

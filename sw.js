@@ -24,9 +24,12 @@ self.addEventListener('push', e => {
   e.waitUntil((async () => {
     // If the app is already open and focused, let the page show its own
     // in-page alert with the custom sound instead of a duplicate OS notification.
+    // Only the store and admin dashboards show in-page alerts; on any other
+    // page the OS notification is still shown so nothing is silently dropped.
     const wins = await clients.matchAll({ type: 'window', includeUncontrolled: true });
     const focused = wins.find(c => c.focused || c.visibilityState === 'visible');
-    if (focused) {
+    const inPage = focused && /\/(store|admin)(\.html)?(\?|#|$)/.test(new URL(focused.url).pathname + (new URL(focused.url).search || ''));
+    if (inPage) {
       focused.postMessage({ type: 'push', data });
       return;
     }

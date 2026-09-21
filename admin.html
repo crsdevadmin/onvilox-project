@@ -73,7 +73,30 @@
     </div>
   </div>
 
+  <!-- Activity feed: every status change across patients, prices and production -->
+  <div class="card" id="activityCard" style="margin-top:18px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+      <div>
+        <div style="font-size:16px;font-weight:800;">Activity <span id="actUnread" style="display:none;margin-left:6px;font-size:11px;font-weight:800;background:#dc2626;color:#fff;border-radius:999px;padding:2px 8px;vertical-align:middle;"></span></div>
+        <div style="font-size:12px;opacity:.7;">Plan approvals, prices, processing, dispatch and delivery — newest first. Updates every 20 seconds.</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <select id="actFilter" onchange="renderActivity()" style="padding:6px 8px;border-radius:6px;font-size:12px;">
+          <option value="">All events</option>
+          <option value="plan">Plan &amp; prescription approvals</option>
+          <option value="price">Pricing</option>
+          <option value="job">Processing &amp; dispatch</option>
+          <option value="patient">Patients (new / closed / reopened)</option>
+        </select>
+        <button class="btn-secondary btn-sm" onclick="markActivityRead()" style="padding:6px 12px;border-radius:6px;">Mark all read</button>
+        <button class="btn-secondary btn-sm" id="actNotifyBtn" onclick="enableAdminPush()" style="padding:6px 12px;border-radius:6px;display:none;">🔔 Enable phone notifications</button>
+      </div>
+    </div>
+    <div id="actList" style="font-size:13px;"><div style="opacity:.6;padding:10px 0;">Loading…</div></div>
+  </div>
+  <div id="actToast" style="display:none;position:fixed;right:18px;bottom:18px;max-width:360px;z-index:9999;background:#0e2247;color:#fff;border-radius:10px;padding:12px 14px;box-shadow:0 10px 30px rgba(0,0,0,.35);font-size:13px;"></div>
 </div>
+
 
 <script src="/js/config.js"></script>
 <script src="/js/storage.js"></script>
@@ -166,6 +189,95 @@ async function syncJobs(btn){
 }
 </script>
 
+<script>
+// ── Activity feed ───────────────────────────────────────────────────────────
+const _ACT_GROUP = {
+  patient_status: 'plan', rx_approved: 'plan',
+  price_set: 'price', price_approved: 'price', price_queried: 'price',
+  job_status: 'job', batch: 'job',
+  patient_created: 'patient', patient_closed: 'patient', patient_closure_confirmed: 'patient', patient_reopened: 'patient'
+};
+let _actEvents = [], _actMaxId = 0, _actFirst = true;
+function _actSeen(){ try { return parseInt(localStorage.getItem('gq_admin_act_seen') || '0', 10); } catch(e){ return 0; } }
+function _actSetSeen(id){ try { localStorage.setItem('gq_admin_act_seen', String(id)); } catch(e){} }
+function _actEsc(s){ return String(s == null ? '' : s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c])); }
+function _actWhen(iso){
+  const d = new Date(iso); if (isNaN(d)) return '';
+  const m = Math.floor((Date.now() - d.getTime()) / 60000);
+  if (m < 1) return 'just now'; if (m < 60) return m + ' min ago';
+  const h = Math.floor(m / 60); if (h < 24) return h + ' h ago';
+  return d.toLocaleDateString('en-IN', { day:'2-digit', month:'short' }) + ' ' + d.toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit' });
+}
+async function loadActivity(){
+  const apiBase = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : '';
+  const me = auth.getCurrentUser();
+  try {
+    const res = await fetch(apiBase + '/api/admin/events?limit=100', { headers: { Authorization: 'Bearer ' + me.token } });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const rows = await res.json();
+    const fresh = rows.filter(r => r.id > _actMaxId);
+    if (!_actFirst && fresh.length) _actToast(fresh[0], fresh.length);
+    _actEvents = rows;
+    _actMaxId = rows.reduce((m, r) => Math.max(m, r.id), _actMaxId);
+    _actFirst = false;
+    renderActivity();
+  } catch (e) {
+    if (_actFirst) document.getElementById('actList').innerHTML = '<div style="color:#dc2626;padding:10px 0;">Could not load activity (' + _actEsc(e.message) + ').</div>';
+  }
+}
+function renderActivity(){
+  const f = document.getElementById('actFilter').value;
+  const seen = _actSeen();
+  const rows = _actEvents.filter(r => !f || _ACT_GROUP[r.type] === f);
+  const unread = _actEvents.filter(r => r.id > seen).length;
+  const badge = document.getElementById('actUnread');
+  badge.style.display = unread ? '' : 'none'; badge.textContent = unread + ' new';
+  const list = document.getElementById('actList');
+  if (!rows.length) { list.innerHTML = '<div style="opacity:.6;padding:10px 0;">No activity yet.</div>'; return; }
+  list.innerHTML = rows.map(r => {
+    const isNew = r.id > seen;
+    const link = r.patient_id ? '<a href="/patients/profile?id=' + encodeURIComponent(r.patient_id) + '" style="font-size:11.5px;font-weight:700;color:#38bdf8;text-decoration:none;white-space:nowrap;">Open patient →</a>' : '';
+    return '<div style="display:flex;gap:12px;align-items:flex-start;padding:10px 0;border-top:1px solid rgba(148,163,184,.18);' + (isNew ? 'background:rgba(56,189,248,.06);' : '') + '">'
+      + '<div style="min-width:86px;font-size:11.5px;opacity:.7;padding-top:2px;">' + _actWhen(r.at) + '</div>'
+      + '<div style="flex:1;">'
+      +   '<div style="font-weight:700;">' + _actEsc(r.title) + (isNew ? ' <span style="font-size:10px;color:#0ea5e9;font-weight:800;">NEW</span>' : '') + '</div>'
+      +   '<div style="margin-top:2px;opacity:.9;">' + _actEsc(r.body) + '</div>'
+      + '</div>'
+      + '<div style="padding-top:2px;">' + link + '</div>'
+      + '</div>';
+  }).join('');
+}
+function markActivityRead(){ _actSetSeen(_actMaxId); renderActivity(); }
+function _actToast(ev, n){
+  const t = document.getElementById('actToast');
+  t.innerHTML = '<b>' + _actEsc(ev.title) + '</b><div style="margin-top:3px;opacity:.9;">' + _actEsc(ev.body) + '</div>'
+    + (n > 1 ? '<div style="margin-top:4px;font-size:11px;opacity:.7;">+' + (n - 1) + ' more</div>' : '');
+  t.style.display = 'block';
+  clearTimeout(window._actToastT); window._actToastT = setTimeout(() => { t.style.display = 'none'; }, 8000);
+}
+// Phone / desktop push: pwa.js subscribes admins automatically once the
+// browser has permission. The button asks for permission when it hasn't been given.
+function _actNotifyState(){
+  const b = document.getElementById('actNotifyBtn');
+  if (!('Notification' in window) || !('serviceWorker' in navigator)) { b.style.display = 'none'; return; }
+  b.style.display = Notification.permission === 'granted' ? 'none' : '';
+  if (Notification.permission === 'denied') { b.textContent = '🔕 Notifications blocked in browser settings'; b.disabled = true; }
+}
+function enableAdminPush(){
+  Notification.requestPermission().then(() => { _actNotifyState(); if (Notification.permission === 'granted') location.reload(); });
+}
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.addEventListener('message', e => {
+    if (e.data && e.data.type === 'push') loadActivity();
+  });
+}
+loadActivity();
+_actNotifyState();
+setInterval(loadActivity, 20000);
+</script>
+
 <script src="/js/theme.js"></script>
+<script src="/js/pwa.js"></script>
 </body>
+
 </html>

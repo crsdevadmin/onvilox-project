@@ -207,6 +207,63 @@ async function notifyStore(storeId, title, body, url, roles) {
   return notifyUsers(ids, title, body, url);
 }
 
+// ── Admin activity feed ────────────────────────────────────────────────────
+// Every status change in the patient → plan → price → production → dispatch
+// flow is recorded here and pushed to all admins. The admin dashboard shows
+// the feed (GET /api/admin/events); phones get a push notification.
+async function adminUserIds() {
+  try {
+    const r = await pool.query("SELECT id FROM users WHERE role IN ('ADMIN','SUPER_ADMIN')");
+    return r.rows.map(x => x.id);
+  } catch (e) { return []; }
+}
+async function _nameOf(table, id) {
+  if (!id) return null;
+  try {
+    const r = await pool.query(`SELECT name FROM ${table} WHERE id=$1`, [id]);
+    return r.rows[0] ? r.rows[0].name : null;
+  } catch (e) { return null; }
+}
+// evt: { type, title, body, patientId, jobId, user (req.user), url }
+// Never throws — a failed notification must not fail the action itself.
+async function recordEvent(evt) {
+  try {
+    const actorName = evt.user ? await _nameOf('users', evt.user.id) : null;
+    const patientName = evt.patientName || (evt.patientId ? await _nameOf('patients', evt.patientId) : null);
+    const body = String(evt.body || '')
+      .replace(/\{patient\}/g, patientName || 'A patient')
+      .replace(/\{actor\}/g, actorName || (evt.user && evt.user.role ? evt.user.role.toLowerCase().replace('_', ' ') : 'Someone'));
+    await pool.query(
+      `INSERT INTO activity_events (type, title, body, patient_id, job_id, actor_id, actor_role)
+       VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+      [evt.type, evt.title, body, evt.patientId || null, evt.jobId || null,
+       evt.user ? evt.user.id : null, evt.user ? evt.user.role : null]);
+    const ids = (await adminUserIds()).filter(id => !evt.user || id !== evt.user.id);
+    notifyUsers(ids, evt.title, body, evt.url || '/admin').catch(() => {});
+  } catch (e) { console.warn('recordEvent:', e.message); }
+}
+function _stageLabel(s) {
+  return ({ APPROVED: 'Approved', PENDING_PROCESSING: 'Processing requested', PROCESSING: 'Processing',
+            PENDING_DISPATCH: 'Dispatch requested', DISPATCHED: 'Dispatched', DELIVERED: 'Delivered',
+            CREATED: 'Created' })[String(s || '').toUpperCase()] || s;
+}
+
+app.get('/api/admin/events', authenticateToken, async (req, res) => {
+  const role = req.user && req.user.role;
+  if (role !== 'ADMIN' && role !== 'SUPER_ADMIN') return res.status(403).json({ error: 'Admin only' });
+  const limit = Math.min(200, Math.max(1, parseInt(req.query.limit, 10) || 50));
+  const since = parseInt(req.query.since, 10) || 0;
+  try {
+    const r = await pool.query(
+      `SELECT e.*, u.name AS actor_name, p.name AS patient_name
+         FROM activity_events e
+         LEFT JOIN users u ON u.id = e.actor_id
+         LEFT JOIN patients p ON p.id = e.patient_id
+        WHERE e.id > $1 ORDER BY e.id DESC LIMIT $2`, [since, limit]);
+    res.json(r.rows);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // Health Check
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
@@ -271,6 +328,9 @@ app.get('/api/patients', authenticateToken, async (req, res) => {
       // Ensure assigned doctor is always present under the camelCase key the frontend uses
       if (!p.assignedDoctorId && r.assigned_doctor_id) p.assignedDoctorId = r.assigned_doctor_id;
       if (!p.id && r.id) p.id = r.id;
+      // Some records (e.g. ones activated from a draft) never got a createdAt in
+      // full_data; the dashboards sort on it, so those sank to the bottom.
+      if (!p.createdAt && r.created_at) p.createdAt = new Date(r.created_at).toISOString();
       return p;
     });
     res.json(patients);
@@ -336,6 +396,8 @@ app.post('/api/patients', authenticateToken, async (req, res) => {
       ]
     );
     res.status(201).json(p);
+    recordEvent({ type: 'patient_created', title: '🆕 New patient',
+      body: `{patient} was registered by {actor}.`, patientId: p.id, patientName: p.name, user: req.user });
   } catch (err) {
     console.error('Patient create error:', err.message);
     res.status(500).json({ error: err.message });
@@ -378,6 +440,11 @@ app.get('/api/patients/:id', authenticateToken, async (req, res) => {
 app.put('/api/patients/:id', authenticateToken, async (req, res) => {
   const p = req.body;
   try {
+    let _prevStatus = null;
+    try {
+      const pr = await pool.query('SELECT status FROM patients WHERE id=$1', [req.params.id]);
+      _prevStatus = pr.rows[0] ? pr.rows[0].status : null;
+    } catch (e) {}
     await pool.query(
       `UPDATE patients SET
         name=$1, age=$2, sex=$3, height=$4, weight=$5, usual_weight=$6,
@@ -435,6 +502,16 @@ app.put('/api/patients/:id', authenticateToken, async (req, res) => {
       ).catch(() => {});
     }
     res.json(p);
+    const _newStatus = p.status || 'CREATED';
+    if (_prevStatus && _newStatus !== _prevStatus) {
+      recordEvent({
+        type: 'patient_status',
+        title: _newStatus === 'APPROVED' ? '✅ Plan approved' : 'Patient status changed',
+        body: _newStatus === 'APPROVED'
+          ? `{actor} approved the nutrition plan for {patient}. It goes to the store for pricing.`
+          : `{patient}: ${_stageLabel(_prevStatus)} → ${_stageLabel(_newStatus)} (by {actor}).`,
+        patientId: req.params.id, patientName: p.name, user: req.user });
+    }
   } catch (err) {
     console.error('Patient update error:', err.message);
     res.status(500).json({ error: err.message });
@@ -1190,6 +1267,9 @@ app.post('/api/weekly-prescriptions/:id/approve', authenticateToken, async (req,
     );
 
     res.json({ success: true, batchCode: rx.batch_code, jobId });
+    recordEvent({ type: 'rx_approved', title: '✅ Weekly prescription approved',
+      body: `{actor} approved Week ${rx.week_number} for {patient}. It goes to the store for pricing.`,
+      patientId: rx.patient_id, jobId, user: req.user });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -3378,6 +3458,16 @@ app.put('/api/manufacturing-jobs/:id', authenticateToken, async (req, res) => {
     );
     const job = result.rows[0];
     res.json(jobPriceView(job, req.user));
+    if (currentStatus !== target) {
+      const _last = Array.isArray(history) && history.length ? history[history.length - 1] : null;
+      const _act = _last && _last.action;
+      const _t = { PENDING_PROCESSING: '🟠 Processing requested', PROCESSING: '🏭 Processing started',
+                   PENDING_DISPATCH: '🟠 Dispatch requested', DISPATCHED: '🚚 Dispatched', DELIVERED: '📦 Delivered' }[target]
+              || (_act === 'reject' ? '🔴 Request rejected' : 'Production status changed');
+      recordEvent({ type: 'job_status', title: _act === 'reject' ? '🔴 Request rejected' : _t,
+        body: `{patient} — ${_jobProductLabel(req.params.id)}: ${_stageLabel(currentStatus)} → ${_stageLabel(target)} (by {actor}).`,
+        patientId: job.patient_id, jobId: req.params.id, user: req.user });
+    }
 
     // ── Approval-workflow notifications (sent after responding) ──────────────
     // The last history entry carries the action: request | approve | reject.
@@ -3497,6 +3587,9 @@ app.post('/api/manufacturing-jobs/:id/store-price', authenticateToken, async (re
       [_money(price), markupPct, base, req.user.id,
        _appendHistory(job, { action: 'price_set', by: req.user.id, role }), job.id]);
     res.json(jobPriceView(upd.rows[0], req.user));
+    recordEvent({ type: 'price_set', title: '💰 Store price entered',
+      body: `{patient} — ${_jobProductLabel(job.id)}: store price ₹${_money(price)} → ₹${base} after ${markupPct}% markup. Waiting for the doctor.`,
+      patientId: job.patient_id, patientName: job.patient_name, jobId: job.id, user: req.user });
     const doc = job.doctor_id || job.assigned_doctor_id;
     if (doc) notifyUsers([doc], '💰 Price approval needed',
       `${job.patient_name || 'A patient'} — ${_jobProductLabel(job.id)}: price ₹${base} is waiting for your approval.`, '/doctor').catch(() => {});
@@ -3544,6 +3637,9 @@ app.post('/api/manufacturing-jobs/:id/doctor-price', authenticateToken, async (r
       [pct, amount, final, req.user.id,
        _appendHistory(job, { action: 'price_approved', by: req.user.id, role }), job.id]);
     res.json(jobPriceView(upd.rows[0], req.user));
+    recordEvent({ type: 'price_approved', title: '✅ Price approved',
+      body: `{actor} approved {patient} — ${_jobProductLabel(job.id)}: final price ₹${final} (price ₹${base}, doctor share ₹${amount}).`,
+      patientId: job.patient_id, patientName: job.patient_name, jobId: job.id, user: req.user });
     notifyStore(job.store_id, '✅ Price approved',
       `${job.patient_name || 'A patient'} — ${_jobProductLabel(job.id)}: final price ₹${final}. You can start production.`,
       '/store', ['STORE', 'STORE_APPROVER']).catch(() => {});
@@ -3569,6 +3665,9 @@ app.post('/api/manufacturing-jobs/:id/price-query', authenticateToken, async (re
         WHERE id=$3 RETURNING *`,
       [note, _appendHistory(job, { action: 'price_queried', by: req.user.id, role, note }), job.id]);
     res.json(jobPriceView(upd.rows[0], req.user));
+    recordEvent({ type: 'price_queried', title: '🔁 Price sent back',
+      body: `{actor} sent back the price for {patient} — ${_jobProductLabel(job.id)}: "${note}"`,
+      patientId: job.patient_id, patientName: job.patient_name, jobId: job.id, user: req.user });
     notifyStore(job.store_id, '🔁 Price sent back',
       `${job.patient_name || 'A patient'} — ${_jobProductLabel(job.id)}: ${note}`, '/store', ['STORE', 'STORE_APPROVER']).catch(() => {});
   } catch (e) { res.status(500).json({ error: e.message }); }
@@ -3613,6 +3712,11 @@ app.post('/api/manufacturing-jobs/:id/batch', authenticateToken, async (req, res
       [batchNo, mfgDate, expDate, req.params.id]
     );
     res.json(jobPriceView(upd.rows[0], req.user));
+    if (!cur.rows[0].batch_no) {
+      recordEvent({ type: 'batch', title: '🏷️ Batch generated',
+        body: `{patient} — ${_jobProductLabel(req.params.id)}: batch ${batchNo}, mfg ${mfgDate}, exp ${expDate} (by {actor}).`,
+        patientId: upd.rows[0].patient_id, jobId: req.params.id, user: req.user });
+    }
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -4676,6 +4780,17 @@ OUTPUT FORMAT — return ONLY valid JSON, no markdown, no text outside the JSON 
 (async () => {
   try {
     await pool.query(`
+      CREATE TABLE IF NOT EXISTS activity_events (
+        id SERIAL PRIMARY KEY,
+        at TIMESTAMPTZ DEFAULT NOW(),
+        type TEXT NOT NULL,
+        title TEXT,
+        body TEXT,
+        patient_id TEXT,
+        job_id TEXT,
+        actor_id TEXT,
+        actor_role TEXT
+      );
       CREATE TABLE IF NOT EXISTS patient_closures (
         patient_id     TEXT PRIMARY KEY,
         reason         TEXT NOT NULL,
@@ -4785,6 +4900,9 @@ app.post('/api/patients/:id/close', authenticateToken, async (req, res) => {
     ).catch(() => {});
 
     res.json({ ok:true, reason, label: spec.label, needsConfirmation: !isDoctor });
+    recordEvent({ type: 'patient_closed', title: '⛔ Patient closed',
+      body: `{actor} closed {patient}: ${spec.label}${note ? ' — ' + String(note).slice(0, 200) : ''}.`,
+      patientId: req.params.id, user: req.user });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -4801,6 +4919,8 @@ app.post('/api/patients/:id/close/confirm', authenticateToken, async (req, res) 
         RETURNING patient_id`, [req.params.id, req.user.id]);
     if (!r.rowCount) return res.status(404).json({ error: 'No closure to confirm' });
     res.json({ ok:true });
+    recordEvent({ type: 'patient_closure_confirmed', title: 'Closure confirmed',
+      body: `{actor} confirmed the closure of {patient}.`, patientId: req.params.id, user: req.user });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -4823,6 +4943,8 @@ app.post('/api/patients/:id/reopen', authenticateToken, async (req, res) => {
       `UPDATE trial_enrollments SET withdrawn_at=NULL, withdrawn_reason=NULL WHERE patient_id=$1`,
       [req.params.id]).catch(() => {});
     res.json({ ok:true, was: r.rows[0].reason });
+    recordEvent({ type: 'patient_reopened', title: '↩️ Patient reopened',
+      body: `{actor} reopened {patient}.`, patientId: req.params.id, user: req.user });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
