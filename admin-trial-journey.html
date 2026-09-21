@@ -105,13 +105,16 @@
 
       <!-- ── Product dispatch table ── -->
       <h3 style="margin:0;">Product Dispatch</h3>
-      <p style="color:#6b7280;font-size:13px;margin-top:2px;">Initial and weekly products — doctor approval, store processing and dispatch dates.</p>
+      <p style="color:#6b7280;font-size:13px;margin-top:2px;">Initial and weekly products — doctor approval, pricing, store processing, dispatch and delivery.</p>
       <div style="overflow-x:auto;">
         <table class="wk">
           <thead>
             <tr>
               <th>Product</th><th>Batch No</th>
-              <th>Doctor Approved</th><th>Processing Started</th><th>Dispatched</th>
+              <th>Doctor Approved</th>
+              <th style="text-align:right;">Store Price</th><th style="text-align:right;">Price to Doctor</th>
+              <th style="text-align:right;">Doctor Share</th><th style="text-align:right;">Final MRP</th>
+              <th>Processing Started</th><th>Dispatched</th><th>Delivered</th>
               <th>Status</th>
             </tr>
           </thead>
@@ -332,7 +335,7 @@ function renderProducts(list){
   const body=document.getElementById('pjProductsBody');
   if(!body) return;
   if(!list.length){
-    body.innerHTML='<tr><td colspan="6" style="padding:16px;color:var(--text-2);">No products created yet.</td></tr>';
+    body.innerHTML='<tr><td colspan="12" style="padding:16px;color:var(--text-2);">No products created yet.</td></tr>';
     return;
   }
   const cell=(at,by)=>{
@@ -340,14 +343,32 @@ function renderProducts(list){
     if(!dt) return '<td style="color:var(--text-2);font-style:italic;">Pending</td>';
     return '<td><span style="font-weight:600;">'+dt+'</span>'+(by?'<div style="font-size:11px;color:var(--text-2);">by '+by+'</div>':'')+'</td>';
   };
-  body.innerHTML=list.map(p=>`<tr>
+  const inr=n=>(n==null||isNaN(n))?'—':'₹'+Number(n).toLocaleString('en-IN',{maximumFractionDigits:2});
+  const money=(v,sub)=>'<td style="text-align:right;white-space:nowrap;">'+inr(v)+(sub?'<div style="font-size:11px;color:var(--text-2);">'+sub+'</div>':'')+'</td>';
+  const priceState=pr=>{
+    const s=(pr&&pr.status)||'';
+    if(s==='APPROVED') return '';
+    if(s==='AWAITING_DOCTOR') return 'waiting for doctor';
+    if(s==='QUERIED') return 'sent back'+(pr.note?': '+String(pr.note).replace(/[<>&"]/g,''):'');
+    return 'awaiting store price';
+  };
+  body.innerHTML=list.map(p=>{
+    const pr=p.price||{};
+    const markup=(pr.storePrice!=null&&pr.basePrice!=null)?'+'+inr(pr.basePrice-pr.storePrice)+(pr.markupPct!=null?' ('+pr.markupPct+'%)':''):'';
+    const st=priceState(pr);
+    return `<tr>
     <td style="font-weight:700;">${p.label||'—'}</td>
     <td>${p.batchNo||'—'}</td>
     ${cell(p.approvedAt,p.approvedBy)}
+    ${money(pr.storePrice, pr.pricedAt?fmtDT(pr.pricedAt):'')}
+    ${money(pr.basePrice, markup)}
+    ${money(pr.doctorShare, '')}
+    <td style="text-align:right;white-space:nowrap;font-weight:800;">${inr(pr.finalPrice)}${st?'<div style="font-size:11px;font-weight:600;color:#d97706;">'+st+'</div>':(pr.approvedAt?'<div style="font-size:11px;color:var(--text-2);font-weight:400;">approved '+fmtDT(pr.approvedAt)+'</div>':'')}</td>
     ${cell(p.processingAt,p.processingBy)}
     ${cell(p.dispatchedAt,p.dispatchedBy)}
+    ${cell(p.deliveredAt,p.deliveredBy)}
     <td>${jobBadge(p.status)}</td>
-  </tr>`).join('');
+  </tr>`;}).join('');
 }
 
 // ── Treatment Response signal ───────────────────────────────────────────
@@ -910,13 +931,14 @@ function buildOnePager(){
     const prods=(j.products||[]).map(pr=>[
       pr.label||'—', pr.batchNo||'—',
       pr.approvedAt?fmtDate(pr.approvedAt):'—',
+      (pr.price&&pr.price.finalPrice!=null)?'Rs. '+Number(pr.price.finalPrice).toLocaleString('en-IN'):'—',
       pr.dispatchedAt?fmtDate(pr.dispatchedAt):'Pending',
       (pr.status||'—').replace(/_/g,' ')
     ]);
     if(prods.length){
       doc.autoTable({
         startY:y, theme:'striped', margin:{left:M,right:M},
-        head:[['Product','Batch','Doctor Approved','Dispatched','Status']],
+        head:[['Product','Batch','Doctor Approved','Final MRP','Dispatched','Status']],
         body:prods, styles:{fontSize:8,cellPadding:3.5},
         headStyles:{fillColor:[14,34,71],fontSize:8}
       });

@@ -3009,7 +3009,21 @@ app.get('/api/trials/:patientId/journey', authenticateToken, requireAdmin, async
     const pat = (await pool.query('SELECT id, uhic, name, cancer, created_date, created_at FROM patients WHERE id=$1', [pid])).rows[0];
     if (!pat) return res.status(404).json({ error: 'Patient not found' });
     const trial = (await pool.query('SELECT * FROM trial_enrollments WHERE patient_id=$1', [pid])).rows[0] || null;
-    const allJobs = (await pool.query('SELECT id, status, history, mfg_date, exp_date, batch_no, created_at FROM manufacturing_jobs WHERE patient_id=$1 ORDER BY created_at ASC', [pid])).rows;
+    const allJobs = (await pool.query(`SELECT id, status, history, mfg_date, exp_date, batch_no, created_at,
+        price_status, store_price, markup_pct, base_price, doctor_amount, doctor_pct, final_price, price_note,
+        store_priced_at, price_approved_at
+      FROM manufacturing_jobs WHERE patient_id=$1 ORDER BY created_at ASC`, [pid])).rows;
+    // History entries carry user ids — resolve them to names for display.
+    const _uids = new Set();
+    allJobs.forEach(j => (Array.isArray(j.history) ? j.history : []).forEach(e => { if (e && e.by) _uids.add(String(e.by)); }));
+    const _uname = {};
+    if (_uids.size) {
+      try {
+        (await pool.query('SELECT id, name FROM users WHERE id = ANY($1)', [[..._uids]])).rows
+          .forEach(u => { _uname[u.id] = u.name; });
+      } catch (_) {}
+    }
+    const _byName = by => by ? (_uname[by] || by) : null;
     // Initial product job = first non-weekly job (weekly jobs have id 'wxjob_...')
     const job = allJobs.find(j => !String(j.id).startsWith('wxjob_')) || allJobs[0] || null;
     let weeklyRx = [];
@@ -3065,11 +3079,24 @@ app.get('/api/trials/:patientId/journey', authenticateToken, requireAdmin, async
         batchNo:      j.batch_no || (rx ? rx.batch_code : null),
         status:       j.status,
         approvedAt:   (ap ? ap.at : null) || (rx ? rx.approved_at : null) || j.created_at,
-        approvedBy:   (ap && ap.by) || (rx ? rx.approved_by_name : null) || null,
+        approvedBy:   _byName(ap && ap.by) || (rx ? rx.approved_by_name : null) || null,
         processingAt: pr ? pr.at : null,
-        processingBy: (pr && pr.by) || null,
+        processingBy: _byName(pr && pr.by),
         dispatchedAt: dp ? dp.at : null,
-        dispatchedBy: (dp && dp.by) || null,
+        dispatchedBy: _byName(dp && dp.by),
+        deliveredAt:  (() => { const e = histEntry(j, 'DELIVERED'); return e ? (e.deliveredOn || e.at) : null; })(),
+        deliveredBy:  (() => { const e = histEntry(j, 'DELIVERED'); return e ? _byName(e.by) : null; })(),
+        price: {
+          status:      j.price_status || null,
+          storePrice:  j.store_price  != null ? Number(j.store_price)  : null,
+          markupPct:   j.markup_pct   != null ? Number(j.markup_pct)   : null,
+          basePrice:   j.base_price   != null ? Number(j.base_price)   : null,
+          doctorShare: j.doctor_amount!= null ? Number(j.doctor_amount): null,
+          finalPrice:  j.final_price  != null ? Number(j.final_price)  : null,
+          note:        j.price_note || null,
+          pricedAt:    j.store_priced_at || null,
+          approvedAt:  j.price_approved_at || null
+        },
         mfgDate:      j.mfg_date,
         expDate:      j.exp_date
       };
