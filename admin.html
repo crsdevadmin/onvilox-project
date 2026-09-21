@@ -80,6 +80,38 @@
     </div>
   </div>
 
+  <!-- Product pricing: store price → markup → doctor's final price (MRP) -->
+  <div class="card" id="pricingCard" style="margin-top:18px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+      <div>
+        <div style="font-size:16px;font-weight:800;">Product pricing</div>
+        <div style="font-size:12px;opacity:.7;">Every product's store price, the price after markup, the doctor's share and the final MRP on the label.</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <input id="prSearch" oninput="renderPricing()" placeholder="Search patient / doctor / store" style="padding:6px 8px;border-radius:6px;font-size:12px;min-width:200px;">
+        <select id="prFilter" onchange="renderPricing()" style="padding:6px 8px;border-radius:6px;font-size:12px;">
+          <option value="">All products</option>
+          <option value="APPROVED">Price approved</option>
+          <option value="AWAITING_DOCTOR">Waiting for doctor</option>
+          <option value="QUERIED">Sent back to store</option>
+          <option value="NONE">Waiting for store price</option>
+        </select>
+      </div>
+    </div>
+    <div id="prTotals" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;"></div>
+    <div style="overflow-x:auto;">
+      <table class="table" style="width:100%;font-size:12.5px;">
+        <thead><tr>
+          <th>Patient</th><th>Product</th><th>Doctor</th><th>Store</th>
+          <th style="text-align:right;">Store price</th><th style="text-align:right;">Markup</th>
+          <th style="text-align:right;">Price to doctor</th><th style="text-align:right;">Doctor share</th>
+          <th style="text-align:right;">Final MRP</th><th>Price status</th><th>Production</th>
+        </tr></thead>
+        <tbody id="prBody"><tr><td colspan="11" style="opacity:.6;">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
   <!-- Activity feed: every status change across patients, prices and production -->
   <div class="card" id="activityCard" style="margin-top:18px;">
     <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
@@ -139,6 +171,7 @@ document.getElementById('tProcessing').innerText = countJobs('PROCESSING');
 document.getElementById('tReady').innerText = countJobs('READY');
 document.getElementById('tDispatched').innerText = countJobs('DISPATCHED');
 document.getElementById('tDelivered').innerText = countJobs('DELIVERED');
+try { renderPricing(); } catch (e) { console.warn('pricing:', e); }
 }); // end initStore().then
 
 // Manually reconcile production jobs (creates missing jobs for approved patients)
@@ -194,6 +227,91 @@ async function syncJobs(btn){
     if(btn){ btn.disabled = false; btn.textContent = 'Sync Production Jobs'; }
   }
 }
+</script>
+
+<script>
+// ── Product pricing table ───────────────────────────────────────────────────
+function _inr(n){ return (n == null || isNaN(n)) ? '—' : '₹' + Number(n).toLocaleString('en-IN', { maximumFractionDigits: 2 }); }
+function _prEsc(s){ return String(s == null ? '' : s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c])); }
+function _prProduct(j){ const m = String(j.id).match(/_w(\d+)$/); return m ? 'Week ' + m[1] : 'Initial'; }
+function _prPriceState(j){
+  const ps = j.priceStatus;
+  if (ps === 'APPROVED')        return ['Approved', '#16a34a'];
+  if (ps === 'AWAITING_DOCTOR') return ['Waiting for doctor', '#d97706'];
+  if (ps === 'QUERIED')         return ['Sent back to store', '#dc2626'];
+  return ['Waiting for store price', '#64748b'];
+}
+function _prStage(s){
+  return ({ APPROVED:'Not started', PENDING_PROCESSING:'Processing requested', PROCESSING:'Processing',
+            PENDING_DISPATCH:'Dispatch requested', DISPATCHED:'Dispatched', DELIVERED:'Delivered' })[(s||'APPROVED').toUpperCase()] || s;
+}
+function renderPricing(){
+  if (typeof manufacturingService === 'undefined') return;
+  const jobs = manufacturingService.getJobs();
+  const pById = {}; (getPatients() || []).forEach(p => { pById[p.id] = p; });
+  const uName = id => { const u = (typeof userService !== 'undefined' && id) ? userService.getUserById(id) : null; return u ? u.name : '—'; };
+  const sName = id => { const s = (typeof storeService !== 'undefined' && id) ? storeService.getStoreById(id) : null; return s ? s.name : (id || '—'); };
+  const q = (document.getElementById('prSearch').value || '').toLowerCase().trim();
+  const f = document.getElementById('prFilter').value;
+  const rows = jobs.map(j => {
+    const p = pById[j.patientId] || {};
+    return { j, patient: p.name || j.patientId, doctor: uName(j.doctorId || p.assignedDoctorId), store: sName(j.storeId) };
+  }).filter(r => {
+    const ps = r.j.priceStatus || 'NONE';
+    if (f && (f === 'NONE' ? !(ps === 'NONE' || ps === 'AWAITING_STORE') : ps !== f)) return false;
+    if (q && ![r.patient, r.doctor, r.store].some(v => String(v).toLowerCase().includes(q))) return false;
+    return true;
+  }).sort((a, b) => String(b.j.priceApprovedAt || b.j.storePricedAt || b.j.updatedAt || '')
+                     .localeCompare(String(a.j.priceApprovedAt || a.j.storePricedAt || a.j.updatedAt || '')));
+
+  // Totals across approved prices in the current view
+  const appr = rows.filter(r => r.j.priceStatus === 'APPROVED');
+  const sum = k => appr.reduce((t, r) => t + (Number(r.j[k]) || 0), 0);
+  const tile = (k, v) => '<div style="border:1px solid rgba(148,163,184,.25);border-radius:8px;padding:8px 12px;min-width:130px;">'
+    + '<div style="font-size:10.5px;opacity:.7;text-transform:uppercase;letter-spacing:.06em;">' + k + '</div>'
+    + '<div style="font-size:16px;font-weight:800;margin-top:2px;">' + v + '</div></div>';
+  document.getElementById('prTotals').innerHTML =
+      tile('Approved products', appr.length)
+    + tile('Store total', _inr(sum('storePrice')))
+    + tile('Markup total', _inr(sum('basePrice') - sum('storePrice')))
+    + tile('Doctor share total', _inr(sum('doctorAmount')))
+    + tile('MRP total', _inr(sum('finalPrice')));
+
+  const body = document.getElementById('prBody');
+  if (!rows.length) { body.innerHTML = '<tr><td colspan="11" style="opacity:.6;">No products match.</td></tr>'; return; }
+  body.innerHTML = rows.map(r => {
+    const j = r.j, st = _prPriceState(j);
+    const markup = (j.storePrice != null && j.basePrice != null)
+      ? _inr(j.basePrice - j.storePrice) + (j.markupPct != null ? ' <span style="opacity:.6;">(' + j.markupPct + '%)</span>' : '') : '—';
+    const share = j.doctorAmount != null
+      ? _inr(j.doctorAmount) + (j.doctorPct != null ? ' <span style="opacity:.6;">(' + Number(j.doctorPct).toFixed(1) + '%)</span>' : '') : '—';
+    const note = j.priceStatus === 'QUERIED' && j.priceNote ? '<div style="font-size:11px;color:#dc2626;margin-top:2px;">' + _prEsc(j.priceNote) + '</div>' : '';
+    return '<tr>'
+      + '<td><a href="/patients/profile?id=' + encodeURIComponent(j.patientId) + '" style="color:#38bdf8;font-weight:700;text-decoration:none;">' + _prEsc(r.patient) + '</a></td>'
+      + '<td>' + _prProduct(j) + (j.batchNo ? '<div style="font-size:11px;opacity:.6;">Batch ' + _prEsc(j.batchNo) + '</div>' : '') + '</td>'
+      + '<td>' + _prEsc(r.doctor) + '</td>'
+      + '<td>' + _prEsc(r.store) + '</td>'
+      + '<td style="text-align:right;">' + _inr(j.storePrice) + '</td>'
+      + '<td style="text-align:right;">' + markup + '</td>'
+      + '<td style="text-align:right;">' + _inr(j.basePrice) + '</td>'
+      + '<td style="text-align:right;">' + share + '</td>'
+      + '<td style="text-align:right;font-weight:800;">' + _inr(j.finalPrice) + '</td>'
+      + '<td><span style="font-weight:700;color:' + st[1] + ';">' + st[0] + '</span>' + note + '</td>'
+      + '<td>' + _prStage(j.status) + '</td>'
+      + '</tr>';
+  }).join('');
+}
+// Initial render once the store data is in, then keep it fresh.
+(function waitForJobs(){
+  if (typeof manufacturingService !== 'undefined' && manufacturingService.getJobs().length !== undefined && typeof getPatients === 'function') {
+    setTimeout(renderPricing, 800);
+  }
+})();
+setInterval(() => {
+  if (typeof manufacturingService !== 'undefined' && manufacturingService.initJobs) {
+    manufacturingService.initJobs().then(renderPricing).catch(() => {});
+  }
+}, 30000);
 </script>
 
 <script>
