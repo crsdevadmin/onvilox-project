@@ -55,6 +55,7 @@
       doctorPct:    r.doctor_pct   != null ? Number(r.doctor_pct)   : null,
       doctorAmount: r.doctor_amount!= null ? Number(r.doctor_amount): null,
       finalPrice:   r.final_price  != null ? Number(r.final_price)  : null,
+      defaultMarkupPct: r.default_markup_pct != null ? Number(r.default_markup_pct) : null,
       priceNote:    r.price_note || null,
       storePricedAt:   r.store_priced_at || null,
       priceApprovedAt: r.price_approved_at || null,
@@ -215,12 +216,14 @@
   }
   function setStorePrice(jobId, price)   { return _pricePost(jobId, 'store-price',  { price }); }
   function approvePrice(jobId, finalPrice){ return _pricePost(jobId, 'doctor-price', { finalPrice }); }
+  function adminMarkup(jobId, markupPct) { return _pricePost(jobId, 'admin-markup', { markupPct }); }
   function queryPrice(jobId, note)       { return _pricePost(jobId, 'price-query',  { note }); }
   // A job may enter production only once its price is approved.
   function isPriced(j) { return !!j && (j.priceStatus || j.price_status) === 'APPROVED'; }
   function priceLabel(j) {
     const s = j && (j.priceStatus || j.price_status);
     if (s === 'APPROVED')        return 'Price approved';
+    if (s === 'AWAITING_ADMIN')  return 'Price with admin';
     if (s === 'AWAITING_DOCTOR') return 'Price with doctor';
     if (s === 'QUERIED')         return 'Price sent back';
     return 'Price needed';
@@ -280,5 +283,5 @@
   };
 
   global.manufacturingService = { initJobs, applyServerJobs, getJobs, createJob, updateJobStatus, assignBatch, getJobsForStore, getJobByPatient, WORKFLOW,
-    setStorePrice, approvePrice, queryPrice, isPriced, priceLabel, markDelivered, deliveryInfo };
+    setStorePrice, approvePrice, adminMarkup, queryPrice, isPriced, priceLabel, markDelivered, deliveryInfo };
 })(window);

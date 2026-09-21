@@ -85,12 +85,13 @@
     <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
       <div>
         <div style="font-size:16px;font-weight:800;">Product pricing</div>
-        <div style="font-size:12px;opacity:.7;">Every product's store price, the price after markup, the doctor's share and the final MRP on the label.</div>
+        <div style="font-size:12px;opacity:.7;">Store price → your markup % → the doctor sets the final MRP. Products waiting for your markup are listed first.</div>
       </div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
         <input id="prSearch" oninput="renderPricing()" placeholder="Search patient / doctor / store" style="padding:6px 8px;border-radius:6px;font-size:12px;min-width:200px;">
         <select id="prFilter" onchange="renderPricing()" style="padding:6px 8px;border-radius:6px;font-size:12px;">
           <option value="">All products</option>
+          <option value="AWAITING_ADMIN">Needs your markup</option>
           <option value="APPROVED">Price approved</option>
           <option value="AWAITING_DOCTOR">Waiting for doctor</option>
           <option value="QUERIED">Sent back to store</option>
@@ -105,9 +106,9 @@
           <th>Patient</th><th>Product</th><th>Doctor</th><th>Store</th>
           <th style="text-align:right;">Store price</th><th style="text-align:right;">Markup</th>
           <th style="text-align:right;">Price to doctor</th><th style="text-align:right;">Doctor share</th>
-          <th style="text-align:right;">Final MRP</th><th>Price status</th><th>Production</th>
+          <th style="text-align:right;">Final MRP</th><th>Price status</th><th>Production</th><th>Action</th>
         </tr></thead>
-        <tbody id="prBody"><tr><td colspan="11" style="opacity:.6;">Loading…</td></tr></tbody>
+        <tbody id="prBody"><tr><td colspan="12" style="opacity:.6;">Loading…</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -237,6 +238,7 @@ function _prProduct(j){ const m = String(j.id).match(/_w(\d+)$/); return m ? 'We
 function _prPriceState(j){
   const ps = j.priceStatus;
   if (ps === 'APPROVED')        return ['Approved', '#16a34a'];
+  if (ps === 'AWAITING_ADMIN')  return ['Needs your markup', '#0ea5e9'];
   if (ps === 'AWAITING_DOCTOR') return ['Waiting for doctor', '#d97706'];
   if (ps === 'QUERIED')         return ['Sent back to store', '#dc2626'];
   return ['Waiting for store price', '#64748b'];
@@ -261,8 +263,12 @@ function renderPricing(){
     if (f && (f === 'NONE' ? !(ps === 'NONE' || ps === 'AWAITING_STORE') : ps !== f)) return false;
     if (q && ![r.patient, r.doctor, r.store].some(v => String(v).toLowerCase().includes(q))) return false;
     return true;
-  }).sort((a, b) => String(b.j.priceApprovedAt || b.j.storePricedAt || b.j.updatedAt || '')
-                     .localeCompare(String(a.j.priceApprovedAt || a.j.storePricedAt || a.j.updatedAt || '')));
+  }).sort((a, b) => {
+    const wa = a.j.priceStatus === 'AWAITING_ADMIN' ? 0 : 1, wb = b.j.priceStatus === 'AWAITING_ADMIN' ? 0 : 1;
+    if (wa !== wb) return wa - wb;
+    return String(b.j.priceApprovedAt || b.j.storePricedAt || b.j.updatedAt || '')
+      .localeCompare(String(a.j.priceApprovedAt || a.j.storePricedAt || a.j.updatedAt || ''));
+  });
 
   // Totals across approved prices in the current view
   const appr = rows.filter(r => r.j.priceStatus === 'APPROVED');
@@ -270,15 +276,17 @@ function renderPricing(){
   const tile = (k, v) => '<div style="border:1px solid rgba(148,163,184,.25);border-radius:8px;padding:8px 12px;min-width:130px;">'
     + '<div style="font-size:10.5px;opacity:.7;text-transform:uppercase;letter-spacing:.06em;">' + k + '</div>'
     + '<div style="font-size:16px;font-weight:800;margin-top:2px;">' + v + '</div></div>';
+  const waiting = jobs.filter(j => j.priceStatus === 'AWAITING_ADMIN').length;
   document.getElementById('prTotals').innerHTML =
-      tile('Approved products', appr.length)
+      tile('Needs your markup', '<span style="color:' + (waiting ? '#0ea5e9' : 'inherit') + ';">' + waiting + '</span>')
+    + tile('Approved products', appr.length)
     + tile('Store total', _inr(sum('storePrice')))
     + tile('Markup total', _inr(sum('basePrice') - sum('storePrice')))
     + tile('Doctor share total', _inr(sum('doctorAmount')))
     + tile('MRP total', _inr(sum('finalPrice')));
 
   const body = document.getElementById('prBody');
-  if (!rows.length) { body.innerHTML = '<tr><td colspan="11" style="opacity:.6;">No products match.</td></tr>'; return; }
+  if (!rows.length) { body.innerHTML = '<tr><td colspan="12" style="opacity:.6;">No products match.</td></tr>'; return; }
   body.innerHTML = rows.map(r => {
     const j = r.j, st = _prPriceState(j);
     const markup = (j.storePrice != null && j.basePrice != null)
@@ -298,8 +306,52 @@ function renderPricing(){
       + '<td style="text-align:right;font-weight:800;">' + _inr(j.finalPrice) + '</td>'
       + '<td><span style="font-weight:700;color:' + st[1] + ';">' + st[0] + '</span>' + note + '</td>'
       + '<td>' + _prStage(j.status) + '</td>'
+      + '<td>' + _prAction(j) + '</td>'
       + '</tr>';
   }).join('');
+}
+// Markup editor: shown while the store price waits for the admin, and while
+// the doctor hasn't acted yet (so the admin can still correct it).
+function _prAction(j){
+  const ps = j.priceStatus, busy = (j.status || 'APPROVED').toUpperCase() !== 'APPROVED';
+  if (busy || !(ps === 'AWAITING_ADMIN' || ps === 'AWAITING_DOCTOR') || j.storePrice == null) return '<span style="opacity:.4;">—</span>';
+  const id = _prEsc(j.id);
+  const pct = j.markupPct != null ? j.markupPct : (j.defaultMarkupPct != null ? j.defaultMarkupPct : 40);
+  const out = _inr(Math.round(j.storePrice * (1 + pct / 100) * 100) / 100);
+  return '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;min-width:230px;">'
+    + '<input id="mk_' + id + '" type="number" min="0" step="0.5" value="' + pct + '" oninput="_prMkPreview(\'' + id + '\')"'
+    + ' onkeydown="if(event.key===\'Enter\')_prMkSend(\'' + id + '\')" style="width:70px;padding:5px 6px;border-radius:6px;font-size:12px;"> %'
+    + ' <span id="mkv_' + id + '" style="font-weight:700;">= ' + out + '</span>'
+    + '<button onclick="_prMkSend(\'' + id + '\')" style="padding:5px 10px;font-size:11.5px;border-radius:6px;border:1px solid #16a34a;background:#f0fdf4;color:#15803d;font-weight:700;cursor:pointer;">'
+    + (ps === 'AWAITING_ADMIN' ? 'Send to doctor' : 'Update') + '</button>'
+    + (ps === 'AWAITING_ADMIN' ? '<button onclick="_prMkBack(\'' + id + '\')" style="padding:5px 8px;font-size:11.5px;border-radius:6px;border:1px solid #cbd5e1;background:transparent;color:inherit;cursor:pointer;">Send back</button>' : '')
+    + '</div>';
+}
+function _prJob(id){ return manufacturingService.getJobs().find(x => String(x.id) === String(id)); }
+function _prMkPreview(id){
+  const j = _prJob(id), el = document.getElementById('mk_' + id), out = document.getElementById('mkv_' + id);
+  if (!j || !el || !out) return;
+  const v = parseFloat(el.value);
+  out.textContent = v >= 0 ? '= ' + _inr(Math.round(j.storePrice * (1 + v / 100) * 100) / 100) : '';
+}
+async function _prMkSend(id){
+  const j = _prJob(id), el = document.getElementById('mk_' + id);
+  if (!j || !el) return;
+  const v = parseFloat(el.value);
+  if (!(v >= 0)) { alert('Enter the markup percentage (0 or more).'); el.focus(); return; }
+  const price = Math.round(j.storePrice * (1 + v / 100) * 100) / 100;
+  if (!confirm('Send ' + _inr(price) + ' to the doctor?\n\nStore price ' + _inr(j.storePrice) + ' + ' + v + '% markup.')) return;
+  const r = await manufacturingService.adminMarkup(id, v);
+  if (!r.ok) { alert(r.error || 'Could not save the markup.'); return; }
+  renderPricing();
+}
+async function _prMkBack(id){
+  const note = prompt('What should the store change? (sent to the store)');
+  if (note === null) return;
+  if (!note.trim()) { alert('Add a short note for the store.'); return; }
+  const r = await manufacturingService.queryPrice(id, note.trim());
+  if (!r.ok) { alert(r.error || 'Could not send it back.'); return; }
+  renderPricing();
 }
 // Initial render once the store data is in, then keep it fresh.
 (function waitForJobs(){
@@ -318,7 +370,7 @@ setInterval(() => {
 // ── Activity feed ───────────────────────────────────────────────────────────
 const _ACT_GROUP = {
   patient_status: 'plan', rx_approved: 'plan',
-  price_set: 'price', price_approved: 'price', price_queried: 'price',
+  price_set: 'price', price_markup: 'price', price_approved: 'price', price_queried: 'price',
   job_status: 'job', batch: 'job',
   patient_created: 'patient', patient_closed: 'patient', patient_closure_confirmed: 'patient', patient_reopened: 'patient'
 };

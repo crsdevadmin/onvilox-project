@@ -732,6 +732,7 @@
       const s = (j.status || 'APPROVED').toUpperCase();
       if (s === 'APPROVED') {
         const ps = j.priceStatus;
+        if (ps === 'AWAITING_ADMIN')  return { label: 'Price with admin',   cls: 'pending', group: 'APPROVED' };
         if (ps === 'AWAITING_DOCTOR') return { label: 'Price awaiting you', cls: 'pending', group: 'APPROVED' };
         if (ps === 'QUERIED')         return { label: 'Price sent back',    cls: 'pending', group: 'APPROVED' };
         if (ps === 'APPROVED')        return { label: 'Ready for production', cls: 'approved', group: 'APPROVED' };

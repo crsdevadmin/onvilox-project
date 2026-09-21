@@ -261,7 +261,8 @@ function renderActions(){
     if (s === 'APPROVED' && !manufacturingService.isPriced(job)) {
       // Production waits for the doctor-approved price.
       const ps = job.priceStatus;
-      const msg = ps === 'AWAITING_DOCTOR' ? '⏳ Price sent — waiting for the doctor to approve it'
+      const msg = ps === 'AWAITING_ADMIN' ? '⏳ Price sent — waiting for admin'
+                : ps === 'AWAITING_DOCTOR' ? '⏳ Price sent — waiting for the doctor to approve it'
                 : ps === 'QUERIED' ? '🔁 The doctor sent the price back' + (job.priceNote ? ': ' + String(job.priceNote).replace(/[<>&"]/g, '') : '')
                 : '💰 Enter the store price on the Store dashboard before production';
       html += `<span style="align-self:center;color:#d97706;font-weight:700;">${msg}</span>`;

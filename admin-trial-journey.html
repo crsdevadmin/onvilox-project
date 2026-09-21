@@ -348,6 +348,7 @@ function renderProducts(list){
   const priceState=pr=>{
     const s=(pr&&pr.status)||'';
     if(s==='APPROVED') return '';
+    if(s==='AWAITING_ADMIN') return 'waiting for admin markup';
     if(s==='AWAITING_DOCTOR') return 'waiting for doctor';
     if(s==='QUERIED') return 'sent back'+(pr.note?': '+String(pr.note).replace(/[<>&"]/g,''):'');
     return 'awaiting store price';

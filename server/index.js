@@ -3335,8 +3335,12 @@ app.get('/api/manufacturing-jobs', authenticateToken, async (req, res) => {
     const closedBy = {};
     closures.rows.forEach(c => { closedBy[c.patient_id] = c; });
 
+    const _isAdm = req.user && (req.user.role === 'ADMIN' || req.user.role === 'SUPER_ADMIN');
+    let _defMarkup = 40;
+    if (_isAdm) { try { const F = await loadFormulaConstants(pool); const m = parseFloat(F.platform_markup_pct); if (m >= 0) _defMarkup = m; } catch (e) {} }
     res.json(result.rows.map(j0 => {
       const j = jobPriceView(j0, req.user);
+      if (_isAdm) j.default_markup_pct = _defMarkup;
       const c = closedBy[j.patient_id];
       if (!c) return j;
       return {
@@ -3581,12 +3585,13 @@ app.put('/api/manufacturing-jobs/:id', authenticateToken, async (req, res) => {
 
 // ── Product pricing ─────────────────────────────────────────────────────────
 // Flow per job (initial plan and every weekly batch):
-//   store enters its price → platform markup (engine_formulas.platform_markup_pct,
-//   default 40 %) is added → doctor enters the FINAL price (≥ that price) →
-//   which is printed on the label as the MRP. Production is blocked until then.
-//   Example: store 1000 → +40 % = 1400 → doctor enters 1900 → final 1900.
+//   store enters its price → the ADMIN sets the markup % (default
+//   engine_formulas.platform_markup_pct = 40, any value allowed) → the doctor
+//   enters the FINAL price (≥ the marked-up price) → store, printed as the MRP.
+//   Production is blocked until then.
+//   Example: store 1000 → admin 45 % = 1450 → doctor enters 1900 → final 1900.
 //   doctor_amount (1900 − 1400 = 500) and doctor_pct are derived and stored for reporting.
-// price_status: NULL/'AWAITING_STORE' → 'AWAITING_DOCTOR' → 'APPROVED'
+// price_status: NULL/'AWAITING_STORE' → 'AWAITING_ADMIN' (admin sets markup %) → 'AWAITING_DOCTOR' → 'APPROVED'
 //               ('QUERIED' = doctor sent it back to the store with a note).
 // Visibility: the store never sees the markup or the doctor's share; the doctor
 // never sees the store's own price or the markup rate; admins see everything.
@@ -3641,26 +3646,53 @@ app.post('/api/manufacturing-jobs/:id/store-price', authenticateToken, async (re
     if ((job.status || '').toUpperCase() !== 'APPROVED') return res.status(409).json({ error: 'Price can only be set before production starts.' });
     if (job.price_status === 'APPROVED') return res.status(409).json({ error: 'The doctor has already approved the price for this product.' });
 
-    const F = await loadFormulaConstants(pool);
-    const markup = parseFloat(F.platform_markup_pct);
-    const markupPct = (markup >= 0) ? markup : 40;
-    const base = _money(price * (1 + markupPct / 100));
+    // The store's price goes to the admin first; the admin sets the markup %
+    // (default platform_markup_pct, 40) and only then does it reach the doctor.
     const upd = await pool.query(
       `UPDATE manufacturing_jobs
-          SET price_status='AWAITING_DOCTOR', store_price=$1, markup_pct=$2, base_price=$3,
+          SET price_status='AWAITING_ADMIN', store_price=$1, markup_pct=NULL, base_price=NULL,
               doctor_pct=NULL, doctor_amount=NULL, final_price=NULL, price_note=NULL,
-              store_priced_by=$4, store_priced_at=NOW(), price_approved_by=NULL, price_approved_at=NULL,
-              history=$5, updated_at=NOW()
-        WHERE id=$6 RETURNING *`,
-      [_money(price), markupPct, base, req.user.id,
+              store_priced_by=$2, store_priced_at=NOW(), price_approved_by=NULL, price_approved_at=NULL,
+              history=$3, updated_at=NOW()
+        WHERE id=$4 RETURNING *`,
+      [_money(price), req.user.id,
        _appendHistory(job, { action: 'price_set', by: req.user.id, role }), job.id]);
     res.json(jobPriceView(upd.rows[0], req.user));
-    recordEvent({ type: 'price_set', title: '💰 Store price entered',
-      body: `{patient} — ${_jobProductLabel(job.id)}: store price ₹${_money(price)} → ₹${base} after ${markupPct}% markup. Waiting for the doctor.`,
+    recordEvent({ type: 'price_set', title: '💰 Store price — set your markup',
+      body: `{patient} — ${_jobProductLabel(job.id)}: store price ₹${_money(price)}. Set the markup % and send it to the doctor.`,
+      patientId: job.patient_id, patientName: job.patient_name, jobId: job.id, user: req.user });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Admin sets the markup % on the store price (any value ≥ 0, e.g. 40, 45, 105)
+// and sends the resulting price to the doctor.
+app.post('/api/manufacturing-jobs/:id/admin-markup', authenticateToken, async (req, res) => {
+  const role = req.user && req.user.role;
+  if (role !== 'ADMIN' && role !== 'SUPER_ADMIN') return res.status(403).json({ error: 'Only an admin can set the markup.' });
+  const pct = parseFloat(req.body && req.body.markupPct);
+  if (!(pct >= 0) || pct > 10000) return res.status(400).json({ error: 'Enter a markup percentage (0 or more).' });
+  try {
+    const job = await _loadJobForPricing(req.params.id);
+    if (!job) return res.status(404).json({ error: 'Job not found' });
+    if ((job.status || '').toUpperCase() !== 'APPROVED') return res.status(409).json({ error: 'Price can only be changed before production starts.' });
+    if (!['AWAITING_ADMIN', 'AWAITING_DOCTOR'].includes(job.price_status) || job.store_price == null) {
+      return res.status(409).json({ error: 'There is no store price waiting for your markup on this product.' });
+    }
+    const store = Number(job.store_price);
+    const base = _money(store * (1 + pct / 100));
+    const upd = await pool.query(
+      `UPDATE manufacturing_jobs
+          SET price_status='AWAITING_DOCTOR', markup_pct=$1, base_price=$2, price_note=NULL,
+              history=$3, updated_at=NOW()
+        WHERE id=$4 RETURNING *`,
+      [_money(pct), base, _appendHistory(job, { action: 'markup_set', by: req.user.id, role, markupPct: pct }), job.id]);
+    res.json(jobPriceView(upd.rows[0], req.user));
+    recordEvent({ type: 'price_markup', title: '📈 Markup set — sent to doctor',
+      body: `{actor} set ${_money(pct)}% on {patient} — ${_jobProductLabel(job.id)}: store ₹${store} → ₹${base}. Waiting for the doctor.`,
       patientId: job.patient_id, patientName: job.patient_name, jobId: job.id, user: req.user });
     const doc = job.doctor_id || job.assigned_doctor_id;
     if (doc) notifyUsers([doc], '💰 Price approval needed',
-      `${job.patient_name || 'A patient'} — ${_jobProductLabel(job.id)}: price ₹${base} is waiting for your approval.`, '/doctor').catch(() => {});
+      `${job.patient_name || 'A patient'} — ${_jobProductLabel(job.id)}: price ₹${base} is waiting for your approval.`, '/dashboard').catch(() => {});
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -3718,7 +3750,7 @@ app.post('/api/manufacturing-jobs/:id/doctor-price', authenticateToken, async (r
 app.post('/api/manufacturing-jobs/:id/price-query', authenticateToken, async (req, res) => {
   const role = req.user && req.user.role;
   const isAdmin = role === 'ADMIN' || role === 'SUPER_ADMIN';
-  if (role !== 'DOCTOR' && !isAdmin) return res.status(403).json({ error: 'Only the doctor can send a price back.' });
+  if (role !== 'DOCTOR' && !isAdmin) return res.status(403).json({ error: 'Only the doctor or an admin can send a price back.' });
   const note = String((req.body && req.body.note) || '').trim().slice(0, 500);
   if (!note) return res.status(400).json({ error: 'Add a note so the store knows what to change.' });
   try {
@@ -3727,7 +3759,8 @@ app.post('/api/manufacturing-jobs/:id/price-query', authenticateToken, async (re
     if (!isAdmin && req.user.id !== job.doctor_id && req.user.id !== job.assigned_doctor_id) {
       return res.status(403).json({ error: 'This product belongs to another doctor\'s patient.' });
     }
-    if (job.price_status !== 'AWAITING_DOCTOR') return res.status(409).json({ error: 'This price is not waiting for your approval.' });
+    const okStates = isAdmin ? ['AWAITING_ADMIN', 'AWAITING_DOCTOR'] : ['AWAITING_DOCTOR'];
+    if (!okStates.includes(job.price_status)) return res.status(409).json({ error: 'This price is not waiting for your approval.' });
     const upd = await pool.query(
       `UPDATE manufacturing_jobs SET price_status='QUERIED', price_note=$1, history=$2, updated_at=NOW()
         WHERE id=$3 RETURNING *`,
@@ -5561,7 +5594,7 @@ app.post('/api/drafts/:id/complete', authenticateToken, async (req, res) => {
         { id:'servings_high_count',       category:'servings',     name:'servings_high_count',       description:'Servings per day when calories ≥1800 or appetite loss/nausea present',                         value:'4',    unit:'servings',     source:'Clinical' },
         { id:'servings_very_high_threshold',category:'servings',   name:'servings_very_high_threshold','description':'Daily calorie level above which servings increase to 5',                                     value:'2400', unit:'kcal',         source:'Clinical' },
         // ── Pricing ───────────────────────────────────────────────────────────
-        { id:'platform_markup_pct',       category:'pricing',      name:'platform_markup_pct',       description:'Markup added on top of the store price before the doctor adds their share (applies to new prices only)', value:'40', unit:'%', source:'Commercial' },
+        { id:'platform_markup_pct',       category:'pricing',      name:'platform_markup_pct',       description:'Default markup % suggested to the admin when a store price arrives (the admin can change it per product)', value:'40', unit:'%', source:'Commercial' },
         { id:'servings_very_high_count',  category:'servings',     name:'servings_very_high_count',  description:'Servings per day when calories ≥2400',                                                          value:'5',    unit:'servings',     source:'Clinical' },
       ];
       for (const f of formulas) {
