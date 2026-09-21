@@ -3467,6 +3467,22 @@ app.put('/api/manufacturing-jobs/:id', authenticateToken, async (req, res) => {
       recordEvent({ type: 'job_status', title: _act === 'reject' ? '🔴 Request rejected' : _t,
         body: `{patient} — ${_jobProductLabel(req.params.id)}: ${_stageLabel(currentStatus)} → ${_stageLabel(target)} (by {actor}).`,
         patientId: job.patient_id, jobId: req.params.id, user: req.user });
+
+      // Tell the patient's doctor when their product actually moves stage.
+      const _docMsg = { PROCESSING: ['🏭 Production started', 'is being prepared by the store'],
+                        DISPATCHED: ['🚚 Product dispatched', 'has been dispatched'],
+                        DELIVERED:  ['📦 Product delivered', 'has been delivered'] }[target];
+      if (_docMsg && _act !== 'reject') {
+        (async () => {
+          try {
+            const pr = await pool.query('SELECT name, assigned_doctor_id FROM patients WHERE id=$1', [job.patient_id]);
+            const pat = pr.rows[0] || {};
+            const docs = [...new Set([job.doctor_id, pat.assigned_doctor_id].filter(Boolean))];
+            if (docs.length) await notifyUsers(docs, _docMsg[0],
+              `${pat.name || 'Your patient'} — ${_jobProductLabel(req.params.id)} ${_docMsg[1]}.`, '/dashboard');
+          } catch (e) { console.warn('doctor job notify:', e.message); }
+        })();
+      }
     }
 
     // ── Approval-workflow notifications (sent after responding) ──────────────
