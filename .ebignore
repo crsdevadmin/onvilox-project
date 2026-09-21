@@ -11,3 +11,14 @@ regex-test.js
 inject.py
 inject-theme.ps1
 test_models.js
+# Not part of the app — keep out of the deploy bundle (and off the public site)
+.elasticbeanstalk/
+Claude outputs/
+_deck_qa/
+_hos_qa/
+_inv_qa/
+*.mp4
+*.pptx
+*.bak*
+store.html.bak-artwork
+.DS_Store

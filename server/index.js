@@ -9,8 +9,11 @@ const { computeMust, mustInputs, MUST_PATIENT_COLUMNS } = require('./must');
 const ProteinPlans = require('../js/protein-plans');
 require('dotenv').config();
 
-const VAPID_PUBLIC  = 'BP2E-Ogveb92wrIjjciORv_jDJO82jut8m3QSJM_UrwJbVDJCFZdDzSuQZvahxpu_0gw7B-E_bJktm7VKd-qTEo';
-const VAPID_PRIVATE = 'of-_1IjWZ415k3XDDwbpbgtNDpm0d-Hcxkz1eCNfbk0';
+// Push keys: prefer the environment. The hard-coded pair is kept only as a
+// fallback so existing browser subscriptions keep working until the keys are
+// rotated (set VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY; users then re-allow push).
+const VAPID_PUBLIC  = process.env.VAPID_PUBLIC_KEY  || 'BP2E-Ogveb92wrIjjciORv_jDJO82jut8m3QSJM_UrwJbVDJCFZdDzSuQZvahxpu_0gw7B-E_bJktm7VKd-qTEo';
+const VAPID_PRIVATE = process.env.VAPID_PRIVATE_KEY || 'of-_1IjWZ415k3XDDwbpbgtNDpm0d-Hcxkz1eCNfbk0';
 const _pushSubs = {};
 let webpush = null;
 try {
@@ -45,13 +48,35 @@ app.use(express.json({ limit: '2mb' }));
 // HTML, the service worker, and app JS/CSS are served with no-cache so every
 // deploy is picked up automatically — users never need to clear cache. (Static
 // assets that rarely change, like images/fonts, may still be cached by the browser.)
+// Never serve working files, decks, QA folders or personal documents from the
+// project root — express.static would otherwise publish everything deployed.
+const _PRIVATE_PATHS = /^\/(claude(%20| )outputs|_deck_qa|_hos_qa|_inv_qa|server|node_modules|\.(?!well-known)[^/]*)(\/|$)|\.(md|pptx|pdf|mp4|bak[^/]*|ps1|py|sql|log|zip)$/i;
+app.use((req, res, next) => {
+  let p = req.path;
+  try { p = decodeURIComponent(p); } catch (e) {}
+  if (_PRIVATE_PATHS.test(p) || _PRIVATE_PATHS.test(req.path)) return res.status(404).send('Not found');
+  next();
+});
+
+// Caching:
+//  - HTML and the service worker: never cached, so a deploy shows up at once.
+//  - JS / CSS: the browser revalidates every time (cheap 304 via ETag), but
+//    Cloudflare may keep a copy for 2 minutes (s-maxage). That takes most of
+//    the static-file traffic off this server — previously every page view sent
+//    ~25 uncached requests here, which is what was timing out (Cloudflare 520/522).
+//    After a deploy, new JS/CSS reaches everyone within 2 minutes.
+//  - Images / fonts / icons: cached for a day.
 app.use(express.static(path.join(__dirname, '..'), {
   etag: true,
   setHeaders: (res, filePath) => {
-    if (/\.(html|js|css)$/i.test(filePath) || /sw\.js$/i.test(filePath)) {
+    if (/\.html$/i.test(filePath) || /sw\.js$/i.test(filePath)) {
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
       res.setHeader('Pragma', 'no-cache');
       res.setHeader('Expires', '0');
+    } else if (/\.(js|css)$/i.test(filePath)) {
+      res.setHeader('Cache-Control', 'public, max-age=0, s-maxage=120, must-revalidate');
+    } else if (/\.(png|jpe?g|gif|svg|webp|ico|woff2?|ttf)$/i.test(filePath)) {
+      res.setHeader('Cache-Control', 'public, max-age=86400');
     }
   }
 }));
@@ -5594,14 +5619,33 @@ async function seedSuperAdmin() {
     // Remove old admin@onvilox.com if it exists
     await pool.query("DELETE FROM users WHERE email = $1 AND role = 'SUPER_ADMIN'", ['admin@onvilox.com']);
 
-    const hash = await bcrypt.hash('admin2026', 10);
-    await pool.query(
-      `INSERT INTO users (id, name, email, password_hash, role, created_at)
-       VALUES ($1, $2, $3, $4, $5, NOW())
-       ON CONFLICT (id) DO UPDATE SET email=$3, password_hash=$4, role=$5`,
-      ['superadmin_001', 'System Admin', 'admin@gquence.in', hash, 'SUPER_ADMIN']
-    );
-    console.log('SUPER_ADMIN ensured: admin@gquence.in');
+    // The password comes ONLY from the SUPER_ADMIN_PASSWORD environment
+    // variable. It used to be hard-coded here and re-applied on every start,
+    // which meant anyone who saw this file could sign in as super admin.
+    const envPw = process.env.SUPER_ADMIN_PASSWORD;
+    if (envPw && envPw.length >= 10) {
+      const hash = await bcrypt.hash(envPw, 10);
+      await pool.query(
+        `INSERT INTO users (id, name, email, password_hash, role, created_at)
+         VALUES ($1, $2, $3, $4, $5, NOW())
+         ON CONFLICT (id) DO UPDATE SET email=$3, password_hash=$4, role=$5`,
+        ['superadmin_001', 'System Admin', 'admin@gquence.in', hash, 'SUPER_ADMIN']
+      );
+      console.log('SUPER_ADMIN ensured: admin@gquence.in (password from SUPER_ADMIN_PASSWORD)');
+    } else {
+      // No env password: create the account only if it is missing, with a
+      // random password nobody knows (set SUPER_ADMIN_PASSWORD to take it over).
+      // An existing account's password is left exactly as it is.
+      const hash = await bcrypt.hash(require('crypto').randomBytes(24).toString('hex'), 10);
+      await pool.query(
+        `INSERT INTO users (id, name, email, password_hash, role, created_at)
+         VALUES ($1, $2, $3, $4, $5, NOW())
+         ON CONFLICT (id) DO NOTHING`,
+        ['superadmin_001', 'System Admin', 'admin@gquence.in', hash, 'SUPER_ADMIN']
+      );
+      console.warn('SUPER_ADMIN_PASSWORD is not set (or shorter than 10 characters) — super admin password left unchanged. '
+                 + 'Set it in the environment to rotate the password.');
+    }
   } catch(e) {
     console.warn('seedSuperAdmin error:', e.message);
   }

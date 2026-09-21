@@ -14,9 +14,9 @@ self.addEventListener('activate', e => {
   })());
 });
 
-// Explicitly never serve from cache — always go to the network. Guarantees the
-// latest deployed files after an eb deploy without manual cache clearing.
-self.addEventListener('fetch', e => { /* pass-through: no caching */ });
+// No fetch handler on purpose: without one the browser goes straight to the
+// network (nothing is cached by this worker). An empty handler only added
+// overhead to every request ("no-op fetch handler" warning).
 
 // Push notification received
 self.addEventListener('push', e => {

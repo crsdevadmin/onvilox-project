@@ -699,8 +699,8 @@
 
       const weeks = jobs.filter(j => productOrder(j) > 0).length;
       const chips = jobs.map(j => {
-        const cls = manufacturingService.WORKFLOW.badgeClass(j.status);
-        const title = productLabel(j) + ' — ' + manufacturingService.WORKFLOW.statusLabel(j.status)
+        const cls = jobStage(j).cls;
+        const title = productLabel(j) + ' — ' + jobStage(j).label
           + (j.batchNo ? ' · Batch ' + j.batchNo : '')
           + (manufacturingService.priceLabel ? ' · ' + manufacturingService.priceLabel(j)
              + (j.finalPrice != null ? ' ' + _inr(j.finalPrice) : '') : '');
@@ -710,6 +710,42 @@
       return `<div style="font-size:11px;color:#6b7280;margin-bottom:2px;">
                 ${weeks ? '<b style="color:#111827;">Week ' + weeks + '</b> of monitoring' : 'Initial only'}
               </div><div>${chips}</div>`;
+    }
+
+    // ── Production status for the Status column ──────────────────────────
+    // The patient record only says CREATED / APPROVED — the store's progress
+    // (pricing, processing, dispatch) lives on the manufacturing jobs. Show the
+    // stage of the patient's latest product so the doctor can see where it is.
+    function latestJob(patientId) {
+      if (typeof manufacturingService === 'undefined') return null;
+      const jobs = manufacturingService.getJobs()
+        .filter(j => (j.patientId || j.patient_id) === patientId)
+        .sort((a, b) => productOrder(a) - productOrder(b));
+      return jobs.length ? jobs[jobs.length - 1] : null;
+    }
+    function jobStage(j) {
+      const s = (j.status || 'APPROVED').toUpperCase();
+      if (s === 'APPROVED') {
+        const ps = j.priceStatus;
+        if (ps === 'AWAITING_DOCTOR') return { label: 'Price awaiting you', cls: 'pending', group: 'APPROVED' };
+        if (ps === 'QUERIED')         return { label: 'Price sent back',    cls: 'pending', group: 'APPROVED' };
+        if (ps === 'APPROVED')        return { label: 'Ready for production', cls: 'approved', group: 'APPROVED' };
+        return { label: 'Awaiting store price', cls: 'pending', group: 'APPROVED' };
+      }
+      if (s === 'PENDING_PROCESSING') return { label: 'Processing requested', cls: 'processing', group: 'PROCESSING' };
+      if (s === 'PROCESSING')         return { label: 'Processing',           cls: 'processing', group: 'PROCESSING' };
+      if (s === 'PENDING_DISPATCH')   return { label: 'Dispatch requested',   cls: 'processing', group: 'PROCESSING' };
+      if (s === 'DISPATCHED')         return { label: 'Dispatched',           cls: 'dispatched', group: 'DISPATCHED' };
+      if (s === 'DELIVERED')          return { label: 'Delivered',            cls: 'delivered',  group: 'DELIVERED' };
+      return { label: s.charAt(0) + s.slice(1).toLowerCase(), cls: s.toLowerCase(), group: s };
+    }
+    // Effective status used by the KPIs: the latest product's stage once the
+    // patient is approved, otherwise the patient's own status.
+    function effectiveStatus(p) {
+      const st = p.status || 'CREATED';
+      if (st === 'CREATED') return st;
+      const j = latestJob(p.id);
+      return j ? jobStage(j).group : st;
     }
 
     // ── Week / Next Review columns ────────────────────────────────────────
@@ -752,8 +788,8 @@
       // KPI counts (based on all patients for this doctor)
       const total = patients.length;
       const pending = patients.filter(p => (p.status || 'CREATED') === 'CREATED').length;
-      const progress = patients.filter(p => ['APPROVED', 'PROCESSING', 'DISPATCHED'].includes(p.status || '')).length;
-      const ready = patients.filter(p => ['READY', 'DELIVERED'].includes(p.status || '')).length;
+      const progress = patients.filter(p => ['APPROVED', 'PROCESSING'].includes(effectiveStatus(p))).length;
+      const ready = patients.filter(p => ['READY', 'DISPATCHED', 'DELIVERED'].includes(effectiveStatus(p))).length;
 
       const setKpi = (id, val) => {
         const el = document.getElementById(id);
@@ -782,6 +818,13 @@
       filtered.forEach(p => {
         const status = p.status || 'CREATED';
         const statusClass = status.toLowerCase();
+        // Once approved, show where the latest product is (price → processing → dispatch).
+        const _lj = status !== 'CREATED' ? latestJob(p.id) : null;
+        const _stg = _lj ? jobStage(_lj) : null;
+        const statusHtml = _stg
+          ? `<span class="status ${_stg.cls}" title="${productLabel(_lj) === 'Initial' ? 'Initial product' : 'Week ' + productLabel(_lj).slice(1) + ' product'}${_lj.batchNo ? ' · Batch ' + _lj.batchNo : ''}">${_stg.label}</span>`
+            + `<div style="font-size:10.5px;color:var(--text-3,#64748b);margin-top:3px;">${productLabel(_lj) === 'Initial' ? 'Initial product' : 'Week ' + productLabel(_lj).slice(1)}</div>`
+          : `<span class="status ${statusClass}">${status}</span>`;
 
 
         // Compute a quick nutrition preview (engine output). Full plan/overrides live in Patient-Profile-STABLE-V3.html; page.
@@ -963,7 +1006,7 @@
       <td>${weekCell(p.id)}</td>
       <td>${nextReviewCell(p.id)}</td>
       <td>${productCell(p.id)}</td>
-      <td><span class="status ${statusClass}">${status}</span>${aiStatus}${closedBadge}</td>
+      <td>${statusHtml}${aiStatus}${closedBadge}</td>
       <td>
         <div class="action-row" onclick="event.stopPropagation();" style="display:flex; gap:8px;">
           ${approveBtn}
