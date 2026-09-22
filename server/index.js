@@ -270,6 +270,31 @@ function _stageLabel(s) {
 // step on every change) so request handlers can resolve ownership cheaply.
 const _asstMap = {};
 function _mappedDoctor(id) { return (id && _asstMap[id]) || null; }
+// The map is cached in memory, but the database is the truth: with more than
+// one server instance (or a mapping saved before a restart finished loading),
+// the cache on the instance answering a request could be stale — an assistant
+// who IS linked was then treated as unlinked. So refresh it from the database:
+// for every assistant request (one indexed lookup), and fully once a minute.
+async function _refreshAsstMap(assistantId) {
+  if (assistantId) {
+    const r = await pool.query('SELECT doctor_id FROM doctor_assistant_map WHERE assistant_id=$1 AND doctor_id IS NOT NULL LIMIT 1', [assistantId]);
+    if (r.rows[0]) _asstMap[assistantId] = r.rows[0].doctor_id; else delete _asstMap[assistantId];
+    return;
+  }
+  const r = await pool.query('SELECT assistant_id, doctor_id FROM doctor_assistant_map WHERE doctor_id IS NOT NULL');
+  Object.keys(_asstMap).forEach(k => delete _asstMap[k]);
+  r.rows.forEach(x => { _asstMap[x.assistant_id] = x.doctor_id; });
+}
+setInterval(() => { _refreshAsstMap().catch(() => {}); }, 60000);
+app.use('/api', (req, res, next) => {
+  const h = req.headers['authorization'] || '';
+  const tok = h.startsWith('Bearer ') ? h.slice(7) : null;
+  if (!tok) return next();
+  let u = null;
+  try { u = jwt.verify(tok, process.env.JWT_SECRET); } catch (e) { return next(); }
+  if (!u || u.role !== 'ASSISTANT') return next();
+  _refreshAsstMap(u.id).then(() => next(), () => next());
+});
 // The doctor a record created by this request belongs to.
 function _ownerDoctorFor(req, requested) {
   const u = req.user || {};
