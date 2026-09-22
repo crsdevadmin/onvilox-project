@@ -284,6 +284,7 @@ async function _reassignAssistantPatients(assistantId, doctorId) {
     await pool.query('CREATE UNIQUE INDEX IF NOT EXISTS uq_doctor_assistant_map_asst ON doctor_assistant_map(assistant_id)').catch(e =>
       console.warn('doctor_assistant_map unique index:', e.message));
     const m = await pool.query('SELECT assistant_id, doctor_id FROM doctor_assistant_map WHERE doctor_id IS NOT NULL');
+    console.log('doctor_assistant_map rows:', JSON.stringify(m.rows));
     for (const row of m.rows) {
       _asstMap[row.assistant_id] = row.doctor_id;
       await _reassignAssistantPatients(row.assistant_id, row.doctor_id).catch(e => console.warn('reassign:', e.message));
@@ -3881,9 +3882,10 @@ app.post('/api/manufacturing-jobs/:id/batch', authenticateToken, async (req, res
 // the doctor's dashboard).
 async function _saveAssistantMapping(assistantId, doctorId) {
   if (doctorId) {
-    await pool.query(
-      `INSERT INTO doctor_assistant_map (assistant_id, doctor_id, updated_at) VALUES ($1,$2,NOW())
-       ON CONFLICT (assistant_id) DO UPDATE SET doctor_id=$2, updated_at=NOW()`, [assistantId, doctorId]);
+    // Delete-then-insert rather than ON CONFLICT: an older copy of this table
+    // may exist without a unique key on assistant_id (and even with duplicates).
+    await pool.query('DELETE FROM doctor_assistant_map WHERE assistant_id=$1', [assistantId]);
+    await pool.query('INSERT INTO doctor_assistant_map (assistant_id, doctor_id) VALUES ($1,$2)', [assistantId, doctorId]);
     _asstMap[assistantId] = doctorId;
     return _reassignAssistantPatients(assistantId, doctorId);
   }
