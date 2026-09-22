@@ -2001,10 +2001,31 @@ app.put('/api/pilot-settings', authenticateToken, requireAdminOnly, async (req, 
 // including patients who are not theirs. That may be intended for a small
 // single-site pilot, but it should be a decision rather than a side effect of
 // the name. Use requireAdminOnly for anything that must exclude clinicians.
+// Doctors (and their assistants) see only their own caseload in the trial
+// pages. Admins see everyone. req.caseload = Set of patient ids, or undefined.
+function _scopeIds(req, ids) {
+  return req.caseload ? ids.filter(id => req.caseload.has(String(id))) : ids;
+}
+app.use('/api/trials', authenticateToken, async (req, res, next) => {
+  const u = req.user || {};
+  if (u.role !== 'DOCTOR' && u.role !== 'ASSISTANT') return next();
+  try {
+    const docId = u.role === 'ASSISTANT' ? (_mappedDoctor(u.id) || u.id) : u.id;
+    const r = await pool.query(
+      `SELECT p.id FROM patients p WHERE (p.assigned_doctor_id = $1 OR p.full_data->>'assignedDoctorId' = $1
+         OR p.created_by_id = $2 OR p.created_by_user_id = $2)`, [docId, u.id]);
+    req.caseload = new Set(r.rows.map(x => String(x.id)));
+    next();
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 function requireAdmin(req, res, next) {
   const role = req.user && req.user.role;
-  if (!['ADMIN', 'SUPER_ADMIN', 'DOCTOR'].includes(role)) {
-    return res.status(403).json({ error: 'Not permitted' });
+  // Assistants may VIEW trial data (same as their doctor) but not change it.
+  const ok = ['ADMIN', 'SUPER_ADMIN', 'DOCTOR'].includes(role)
+          || (role === 'ASSISTANT' && req.method === 'GET');
+  if (!ok) {
+    return res.status(403).json({ error: role === 'ASSISTANT' ? 'Only the doctor or an admin can change trial records.' : 'Not permitted' });
   }
   next();
 }
@@ -2020,6 +2041,7 @@ function requireAdminOnly(req, res, next) {
 
 // Manually flag a patient as Withdrawn (the one trial status that can't be auto-derived)
 app.post('/api/trials/:patientId/withdraw', authenticateToken, requireAdmin, async (req, res) => {
+  if (req.caseload && !req.caseload.has(String(req.params.patientId))) return res.status(404).json({ error: 'Patient not found' });
   const { reason } = req.body || {};
   try {
     await pool.query(
@@ -2030,6 +2052,7 @@ app.post('/api/trials/:patientId/withdraw', authenticateToken, requireAdmin, asy
 });
 // Un-withdraw (correction)
 app.post('/api/trials/:patientId/reinstate', authenticateToken, requireAdmin, async (req, res) => {
+  if (req.caseload && !req.caseload.has(String(req.params.patientId))) return res.status(404).json({ error: 'Patient not found' });
   try {
     await pool.query('UPDATE trial_enrollments SET withdrawn_at=NULL, withdrawn_reason=NULL WHERE patient_id=$1', [req.params.patientId]);
     res.json({ success: true });
@@ -2050,7 +2073,7 @@ app.get('/api/trials', authenticateToken, requireAdmin, async (req, res) => {
       const prev = jobByPatient[j.patient_id];
       if (!prev || new Date(j.created_at) > new Date(prev.created_at)) jobByPatient[j.patient_id] = j;
     });
-    const ids = Object.keys(jobByPatient);
+    const ids = _scopeIds(req, Object.keys(jobByPatient));
     if (!ids.length) return res.json({ settings, patients: [] });
 
     const patRes = await pool.query('SELECT id, uhic, name, cancer, created_date FROM patients WHERE id = ANY($1)', [ids]);
@@ -2149,7 +2172,7 @@ app.get('/api/trials/export', authenticateToken, requireAdmin, async (req, res) 
     const enrolledRes = await pool.query('SELECT patient_id FROM trial_enrollments');
     const idSet = new Set(Object.keys(jobByPatient));
     enrolledRes.rows.forEach(r => { if (r.patient_id) idSet.add(r.patient_id); });
-    const ids = Array.from(idSet);
+    const ids = _scopeIds(req, Array.from(idSet));
     const empty = { enrollment: [], baseline: [], weekly: [], final: [], analysis: [], daily: [], summary: [] };
     if (!ids.length) return res.json(empty);
 
@@ -2714,7 +2737,7 @@ app.get('/api/trials/formula', authenticateToken, requireAdmin, async (req, res)
       const prev = jobByPatient[j.patient_id];
       if (!prev || new Date(j.created_at) > new Date(prev.created_at)) jobByPatient[j.patient_id] = j;
     });
-    const ids = Object.keys(jobByPatient);
+    const ids = _scopeIds(req, Object.keys(jobByPatient));
     if (!ids.length) return res.json({ patients: [] });
 
     const pats = (await pool.query('SELECT id, name FROM patients WHERE id = ANY($1)', [ids])).rows;
@@ -2783,7 +2806,7 @@ app.post('/api/admin/migrate-doctor-id', authenticateToken, async (req, res) => 
 app.get('/api/trials/outcomes', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const jobsRes = await pool.query('SELECT DISTINCT patient_id FROM manufacturing_jobs');
-    const ids = jobsRes.rows.map(r => r.patient_id).filter(Boolean);
+    const ids = _scopeIds(req, jobsRes.rows.map(r => r.patient_id).filter(Boolean));
     if (!ids.length) return res.json({ patients: [] });
     const pats = (await pool.query(
       'SELECT id, name, weight, albumin, crp, muac, hand_grip, ecog_status, full_data FROM patients WHERE id = ANY($1)', [ids]
@@ -3005,7 +3028,7 @@ app.get('/api/supply-status', authenticateToken, async (req, res) => {
 app.get('/api/trials/impact', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const jobsRes = await pool.query('SELECT DISTINCT patient_id FROM manufacturing_jobs');
-    const ids = jobsRes.rows.map(r => r.patient_id).filter(Boolean);
+    const ids = _scopeIds(req, jobsRes.rows.map(r => r.patient_id).filter(Boolean));
     if (!ids.length) return res.json({ metrics: [], patients: [], n: 0 });
 
     const pats = (await pool.query(
@@ -3129,6 +3152,7 @@ app.get('/api/trials/impact', authenticateToken, requireAdmin, async (req, res) 
 // Patient Journey — assembles every key date for one patient from existing data.
 app.get('/api/trials/:patientId/journey', authenticateToken, requireAdmin, async (req, res) => {
   const pid = req.params.patientId;
+  if (req.caseload && !req.caseload.has(pid)) return res.status(404).json({ error: 'Patient not found' });
   try {
     const pat = (await pool.query('SELECT id, uhic, name, cancer, created_date, created_at FROM patients WHERE id=$1', [pid])).rows[0];
     if (!pat) return res.status(404).json({ error: 'Patient not found' });

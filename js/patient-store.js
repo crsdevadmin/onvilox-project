@@ -73,8 +73,10 @@
     if (typeof mappingService !== 'undefined' && mappingService.initMappings) inits.push(mappingService.initMappings());
     await Promise.all(inits);
 
-    // Retry any record that a previous save failed to push to the server.
-    try { await syncPending(); } catch (e) { console.warn('syncPending failed:', e.message); }
+    // Retry any record that a previous save failed to push to the server —
+    // in the background. Awaiting it here held up the whole page (each retry
+    // is a network round-trip, and on a slow server several took 20 s+ each).
+    setTimeout(() => { syncPending().catch(e => console.warn('syncPending failed:', e.message)); }, 0);
   }
 
   // ── Synchronous getters (use cache) ──────────────────────────────

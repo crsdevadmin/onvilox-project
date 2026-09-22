@@ -109,8 +109,8 @@
 <script src="/js/theme.js"></script>
 
 <script>
-auth.requireRole(['SUPER_ADMIN', 'ADMIN', 'DOCTOR']);
-(function(){ var u=auth.getCurrentUser(); if(u&&u.role==="DOCTOR"){ ["/admin/stores","/admin/users","/admin/mapping","/admin/rules"].forEach(function(h){ var el=document.querySelector(".nav a[href=\""+h+"\"]"); if(el) el.style.display="none"; }); var dash=document.querySelector(".nav a[href=\"/admin\"]"); if(dash){ dash.href="/dashboard"; dash.textContent="Dashboard"; } } })();
+auth.requireRole(['SUPER_ADMIN', 'ADMIN', 'DOCTOR', 'ASSISTANT']);
+(function(){ var u=auth.getCurrentUser(); if(u&&(u.role==="DOCTOR"||u.role==="ASSISTANT")){ ["/admin/stores","/admin/users","/admin/mapping","/admin/rules"].forEach(function(h){ var el=document.querySelector(".nav a[href=\""+h+"\"]"); if(el) el.style.display="none"; }); var dash=document.querySelector(".nav a[href=\"/admin\"]"); if(dash){ dash.href="/dashboard"; dash.textContent="Dashboard"; } } })();
 const me = auth.getCurrentUser();
 const apiBase = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : '';
 let _rows = [];
@@ -227,7 +227,7 @@ function render(){
       <td>${sparkline(weeks)}</td>
       <td>${healthBadge(weeks)}</td>
       <td>${badge(r.status)}${r.withdrawnReason ? `<div style="font-size:10px;color:#94a3b8;">${r.withdrawnReason}</div>` : ''}</td>
-      <td onclick="event.stopPropagation()">${r.status === 'Withdrawn'
+      <td onclick="event.stopPropagation()">${(me && me.role === 'ASSISTANT') ? '<span style="color:#94a3b8;font-size:11px;">—</span>' : r.status === 'Withdrawn'
             ? `<button class="linkbtn" style="color:#166534;" onclick="reinstate('${pid}')">Reinstate</button>`
             : `<button class="linkbtn" onclick="withdraw('${pid}','${safeName}')">Withdraw</button>`}</td>
     </tr>`;
