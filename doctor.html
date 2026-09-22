@@ -460,6 +460,7 @@
   <script src="/js/storage.js?v=3.1"></script>
   <script src="/js/seed.js?v=3.1"></script>
   <script src="/js/auth.js?v=3.1"></script>
+  <script src="/js/whoami.js"></script>
   <script src="/js/users.js"></script>
   <script src="/js/mappings.js?v=3.2"></script>
   <script src="/js/patient-store.js?v=3.3"></script>
@@ -526,6 +527,14 @@
     if (me.role === 'ASSISTANT') {
       document.getElementById('title').innerText = "Doctor's Patients";
     }
+    // Put the name in the heading: "Dr. Srinivasan's Patients".
+    document.addEventListener('whoami', function (e) {
+      const i = e.detail || {}, t = document.getElementById('title');
+      const dr = n => /^dr\.?\s/i.test(n) ? n : 'Dr. ' + n;
+      if (!t) return;
+      if (i.role === 'DOCTOR' && i.name) t.innerText = 'My Patients — ' + dr(i.name);
+      else if (i.role === 'ASSISTANT') t.innerText = i.doctor ? dr(i.doctor.name) + "'s Patients" : 'Patients (not linked to a doctor)';
+    });
 
     // An assistant must be linked to a doctor (Admin → Mapping) or the
     // patients they create reach nobody. Say so plainly instead of failing silently.

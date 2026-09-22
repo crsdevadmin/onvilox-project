@@ -327,6 +327,27 @@ app.get('/api/admin/events', authenticateToken, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// Who is signed in — shown in the top bar so staff always know whose
+// workspace they are in (an assistant sees which doctor they work for).
+app.get('/api/me', authenticateToken, async (req, res) => {
+  try {
+    const u = (await pool.query('SELECT id, name, email, role, store_id FROM users WHERE id=$1', [req.user.id])).rows[0];
+    if (!u) return res.status(404).json({ error: 'User not found' });
+    const out = { id: u.id, name: u.name, email: u.email, role: u.role, doctor: null, store: null };
+    if (u.role === 'ASSISTANT') {
+      const docId = _mappedDoctor(u.id);
+      if (docId) {
+        const d = (await pool.query('SELECT id, name FROM users WHERE id=$1', [docId])).rows[0];
+        if (d) out.doctor = { id: d.id, name: d.name };
+      }
+    }
+    if (u.store_id) {
+      try { const st = (await pool.query('SELECT id, name FROM stores WHERE id=$1', [u.store_id])).rows[0]; if (st) out.store = st; } catch (e) {}
+    }
+    res.json(out);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // Health Check
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 // Database round-trip + connection pool state — open /health/db to see whether
