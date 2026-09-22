@@ -44,5 +44,26 @@
     return d ? (d.storeId || d.store_id || null) : null;
   }
 
-  global.mappingService = { initMappings, getDoctorForAssistant, getStoreForDoctor };
+  // Ask the server (source of truth) for the doctor's store; fall back to the
+  // cached user list only if the server can't be reached.
+  async function resolveStoreForDoctor(doctorId) {
+    try {
+      const res = await fetch(_apiBase() + '/api/users/' + encodeURIComponent(doctorId) + '/store', { headers: _headers() });
+      if (res.ok) {
+        const d = await res.json();
+        if (d.storeId) {
+          // refresh the local cache so the rest of the page agrees
+          try {
+            const users = db.getTable('users', []);
+            const u = users.find(x => x.id === doctorId);
+            if (u) { u.storeId = d.storeId; db.setTable('users', users); }
+          } catch (e) {}
+        }
+        return d.storeId || null;
+      }
+    } catch (e) {}
+    return getStoreForDoctor(doctorId);
+  }
+
+  global.mappingService = { initMappings, getDoctorForAssistant, getStoreForDoctor, resolveStoreForDoctor };
 })(window);

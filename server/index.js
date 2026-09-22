@@ -3253,6 +3253,16 @@ app.delete('/api/users/:id', authenticateToken, async (req, res) => {
 });
 
 // Users: Assign store
+// The store a doctor is mapped to — read live from the server so approval never
+// depends on a stale copy of the user list cached in the browser.
+app.get('/api/users/:id/store', authenticateToken, async (req, res) => {
+  try {
+    const r = await pool.query('SELECT store_id FROM users WHERE id=$1', [req.params.id]);
+    if (!r.rowCount) return res.status(404).json({ error: 'User not found' });
+    res.json({ storeId: r.rows[0].store_id || null });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.patch('/api/users/:id/store', authenticateToken, async (req, res) => {
   const { storeId } = req.body;
   try {

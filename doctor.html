@@ -460,6 +460,7 @@
   <script src="/js/storage.js?v=3.1"></script>
   <script src="/js/seed.js?v=3.1"></script>
   <script src="/js/auth.js?v=3.1"></script>
+  <script src="/js/users.js"></script>
   <script src="/js/mappings.js?v=3.1"></script>
   <script src="/js/patient-store.js?v=3.2"></script>
   <script src="/js/protein-plans.js"></script>
@@ -2572,7 +2573,7 @@
       if (btn) { btn.disabled = true; btn.textContent = 'Approving...'; }
 
       // Get storeId
-      const storeId = mappingService.getStoreForDoctor(me.id);
+      const storeId = await mappingService.resolveStoreForDoctor(me.id);
       if (!storeId) {
         if (btn) { btn.disabled = false; btn.textContent = 'Approve'; }
         return alert('Doctor is not mapped to a store. Admin must map doctor → store.');

@@ -3730,7 +3730,7 @@
               if (!confirmed) return;
             }
 
-            const storeId = mappingService.getStoreForDoctor(me.id);
+            const storeId = await mappingService.resolveStoreForDoctor(me.id);
             if (!storeId) {
               alert('Doctor is not mapped to a store. Admin must map doctor → store.');
               return;
