@@ -130,7 +130,17 @@
     else if (tableKey === 'nutrition_plans') db.setTable('nutrition_plans', getPlans());
   }
 
+  const _inFlight = {};
   function _syncRecord(path, record, tableKey) {
+    // One request per record at a time: page loads and re-renders used to fire
+    // several identical POSTs for the same plan while the first was still slow.
+    const key = path + '|' + (record && record.id);
+    if (record && record.id && _inFlight[key]) return _inFlight[key];
+    const p = _syncRecordNow(path, record, tableKey);
+    if (record && record.id) { _inFlight[key] = p; p.finally(() => { delete _inFlight[key]; }); }
+    return p;
+  }
+  function _syncRecordNow(path, record, tableKey) {
     // Exclude the internal _syncPromise handle from the request body.
     return fetch(_apiBase() + path, { method: 'POST', headers: _headers(), body: JSON.stringify(record, (k, v) => k === '_syncPromise' ? undefined : v), keepalive: true })
       .then(res => {

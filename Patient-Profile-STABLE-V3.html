@@ -2506,7 +2506,7 @@
         <script src="/js/auth.js"></script>
         <script src="/js/users.js"></script>
         <script src="/js/stores.js"></script>
-        <script src="/js/mappings.js"></script>
+        <script src="/js/mappings.js?v=3.2"></script>
         <script src="/js/manufacturing.js"></script>
         <script src="/js/master-data.js"></script>
         <script src="/js/ingredients.js"></script>
@@ -3730,7 +3730,9 @@
               if (!confirmed) return;
             }
 
-            const storeId = await mappingService.resolveStoreForDoctor(me.id);
+            const storeId = (typeof mappingService.resolveStoreForDoctor === 'function')
+              ? await mappingService.resolveStoreForDoctor(me.id)
+              : mappingService.getStoreForDoctor(me.id);
             if (!storeId) {
               alert('Doctor is not mapped to a store. Admin must map doctor → store.');
               return;

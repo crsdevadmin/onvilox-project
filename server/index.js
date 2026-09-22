@@ -84,7 +84,25 @@ app.use(express.static(path.join(__dirname, '..'), {
 // Database Connection
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+  // Default was 10 connections with no wait limit: when the dashboards' heavier
+  // queries held them, a small INSERT (e.g. saving a plan) queued for 20–50 s
+  // and Cloudflare gave up with a 520. More room, and fail fast instead of hanging.
+  max: parseInt(process.env.PG_POOL_MAX, 10) || 20,
+  connectionTimeoutMillis: 15000,
+  idleTimeoutMillis: 30000
+});
+
+// Log any API request slower than 3 s, so slowness shows up in web.stdout.log
+// with the endpoint that caused it instead of only as a 520 in the browser.
+app.use('/api', (req, res, next) => {
+  const t0 = Date.now();
+  res.on('finish', () => {
+    const ms = Date.now() - t0;
+    if (ms > 3000) console.warn(`SLOW ${ms}ms ${req.method} ${req.originalUrl.split('?')[0]} → ${res.statusCode} `
+      + `(db pool: ${pool.totalCount} open, ${pool.idleCount} idle, ${pool.waitingCount} waiting)`);
+  });
+  next();
 });
 
 // ── Weekly data completeness gate ───────────────────────────────────────────
@@ -311,6 +329,37 @@ app.get('/api/admin/events', authenticateToken, async (req, res) => {
 
 // Health Check
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
+// Database round-trip + connection pool state — open /health/db to see whether
+// slowness is the database (high ms) or the pool (waiting > 0).
+app.get('/health/db', async (req, res) => {
+  const t0 = Date.now();
+  try {
+    await pool.query('SELECT 1');
+    res.json({ db: 'ok', ms: Date.now() - t0, pool: { open: pool.totalCount, idle: pool.idleCount, waiting: pool.waitingCount } });
+  } catch (e) {
+    res.status(500).json({ db: 'error', error: e.message, ms: Date.now() - t0,
+      pool: { open: pool.totalCount, idle: pool.idleCount, waiting: pool.waitingCount } });
+  }
+});
+
+// Indexes for the lookups every dashboard load makes (by patient / doctor).
+// Without them each lookup scanned whole tables — and nutrition_plans rows are
+// large (full plan JSON), so those scans were expensive.
+(async () => {
+  const idx = [
+    'CREATE INDEX IF NOT EXISTS idx_nutrition_plans_patient_ver ON nutrition_plans(patient_id, version DESC)',
+    'CREATE INDEX IF NOT EXISTS idx_manufacturing_jobs_patient ON manufacturing_jobs(patient_id)',
+    'CREATE INDEX IF NOT EXISTS idx_manufacturing_jobs_store ON manufacturing_jobs(store_id)',
+    'CREATE INDEX IF NOT EXISTS idx_monitoring_logs_patient_type ON monitoring_logs(patient_id, type)',
+    'CREATE INDEX IF NOT EXISTS idx_patients_assigned_doctor ON patients(assigned_doctor_id)',
+    "CREATE INDEX IF NOT EXISTS idx_patients_fd_doctor ON patients((full_data->>'assignedDoctorId'))",
+    'CREATE INDEX IF NOT EXISTS idx_patients_created_at ON patients(created_at DESC)'
+  ];
+  for (const q of idx) {
+    try { await pool.query(q); } catch (e) { console.warn('index:', e.message); }
+  }
+  console.log('performance indexes ready');
+})();
 
 // Test push — send a test notification to the calling user
 app.post('/api/push/test', authenticateToken, async (req, res) => {
@@ -361,9 +410,25 @@ app.post('/api/auth/login', async (req, res) => {
 });
 
 // Patients: Get All
+// Doctors and assistants only ever work with their own caseload, but every
+// page load used to download EVERY patient (and every plan version) in the
+// system. Scope those two roles to their doctor's patients; admin / store /
+// coordinator keep the full list.
+function _caseloadScope(req) {
+  const u = req.user || {};
+  if (u.role === 'DOCTOR')    return { doctorId: u.id, selfId: u.id };
+  if (u.role === 'ASSISTANT') return { doctorId: _mappedDoctor(u.id) || u.id, selfId: u.id };
+  return null;
+}
+const _CASELOAD_SQL = `(p.assigned_doctor_id = $1 OR p.full_data->>'assignedDoctorId' = $1
+                        OR p.created_by_id = $2 OR p.created_by_user_id = $2)`;
+
 app.get('/api/patients', authenticateToken, async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM patients ORDER BY created_at DESC');
+    const scope = _caseloadScope(req);
+    const result = scope
+      ? await pool.query(`SELECT p.* FROM patients p WHERE ${_CASELOAD_SQL} ORDER BY p.created_at DESC`, [scope.doctorId, scope.selfId])
+      : await pool.query('SELECT * FROM patients ORDER BY created_at DESC');
     const patients = result.rows.map(r => {
       const p = r.full_data || {};
       if (r.feeding_method != null) p.feedingMethod = r.feeding_method;
@@ -612,9 +677,16 @@ app.post('/api/patients/:id/assessments', authenticateToken, async (req, res) =>
 // Nutrition Plans: Get all (optionally filtered by patient)
 app.get('/api/nutrition-plans', authenticateToken, async (req, res) => {
   try {
+    // Only the latest version of each patient's plan is used by the pages
+    // (getLatestPlanForPatient / next version number), so don't ship the history.
+    const scope = _caseloadScope(req);
     const result = await pool.query(
-      'SELECT * FROM nutrition_plans ORDER BY generated_at DESC'
-    );
+      `SELECT DISTINCT ON (np.patient_id) np.*
+         FROM nutrition_plans np
+         ${scope ? `JOIN patients p ON p.id = np.patient_id WHERE ${_CASELOAD_SQL}` : ''}
+        ORDER BY np.patient_id, np.version DESC NULLS LAST, np.generated_at DESC`,
+      scope ? [scope.doctorId, scope.selfId] : []);
+    result.rows.sort((a, b) => new Date(b.generated_at || 0) - new Date(a.generated_at || 0));
     const plans = result.rows.map(r => {
       const plan = r.full_data || {
         id: r.id, patientId: r.patient_id, version: r.version,

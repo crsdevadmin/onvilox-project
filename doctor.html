@@ -461,7 +461,7 @@
   <script src="/js/seed.js?v=3.1"></script>
   <script src="/js/auth.js?v=3.1"></script>
   <script src="/js/users.js"></script>
-  <script src="/js/mappings.js?v=3.1"></script>
+  <script src="/js/mappings.js?v=3.2"></script>
   <script src="/js/patient-store.js?v=3.2"></script>
   <script src="/js/protein-plans.js"></script>
   <script src="/js/nutrition-engine-v4.js?v=3.9"></script>
@@ -795,6 +795,7 @@
       return chip('IN ' + left + 'D', 'nr-ok');
     }
 
+    const _previewCache = {};
     function render() {
       const table = document.getElementById('patientTable');
       table.innerHTML = '';
@@ -873,7 +874,12 @@
             weightLossPercent: parseFloat(p.weightLossPercent || 0),
             giIssues: !!p.giIssues
           });
-          preview = generateNutritionPlan(patientForCalc);
+          // The engine is expensive and render() runs many times per load
+          // (queue, jobs poll, AI updates) — reuse the result until the patient changes.
+          const _sig = JSON.stringify(patientForCalc);
+          const _hit = _previewCache[p.id];
+          if (_hit && _hit.sig === _sig) preview = _hit.plan;
+          else { preview = generateNutritionPlan(patientForCalc); _previewCache[p.id] = { sig: _sig, plan: preview }; }
         } catch (e) { /* ignore */ }
 
         const latestPlan = getLatestPlanForPatient(p.id);
@@ -2573,7 +2579,13 @@
       if (btn) { btn.disabled = true; btn.textContent = 'Approving...'; }
 
       // Get storeId
-      const storeId = await mappingService.resolveStoreForDoctor(me.id);
+      let storeId = null;
+      try {
+        // Older cached copies of mappings.js lack resolveStoreForDoctor — fall back.
+        storeId = (typeof mappingService.resolveStoreForDoctor === 'function')
+          ? await mappingService.resolveStoreForDoctor(me.id)
+          : mappingService.getStoreForDoctor(me.id);
+      } catch (e) { storeId = null; }
       if (!storeId) {
         if (btn) { btn.disabled = false; btn.textContent = 'Approve'; }
         return alert('Doctor is not mapped to a store. Admin must map doctor → store.');
