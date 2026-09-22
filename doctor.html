@@ -512,6 +512,21 @@
       document.getElementById('title').innerText = "Doctor's Patients";
     }
 
+    // An assistant must be linked to a doctor (Admin → Mapping) or the
+    // patients they create reach nobody. Say so plainly instead of failing silently.
+    function _showUnlinkedBanner(show) {
+      let b = document.getElementById('unlinkedBanner');
+      if (!show) { if (b) b.remove(); return; }
+      if (b) return;
+      b = document.createElement('div');
+      b.id = 'unlinkedBanner';
+      b.style.cssText = 'margin:0 0 16px;padding:12px 16px;border-radius:10px;border:1px solid #dc2626;background:rgba(220,38,38,.08);color:#dc2626;font-size:13.5px;font-weight:600;';
+      b.innerHTML = '⚠ Your assistant account is not linked to a doctor yet. Patients you create will not appear on any doctor\'s dashboard. '
+        + '<span style="font-weight:500;">Ask the admin to link you under <b>Admin → Mapping → Assistant → Doctor</b> — your existing patients move to the doctor automatically.</span>';
+      const host = document.querySelector('.container') || document.body;
+      host.insertBefore(b, host.firstChild);
+    }
+
 
     // ── Early-warning risk panel ──────────────────────────────────────────
     // Answers "which of my patients is deteriorating right now?" without the
@@ -787,8 +802,13 @@
       if (me.role === 'ASSISTANT') {
         doctorId = mappingService.getDoctorForAssistant(me.id);
       }
+      _showUnlinkedBanner(me.role === 'ASSISTANT' && !doctorId);
 
-      const patients = getPatients().filter(p => p.assignedDoctorId === doctorId);
+      // An unlinked assistant used to "see" every ownerless patient here
+      // (null === null), which hid the fact that none of them reach a doctor.
+      const patients = getPatients().filter(p => doctorId
+        ? p.assignedDoctorId === doctorId
+        : (me.role === 'ASSISTANT' && (p.createdByUserId === me.id || p.assignedDoctorId === me.id)));
       // Newest first. Parse the dates (they are not always ISO strings) and keep
       // the server's order (created_at DESC) for records without a date, instead
       // of pushing them to the bottom.
