@@ -248,6 +248,50 @@ function _stageLabel(s) {
             CREATED: 'Created' })[String(s || '').toUpperCase()] || s;
 }
 
+// In-memory copy of the assistant → doctor map (loaded at startup, kept in
+// step on every change) so request handlers can resolve ownership cheaply.
+const _asstMap = {};
+function _mappedDoctor(id) { return (id && _asstMap[id]) || null; }
+// The doctor a record created by this request belongs to.
+function _ownerDoctorFor(req, requested) {
+  const u = req.user || {};
+  if (u.role === 'ASSISTANT') return _mappedDoctor(u.id) || _mappedDoctor(requested) || requested || u.id;
+  if (u.role === 'DOCTOR') return _mappedDoctor(requested) || requested || u.id;
+  // A record pointed at an assistant (older data) belongs to that assistant's doctor.
+  return _mappedDoctor(requested) || requested || null;
+}
+// Move patients and drafts an assistant created (or that were pinned to the
+// assistant) onto their doctor. Returns how many patients moved.
+async function _reassignAssistantPatients(assistantId, doctorId) {
+  const r = await pool.query(
+    `UPDATE patients
+        SET assigned_doctor_id = $2::text,
+            full_data = jsonb_set(COALESCE(full_data,'{}'::jsonb), '{assignedDoctorId}', to_jsonb($2::text))
+      WHERE assigned_doctor_id = $1::text
+         OR full_data->>'assignedDoctorId' = $1::text
+         OR ((assigned_doctor_id IS NULL OR assigned_doctor_id = '')
+             AND (created_by_user_id = $1::text OR created_by_id = $1::text OR full_data->>'createdByUserId' = $1::text))`,
+    [assistantId, doctorId]);
+  await pool.query('UPDATE patient_drafts SET doctor_id=$2 WHERE doctor_id=$1', [assistantId, doctorId]).catch(() => {});
+  if (r.rowCount) console.log(`assistant mapping: moved ${r.rowCount} patient(s) from ${assistantId} to doctor ${doctorId}`);
+  return r.rowCount;
+}
+(async () => {
+  try {
+    await pool.query(`CREATE TABLE IF NOT EXISTS doctor_assistant_map (
+      assistant_id TEXT PRIMARY KEY, doctor_id TEXT, updated_at TIMESTAMPTZ DEFAULT NOW())`);
+    await pool.query('ALTER TABLE doctor_assistant_map ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW()').catch(() => {});
+    await pool.query('CREATE UNIQUE INDEX IF NOT EXISTS uq_doctor_assistant_map_asst ON doctor_assistant_map(assistant_id)').catch(e =>
+      console.warn('doctor_assistant_map unique index:', e.message));
+    const m = await pool.query('SELECT assistant_id, doctor_id FROM doctor_assistant_map WHERE doctor_id IS NOT NULL');
+    for (const row of m.rows) {
+      _asstMap[row.assistant_id] = row.doctor_id;
+      await _reassignAssistantPatients(row.assistant_id, row.doctor_id).catch(e => console.warn('reassign:', e.message));
+    }
+    console.log(`doctor_assistant_map ready (${m.rowCount} mapping(s))`);
+  } catch (e) { console.error('doctor_assistant_map migration:', e.message); }
+})();
+
 app.get('/api/admin/events', authenticateToken, async (req, res) => {
   const role = req.user && req.user.role;
   if (role !== 'ADMIN' && role !== 'SUPER_ADMIN') return res.status(403).json({ error: 'Admin only' });
@@ -342,6 +386,8 @@ app.get('/api/patients', authenticateToken, async (req, res) => {
 // Patients: Create
 app.post('/api/patients', authenticateToken, async (req, res) => {
   const p = req.body;
+  p.assignedDoctorId = _ownerDoctorFor(req, p.assignedDoctorId || p.assigned_doctor_id || null);
+  if (p.assigned_doctor_id) p.assigned_doctor_id = p.assignedDoctorId;
   try {
     await pool.query(
       `INSERT INTO patients (
@@ -439,6 +485,11 @@ app.get('/api/patients/:id', authenticateToken, async (req, res) => {
 // Patients: Update
 app.put('/api/patients/:id', authenticateToken, async (req, res) => {
   const p = req.body;
+  {
+    const want = p.assignedDoctorId || p.assigned_doctor_id || null;
+    const fixed = _ownerDoctorFor(req, want);
+    if (fixed && fixed !== want) { p.assignedDoctorId = fixed; if (p.assigned_doctor_id) p.assigned_doctor_id = fixed; }
+  }
   try {
     let _prevStatus = null;
     try {
@@ -3823,25 +3874,60 @@ app.post('/api/manufacturing-jobs/:id/batch', authenticateToken, async (req, res
   }
 });
 
+// ── Assistant → Doctor mapping ─────────────────────────────────────────────
+// Stored on the server (it used to live only in the admin's browser, so an
+// assistant's own browser never knew their doctor and every patient they
+// created was assigned to nobody — or to the assistant — and never reached
+// the doctor's dashboard).
+async function _saveAssistantMapping(assistantId, doctorId) {
+  if (doctorId) {
+    await pool.query(
+      `INSERT INTO doctor_assistant_map (assistant_id, doctor_id, updated_at) VALUES ($1,$2,NOW())
+       ON CONFLICT (assistant_id) DO UPDATE SET doctor_id=$2, updated_at=NOW()`, [assistantId, doctorId]);
+    _asstMap[assistantId] = doctorId;
+    return _reassignAssistantPatients(assistantId, doctorId);
+  }
+  await pool.query('DELETE FROM doctor_assistant_map WHERE assistant_id=$1', [assistantId]);
+  delete _asstMap[assistantId];
+  return 0;
+}
+
 // Mappings: Get doctor-assistant map
 app.get('/api/mappings', authenticateToken, async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM doctor_assistant_map');
+    const result = await pool.query('SELECT assistant_id, doctor_id FROM doctor_assistant_map');
     res.json(result.rows);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Mappings: Create
-app.post('/api/mappings', authenticateToken, async (req, res) => {
-  const { assistantId, doctorId } = req.body;
+// Mappings: set / clear one assistant's doctor (admin only)
+app.put('/api/mappings/:assistantId', authenticateToken, async (req, res) => {
+  const role = req.user && req.user.role;
+  if (role !== 'ADMIN' && role !== 'SUPER_ADMIN') return res.status(403).json({ error: 'Admin only' });
+  const doctorId = (req.body && req.body.doctorId) || null;
   try {
-    const result = await pool.query(
-      'INSERT INTO doctor_assistant_map (assistant_id, doctor_id) VALUES ($1,$2) RETURNING *',
-      [assistantId, doctorId]
-    );
-    res.status(201).json(result.rows[0]);
+    if (doctorId) {
+      const d = await pool.query("SELECT role FROM users WHERE id=$1", [doctorId]);
+      if (!d.rowCount || d.rows[0].role !== 'DOCTOR') return res.status(400).json({ error: 'That user is not a doctor.' });
+    }
+    const moved = await _saveAssistantMapping(req.params.assistantId, doctorId);
+    res.json({ ok: true, assistantId: req.params.assistantId, doctorId, patientsReassigned: moved });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Mappings: Create (kept for older clients — behaves as an upsert)
+app.post('/api/mappings', authenticateToken, async (req, res) => {
+  const role = req.user && req.user.role;
+  if (role !== 'ADMIN' && role !== 'SUPER_ADMIN') return res.status(403).json({ error: 'Admin only' });
+  const { assistantId, doctorId } = req.body || {};
+  if (!assistantId) return res.status(400).json({ error: 'assistantId required' });
+  try {
+    const moved = await _saveAssistantMapping(assistantId, doctorId || null);
+    res.status(201).json({ assistant_id: assistantId, doctor_id: doctorId || null, patientsReassigned: moved });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -5128,7 +5214,10 @@ app.get('/api/retention-funnel', authenticateToken, async (req, res) => {
 // A draft holds unverified, partly-entered clinical values, so it is visible
 // only to the doctor it belongs to — not to the whole clinic.
 function _draftOwner(req) {
-  return req.query.doctorId || (req.body && req.body.doctorId) || req.user.id;
+  // An assistant's drafts belong to their mapped doctor, whatever the browser sent.
+  if (req.user && req.user.role === 'ASSISTANT' && _mappedDoctor(req.user.id)) return _mappedDoctor(req.user.id);
+  const asked = req.query.doctorId || (req.body && req.body.doctorId) || req.user.id;
+  return _mappedDoctor(asked) || asked;
 }
 
 // List this doctor's drafts. Returns a summary per draft — enough for the
@@ -5256,7 +5345,7 @@ app.post('/api/drafts/:id/activate', authenticateToken, async (req, res) => {
       cancer: data.cancerInput,
       regimen: data.regimenInput,
       status: 'CREATED',
-      assignedDoctorId: draft.doctor_id,
+      assignedDoctorId: _mappedDoctor(draft.doctor_id) || draft.doctor_id,
       createdDate: new Date().toISOString().slice(0, 10),
       // Which values the doctor actually stated, and which were recorded as
       // unavailable. Carried onto the patient so the plan can flag that it was

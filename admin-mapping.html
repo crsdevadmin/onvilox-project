@@ -76,6 +76,7 @@
 <script src="/js/auth.js"></script>
 <script src="/js/users.js"></script>
 <script src="/js/stores.js"></script>
+<script src="/js/mappings.js"></script>
 
 <script>
 auth.requireRole(['SUPER_ADMIN', 'ADMIN']);
@@ -135,7 +136,7 @@ async function updateDoctorStore(doctorId){
 function renderAssistantDoctor(){
   const assistants = userService.getUsersByRole('ASSISTANT');
   const doctors = userService.getUsersByRole('DOCTOR');
-  const map = db.getTable('doctor_assistant_map', []);
+  const map = db.getTable('doctor_assistant_map', []);   // filled from the server by mappingService.initMappings()
   const tbody = document.getElementById('asstDocTable');
   tbody.innerHTML='';
 
@@ -161,16 +162,29 @@ function renderAssistantDoctor(){
   });
 }
 
-function updateAssistantDoctor(assistantId){
+// Saved on the server so the assistant's own browser (and the doctor's) sees it.
+// Saving also moves any patients the assistant already created onto the doctor.
+async function updateAssistantDoctor(assistantId){
   const sel = document.getElementById('ad_' + assistantId);
   const doctorId = sel.value;
-  let map = db.getTable('doctor_assistant_map', []);
-  map = map.filter(x => x.assistantId !== assistantId);
-  if(doctorId){
-    map.push({ assistantId, doctorId });
+  const u = (typeof auth !== 'undefined') ? auth.getCurrentUser() : null;
+  const apiBase = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : '';
+  try {
+    const res = await fetch(`${apiBase}/api/mappings/${encodeURIComponent(assistantId)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'Authorization': u && u.token ? 'Bearer ' + u.token : '' },
+      body: JSON.stringify({ doctorId: doctorId || null })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Server error');
+    let map = db.getTable('doctor_assistant_map', []).filter(x => x.assistantId !== assistantId);
+    if (doctorId) map.push({ assistantId, doctorId });
+    db.setTable('doctor_assistant_map', map);
+    renderAssistantDoctor();
+    alert('Assistant mapping saved.' + (data.patientsReassigned ? '\n' + data.patientsReassigned + ' patient(s) created by this assistant are now under the doctor.' : ''));
+  } catch (e) {
+    alert('Failed to save mapping: ' + e.message);
   }
-  db.setTable('doctor_assistant_map', map);
-  renderAssistantDoctor();
 }
 
 const ROLE_LABELS = { STORE: 'Store Manager', STORE_APPROVER: 'Store Approver', COORDINATOR: 'Coordinator' };
@@ -238,7 +252,8 @@ function renderAllMappings(){
 // created accounts (e.g. coordinators / store approvers) always appear.
 Promise.all([
   (userService.initUsers ? userService.initUsers() : Promise.resolve()),
-  (storeService.initStores ? storeService.initStores() : Promise.resolve())
+  (storeService.initStores ? storeService.initStores() : Promise.resolve()),
+  (typeof mappingService !== 'undefined' && mappingService.initMappings ? mappingService.initMappings() : Promise.resolve())
 ]).then(renderAllMappings).catch(renderAllMappings);
 </script>
 
