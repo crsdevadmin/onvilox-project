@@ -758,6 +758,7 @@
     escalation:     { icon: '📈', label: 'Intake / Escalation Thresholds' },
     fluid:          { icon: '💧', label: 'Fluid Targets' },
     servings:       { icon: '🍽️', label: 'Serving Frequency' },
+    monitoring:     { icon: '📅', label: 'Monitoring Schedule' },
     micronutrients:      { icon: '💊', label: 'Micronutrient RDA — FSSAI / ICMR-NIN 2020' },
     clinical_protocols:  { icon: '🩺', label: 'Clinical Protocols — Correction & Therapeutic Doses' },
     pricing:             { icon: '💰', label: 'Product Pricing — markup added to the store price' }
@@ -771,7 +772,7 @@
     }
     const groups = {};
     _formulas.forEach(f => { if (!groups[f.category]) groups[f.category] = []; groups[f.category].push(f); });
-    const catOrder = ['calories','protein','weight','risk_scoring','sarcopenia','safety_labs','macros','escalation','fluid','servings','micronutrients','clinical_protocols'];
+    const catOrder = ['calories','protein','weight','risk_scoring','sarcopenia','safety_labs','macros','escalation','fluid','servings','monitoring','micronutrients','clinical_protocols'];
     const orderedCats = [...catOrder.filter(c => groups[c]), ...Object.keys(groups).filter(c => !catOrder.includes(c))];
 
     const toNutrientLabel = name => name.replace(/^micro_/, '').split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');

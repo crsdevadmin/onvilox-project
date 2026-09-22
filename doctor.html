@@ -787,6 +787,11 @@
     // ── Week / Next Review columns ────────────────────────────────────────
     // Fed by the same queue payload, so the table agrees with the queue above
     // it rather than deriving the week a second, slightly different way.
+    // Week 1 is due 7 days after the first product is dispatched; daily logs
+    // are expected only once the patient has product. (Older servers didn't
+    // send these fields — fall back to the previous behaviour.)
+    function _week1Due(p) { return ('week1Due' in p) ? !!p.week1Due : true; }
+    function _dailyExpected(p) { return ('dailyExpected' in p) ? !!p.dailyExpected : true; }
     function _qFor(pid) { return (_queue || []).find(x => String(x.id) === String(pid)); }
 
     function weekCell(pid) {
@@ -800,10 +805,16 @@
       if (!q) return '<span style="color:var(--text-3);font-size:11px;">—</span>';
       const chip = (txt, cls) => '<span class="nrchip ' + cls + '">' + txt + '</span>';
       if (q.pendingRx)      return chip('RX WAITING', 'nr-warn');
-      if (q.neverMonitored) return chip('BASELINE', 'nr-muted');
+      if (q.neverMonitored) {
+        if (!q.firstDispatchAt) return chip('NOT STARTED', 'nr-muted');
+        const dl = Math.ceil((new Date(q.week1DueAt).getTime() - Date.now()) / 86400000);
+        if (dl > 0)  return chip('WEEK 1 IN ' + dl + 'D', 'nr-ok');
+        if (dl === 0) return chip('WEEK 1 DUE TODAY', 'nr-bad');
+        return chip('WEEK 1 OVERDUE ' + Math.abs(dl) + 'D', 'nr-bad');
+      }
       const d = q.daysSinceWeekly;
       if (d === null)       return '<span style="color:var(--text-3);font-size:11px;">—</span>';
-      const left = 7 - d;
+      const left = (q.reviewIntervalDays || 5) - d;
       if (left < 0)   return chip('OVERDUE ' + Math.abs(left) + 'D', 'nr-bad');
       if (left === 0) return chip('DUE TODAY', 'nr-bad');
       return chip('IN ' + left + 'D', 'nr-ok');
@@ -1253,7 +1264,7 @@
       card.style.display = '';
 
       const live = _queue.filter(p => p.pendingRx);
-      const overdue = _queue.filter(p => p.weeklyOverdue || p.neverMonitored);
+      const overdue = _queue.filter(p => p.weeklyOverdue || (p.neverMonitored && _week1Due(p)));
       const adh = _queue.map(p => {
         const h = p.history || [], h1 = h[h.length - 1];
         return h1 && h1.adh != null ? h1.adh : null;
@@ -1484,8 +1495,8 @@
       return {
         rx:    _queue.filter(p => p.pendingRx && !_rxIncomplete(p)),
         asmt:  _queue.filter(p => _rxIncomplete(p)
-                              || (!p.pendingRx && (p.weeklyOverdue || p.neverMonitored))),
-        daily: _queue.filter(p => p.daysSinceDaily === null || p.daysSinceDaily >= DAILY_GAP_DAYS),
+                              || (!p.pendingRx && (p.weeklyOverdue || (p.neverMonitored && _week1Due(p))))),
+        daily: _queue.filter(p => _dailyExpected(p) && (p.daysSinceDaily === null || p.daysSinceDaily >= DAILY_GAP_DAYS)),
         price: priceJobs()
       };
     }
@@ -1939,8 +1950,8 @@
         'Week ' + wk + (partial ? ' — complete the entry' : ' assessment');
       document.getElementById('qdSub').textContent = p.name + (p.uhic ? ' · UHIC ' + p.uhic : '');
       document.getElementById('qdBody').innerHTML =
-        (p.daysSinceWeekly !== null && p.daysSinceWeekly >= 7
-          ? '<div class="dbanner">⚠ Overdue by ' + p.daysSinceWeekly + ' days</div>' : '')
+        (p.daysSinceWeekly !== null && p.daysSinceWeekly >= (p.reviewIntervalDays || 5)
+          ? '<div class="dbanner">⚠ Due — last entry was ' + p.daysSinceWeekly + ' days ago</div>' : '')
         + (partial ? '<div class="dbanner">✎ Week ' + wk + ' was saved with required values blank. '
             + 'Fill in ' + _esc((p.pendingRx.missingFields || []).join(', '))
             + ' to make it approvable.</div>' : '')
@@ -2151,8 +2162,8 @@
       const p = _queue.find(x => String(x.id) === String(pid));
       if (!p) { qToast('No open action for this patient this week'); return; }
       const b = p.pendingRx ? 'rx'
-              : (p.weeklyOverdue || p.neverMonitored) ? 'asmt'
-              : (p.daysSinceDaily === null || p.daysSinceDaily >= DAILY_GAP_DAYS) ? 'daily' : null;
+              : (p.weeklyOverdue || (p.neverMonitored && _week1Due(p))) ? 'asmt'
+              : (_dailyExpected(p) && (p.daysSinceDaily === null || p.daysSinceDaily >= DAILY_GAP_DAYS)) ? 'daily' : null;
       if (!b) { qToast('No open action for this patient this week'); return; }
       setQBucket(b);
       const card = document.getElementById('weekQueue');

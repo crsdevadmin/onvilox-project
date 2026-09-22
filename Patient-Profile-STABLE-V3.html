@@ -7390,19 +7390,32 @@ async function loadMonitoringLogs() {
     _monLogs = await res.json();
     renderMonitorTables();
     try { renderPatientCharts(); } catch (e) { console.warn('patient charts:', e); }
-    // 7-day overdue notification
+    // Weekly assessment due notification (5-day review cycle)
     (function() {
       var banner = document.getElementById('weeklyDueBanner');
       if (!banner) return;
       var weeklyLogs = _monLogs.filter(function(l){ return l.type === 'weekly'; });
       var msgEl = banner.querySelector('.wb-msg');
+      var REVIEW_DAYS = 5;   // same cycle as the doctor dashboard queue
       if (weeklyLogs.length === 0) {
-        msgEl.textContent = 'No weekly monitoring entries yet. Please add the first weekly assessment.';
-        banner.style.display = 'flex';
+        // First assessment is due REVIEW_DAYS after the first product was dispatched.
+        var firstDisp = null;
+        try {
+          (manufacturingService.getJobs() || []).filter(function(j){ return (j.patientId || j.patient_id) === (window.patient && window.patient.id); })
+            .forEach(function(j){ (j.history || []).forEach(function(e){
+              if (e && e.at && /DISPATCHED|DELIVERED/i.test(e.status || '')) { var t = new Date(e.at).getTime(); if (!isNaN(t) && (firstDisp === null || t < firstDisp)) firstDisp = t; }
+            }); });
+        } catch (e) {}
+        if (firstDisp !== null && (Date.now() - firstDisp) >= REVIEW_DAYS * 86400000) {
+          msgEl.textContent = 'First weekly assessment is due — the product was dispatched ' + Math.floor((Date.now() - firstDisp) / 86400000) + ' days ago.';
+          banner.style.display = 'flex';
+        } else {
+          banner.style.display = 'none';
+        }
       } else {
         var lastDate = new Date(weeklyLogs[0].recorded_at);
         var daysSince = Math.floor((Date.now() - lastDate.getTime()) / 86400000);
-        if (daysSince >= 7) {
+        if (daysSince >= REVIEW_DAYS) {
           msgEl.textContent = 'Weekly monitoring update due — last entry was ' + daysSince + ' day' + (daysSince === 1 ? '' : 's') + ' ago.';
           banner.style.display = 'flex';
         } else {

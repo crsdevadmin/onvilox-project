@@ -1442,10 +1442,11 @@ app.get('/api/doctor/weekly-queue', authenticateToken, async (req, res) => {
     if (!patients.length) return res.json({ patients: [], generatedAt: new Date().toISOString() });
 
     const ids = patients.map(p => p.id);
+    const now0 = Date.now();
     // A closed patient must leave the queue. Nagging about someone who was
     // discharged three weeks ago is how staff learn to ignore the queue, and
     // an ignored queue is worse than no queue.
-    const [logRes, rxRes, closureRes, settingsRes] = await Promise.all([
+    const [logRes, rxRes, closureRes, settingsRes, jobRes] = await Promise.all([
       pool.query(
         `SELECT patient_id, type, recorded_at, data FROM monitoring_logs
           WHERE patient_id = ANY($1) ORDER BY recorded_at ASC`, [ids]),
@@ -1459,8 +1460,22 @@ app.get('/api/doctor/weekly-queue', authenticateToken, async (req, res) => {
         `SELECT patient_id, reason, note, closed_by, closed_by_role, closed_at, confirmed_at
            FROM patient_closures
           WHERE patient_id = ANY($1) AND reopened_at IS NULL`, [ids]),
-      pool.query('SELECT lost_threshold_days FROM pilot_settings WHERE id=1')
+      pool.query('SELECT lost_threshold_days FROM pilot_settings WHERE id=1'),
+      pool.query('SELECT patient_id, status, history FROM manufacturing_jobs WHERE patient_id = ANY($1)', [ids])
     ]);
+
+    // When the patient's first product left the store. Monitoring only makes
+    // sense once they are on the supplement: Week 1 is due 7 days after that,
+    // daily logs from that day. A patient created today is not "due" anything.
+    const firstDispatchBy = {};
+    jobRes.rows.forEach(j => {
+      const h = Array.isArray(j.history) ? j.history : [];
+      let at = null;
+      h.forEach(e => { if (e && ['DISPATCHED', 'DELIVERED'].includes(String(e.status || '').toUpperCase()) && e.at) {
+        const t = new Date(e.at).getTime(); if (!isNaN(t) && (at === null || t < at)) at = t; } });
+      if (at === null && ['DISPATCHED', 'DELIVERED'].includes(String(j.status || '').toUpperCase())) at = now0;
+      if (at !== null && (firstDispatchBy[j.patient_id] == null || at < firstDispatchBy[j.patient_id])) firstDispatchBy[j.patient_id] = at;
+    });
 
     const closedBy = {};
     closureRes.rows.forEach(c => { closedBy[c.patient_id] = c; });
@@ -1491,6 +1506,16 @@ app.get('/api/doctor/weekly-queue', authenticateToken, async (req, res) => {
     const DAY = 86400000;
     const now = Date.now();
     const SUPPLY_DAYS = 7;   // one weekly batch = 7 days of cover
+    // Review cycle: the first assessment is due 5 days after the product is
+    // dispatched, and each next one 5 days after the previous entry — so the
+    // new batch can be prescribed before the 7-day supply runs out.
+    // Admin-configurable via engine_formulas.review_interval_days.
+    let REVIEW_DAYS = 5;
+    try {
+      const rf = await pool.query("SELECT value FROM engine_formulas WHERE id='review_interval_days'");
+      const v = rf.rows[0] ? parseInt(rf.rows[0].value, 10) : NaN;
+      if (v >= 1 && v <= 30) REVIEW_DAYS = v;
+    } catch (e) {}
 
     const out = patients.map(p => {
       const closure = closedBy[p.id] || null;
@@ -1618,9 +1643,16 @@ app.get('/api/doctor/weekly-queue', authenticateToken, async (req, res) => {
         // No due-date column exists; a week of cover from the last log is the
         // same rule the profile page's overdue banner already uses.
         dueAt: lastWeeklyAt
-          ? new Date(new Date(lastWeeklyAt).getTime() + 7 * DAY).toISOString() : null,
-        weeklyOverdue: daysSinceWeekly == null ? false : daysSinceWeekly >= 7,
+          ? new Date(new Date(lastWeeklyAt).getTime() + REVIEW_DAYS * DAY).toISOString() : null,
+        weeklyOverdue: daysSinceWeekly == null ? false : daysSinceWeekly >= REVIEW_DAYS,
+        reviewIntervalDays: REVIEW_DAYS,
         neverMonitored: weeks.length === 0,
+        firstDispatchAt: firstDispatchBy[p.id] != null ? new Date(firstDispatchBy[p.id]).toISOString() : null,
+        week1DueAt: firstDispatchBy[p.id] != null ? new Date(firstDispatchBy[p.id] + REVIEW_DAYS * DAY).toISOString() : null,
+        // Week 1 is due only once the patient has been on the supplement for 7 days.
+        week1Due: weeks.length === 0 && firstDispatchBy[p.id] != null && now >= firstDispatchBy[p.id] + REVIEW_DAYS * DAY,
+        // Daily logs are expected only after the product has been dispatched.
+        dailyExpected: firstDispatchBy[p.id] != null,
         daysSinceDaily,
         dailyGap: daysSinceDaily == null ? null : daysSinceDaily,
         pendingRx: pendingRow ? {
@@ -5803,6 +5835,7 @@ app.post('/api/drafts/:id/complete', authenticateToken, async (req, res) => {
         { id:'servings_high_count',       category:'servings',     name:'servings_high_count',       description:'Servings per day when calories ≥1800 or appetite loss/nausea present',                         value:'4',    unit:'servings',     source:'Clinical' },
         { id:'servings_very_high_threshold',category:'servings',   name:'servings_very_high_threshold','description':'Daily calorie level above which servings increase to 5',                                     value:'2400', unit:'kcal',         source:'Clinical' },
         // ── Pricing ───────────────────────────────────────────────────────────
+        { id:'review_interval_days',      category:'monitoring',   name:'review_interval_days',      description:'Days between weekly assessments: first one is due this many days after the product is dispatched, then this many days after each entry', value:'5', unit:'days', source:'Clinical' },
         { id:'platform_markup_pct',       category:'pricing',      name:'platform_markup_pct',       description:'Default markup % suggested to the admin when a store price arrives (the admin can change it per product)', value:'40', unit:'%', source:'Commercial' },
         { id:'servings_very_high_count',  category:'servings',     name:'servings_very_high_count',  description:'Servings per day when calories ≥2400',                                                          value:'5',    unit:'servings',     source:'Clinical' },
       ];
@@ -5814,6 +5847,7 @@ app.post('/api/drafts/:id/complete', authenticateToken, async (req, res) => {
         );
       }
       console.log(`Engine formulas seeded: ${formulas.length} constants.`);
+      await pool.query("UPDATE engine_formulas SET category='monitoring' WHERE id='review_interval_days' AND category<>'monitoring'").catch(() => {});
 
       // ── Force-correct WBC thresholds to /µL units (fix for ON CONFLICT DO NOTHING leaving stale values) ──
       await pool.query(`UPDATE engine_formulas SET value = '3500', unit = '/µL' WHERE id = 'wbc_neutropenia'`);
