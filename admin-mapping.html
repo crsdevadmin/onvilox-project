@@ -235,4 +235,13 @@ function renderAllMappings(){
 }
 
 // Load fresh users + stores from the server before rendering, so newly
-// created accounts (e.g. coordinators / st
+// created accounts (e.g. coordinators / store approvers) always appear.
+Promise.all([
+  (userService.initUsers ? userService.initUsers() : Promise.resolve()),
+  (storeService.initStores ? storeService.initStores() : Promise.resolve())
+]).then(renderAllMappings).catch(renderAllMappings);
+</script>
+
+<script src="/js/theme.js"></script>
+</body>
+</html>

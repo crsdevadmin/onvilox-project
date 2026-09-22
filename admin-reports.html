@@ -55,4 +55,10 @@ initStore({ plans: false }).then(() => {
   document.getElementById('rpPatients').innerText = patients.length;
   document.getElementById('rpPending').innerText = patients.filter(p => p.status === 'CREATED').length;
   document.getElementById('rpProcessing').innerText = jobs.filter(j => j.status === 'PROCESSING').length;
-  document.getElementById('rpDelivered').i
+  document.getElementById('rpDelivered').innerText = jobs.filter(j => j.status === 'DELIVERED').length;
+});
+</script>
+
+<script src="/js/theme.js"></script>
+</body>
+</html>
