@@ -105,7 +105,7 @@
         <thead><tr>
           <th>Patient</th><th>Product</th><th>Doctor</th><th>Store</th>
           <th style="text-align:right;">Store price</th><th style="text-align:right;">Markup</th>
-          <th style="text-align:right;">Price to doctor</th><th style="text-align:right;">Doctor share</th>
+          <th style="text-align:right;">Price to doctor</th><th style="text-align:right;">Protocol supervision fee</th>
           <th style="text-align:right;">Final MRP</th><th>Price status</th><th>Production</th><th>Action</th>
         </tr></thead>
         <tbody id="prBody"><tr><td colspan="12" style="opacity:.6;">Loading…</td></tr></tbody>
@@ -282,7 +282,7 @@ function renderPricing(){
     + tile('Approved products', appr.length)
     + tile('Store total', _inr(sum('storePrice')))
     + tile('Markup total', _inr(sum('basePrice') - sum('storePrice')))
-    + tile('Doctor share total', _inr(sum('doctorAmount')))
+    + tile('Protocol supervision fee total', _inr(sum('doctorAmount')))
     + tile('MRP total', _inr(sum('finalPrice')));
 
   const body = document.getElementById('prBody');

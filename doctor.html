@@ -1778,7 +1778,7 @@
                  + ' oninput="updPriceRow(\'' + id + '\')" onkeydown="if(event.key===\'Enter\')approvePriceRow(\'' + id + '\')">'
                : '<small>set by the doctor</small>')
           + '</div></div>'
-          + '<div class="qm"><div class="k">Your share</div><div class="v" id="df_' + id + '">—</div></div>'
+          + '<div class="qm"><div class="k">Protocol supervision fee</div><div class="v" id="df_' + id + '">—</div></div>'
         + '</div>'
         + '<div class="qacts">'
           + (isDoc
@@ -1810,7 +1810,7 @@
       if (!(f > 0)) { alert('Enter the final price (₹) before approving.'); el.focus(); return; }
       if (f < minP) { alert('The final price cannot be below ' + _inr(minP) + ' (the price from the store).'); el.focus(); return; }
       if (!confirm('Approve the final price of ' + _inr(f) + ' for this product?\n\n'
-                 + 'Price from store ' + _inr(j.basePrice) + ' · your share ' + _inr(Math.round((f - j.basePrice) * 100) / 100) + '.\n'
+                 + 'Price from store ' + _inr(j.basePrice) + ' · protocol supervision fee ' + _inr(Math.round((f - j.basePrice) * 100) / 100) + '.\n'
                  + 'This is printed on the label as the MRP.')) return;
       const btn = document.getElementById('dpb_' + id); if (btn) btn.disabled = true;
       const r = await manufacturingService.approvePrice(id, f);

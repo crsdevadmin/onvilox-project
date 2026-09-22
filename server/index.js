@@ -3150,6 +3150,17 @@ app.get('/api/trials/impact', authenticateToken, requireAdmin, async (req, res) 
 });
 
 // Patient Journey — assembles every key date for one patient from existing data.
+// Pricing in the patient journey follows the same visibility rules as the
+// rest of the app: admins see everything; the doctor sees the price sent to
+// them, their share and the final MRP (never the store's price or markup);
+// assistants and everyone else see no pricing at all.
+function _journeyPrice(req, pr) {
+  const role = req.user && req.user.role;
+  if (role === 'ADMIN' || role === 'SUPER_ADMIN') return pr;
+  if (role === 'DOCTOR') return { status: pr.status, basePrice: pr.basePrice, doctorShare: pr.doctorShare,
+                                  finalPrice: pr.finalPrice, approvedAt: pr.approvedAt };
+  return null;
+}
 app.get('/api/trials/:patientId/journey', authenticateToken, requireAdmin, async (req, res) => {
   const pid = req.params.patientId;
   if (req.caseload && !req.caseload.has(pid)) return res.status(404).json({ error: 'Patient not found' });
@@ -3234,7 +3245,7 @@ app.get('/api/trials/:patientId/journey', authenticateToken, requireAdmin, async
         dispatchedBy: _byName(dp && dp.by),
         deliveredAt:  (() => { const e = histEntry(j, 'DELIVERED'); return e ? (e.deliveredOn || e.at) : null; })(),
         deliveredBy:  (() => { const e = histEntry(j, 'DELIVERED'); return e ? _byName(e.by) : null; })(),
-        price: {
+        price: _journeyPrice(req, {
           status:      j.price_status || null,
           storePrice:  j.store_price  != null ? Number(j.store_price)  : null,
           markupPct:   j.markup_pct   != null ? Number(j.markup_pct)   : null,
@@ -3244,7 +3255,7 @@ app.get('/api/trials/:patientId/journey', authenticateToken, requireAdmin, async
           note:        j.price_note || null,
           pricedAt:    j.store_priced_at || null,
           approvedAt:  j.price_approved_at || null
-        },
+        }),
         mfgDate:      j.mfg_date,
         expDate:      j.exp_date
       };
@@ -3765,7 +3776,8 @@ function jobPriceView(job, user) {
   const keep = {
     STORE:          ['price_status','store_price','final_price','price_note','store_priced_at','price_approved_at'],
     STORE_APPROVER: ['price_status','store_price','final_price','price_note','store_priced_at','price_approved_at'],
-    DOCTOR:         ['price_status','base_price','doctor_pct','doctor_amount','final_price','price_note','store_priced_at','price_approved_at']
+    DOCTOR:         ['price_status','base_price','doctor_pct','doctor_amount','final_price','price_note','store_priced_at','price_approved_at'],
+    ASSISTANT:      ['price_status']      // assistants see no amounts at all
   }[role] || ['price_status','final_price'];
   const out = Object.assign({}, job);
   PRICE_FIELDS.forEach(f => { if (!keep.includes(f)) delete out[f]; });
@@ -3896,7 +3908,7 @@ app.post('/api/manufacturing-jobs/:id/doctor-price', authenticateToken, async (r
        _appendHistory(job, { action: 'price_approved', by: req.user.id, role }), job.id]);
     res.json(jobPriceView(upd.rows[0], req.user));
     recordEvent({ type: 'price_approved', title: '✅ Price approved',
-      body: `{actor} approved {patient} — ${_jobProductLabel(job.id)}: final price ₹${final} (price ₹${base}, doctor share ₹${amount}).`,
+      body: `{actor} approved {patient} — ${_jobProductLabel(job.id)}: final price ₹${final} (price ₹${base}, protocol supervision fee ₹${amount}).`,
       patientId: job.patient_id, patientName: job.patient_name, jobId: job.id, user: req.user });
     notifyStore(job.store_id, '✅ Price approved',
       `${job.patient_name || 'A patient'} — ${_jobProductLabel(job.id)}: final price ₹${final}. You can start production.`,
