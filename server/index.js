@@ -1399,7 +1399,29 @@ app.post('/api/weekly-prescriptions/:id/approve', authenticateToken, async (req,
     // The queue disables the Approve button on an incomplete week, but the UI is
     // not the enforcement point — a stale tab, a second browser or a direct call
     // would otherwise still push an unworked-up week into manufacturing.
-    const _missing = missingWeeklyFields(rx.clinical_params);
+    // Validate against the LIVE weekly entry, not the copy stored on the
+    // prescription when it was generated. The stored copy goes stale the moment
+    // the doctor edits the entry, which made a filled-in value still read as
+    // missing. Prefer the linked log, else the newest weekly log for that week.
+    let _liveParams = rx.clinical_params;
+    try {
+      const lg = (await pool.query(
+        `SELECT data FROM monitoring_logs
+          WHERE (id = $1 OR (patient_id = $2 AND type='weekly'))
+          ORDER BY (id = $1) DESC, recorded_at DESC`,
+        [rx.monitoring_log_id || -1, rx.patient_id])).rows
+        .map(r => (typeof r.data === 'string' ? (() => { try { return JSON.parse(r.data); } catch (e) { return {}; } })() : (r.data || {})))
+        .find(d => rx.monitoring_log_id ? true : parseInt(d.week, 10) === rx.week_number);
+      if (lg && Object.keys(lg).length) {
+        _liveParams = lg;
+        // Keep the prescription's copy in step so the queue and reports agree.
+        if (JSON.stringify(lg) !== JSON.stringify(rx.clinical_params)) {
+          await pool.query('UPDATE weekly_prescriptions SET clinical_params=$1, updated_at=NOW() WHERE id=$2',
+            [JSON.stringify(lg), rx.id]).catch(() => {});
+        }
+      }
+    } catch (e) { console.warn('live weekly params lookup:', e.message); }
+    const _missing = missingWeeklyFields(_liveParams);
     if (_missing.length) {
       return res.status(400).json({
         error: 'INCOMPLETE_WEEKLY_DATA',
@@ -1714,7 +1736,11 @@ app.get('/api/doctor/weekly-queue', authenticateToken, async (req, res) => {
           reopenedAt: pendingRow.reopened_at || null,
           previouslyApprovedAt: pendingRow.previously_approved_at || null,
           // Which required weekly values are still blank. Empty means approvable.
-          missingFields: missingWeeklyFields(pendingRow.clinical_params),
+          // Same rule as the approve endpoint: judge completeness on the live
+          // weekly entry for that week, not the copy stored when generated.
+          missingFields: missingWeeklyFields(
+            (weeks.find(w => parseInt((w.d || {}).week, 10) === pendingRow.week_number) || {}).d
+            || pendingRow.clinical_params),
           // The values already captured for this week, so the dashboard can
           // reopen a half-finished entry with what was entered still in place
           // rather than making the nurse retype it.
@@ -1838,9 +1864,16 @@ app.put('/api/monitoring/:logId', authenticateToken, async (req, res) => {
     if (log.type === 'weekly') {
       (async () => {
         try {
+          // Match on the log first, then fall back to this patient's week —
+          // an older prescription may have been generated from a different log
+          // for the same week, and that is the row the approval check reads.
+          const _wk = parseInt((data && data.week) != null ? data.week : NaN, 10);
           const rx = (await pool.query(
             `SELECT id, patient_id, week_number, status FROM weekly_prescriptions
-              WHERE monitoring_log_id=$1 ORDER BY week_number DESC LIMIT 1`, [log.id])).rows[0];
+              WHERE monitoring_log_id=$1
+                 OR ($2::text IS NOT NULL AND patient_id=$2 AND week_number=$3)
+              ORDER BY (monitoring_log_id=$1) DESC, week_number DESC LIMIT 1`,
+            [log.id, log.patient_id || null, isNaN(_wk) ? -1 : _wk])).rows[0];
           if (!rx || rx.status === 'APPROVED') return;   // approved weeks keep what was approved
           const patRow = (await pool.query('SELECT full_data, height, sex FROM patients WHERE id=$1', [rx.patient_id])).rows[0];
           const baseline = (patRow && patRow.full_data) || {};
@@ -1855,9 +1888,11 @@ app.put('/api/monitoring/:logId', authenticateToken, async (req, res) => {
           const targets = calcWeeklyRxTargets(baseline, data, await loadFormulaConstants(pool));
           await pool.query(
             `UPDATE weekly_prescriptions
-                SET clinical_params=$1, targets=COALESCE($2, targets), updated_at=NOW()
+                SET clinical_params=$1, targets=COALESCE($2, targets),
+                    monitoring_log_id=$4, updated_at=NOW()
               WHERE id=$3`,
-            [JSON.stringify(data), targets ? JSON.stringify(targets) : null, rx.id]);
+            [JSON.stringify(data), targets ? JSON.stringify(targets) : null, rx.id, log.id]);
+          console.log(`weekly Rx ${rx.id} (patient ${rx.patient_id} week ${rx.week_number}) refreshed from edited log ${log.id}`);
         } catch (e) { console.warn('weekly Rx refresh after log edit:', e.message); }
       })();
     }
