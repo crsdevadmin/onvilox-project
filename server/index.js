@@ -1827,7 +1827,40 @@ app.put('/api/monitoring/:logId', authenticateToken, async (req, res) => {
       [JSON.stringify(data), req.user.id, req.params.logId]
     );
     if (!result.rowCount) return res.status(404).json({ error: 'Log not found' });
-    res.json(result.rows[0]);
+    const log = result.rows[0];
+    res.json(log);
+
+    // The weekly prescription keeps its own copy of the week's readings
+    // (clinical_params) taken when it was generated. Editing the log left that
+    // copy stale, so a value the doctor had just filled in still read as
+    // missing and the week could not be approved. Refresh the copy — and the
+    // targets, since the readings drive them — for the week still in review.
+    if (log.type === 'weekly') {
+      (async () => {
+        try {
+          const rx = (await pool.query(
+            `SELECT id, patient_id, week_number, status FROM weekly_prescriptions
+              WHERE monitoring_log_id=$1 ORDER BY week_number DESC LIMIT 1`, [log.id])).rows[0];
+          if (!rx || rx.status === 'APPROVED') return;   // approved weeks keep what was approved
+          const patRow = (await pool.query('SELECT full_data, height, sex FROM patients WHERE id=$1', [rx.patient_id])).rows[0];
+          const baseline = (patRow && patRow.full_data) || {};
+          if (patRow && patRow.height != null) baseline.height = patRow.height;
+          if (patRow && patRow.sex    != null) baseline.sex    = patRow.sex;
+          const planRow = await pool.query(
+            'SELECT final_plan, engine_output FROM nutrition_plans WHERE patient_id=$1 ORDER BY version DESC LIMIT 1', [rx.patient_id]);
+          if (planRow.rowCount) {
+            baseline.finalPlan    = planRow.rows[0].final_plan    || baseline.finalPlan;
+            baseline.engineOutput = planRow.rows[0].engine_output || baseline.engineOutput;
+          }
+          const targets = calcWeeklyRxTargets(baseline, data, await loadFormulaConstants(pool));
+          await pool.query(
+            `UPDATE weekly_prescriptions
+                SET clinical_params=$1, targets=COALESCE($2, targets), updated_at=NOW()
+              WHERE id=$3`,
+            [JSON.stringify(data), targets ? JSON.stringify(targets) : null, rx.id]);
+        } catch (e) { console.warn('weekly Rx refresh after log edit:', e.message); }
+      })();
+    }
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
