@@ -31,3 +31,17 @@ export interface CaseDetail extends Omit<CaseSummary, 'partners'> {
 }
 
 export interface PartnerInput { name: string; age: string; phone: string; mrn: string }
+
+export interface Finding {
+  ruleId: string; kind: string; behaviour: string; message: string; trigger: string;
+  evidence: string | null; sources: string | null; notes: string | null; status: string; version: number;
+}
+export interface EnginePartner {
+  partnerId: string; sex: Sex; name: string; assessed: boolean; missingRequired: string[] | null;
+  redFlags: number; findings: Finding[]; dataGaps: string[]; staleLabs: string[];
+}
+export interface EngineRun {
+  id: number; created_at: string; engine: string; run_by_name?: string | null;
+  output: { engineVersion: string; phase: string; pregnancyPending: boolean; formulaChangesStopped: boolean;
+    draftRulesUsed: number; partners: EnginePartner[] };
+}

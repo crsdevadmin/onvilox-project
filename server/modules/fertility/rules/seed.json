@@ -1,0 +1,2309 @@
+{
+ "catalogue_version": "v0.1",
+ "rules": [
+  {
+   "id": "G-01",
+   "area": "Global",
+   "pathway": "ALL",
+   "applies_to": "B",
+   "rule_type": "Process",
+   "kind": "INFO",
+   "trigger_text": "Any patient, any pathway",
+   "action_text": "The engine never selects a formula from a diagnosis alone. Every formula passes: pathway → red-flag screen → nutrition phenotype → rules → targets → ingredient safety → clinician approval.",
+   "behaviour": "BLOCK",
+   "evidence_level": "—",
+   "sources": "S1",
+   "notes": "Core design rule.",
+   "status": "DRAFT",
+   "engine_mode": "SYSTEM",
+   "condition": null,
+   "phases": []
+  },
+  {
+   "id": "G-02",
+   "area": "Global",
+   "pathway": "ALL",
+   "applies_to": "B",
+   "rule_type": "Process",
+   "kind": "INFO",
+   "trigger_text": "Any recommendation the engine outputs",
+   "action_text": "Must carry: evidence level (A–D), source ID, source year, date this rule was last reviewed, reviewer name.",
+   "behaviour": "BLOCK",
+   "evidence_level": "—",
+   "sources": "—",
+   "notes": "A recommendation without an evidence tag is not shown.",
+   "status": "DRAFT",
+   "engine_mode": "SYSTEM",
+   "condition": null,
+   "phases": []
+  },
+  {
+   "id": "G-03",
+   "area": "Global",
+   "pathway": "ALL",
+   "applies_to": "B",
+   "rule_type": "Process",
+   "kind": "INFO",
+   "trigger_text": "Recommendation is Level D",
+   "action_text": "Never generated automatically. Can only be added manually by the treating clinician with a documented reason.",
+   "behaviour": "BLOCK",
+   "evidence_level": "—",
+   "sources": "—",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "SYSTEM",
+   "condition": null,
+   "phases": []
+  },
+  {
+   "id": "G-04",
+   "area": "Global",
+   "pathway": "ALL",
+   "applies_to": "B",
+   "rule_type": "Process",
+   "kind": "INFO",
+   "trigger_text": "Recommendation is Level C",
+   "action_text": "Shown only as \"consider — clinician approval required\"; never auto-included in a formula.",
+   "behaviour": "REVIEW",
+   "evidence_level": "—",
+   "sources": "—",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "SYSTEM",
+   "condition": null,
+   "phases": []
+  },
+  {
+   "id": "G-05",
+   "area": "Global",
+   "pathway": "ALL",
+   "applies_to": "B",
+   "rule_type": "Red flag",
+   "kind": "RED_FLAG",
+   "trigger_text": "Any red-flag rule (RF-xx) fires",
+   "action_text": "Stop automated formula changes for that patient; route to treating specialist; formula stays at last approved version until reviewed.",
+   "behaviour": "REVIEW",
+   "evidence_level": "—",
+   "sources": "—",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "SYSTEM",
+   "condition": null,
+   "phases": []
+  },
+  {
+   "id": "G-06",
+   "area": "Global",
+   "pathway": "ALL",
+   "applies_to": "F",
+   "rule_type": "Safety mode",
+   "kind": "SAFETY_MODE",
+   "trigger_text": "Embryo transfer recorded, OR missed period / positive pregnancy test / possible pregnancy reported",
+   "action_text": "Switch patient to PREGNANCY-PENDING safety set (see F9 rules) until the clinician records a negative result.",
+   "behaviour": "BLOCK",
+   "evidence_level": "—",
+   "sources": "—",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "SYSTEM",
+   "condition": null,
+   "phases": []
+  },
+  {
+   "id": "G-07",
+   "area": "Global",
+   "pathway": "ALL",
+   "applies_to": "B",
+   "rule_type": "Ingredient",
+   "kind": "INGREDIENT",
+   "trigger_text": "Formula candidate contains a herbal / botanical ingredient",
+   "action_text": "Not eligible by default. Eligible only with evidence record, pregnancy-safety data, interaction check and explicit clinician approval.",
+   "behaviour": "BLOCK",
+   "evidence_level": "—",
+   "sources": "—",
+   "notes": "Protects GQUENCE from becoming a \"fertility supplement\" product.",
+   "status": "DRAFT",
+   "engine_mode": "SYSTEM",
+   "condition": null,
+   "phases": []
+  },
+  {
+   "id": "G-08",
+   "area": "Global",
+   "pathway": "ALL",
+   "applies_to": "B",
+   "rule_type": "Claims",
+   "kind": "INFO",
+   "trigger_text": "Any patient-facing or label text is generated",
+   "action_text": "Checked against the DO-NOT-CLAIM list (Claims sheet). A blocked phrase stops publication.",
+   "behaviour": "BLOCK",
+   "evidence_level": "—",
+   "sources": "S18",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "SYSTEM",
+   "condition": null,
+   "phases": []
+  },
+  {
+   "id": "G-09",
+   "area": "Global",
+   "pathway": "ALL",
+   "applies_to": "B",
+   "rule_type": "Data",
+   "kind": "INFO",
+   "trigger_text": "A lab value is used by any rule",
+   "action_text": "Must have value, unit, reference range, collection date and source. Engine classifies it as MEASURED DEFICIENCY / BORDERLINE / NORMAL; missing test = RISK ONLY (never treated as deficiency). Result older than the clinic-set window (proposed 3 months) is marked stale.",
+   "behaviour": "BLOCK",
+   "evidence_level": "—",
+   "sources": "—",
+   "notes": "Stale window: clinician to confirm.",
+   "status": "DRAFT",
+   "engine_mode": "SYSTEM",
+   "condition": null,
+   "phases": []
+  },
+  {
+   "id": "G-10",
+   "area": "Global",
+   "pathway": "ALL",
+   "applies_to": "B",
+   "rule_type": "Ingredient",
+   "kind": "INGREDIENT",
+   "trigger_text": "Any ingredient + patient's current medicines",
+   "action_text": "Interaction check against ingredient master. Unknown interaction = not eligible until reviewed.",
+   "behaviour": "REVIEW",
+   "evidence_level": "—",
+   "sources": "—",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "SYSTEM",
+   "condition": null,
+   "phases": []
+  },
+  {
+   "id": "G-11",
+   "area": "Global",
+   "pathway": "ALL",
+   "applies_to": "B",
+   "rule_type": "Process",
+   "kind": "INFO",
+   "trigger_text": "Couple case",
+   "action_text": "Female and male partners are assessed, classified and formulated separately. No combined \"fertility score\".",
+   "behaviour": "BLOCK",
+   "evidence_level": "—",
+   "sources": "S1, S2",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "SYSTEM",
+   "condition": null,
+   "phases": []
+  },
+  {
+   "id": "G-12",
+   "area": "Global",
+   "pathway": "F0/F1",
+   "applies_to": "F",
+   "rule_type": "Referral",
+   "kind": "REFERRAL",
+   "trigger_text": "Trying to conceive without success: age <35 for ≥12 months; 35–39 for ≥6 months; ≥40 at any time",
+   "action_text": "Prompt fertility specialist evaluation. Nutrition work continues in parallel and must never delay referral.",
+   "behaviour": "REVIEW",
+   "evidence_level": "A",
+   "sources": "S1, S2",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "CONDITION",
+   "condition": {
+    "any": [
+     {
+      "all": [
+       {
+        "fact": "age",
+        "op": "<",
+        "value": 35
+       },
+       {
+        "fact": "months_trying",
+        "op": ">=",
+        "value": 12
+       }
+      ]
+     },
+     {
+      "all": [
+       {
+        "fact": "age",
+        "op": ">=",
+        "value": 35
+       },
+       {
+        "fact": "age",
+        "op": "<",
+        "value": 40
+       },
+       {
+        "fact": "months_trying",
+        "op": ">=",
+        "value": 6
+       }
+      ]
+     },
+     {
+      "fact": "age",
+      "op": ">=",
+      "value": 40
+     }
+    ]
+   },
+   "phases": [
+    "F0",
+    "F1"
+   ]
+  },
+  {
+   "id": "G-13",
+   "area": "Global",
+   "pathway": "ALL",
+   "applies_to": "F",
+   "rule_type": "Claims",
+   "kind": "INFO",
+   "trigger_text": "Age ≥35, low AMH/AFC, DOR or POI",
+   "action_text": "State explicitly that nutrition does not improve ovarian reserve or reverse ovarian ageing.",
+   "behaviour": "BLOCK",
+   "evidence_level": "A",
+   "sources": "S1, S13",
+   "notes": "Hard rule.",
+   "status": "DRAFT",
+   "engine_mode": "CONDITION",
+   "condition": {
+    "any": [
+     {
+      "fact": "age",
+      "op": ">=",
+      "value": 35
+     },
+     {
+      "fact": "dx_dor_poi",
+      "op": "is_true"
+     }
+    ]
+   },
+   "phases": []
+  },
+  {
+   "id": "G-14",
+   "area": "Global",
+   "pathway": "ALL",
+   "applies_to": "B",
+   "rule_type": "Process",
+   "kind": "INFO",
+   "trigger_text": "Engine run",
+   "action_text": "Save every run with inputs, engine version, rule-pack version and output, so any past recommendation can be reproduced (outcome database / audit).",
+   "behaviour": "BLOCK",
+   "evidence_level": "—",
+   "sources": "—",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "SYSTEM",
+   "condition": null,
+   "phases": []
+  },
+  {
+   "id": "RF-01",
+   "area": "Red flag",
+   "pathway": "ALL",
+   "applies_to": "F",
+   "rule_type": "Red flag",
+   "kind": "RED_FLAG",
+   "trigger_text": "BMI <18.5 (Asian cut-off) with absent or infrequent periods, OR unintended weight loss (clinic to set threshold, proposed >5% in 3 months)",
+   "action_text": "Possible hypothalamic amenorrhoea / disordered eating. Clinician review. No weight-loss, fasting or restrictive plan may be generated.",
+   "behaviour": "REVIEW",
+   "evidence_level": "A",
+   "sources": "S1, S3, S10",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "CONDITION",
+   "condition": {
+    "any": [
+     {
+      "all": [
+       {
+        "fact": "bmi",
+        "op": "<",
+        "value": 18.5
+       },
+       {
+        "fact": "cycle_regularity",
+        "op": "in",
+        "value": [
+         "IRREGULAR",
+         "ABSENT"
+        ]
+       }
+      ]
+     },
+     {
+      "fact": "weight_loss_pct_3m",
+      "op": ">",
+      "value": 5
+     }
+    ]
+   },
+   "phases": []
+  },
+  {
+   "id": "RF-02",
+   "area": "Red flag",
+   "pathway": "ALL",
+   "applies_to": "B",
+   "rule_type": "Red flag",
+   "kind": "RED_FLAG",
+   "trigger_text": "HbA1c ≥6.5% or fasting plasma glucose ≥126 mg/dL",
+   "action_text": "Possible diabetes → physician review before formula; conception planning is a medical decision.",
+   "behaviour": "REVIEW",
+   "evidence_level": "A",
+   "sources": "S14",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "CONDITION",
+   "condition": {
+    "any": [
+     {
+      "fact": "lab_HBA1C_value",
+      "op": ">=",
+      "value": 6.5
+     },
+     {
+      "fact": "lab_FPG_value",
+      "op": ">=",
+      "value": 126
+     }
+    ]
+   },
+   "phases": []
+  },
+  {
+   "id": "RF-03",
+   "area": "Red flag",
+   "pathway": "ALL",
+   "applies_to": "F",
+   "rule_type": "Red flag",
+   "kind": "RED_FLAG",
+   "trigger_text": "TSH outside the clinic's preconception target range, or known thyroid disease not under review",
+   "action_text": "Physician review. Engine does not dose iodine or thyroid-active ingredients around it.",
+   "behaviour": "REVIEW",
+   "evidence_level": "A",
+   "sources": "S2",
+   "notes": "Target range: clinic to define.",
+   "status": "DRAFT",
+   "engine_mode": "CONDITION",
+   "condition": {
+    "any": [
+     {
+      "fact": "lab_TSH_status",
+      "op": "in",
+      "value": [
+       "LOW",
+       "HIGH"
+      ]
+     },
+     {
+      "fact": "dx_thyroid",
+      "op": "is_true"
+     }
+    ]
+   },
+   "phases": []
+  },
+  {
+   "id": "RF-04",
+   "area": "Red flag",
+   "pathway": "ALL",
+   "applies_to": "F",
+   "rule_type": "Red flag",
+   "kind": "RED_FLAG",
+   "trigger_text": "Prolactin above reference range",
+   "action_text": "Physician review.",
+   "behaviour": "REVIEW",
+   "evidence_level": "A",
+   "sources": "S2",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "CONDITION",
+   "condition": {
+    "fact": "lab_PRL_status",
+    "op": "=",
+    "value": "HIGH"
+   },
+   "phases": []
+  },
+  {
+   "id": "RF-05",
+   "area": "Red flag",
+   "pathway": "F7/F8",
+   "applies_to": "F",
+   "rule_type": "Red flag",
+   "kind": "RED_FLAG",
+   "trigger_text": "During stimulation or after retrieval: abdominal distension/pain, persistent nausea/vomiting, breathlessness, reduced urine output, rapid weight gain, or clinician-entered OHSS concern",
+   "action_text": "URGENT: stop automated nutrition changes; alert treating fertility specialist. Nutrition only within the clinician-approved plan. Never managed through a formula.",
+   "behaviour": "REVIEW",
+   "evidence_level": "A",
+   "sources": "S5",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "MANUAL",
+   "condition": null,
+   "phases": [
+    "F7",
+    "F8"
+   ]
+  },
+  {
+   "id": "RF-06",
+   "area": "Red flag",
+   "pathway": "F9/F10",
+   "applies_to": "F",
+   "rule_type": "Red flag",
+   "kind": "RED_FLAG",
+   "trigger_text": "Bleeding, pain or other concern reported after transfer or with positive test",
+   "action_text": "Clinician review. No formula changes.",
+   "behaviour": "REVIEW",
+   "evidence_level": "A",
+   "sources": "—",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "MANUAL",
+   "condition": null,
+   "phases": [
+    "F9"
+   ]
+  },
+  {
+   "id": "RF-07",
+   "area": "Red flag",
+   "pathway": "M",
+   "applies_to": "M",
+   "rule_type": "Red flag",
+   "kind": "RED_FLAG",
+   "trigger_text": "Current or past testosterone / anabolic-steroid use",
+   "action_text": "Andrology / urology review. No \"testosterone-supporting\" ingredients.",
+   "behaviour": "REVIEW",
+   "evidence_level": "A",
+   "sources": "S6",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "CONDITION",
+   "condition": {
+    "fact": "testosterone_use",
+    "op": "is_true"
+   },
+   "phases": []
+  },
+  {
+   "id": "RF-08",
+   "area": "Red flag",
+   "pathway": "M",
+   "applies_to": "M",
+   "rule_type": "Red flag",
+   "kind": "RED_FLAG",
+   "trigger_text": "Azoospermia, or concentration <5 million/mL",
+   "action_text": "Specialist (andrology) review. Nutrition may be offered for general health only — never presented as treatment.",
+   "behaviour": "REVIEW",
+   "evidence_level": "A",
+   "sources": "S6",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "CONDITION",
+   "condition": {
+    "fact": "sa_conc",
+    "op": "<",
+    "value": 5
+   },
+   "phases": []
+  },
+  {
+   "id": "RF-09",
+   "area": "Red flag",
+   "pathway": "ALL",
+   "applies_to": "B",
+   "rule_type": "Red flag",
+   "kind": "RED_FLAG",
+   "trigger_text": "Haemoglobin below the WHO severe-anaemia threshold",
+   "action_text": "Physician review before formula.",
+   "behaviour": "REVIEW",
+   "evidence_level": "A",
+   "sources": "S19",
+   "notes": "Threshold per WHO 2024 by sex/pregnancy.",
+   "status": "DRAFT",
+   "engine_mode": "CONDITION",
+   "condition": {
+    "fact": "lab_HB_value",
+    "op": "<",
+    "value": 8
+   },
+   "phases": []
+  },
+  {
+   "id": "RF-10",
+   "area": "Red flag",
+   "pathway": "ALL",
+   "applies_to": "B",
+   "rule_type": "Red flag",
+   "kind": "RED_FLAG",
+   "trigger_text": "Current medicine with known teratogenic risk (e.g. isotretinoin, valproate, methotrexate, some antiepileptics) while trying to conceive",
+   "action_text": "Physician review. Also triggers F0-02 (high-dose folic acid flag) where relevant.",
+   "behaviour": "REVIEW",
+   "evidence_level": "A",
+   "sources": "S1",
+   "notes": "Medicine list to be maintained by clinical pharmacist.",
+   "status": "DRAFT",
+   "engine_mode": "CONDITION",
+   "condition": {
+    "fact": "medicines",
+    "op": "contains_any",
+    "value": [
+     "isotretinoin",
+     "valproate",
+     "valproic",
+     "methotrexate"
+    ]
+   },
+   "phases": []
+  },
+  {
+   "id": "RF-11",
+   "area": "Red flag",
+   "pathway": "F8",
+   "applies_to": "F",
+   "rule_type": "Red flag",
+   "kind": "RED_FLAG",
+   "trigger_text": "Unable to keep oral intake/fluids down for >24 h after retrieval",
+   "action_text": "Clinician review.",
+   "behaviour": "REVIEW",
+   "evidence_level": "A",
+   "sources": "—",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "MANUAL",
+   "condition": null,
+   "phases": [
+    "F8"
+   ]
+  },
+  {
+   "id": "RF-12",
+   "area": "Red flag",
+   "pathway": "ALL",
+   "applies_to": "B",
+   "rule_type": "Red flag",
+   "kind": "RED_FLAG",
+   "trigger_text": "Active eating disorder reported or suspected on screening",
+   "action_text": "Clinician / specialist review. Engine generates no energy restriction.",
+   "behaviour": "REVIEW",
+   "evidence_level": "A",
+   "sources": "S3",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "CONDITION",
+   "condition": {
+    "fact": "ed_screen",
+    "op": "=",
+    "value": "POSITIVE"
+   },
+   "phases": []
+  },
+  {
+   "id": "NP-01",
+   "area": "Nutrition phenotype",
+   "pathway": "ALL",
+   "applies_to": "B",
+   "rule_type": "Phenotype",
+   "kind": "PHENOTYPE",
+   "trigger_text": "Estimated protein intake below target (target set by dietitian; ICMR-NIN adult reference ≈0.83 g/kg/day)",
+   "action_text": "N2 inadequate protein → protein-adequacy priority; formula protein = target − dietary intake.",
+   "behaviour": "AUTO",
+   "evidence_level": "A",
+   "sources": "S9",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "CONDITION",
+   "condition": {
+    "fact": "protein_g_per_kg",
+    "op": "<",
+    "value": 0.83
+   },
+   "phases": []
+  },
+  {
+   "id": "NP-02",
+   "area": "Nutrition phenotype",
+   "pathway": "ALL",
+   "applies_to": "B",
+   "rule_type": "Phenotype",
+   "kind": "PHENOTYPE",
+   "trigger_text": "Estimated energy intake well below requirement",
+   "action_text": "N1 inadequate energy → energy-adequacy priority.",
+   "behaviour": "AUTO",
+   "evidence_level": "A",
+   "sources": "S9",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "CONDITION",
+   "condition": {
+    "fact": "energy_kcal",
+    "op": "<",
+    "value": 1200
+   },
+   "phases": []
+  },
+  {
+   "id": "NP-03",
+   "area": "Nutrition phenotype",
+   "pathway": "ALL",
+   "applies_to": "B",
+   "rule_type": "Phenotype",
+   "kind": "PHENOTYPE",
+   "trigger_text": "BMI ≥23 (overweight) or ≥25 (obese) using Asian cut-offs, with or without metabolic markers",
+   "action_text": "N3 excess adiposity / metabolic risk → metabolic-optimisation priority. Intensity and timing set by clinician (see F6-02, F7-02).",
+   "behaviour": "FLAG",
+   "evidence_level": "A",
+   "sources": "S10",
+   "notes": "Clinic to confirm Asian vs WHO global cut-offs.",
+   "status": "DRAFT",
+   "engine_mode": "CONDITION",
+   "condition": {
+    "fact": "bmi",
+    "op": ">=",
+    "value": 23
+   },
+   "phases": []
+  },
+  {
+   "id": "NP-04",
+   "area": "Nutrition phenotype",
+   "pathway": "ALL",
+   "applies_to": "B",
+   "rule_type": "Phenotype",
+   "kind": "PHENOTYPE",
+   "trigger_text": "BMI <18.5",
+   "action_text": "N4 under-nutrition → nutritional-adequacy pathway (plus RF-01 check).",
+   "behaviour": "AUTO",
+   "evidence_level": "A",
+   "sources": "S10",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "CONDITION",
+   "condition": {
+    "fact": "bmi",
+    "op": "<",
+    "value": 18.5
+   },
+   "phases": []
+  },
+  {
+   "id": "NP-05",
+   "area": "Nutrition phenotype",
+   "pathway": "ALL",
+   "applies_to": "B",
+   "rule_type": "Phenotype",
+   "kind": "PHENOTYPE",
+   "trigger_text": "HbA1c 5.7–6.4% or fasting glucose 100–125 mg/dL",
+   "action_text": "N5 glycaemic risk → carbohydrate quality, fibre, activity; physician informed.",
+   "behaviour": "FLAG",
+   "evidence_level": "A",
+   "sources": "S14",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "CONDITION",
+   "condition": {
+    "any": [
+     {
+      "all": [
+       {
+        "fact": "lab_HBA1C_value",
+        "op": ">=",
+        "value": 5.7
+       },
+       {
+        "fact": "lab_HBA1C_value",
+        "op": "<",
+        "value": 6.5
+       }
+      ]
+     },
+     {
+      "all": [
+       {
+        "fact": "lab_FPG_value",
+        "op": ">=",
+        "value": 100
+       },
+       {
+        "fact": "lab_FPG_value",
+        "op": "<",
+        "value": 126
+       }
+      ]
+     }
+    ]
+   },
+   "phases": []
+  },
+  {
+   "id": "NP-06",
+   "area": "Nutrition phenotype",
+   "pathway": "ALL",
+   "applies_to": "B",
+   "rule_type": "Phenotype",
+   "kind": "PHENOTYPE",
+   "trigger_text": "Lab value below reference range (measured, in date)",
+   "action_text": "N6 measured deficiency → correction plan proposed; clinician approves dose; re-test date set.",
+   "behaviour": "REVIEW",
+   "evidence_level": "A",
+   "sources": "—",
+   "notes": "Distinguish from NP-07.",
+   "status": "DRAFT",
+   "engine_mode": "CONDITION",
+   "condition": {
+    "fact": "labs_low_count",
+    "op": ">=",
+    "value": 1
+   },
+   "phases": []
+  },
+  {
+   "id": "NP-07",
+   "area": "Nutrition phenotype",
+   "pathway": "ALL",
+   "applies_to": "B",
+   "rule_type": "Phenotype",
+   "kind": "PHENOTYPE",
+   "trigger_text": "Risk factor present but no lab test (e.g. vegetarian without B12, heavy periods without ferritin)",
+   "action_text": "N6 risk → recommend the TEST, not a treatment dose.",
+   "behaviour": "FLAG",
+   "evidence_level": "B",
+   "sources": "—",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "CONDITION",
+   "condition": {
+    "all": [
+     {
+      "fact": "diet_pattern",
+      "op": "in",
+      "value": [
+       "VEG",
+       "EGG",
+       "VEGAN",
+       "JAIN"
+      ]
+     },
+     {
+      "fact": "lab_B12_status",
+      "op": "=",
+      "value": "MISSING"
+     }
+    ]
+   },
+   "phases": []
+  },
+  {
+   "id": "NP-08",
+   "area": "Nutrition phenotype",
+   "pathway": "ALL",
+   "applies_to": "B",
+   "rule_type": "Phenotype",
+   "kind": "PHENOTYPE",
+   "trigger_text": "Vegetarian / vegan / Jain diet",
+   "action_text": "N9 → check B12, iron/ferritin, protein quality, iodine, omega-3; ingredient choices respect the diet (see IS-05).",
+   "behaviour": "FLAG",
+   "evidence_level": "B",
+   "sources": "S9",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "CONDITION",
+   "condition": {
+    "fact": "diet_pattern",
+    "op": "in",
+    "value": [
+     "VEG",
+     "EGG",
+     "VEGAN",
+     "JAIN"
+    ]
+   },
+   "phases": []
+  },
+  {
+   "id": "NP-09",
+   "area": "Nutrition phenotype",
+   "pathway": "ALL",
+   "applies_to": "B",
+   "rule_type": "Phenotype",
+   "kind": "PHENOTYPE",
+   "trigger_text": "Low diet-quality score or high ultra-processed-food intake",
+   "action_text": "N7/N8 → dietary-pattern counselling; no fertility claim.",
+   "behaviour": "AUTO",
+   "evidence_level": "B",
+   "sources": "S1",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "CONDITION",
+   "condition": {
+    "any": [
+     {
+      "fact": "diet_quality",
+      "op": "=",
+      "value": "POOR"
+     },
+     {
+      "fact": "upf_freq",
+      "op": "in",
+      "value": [
+       "MOST_DAYS",
+       "DAILY"
+      ]
+     }
+    ]
+   },
+   "phases": []
+  },
+  {
+   "id": "NP-10",
+   "area": "Nutrition phenotype",
+   "pathway": "ALL",
+   "applies_to": "F",
+   "rule_type": "Phenotype",
+   "kind": "PHENOTYPE",
+   "trigger_text": "Hb below reference or ferritin low",
+   "action_text": "Iron-status correction via clinician; iron dose never auto-set.",
+   "behaviour": "REVIEW",
+   "evidence_level": "A",
+   "sources": "S19",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "CONDITION",
+   "condition": {
+    "any": [
+     {
+      "fact": "lab_HB_status",
+      "op": "=",
+      "value": "LOW"
+     },
+     {
+      "fact": "lab_FERRITIN_status",
+      "op": "=",
+      "value": "LOW"
+     }
+    ]
+   },
+   "phases": []
+  },
+  {
+   "id": "NP-11",
+   "area": "Nutrition phenotype",
+   "pathway": "ALL",
+   "applies_to": "B",
+   "rule_type": "Phenotype",
+   "kind": "PHENOTYPE",
+   "trigger_text": "Two or more phenotypes",
+   "action_text": "N12 multiple risks → priority order: red flags > measured deficiency > energy/protein > metabolic > diet quality.",
+   "behaviour": "AUTO",
+   "evidence_level": "—",
+   "sources": "—",
+   "notes": "Priority order: clinician to confirm.",
+   "status": "DRAFT",
+   "engine_mode": "SYSTEM",
+   "condition": null,
+   "phases": []
+  },
+  {
+   "id": "F0-01",
+   "area": "Preconception (F0)",
+   "pathway": "F0,F2,F6",
+   "applies_to": "F",
+   "rule_type": "Target",
+   "kind": "RECOMMENDATION",
+   "trigger_text": "Trying to conceive / planning treatment",
+   "action_text": "Folic acid 400 µg/day, started at least 1 month (ideally 3) before conception. If already taking, count it toward the total (IS-03).",
+   "behaviour": "AUTO",
+   "evidence_level": "A",
+   "sources": "S1",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "CONDITION",
+   "condition": {
+    "all": []
+   },
+   "phases": [
+    "F0",
+    "F1",
+    "F6"
+   ]
+  },
+  {
+   "id": "F0-02",
+   "area": "Preconception (F0)",
+   "pathway": "F0,F2,F6",
+   "applies_to": "F",
+   "rule_type": "Red flag",
+   "kind": "RED_FLAG",
+   "trigger_text": "Previous neural-tube-defect pregnancy, diabetes, BMI ≥30, antiepileptic medicine or malabsorption",
+   "action_text": "Flag possible high-dose folic acid (commonly 4–5 mg) — physician decision. Engine never sets high dose itself.",
+   "behaviour": "REVIEW",
+   "evidence_level": "A",
+   "sources": "S16",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "CONDITION",
+   "condition": {
+    "any": [
+     {
+      "fact": "dx_diabetes",
+      "op": "is_true"
+     },
+     {
+      "fact": "bmi",
+      "op": ">=",
+      "value": 30
+     },
+     {
+      "fact": "medicines",
+      "op": "contains_any",
+      "value": [
+       "valproate",
+       "valproic",
+       "carbamazepine",
+       "phenytoin",
+       "lamotrigine",
+       "phenobarbit"
+      ]
+     }
+    ]
+   },
+   "phases": [
+    "F0",
+    "F1",
+    "F6"
+   ]
+  },
+  {
+   "id": "F0-03",
+   "area": "Preconception (F0)",
+   "pathway": "ALL",
+   "applies_to": "B",
+   "rule_type": "Lifestyle",
+   "kind": "RECOMMENDATION",
+   "trigger_text": "Current smoker (either partner)",
+   "action_text": "Cessation advice + referral.",
+   "behaviour": "AUTO",
+   "evidence_level": "A",
+   "sources": "S1",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "CONDITION",
+   "condition": {
+    "fact": "smoking",
+    "op": "is_true"
+   },
+   "phases": []
+  },
+  {
+   "id": "F0-04",
+   "area": "Preconception (F0)",
+   "pathway": "ALL",
+   "applies_to": "F",
+   "rule_type": "Lifestyle",
+   "kind": "RECOMMENDATION",
+   "trigger_text": "Alcohol use while trying to conceive",
+   "action_text": "Advise avoiding alcohol when trying to conceive and in pregnancy.",
+   "behaviour": "AUTO",
+   "evidence_level": "A",
+   "sources": "S1",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "CONDITION",
+   "condition": {
+    "fact": "alcohol_units_week",
+    "op": ">",
+    "value": 0
+   },
+   "phases": []
+  },
+  {
+   "id": "F0-05",
+   "area": "Preconception (F0)",
+   "pathway": "ALL",
+   "applies_to": "F",
+   "rule_type": "Lifestyle",
+   "kind": "RECOMMENDATION",
+   "trigger_text": "Caffeine intake above limit",
+   "action_text": "Advise ≤200 mg caffeine/day.",
+   "behaviour": "AUTO",
+   "evidence_level": "B",
+   "sources": "S1",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "CONDITION",
+   "condition": {
+    "fact": "caffeine_mg_day",
+    "op": ">",
+    "value": 200
+   },
+   "phases": []
+  },
+  {
+   "id": "F0-06",
+   "area": "Preconception (F0)",
+   "pathway": "ALL",
+   "applies_to": "B",
+   "rule_type": "Target",
+   "kind": "RECOMMENDATION",
+   "trigger_text": "Any patient",
+   "action_text": "Healthy, sustainable dietary pattern (Indian foods, preferences respected).",
+   "behaviour": "AUTO",
+   "evidence_level": "A",
+   "sources": "S1",
+   "notes": "Claim restriction: cannot say any diet improves fertility or live birth.",
+   "status": "DRAFT",
+   "engine_mode": "CONDITION",
+   "condition": {
+    "all": []
+   },
+   "phases": []
+  },
+  {
+   "id": "F0-07",
+   "area": "Preconception (F0)",
+   "pathway": "ALL",
+   "applies_to": "F",
+   "rule_type": "Target",
+   "kind": "RECOMMENDATION",
+   "trigger_text": "Iodine intake likely inadequate (no iodised salt)",
+   "action_text": "Recommend iodised salt; formula iodine ≤ phase limit; physician review if thyroid disease (RF-03).",
+   "behaviour": "FLAG",
+   "evidence_level": "B",
+   "sources": "S9",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "MANUAL",
+   "condition": null,
+   "phases": []
+  },
+  {
+   "id": "F0-08",
+   "area": "Preconception (F0)",
+   "pathway": "ALL",
+   "applies_to": "B",
+   "rule_type": "Target",
+   "kind": "RECOMMENDATION",
+   "trigger_text": "Vitamin D measured low",
+   "action_text": "Correct deficiency (NP-06). No claim that vitamin D improves fertility or IVF outcome.",
+   "behaviour": "REVIEW",
+   "evidence_level": "B",
+   "sources": "S5",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "CONDITION",
+   "condition": {
+    "fact": "lab_VITD_status",
+    "op": "=",
+    "value": "LOW"
+   },
+   "phases": []
+  },
+  {
+   "id": "F0-09",
+   "area": "Preconception (F0)",
+   "pathway": "ALL",
+   "applies_to": "B",
+   "rule_type": "Lifestyle",
+   "kind": "RECOMMENDATION",
+   "trigger_text": "Any patient not in active stimulation",
+   "action_text": "Physical activity ≥150 min/week moderate, adapted to treatment phase.",
+   "behaviour": "AUTO",
+   "evidence_level": "A",
+   "sources": "S15",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "CONDITION",
+   "condition": {
+    "fact": "activity_min_week",
+    "op": "<",
+    "value": 150
+   },
+   "phases": [
+    "F0",
+    "F1",
+    "F6",
+    "F8"
+   ]
+  },
+  {
+   "id": "F0-10",
+   "area": "Preconception (F0)",
+   "pathway": "F0",
+   "applies_to": "B",
+   "rule_type": "Target",
+   "kind": "RECOMMENDATION",
+   "trigger_text": "Overweight/obese AND not in active treatment",
+   "action_text": "Gradual weight reduction (e.g. 5–10%) with adequate protein; target set by clinician.",
+   "behaviour": "FLAG",
+   "evidence_level": "B",
+   "sources": "S1, S3",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "CONDITION",
+   "condition": {
+    "fact": "bmi",
+    "op": ">=",
+    "value": 23
+   },
+   "phases": [
+    "F0",
+    "F1"
+   ]
+  },
+  {
+   "id": "F0-11",
+   "area": "Preconception (F0)",
+   "pathway": "ALL",
+   "applies_to": "F",
+   "rule_type": "Lifestyle",
+   "kind": "RECOMMENDATION",
+   "trigger_text": "Fish eater",
+   "action_text": "Avoid high-mercury fish.",
+   "behaviour": "AUTO",
+   "evidence_level": "A",
+   "sources": "S1",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "CONDITION",
+   "condition": {
+    "fact": "diet_pattern",
+    "op": "=",
+    "value": "NONVEG"
+   },
+   "phases": []
+  },
+  {
+   "id": "F2-01",
+   "area": "PCOS (F2)",
+   "pathway": "F2",
+   "applies_to": "F",
+   "rule_type": "Process",
+   "kind": "INFO",
+   "trigger_text": "PCOS entered",
+   "action_text": "Diagnosis is clinician-entered (Rotterdam criteria). The engine never diagnoses PCOS.",
+   "behaviour": "BLOCK",
+   "evidence_level": "A",
+   "sources": "S3",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "SYSTEM",
+   "condition": null,
+   "phases": []
+  },
+  {
+   "id": "F2-02",
+   "area": "PCOS (F2)",
+   "pathway": "F2",
+   "applies_to": "F",
+   "rule_type": "Target",
+   "kind": "RECOMMENDATION",
+   "trigger_text": "PCOS, any BMI",
+   "action_text": "Healthy lifestyle (diet + activity) for metabolic health; benefits occur even without weight loss.",
+   "behaviour": "AUTO",
+   "evidence_level": "A",
+   "sources": "S3",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "CONDITION",
+   "condition": {
+    "fact": "dx_pcos",
+    "op": "is_true"
+   },
+   "phases": []
+  },
+  {
+   "id": "F2-03",
+   "area": "PCOS (F2)",
+   "pathway": "F2",
+   "applies_to": "F",
+   "rule_type": "Target",
+   "kind": "RECOMMENDATION",
+   "trigger_text": "PCOS + overweight/obese, NOT in stimulation or pregnancy-pending",
+   "action_text": "Individualised energy deficit (guideline: ~30% or 500–750 kcal/day), sustainable, patient-preference led.",
+   "behaviour": "FLAG",
+   "evidence_level": "A",
+   "sources": "S3",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "CONDITION",
+   "condition": {
+    "all": [
+     {
+      "fact": "dx_pcos",
+      "op": "is_true"
+     },
+     {
+      "fact": "bmi",
+      "op": ">=",
+      "value": 23
+     }
+    ]
+   },
+   "phases": [
+    "F0",
+    "F1",
+    "F6"
+   ]
+  },
+  {
+   "id": "F2-04",
+   "area": "PCOS (F2)",
+   "pathway": "F2",
+   "applies_to": "F",
+   "rule_type": "Target",
+   "kind": "RECOMMENDATION",
+   "trigger_text": "PCOS + normal BMI",
+   "action_text": "No weight-loss recommendation. Focus on diet quality, protein adequacy, activity, micronutrient adequacy.",
+   "behaviour": "BLOCK",
+   "evidence_level": "A",
+   "sources": "S3",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "CONDITION",
+   "condition": {
+    "all": [
+     {
+      "fact": "dx_pcos",
+      "op": "is_true"
+     },
+     {
+      "fact": "bmi",
+      "op": ">=",
+      "value": 18.5
+     },
+     {
+      "fact": "bmi",
+      "op": "<",
+      "value": 23
+     }
+    ]
+   },
+   "phases": []
+  },
+  {
+   "id": "F2-05",
+   "area": "PCOS (F2)",
+   "pathway": "F2",
+   "applies_to": "F",
+   "rule_type": "Target",
+   "kind": "RECOMMENDATION",
+   "trigger_text": "PCOS",
+   "action_text": "No specific diet type is preferred (not \"PCOS = low-carb\").",
+   "behaviour": "BLOCK",
+   "evidence_level": "A",
+   "sources": "S3",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "CONDITION",
+   "condition": {
+    "fact": "dx_pcos",
+    "op": "is_true"
+   },
+   "phases": []
+  },
+  {
+   "id": "F2-06",
+   "area": "PCOS (F2)",
+   "pathway": "F2",
+   "applies_to": "F",
+   "rule_type": "Data",
+   "kind": "INFO",
+   "trigger_text": "PCOS and no glucose test on record",
+   "action_text": "Prompt clinician to order glycaemic assessment (guideline prefers OGTT).",
+   "behaviour": "FLAG",
+   "evidence_level": "A",
+   "sources": "S3",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "CONDITION",
+   "condition": {
+    "all": [
+     {
+      "fact": "dx_pcos",
+      "op": "is_true"
+     },
+     {
+      "fact": "lab_HBA1C_status",
+      "op": "=",
+      "value": "MISSING"
+     },
+     {
+      "fact": "lab_FPG_status",
+      "op": "=",
+      "value": "MISSING"
+     }
+    ]
+   },
+   "phases": []
+  },
+  {
+   "id": "F2-07",
+   "area": "PCOS (F2)",
+   "pathway": "F2",
+   "applies_to": "F",
+   "rule_type": "Ingredient",
+   "kind": "INGREDIENT",
+   "trigger_text": "Inositol requested or considered",
+   "action_text": "Level C (experimental per 2023 guideline): clinician approval only; no fertility claim.",
+   "behaviour": "REVIEW",
+   "evidence_level": "C",
+   "sources": "S3",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "MANUAL",
+   "condition": null,
+   "phases": []
+  },
+  {
+   "id": "F2-08",
+   "area": "PCOS (F2)",
+   "pathway": "F2",
+   "applies_to": "F",
+   "rule_type": "Data",
+   "kind": "INFO",
+   "trigger_text": "On metformin",
+   "action_text": "Recorded only (prescribing is clinician domain). Long-term use → prompt B12 check.",
+   "behaviour": "FLAG",
+   "evidence_level": "B",
+   "sources": "S3",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "CONDITION",
+   "condition": {
+    "fact": "medicines",
+    "op": "contains_any",
+    "value": [
+     "metformin"
+    ]
+   },
+   "phases": []
+  },
+  {
+   "id": "F2-09",
+   "area": "PCOS (F2)",
+   "pathway": "F2",
+   "applies_to": "F",
+   "rule_type": "Red flag",
+   "kind": "RED_FLAG",
+   "trigger_text": "PCOS",
+   "action_text": "Prompt clinician screening for disordered eating before any energy restriction.",
+   "behaviour": "FLAG",
+   "evidence_level": "A",
+   "sources": "S3",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "CONDITION",
+   "condition": {
+    "all": [
+     {
+      "fact": "dx_pcos",
+      "op": "is_true"
+     },
+     {
+      "any": [
+       {
+        "fact": "ed_screen",
+        "op": "missing"
+       },
+       {
+        "fact": "ed_screen",
+        "op": "=",
+        "value": "NOT_DONE"
+       }
+      ]
+     }
+    ]
+   },
+   "phases": []
+  },
+  {
+   "id": "F2-10",
+   "area": "PCOS (F2)",
+   "pathway": "F2",
+   "applies_to": "F",
+   "rule_type": "Lifestyle",
+   "kind": "RECOMMENDATION",
+   "trigger_text": "PCOS, not in stimulation",
+   "action_text": "Activity: 150–300 min/week moderate or 75–150 vigorous + muscle strengthening 2 days/week.",
+   "behaviour": "AUTO",
+   "evidence_level": "A",
+   "sources": "S3",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "CONDITION",
+   "condition": {
+    "fact": "dx_pcos",
+    "op": "is_true"
+   },
+   "phases": [
+    "F0",
+    "F1",
+    "F6"
+   ]
+  },
+  {
+   "id": "F6-01",
+   "area": "IVF preparation (F6)",
+   "pathway": "F6",
+   "applies_to": "F",
+   "rule_type": "Target",
+   "kind": "RECOMMENDATION",
+   "trigger_text": "IVF/ICSI planned",
+   "action_text": "Continue preconception bundle (F0-01…F0-11).",
+   "behaviour": "AUTO",
+   "evidence_level": "A",
+   "sources": "S1",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "CONDITION",
+   "condition": {
+    "all": []
+   },
+   "phases": [
+    "F6"
+   ]
+  },
+  {
+   "id": "F6-02",
+   "area": "IVF preparation (F6)",
+   "pathway": "F6",
+   "applies_to": "F",
+   "rule_type": "Process",
+   "kind": "INFO",
+   "trigger_text": "Overweight/obese, IVF planned",
+   "action_text": "Whether to delay IVF for weight loss is the specialist's decision. Engine never recommends delaying treatment.",
+   "behaviour": "BLOCK",
+   "evidence_level": "—",
+   "sources": "S5",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "CONDITION",
+   "condition": {
+    "fact": "bmi",
+    "op": ">=",
+    "value": 23
+   },
+   "phases": [
+    "F6"
+   ]
+  },
+  {
+   "id": "F6-03",
+   "area": "IVF preparation (F6)",
+   "pathway": "F6,F7",
+   "applies_to": "B",
+   "rule_type": "Ingredient",
+   "kind": "INGREDIENT",
+   "trigger_text": "DHEA, testosterone, growth hormone, CoQ10, melatonin, \"antioxidant\" or other IVF add-on considered",
+   "action_text": "Level D for improving IVF outcome — never auto-included; no claims.",
+   "behaviour": "BLOCK",
+   "evidence_level": "D",
+   "sources": "S4, S5",
+   "notes": "Verify exact list against current ESHRE documents.",
+   "status": "DRAFT",
+   "engine_mode": "CONDITION",
+   "condition": {
+    "fact": "supplements",
+    "op": "contains_any",
+    "value": [
+     "dhea",
+     "coq10",
+     "coenzyme",
+     "ubiquinol",
+     "melatonin",
+     "growth hormone",
+     "antioxidant"
+    ]
+   },
+   "phases": [
+    "F6",
+    "F7"
+   ]
+  },
+  {
+   "id": "F6-04",
+   "area": "IVF preparation (F6)",
+   "pathway": "F6",
+   "applies_to": "B",
+   "rule_type": "Data",
+   "kind": "INFO",
+   "trigger_text": "Formula generation requested",
+   "action_text": "Required before a formula can be sent for approval: weight, height, diet pattern, current supplements, current medicines, treatment phase. Labs used when present (Hb, HbA1c, TSH, vitamin D, B12, ferritin).",
+   "behaviour": "BLOCK",
+   "evidence_level": "—",
+   "sources": "—",
+   "notes": "Same completeness-gate idea as Oncology.",
+   "status": "DRAFT",
+   "engine_mode": "SYSTEM",
+   "condition": null,
+   "phases": [
+    "F6"
+   ]
+  },
+  {
+   "id": "F6-05",
+   "area": "IVF preparation (F6)",
+   "pathway": "F6",
+   "applies_to": "B",
+   "rule_type": "Ingredient",
+   "kind": "INGREDIENT",
+   "trigger_text": "Patient already takes supplements",
+   "action_text": "Add patient's own supplements to formula totals before checking upper limits (IS-03); flag duplicates.",
+   "behaviour": "BLOCK",
+   "evidence_level": "—",
+   "sources": "S9",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "CONDITION",
+   "condition": {
+    "fact": "has_supplements",
+    "op": "is_true"
+   },
+   "phases": [
+    "F6"
+   ]
+  },
+  {
+   "id": "F7-01",
+   "area": "Ovarian stimulation (F7)",
+   "pathway": "F7",
+   "applies_to": "F",
+   "rule_type": "Safety mode",
+   "kind": "SAFETY_MODE",
+   "trigger_text": "Stimulation start date recorded",
+   "action_text": "Enter stimulation mode: any formula change needs clinician approval that week.",
+   "behaviour": "REVIEW",
+   "evidence_level": "—",
+   "sources": "—",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "CONDITION",
+   "condition": {
+    "all": []
+   },
+   "phases": [
+    "F7"
+   ]
+  },
+  {
+   "id": "F7-02",
+   "area": "Ovarian stimulation (F7)",
+   "pathway": "F7",
+   "applies_to": "F",
+   "rule_type": "Target",
+   "kind": "RECOMMENDATION",
+   "trigger_text": "In stimulation",
+   "action_text": "No calorie restriction, fasting or weight-loss programme.",
+   "behaviour": "BLOCK",
+   "evidence_level": "B",
+   "sources": "S5",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "CONDITION",
+   "condition": {
+    "all": []
+   },
+   "phases": [
+    "F7"
+   ]
+  },
+  {
+   "id": "F7-03",
+   "area": "Ovarian stimulation (F7)",
+   "pathway": "F7",
+   "applies_to": "F",
+   "rule_type": "Target",
+   "kind": "RECOMMENDATION",
+   "trigger_text": "Bloating, early satiety, constipation or nausea",
+   "action_text": "Small frequent meals, adequate fluids and protein, fibre/fluids for constipation — within clinician instructions.",
+   "behaviour": "FLAG",
+   "evidence_level": "B",
+   "sources": "—",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "MANUAL",
+   "condition": null,
+   "phases": [
+    "F7"
+   ]
+  },
+  {
+   "id": "F7-04",
+   "area": "Ovarian stimulation (F7)",
+   "pathway": "F7",
+   "applies_to": "F",
+   "rule_type": "Ingredient",
+   "kind": "INGREDIENT",
+   "trigger_text": "New ingredient proposed during stimulation",
+   "action_text": "Not introduced unless clinician explicitly approves.",
+   "behaviour": "REVIEW",
+   "evidence_level": "—",
+   "sources": "—",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "SYSTEM",
+   "condition": null,
+   "phases": [
+    "F7"
+   ]
+  },
+  {
+   "id": "F8-01",
+   "area": "Post-retrieval (F8)",
+   "pathway": "F8",
+   "applies_to": "F",
+   "rule_type": "Data",
+   "kind": "INFO",
+   "trigger_text": "Retrieval recorded (oocytes, mature oocytes, fertilisation)",
+   "action_text": "Stored for outcomes only. NOT used to score nutrition success; egg number/quality ≠ nutrition result.",
+   "behaviour": "BLOCK",
+   "evidence_level": "—",
+   "sources": "—",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "SYSTEM",
+   "condition": null,
+   "phases": [
+    "F8"
+   ]
+  },
+  {
+   "id": "F8-02",
+   "area": "Post-retrieval (F8)",
+   "pathway": "F8",
+   "applies_to": "F",
+   "rule_type": "Target",
+   "kind": "RECOMMENDATION",
+   "trigger_text": "After retrieval",
+   "action_text": "Support hydration and oral intake; adjust for GI tolerance per clinician instructions.",
+   "behaviour": "FLAG",
+   "evidence_level": "B",
+   "sources": "—",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "CONDITION",
+   "condition": {
+    "all": []
+   },
+   "phases": [
+    "F8"
+   ]
+  },
+  {
+   "id": "F8-03",
+   "area": "Post-retrieval (F8)",
+   "pathway": "F8",
+   "applies_to": "F",
+   "rule_type": "Red flag",
+   "kind": "RED_FLAG",
+   "trigger_text": "Freeze-all or clinician concern for OHSS",
+   "action_text": "Apply RF-05.",
+   "behaviour": "REVIEW",
+   "evidence_level": "A",
+   "sources": "S5",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "MANUAL",
+   "condition": null,
+   "phases": [
+    "F8"
+   ]
+  },
+  {
+   "id": "F9-01",
+   "area": "Transfer / pregnancy-pending (F9)",
+   "pathway": "F9",
+   "applies_to": "F",
+   "rule_type": "Safety mode",
+   "kind": "SAFETY_MODE",
+   "trigger_text": "Embryo transfer date recorded",
+   "action_text": "Enter PREGNANCY-PENDING mode; ingredient eligibility and doses switch to pregnancy limits.",
+   "behaviour": "BLOCK",
+   "evidence_level": "A",
+   "sources": "—",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "CONDITION",
+   "condition": {
+    "all": []
+   },
+   "phases": [
+    "F9"
+   ]
+  },
+  {
+   "id": "F9-02",
+   "area": "Transfer / pregnancy-pending (F9)",
+   "pathway": "F9",
+   "applies_to": "F",
+   "rule_type": "Target",
+   "kind": "RECOMMENDATION",
+   "trigger_text": "Pregnancy-pending",
+   "action_text": "Block: weight-loss programmes, fasting, restrictive diets, herbal and experimental ingredients.",
+   "behaviour": "BLOCK",
+   "evidence_level": "A",
+   "sources": "—",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "CONDITION",
+   "condition": {
+    "all": []
+   },
+   "phases": [
+    "F9"
+   ]
+  },
+  {
+   "id": "F9-03",
+   "area": "Transfer / pregnancy-pending (F9)",
+   "pathway": "F9",
+   "applies_to": "F",
+   "rule_type": "Ingredient",
+   "kind": "INGREDIENT",
+   "trigger_text": "Preformed vitamin A (retinol) in formula",
+   "action_text": "Total must stay below the pregnancy upper limit (3,000 µg RAE/day ≈ 10,000 IU); prefer none/beta-carotene.",
+   "behaviour": "BLOCK",
+   "evidence_level": "A",
+   "sources": "S9",
+   "notes": "Verify limit against ICMR-NIN 2020 table.",
+   "status": "DRAFT",
+   "engine_mode": "CONDITION",
+   "condition": {
+    "all": []
+   },
+   "phases": [
+    "F9"
+   ]
+  },
+  {
+   "id": "F9-04",
+   "area": "Transfer / pregnancy-pending (F9)",
+   "pathway": "F9",
+   "applies_to": "F",
+   "rule_type": "Lifestyle",
+   "kind": "RECOMMENDATION",
+   "trigger_text": "Pregnancy-pending",
+   "action_text": "Food-safety advice (avoid unpasteurised dairy, raw/undercooked meat, fish, eggs; high-mercury fish); caffeine ≤200 mg/day; no alcohol.",
+   "behaviour": "AUTO",
+   "evidence_level": "A",
+   "sources": "S1",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "CONDITION",
+   "condition": {
+    "all": []
+   },
+   "phases": [
+    "F9"
+   ]
+  },
+  {
+   "id": "F9-05",
+   "area": "Transfer / pregnancy-pending (F9)",
+   "pathway": "F9",
+   "applies_to": "F",
+   "rule_type": "Process",
+   "kind": "INFO",
+   "trigger_text": "Positive pregnancy test recorded",
+   "action_text": "Hand over to pregnancy nutrition care (outside V1). Fertility formula stops unless clinician confirms it is pregnancy-appropriate.",
+   "behaviour": "REVIEW",
+   "evidence_level": "—",
+   "sources": "—",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "SYSTEM",
+   "condition": null,
+   "phases": [
+    "F9"
+   ]
+  },
+  {
+   "id": "F9-06",
+   "area": "Transfer / pregnancy-pending (F9)",
+   "pathway": "F9",
+   "applies_to": "F",
+   "rule_type": "Process",
+   "kind": "INFO",
+   "trigger_text": "Negative result recorded",
+   "action_text": "Exit pregnancy-pending mode → reassessment (MO-02) → back to F6.",
+   "behaviour": "AUTO",
+   "evidence_level": "—",
+   "sources": "—",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "SYSTEM",
+   "condition": null,
+   "phases": [
+    "F9"
+   ]
+  },
+  {
+   "id": "M-01",
+   "area": "Male factor (M)",
+   "pathway": "M",
+   "applies_to": "M",
+   "rule_type": "Data",
+   "kind": "INFO",
+   "trigger_text": "Semen analysis entered",
+   "action_text": "Classify against WHO 2021 lower reference limits (volume 1.4 mL; concentration 16 million/mL; total count 39 million; total motility 42%; progressive motility 30%; normal forms 4%; vitality 54%). Limits stored as data, not code.",
+   "behaviour": "AUTO",
+   "evidence_level": "A",
+   "sources": "S6",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "SYSTEM",
+   "condition": null,
+   "phases": []
+  },
+  {
+   "id": "M-02",
+   "area": "Male factor (M)",
+   "pathway": "M",
+   "applies_to": "M",
+   "rule_type": "Process",
+   "kind": "INFO",
+   "trigger_text": "Single abnormal semen analysis",
+   "action_text": "Recommend a repeat analysis before final classification.",
+   "behaviour": "FLAG",
+   "evidence_level": "A",
+   "sources": "S6",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "CONDITION",
+   "condition": {
+    "all": [
+     {
+      "fact": "sa_abnormal_count",
+      "op": ">=",
+      "value": 1
+     },
+     {
+      "any": [
+       {
+        "fact": "sa_repeat",
+        "op": "missing"
+       },
+       {
+        "fact": "sa_repeat",
+        "op": "is_false"
+       }
+      ]
+     }
+    ]
+   },
+   "phases": []
+  },
+  {
+   "id": "M-03",
+   "area": "Male factor (M)",
+   "pathway": "M",
+   "applies_to": "M",
+   "rule_type": "Phenotype",
+   "kind": "PHENOTYPE",
+   "trigger_text": "All parameters ≥ reference limits",
+   "action_text": "M1 → general nutrition and lifestyle optimisation.",
+   "behaviour": "AUTO",
+   "evidence_level": "A",
+   "sources": "S1",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "CONDITION",
+   "condition": {
+    "all": [
+     {
+      "fact": "sa_abnormal_count",
+      "op": "=",
+      "value": 0
+     },
+     {
+      "fact": "sa_conc",
+      "op": "exists"
+     }
+    ]
+   },
+   "phases": []
+  },
+  {
+   "id": "M-04",
+   "area": "Male factor (M)",
+   "pathway": "M",
+   "applies_to": "M",
+   "rule_type": "Referral",
+   "kind": "REFERRAL",
+   "trigger_text": "Any single parameter below limit (M2 concentration / M3 motility / M4 morphology)",
+   "action_text": "Nutrition assessment AND andrology/urology referral pathway.",
+   "behaviour": "FLAG",
+   "evidence_level": "A",
+   "sources": "S6",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "CONDITION",
+   "condition": {
+    "fact": "sa_abnormal_count",
+    "op": "=",
+    "value": 1
+   },
+   "phases": []
+  },
+  {
+   "id": "M-05",
+   "area": "Male factor (M)",
+   "pathway": "M",
+   "applies_to": "M",
+   "rule_type": "Referral",
+   "kind": "REFERRAL",
+   "trigger_text": "Two or more parameters below limit",
+   "action_text": "M5 multiple abnormalities → specialist review.",
+   "behaviour": "REVIEW",
+   "evidence_level": "A",
+   "sources": "S6",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "CONDITION",
+   "condition": {
+    "fact": "sa_abnormal_count",
+    "op": ">=",
+    "value": 2
+   },
+   "phases": []
+  },
+  {
+   "id": "M-06",
+   "area": "Male factor (M)",
+   "pathway": "M",
+   "applies_to": "M",
+   "rule_type": "Ingredient",
+   "kind": "INGREDIENT",
+   "trigger_text": "Antioxidant, folate + zinc or similar \"sperm\" formula considered",
+   "action_text": "Level D for improving semen parameters or live birth (MOXI 2020, FAZST 2020). Never auto-included; no claims.",
+   "behaviour": "BLOCK",
+   "evidence_level": "D",
+   "sources": "S7, S8",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "CONDITION",
+   "condition": {
+    "fact": "supplements",
+    "op": "contains_any",
+    "value": [
+     "antioxidant",
+     "zinc",
+     "coq10",
+     "carnitine",
+     "lycopene",
+     "selenium"
+    ]
+   },
+   "phases": []
+  },
+  {
+   "id": "M-07",
+   "area": "Male factor (M)",
+   "pathway": "M",
+   "applies_to": "M",
+   "rule_type": "Lifestyle",
+   "kind": "RECOMMENDATION",
+   "trigger_text": "Smoking, alcohol, testicular heat exposure, obesity",
+   "action_text": "Lifestyle modification advice.",
+   "behaviour": "AUTO",
+   "evidence_level": "B",
+   "sources": "S1",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "CONDITION",
+   "condition": {
+    "any": [
+     {
+      "fact": "smoking",
+      "op": "is_true"
+     },
+     {
+      "fact": "alcohol_units_week",
+      "op": ">",
+      "value": 0
+     },
+     {
+      "fact": "heat_exposure",
+      "op": "is_true"
+     },
+     {
+      "fact": "bmi",
+      "op": ">=",
+      "value": 25
+     }
+    ]
+   },
+   "phases": []
+  },
+  {
+   "id": "M-08",
+   "area": "Male factor (M)",
+   "pathway": "M",
+   "applies_to": "M",
+   "rule_type": "Red flag",
+   "kind": "RED_FLAG",
+   "trigger_text": "Diabetes or metabolic disease",
+   "action_text": "Physician review; metabolic optimisation.",
+   "behaviour": "REVIEW",
+   "evidence_level": "A",
+   "sources": "S14",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "CONDITION",
+   "condition": {
+    "fact": "dx_diabetes",
+    "op": "is_true"
+   },
+   "phases": []
+  },
+  {
+   "id": "M-09",
+   "area": "Male factor (M)",
+   "pathway": "M",
+   "applies_to": "M",
+   "rule_type": "Monitoring",
+   "kind": "MONITORING",
+   "trigger_text": "Lifestyle/nutrition change started",
+   "action_text": "Repeat semen analysis no sooner than ~3 months (spermatogenesis cycle ≈ 74 days).",
+   "behaviour": "AUTO",
+   "evidence_level": "B",
+   "sources": "S6",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "CONDITION",
+   "condition": {
+    "fact": "sa_abnormal_count",
+    "op": ">=",
+    "value": 1
+   },
+   "phases": []
+  },
+  {
+   "id": "IS-01",
+   "area": "Ingredient safety (IS)",
+   "pathway": "ALL",
+   "applies_to": "B",
+   "rule_type": "Ingredient",
+   "kind": "INGREDIENT",
+   "trigger_text": "Ingredient proposed",
+   "action_text": "Must exist in the approved ingredient master with every safety field complete (see Ingredient fields sheet); otherwise not eligible.",
+   "behaviour": "BLOCK",
+   "evidence_level": "—",
+   "sources": "—",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "SYSTEM",
+   "condition": null,
+   "phases": []
+  },
+  {
+   "id": "IS-02",
+   "area": "Ingredient safety (IS)",
+   "pathway": "ALL",
+   "applies_to": "B",
+   "rule_type": "Ingredient",
+   "kind": "INGREDIENT",
+   "trigger_text": "Dose calculated",
+   "action_text": "Dose ≤ maximum permitted for the current phase (preconception / stimulation / pregnancy-pending).",
+   "behaviour": "BLOCK",
+   "evidence_level": "—",
+   "sources": "S9",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "SYSTEM",
+   "condition": null,
+   "phases": []
+  },
+  {
+   "id": "IS-03",
+   "area": "Ingredient safety (IS)",
+   "pathway": "ALL",
+   "applies_to": "B",
+   "rule_type": "Ingredient",
+   "kind": "INGREDIENT",
+   "trigger_text": "Formula total calculated",
+   "action_text": "Formula + patient's own supplements (+ estimated diet where relevant) ≤ tolerable upper limit.",
+   "behaviour": "BLOCK",
+   "evidence_level": "—",
+   "sources": "S9",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "SYSTEM",
+   "condition": null,
+   "phases": []
+  },
+  {
+   "id": "IS-04",
+   "area": "Ingredient safety (IS)",
+   "pathway": "ALL",
+   "applies_to": "B",
+   "rule_type": "Ingredient",
+   "kind": "INGREDIENT",
+   "trigger_text": "Allergy, intolerance or diet (vegetarian, Jain, egg-free, lactose)",
+   "action_text": "Exclude incompatible ingredients and capsule/excipient sources (e.g. whey vs plant protein, gelatin).",
+   "behaviour": "BLOCK",
+   "evidence_level": "—",
+   "sources": "—",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "SYSTEM",
+   "condition": null,
+   "phases": []
+  },
+  {
+   "id": "IS-05",
+   "area": "Ingredient safety (IS)",
+   "pathway": "ALL",
+   "applies_to": "B",
+   "rule_type": "Ingredient",
+   "kind": "INGREDIENT",
+   "trigger_text": "Ingredient evidence record not reviewed in >12 months",
+   "action_text": "Ingredient flagged for re-review; new formulas cannot use it until re-approved.",
+   "behaviour": "REVIEW",
+   "evidence_level": "—",
+   "sources": "—",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "SYSTEM",
+   "condition": null,
+   "phases": []
+  },
+  {
+   "id": "MO-01",
+   "area": "Monitoring (MO)",
+   "pathway": "ALL",
+   "applies_to": "B",
+   "rule_type": "Monitoring",
+   "kind": "MONITORING",
+   "trigger_text": "Weekly check-in",
+   "action_text": "Capture weight, adherence, GI tolerance, symptoms, current treatment phase.",
+   "behaviour": "AUTO",
+   "evidence_level": "—",
+   "sources": "—",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "SYSTEM",
+   "condition": null,
+   "phases": []
+  },
+  {
+   "id": "MO-02",
+   "area": "Monitoring (MO)",
+   "pathway": "ALL",
+   "applies_to": "B",
+   "rule_type": "Monitoring",
+   "kind": "MONITORING",
+   "trigger_text": "Week 2 / 4 / 6, or ANY treatment-phase change",
+   "action_text": "New engine run → continue / new formula / escalate. A phase change always triggers a new run.",
+   "behaviour": "AUTO",
+   "evidence_level": "—",
+   "sources": "—",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "SYSTEM",
+   "condition": null,
+   "phases": []
+  },
+  {
+   "id": "MO-03",
+   "area": "Monitoring (MO)",
+   "pathway": "ALL",
+   "applies_to": "B",
+   "rule_type": "Monitoring",
+   "kind": "MONITORING",
+   "trigger_text": "Deficiency correction started",
+   "action_text": "Re-test date set by clinician (e.g. vitamin D 8–12 weeks).",
+   "behaviour": "FLAG",
+   "evidence_level": "B",
+   "sources": "—",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "CONDITION",
+   "condition": {
+    "fact": "labs_low_count",
+    "op": ">=",
+    "value": 1
+   },
+   "phases": []
+  },
+  {
+   "id": "LP-01",
+   "area": "Later pathways (guard rails)",
+   "pathway": "F3",
+   "applies_to": "F",
+   "rule_type": "Referral",
+   "kind": "REFERRAL",
+   "trigger_text": "Low AMH/AFC, DOR or POI entered",
+   "action_text": "Specialist pathway (fertility preservation / ART). Nutrition optimisation only; G-13 applies. Full rules in V2.",
+   "behaviour": "REVIEW",
+   "evidence_level": "A",
+   "sources": "S13",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "CONDITION",
+   "condition": {
+    "fact": "dx_dor_poi",
+    "op": "is_true"
+   },
+   "phases": []
+  },
+  {
+   "id": "LP-02",
+   "area": "Later pathways (guard rails)",
+   "pathway": "F4",
+   "applies_to": "F",
+   "rule_type": "Referral",
+   "kind": "REFERRAL",
+   "trigger_text": "Endometriosis entered",
+   "action_text": "Treatment decisions follow ESHRE endometriosis pathway (specialist). Nutrition = adequacy, GI tolerance, iron status. No \"anti-inflammatory cure\" claims. Full rules in V2.",
+   "behaviour": "REVIEW",
+   "evidence_level": "A",
+   "sources": "S11",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "CONDITION",
+   "condition": {
+    "fact": "dx_endometriosis",
+    "op": "is_true"
+   },
+   "phases": []
+  },
+  {
+   "id": "LP-03",
+   "area": "Later pathways (guard rails)",
+   "pathway": "F11",
+   "applies_to": "F",
+   "rule_type": "Referral",
+   "kind": "REFERRAL",
+   "trigger_text": "Two or more pregnancy losses",
+   "action_text": "Specialist RPL evaluation. Engine never attributes loss to nutrition. Full rules in V2.",
+   "behaviour": "REVIEW",
+   "evidence_level": "A",
+   "sources": "S12",
+   "notes": "",
+   "status": "DRAFT",
+   "engine_mode": "CONDITION",
+   "condition": {
+    "fact": "prev_miscarriages",
+    "op": ">=",
+    "value": 2
+   },
+   "phases": []
+  }
+ ]
+}

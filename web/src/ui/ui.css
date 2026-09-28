@@ -71,3 +71,13 @@
 .gq-shell-main a:not(.card):not([class*='btn']) { color: var(--cyan); text-decoration: none; font-weight: 600; }
 .gq-shell-main a:not(.card):not([class*='btn']):hover { text-decoration: underline; }
 body.light .gq-shell-main a:not(.card):not([class*='btn']) { color: var(--gq-teal, #25716f); }
+.gq-cond-group { border-left: 2px solid var(--border-2); padding: 6px 0 6px 10px; margin: 6px 0; }
+.gq-cond-row { gap: 6px; margin: 4px 0; }
+.gq-readonly { white-space: pre-wrap; font-size: 13.5px; }
+.gq-banner.tone-info { background: var(--cyan-dim); color: var(--text); border: 1px solid var(--border-2); }
+.gq-finding { padding: 10px 12px; border: 1px solid var(--border-2); border-radius: 10px; margin-bottom: 8px; }
+.gq-finding[data-kind='RED_FLAG'], .gq-finding[data-kind='SAFETY_MODE'] { border-color: var(--rose); background: var(--rose-dim); }
+.gq-select { width: auto; max-width: 100%; }
+/* The shared stylesheet restyles every <input>; give checkboxes back their native look. */
+#root input[type='checkbox'] { -webkit-appearance: checkbox; appearance: auto; width: 16px !important; height: 16px;
+  min-height: 0; padding: 0; margin: 0 2px 0 0; accent-color: var(--gq-teal, #25716f); flex: none; vertical-align: middle; }
