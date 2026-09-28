@@ -28,7 +28,7 @@ const canon = v => (Array.isArray(v) ? `[${v.map(canon).join(',')}]`
   : JSON.stringify(v ?? null));
 const differsFromSeed = (cur, r, keys = UPGRADE) => keys.some(k => canon(cur[k] ?? null) !== canon(r[k] ?? null));
 
-function rulesService(repo, cases) {
+function rulesService(repo, cases, alerts) {
   const catalogue = factCatalogue();
   // A catalogue update that could not be applied because an admin had edited the rule.
   const suggestion = cur => {
@@ -137,7 +137,8 @@ function rulesService(repo, cases) {
       const c = await cases.get(user, mod, caseId);            // enforces who may see the case
       const output = runEngine(await repo.all(), c);
       const saved = await repo.saveRun(caseId, ENGINE_VERSION, output, user.id);
-      return { id: saved.id, created_at: saved.created_at, engine: ENGINE_VERSION, output };
+      const newAlerts = alerts ? await alerts.afterRun(c, output, saved.id, user.id) : [];
+      return { id: saved.id, created_at: saved.created_at, engine: ENGINE_VERSION, output, newAlerts };
     },
 
     // Saving a check-in re-runs the rules at once, so a red-flag symptom

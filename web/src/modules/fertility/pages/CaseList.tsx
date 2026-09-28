@@ -37,6 +37,7 @@ export function CaseList() {
               { key: 'm', header: 'Male partner', render: c => who(c, 'M') },
               { key: 'phase', header: 'Phase', render: c => (
                 <div><Badge tone={c.status === 'CLOSED' ? 'neutral' : 'info'}>{c.phase}</Badge>
+                  {!!c.open_alerts && <> <Badge tone="bad">⚠ {c.open_alerts} alert{c.open_alerts > 1 ? 's' : ''}</Badge></>}
                   <div className="gq-small gq-muted">{phaseLabel(schema?.phases, c.phase)}</div></div>) },
               { key: 'team', header: 'Care team', render: c => (
                 <div className="gq-small">{c.doctor_name || '—'}<div className="gq-muted">{c.dietitian_name ? 'Dietitian: ' + c.dietitian_name : 'No dietitian'}</div></div>) },

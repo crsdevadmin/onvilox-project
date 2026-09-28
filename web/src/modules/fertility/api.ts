@@ -1,7 +1,7 @@
 import { api } from '../../core/api';
 import type { FormValues } from '../../ui';
 import type { ModuleAccess } from '../../core/types';
-import type { CaseDetail, CaseSummary, EngineRun, FxSchema, PartnerInput, Sex } from './types';
+import type { Alert, CaseDetail, CaseSummary, EngineRun, FxSchema, PartnerInput, Sex } from './types';
 
 const base = '/api/fertility';
 let schemaCache: Promise<FxSchema> | null = null;
@@ -20,6 +20,8 @@ export const fertilityApi = {
   setPhase: (id: string, phase: string, date: string, note: string) => api.post(`${base}/cases/${id}/phase`, { phase, date, note }),
   addCheckin: (id: string, pid: string, date: string, data: FormValues) =>
     api.post<EngineRun>(`${base}/cases/${id}/partners/${pid}/checkins`, { date, data }),
+  alerts: (id: string) => api.get<Alert[]>(`${base}/cases/${id}/alerts`),
+  ackAlert: (id: string, aid: number, note: string) => api.post(`${base}/cases/${id}/alerts/${aid}/ack`, { note }),
   runEngine: (id: string) => api.post<EngineRun>(`${base}/cases/${id}/engine`, {}),
   latestRun: (id: string) => api.get<EngineRun | null>(`${base}/cases/${id}/engine`),
   dietitians: () => api.get<{ id: string; name: string }[]>(`${base}/dietitians`),

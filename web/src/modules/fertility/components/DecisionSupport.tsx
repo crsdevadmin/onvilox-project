@@ -8,7 +8,7 @@ import { sexLabel } from '../helpers';
 import type { CaseDetail, EngineRun, FxSchema } from '../types';
 import { FindingCard } from './FindingCard';
 
-export function DecisionSupport({ c, schema }: { c: CaseDetail; schema: FxSchema }) {
+export function DecisionSupport({ c, schema, onRan }: { c: CaseDetail; schema: FxSchema; onRan?: () => void }) {
   const { data: latest, loading } = useAsync(() => fertilityApi.latestRun(c.id), [c.id]);
   const [run, setRun] = useState<EngineRun | null>(null);
   const [busy, setBusy] = useState(false);
@@ -21,7 +21,7 @@ export function DecisionSupport({ c, schema }: { c: CaseDetail; schema: FxSchema
 
   async function go() {
     setBusy(true); setErr(null);
-    try { setRun(await fertilityApi.runEngine(c.id)); } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    try { setRun(await fertilityApi.runEngine(c.id)); onRan?.(); } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
     finally { setBusy(false); }
   }
 

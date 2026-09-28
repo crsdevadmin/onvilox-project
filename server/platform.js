@@ -12,13 +12,13 @@ const { accessRoutes } = require('./core/access/routes');
 
 const MODULE_SERVERS = [require('./modules/fertility')];
 
-function registerPlatform(app, { pool, authenticateToken }) {
+function registerPlatform(app, { pool, authenticateToken, notify }) {
   const access = createAccessService(pool);
   const ready = ensureAccessSchema(pool).catch(e => console.error('module access migration:', e.message));
 
   app.use('/api', oncoGuard(access));
   app.use('/api/access', accessRoutes({ access, authenticateToken }));
-  for (const m of MODULE_SERVERS) m.mount(app, { pool, access, authenticateToken });
+  for (const m of MODULE_SERVERS) m.mount(app, { pool, access, authenticateToken, notify });
 
   // The modular web shell (web/ → built into app-dist/) lives under /app.
   // Any /app/* path returns its index.html so client-side routes deep-link.

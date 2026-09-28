@@ -157,7 +157,8 @@ const authenticateToken = (req, res, next) => {
 // module's API and the /app web shell. Registered BEFORE the legacy routes below
 // so the Oncology access guard sits in front of all of them. See server/platform.js.
 const { registerPlatform } = require('./platform');
-const platform = registerPlatform(app, { pool, authenticateToken });
+// notify: phone/desktop push to user ids (notifyUsers is defined further down; hoisted).
+const platform = registerPlatform(app, { pool, authenticateToken, notify: (ids, title, body, url) => notifyUsers(ids, title, body, url) });
 
 // --- ROUTES ---
 

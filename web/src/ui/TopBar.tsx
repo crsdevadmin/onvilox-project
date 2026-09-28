@@ -4,6 +4,7 @@ import { NavLink } from 'react-router-dom';
 import { useAccess } from '../core/AccessContext';
 import { MODULE_DEFS, moduleHref } from '../core/modules';
 import { logout } from '../core/session';
+import { PushButton } from './PushButton';
 import { isAdmin, type ModuleCode } from '../core/types';
 
 export interface NavItem { to: string; label: string }
@@ -27,6 +28,7 @@ export function TopBar({ module, nav = [] }: { module?: ModuleCode; nav?: NavIte
             {others.map(m => <option key={m.code} value={m.code}>{m.name}</option>)}
           </select>
         )}
+        <PushButton />
         {admin && <a href="/admin">Admin</a>}
         <span className="gq-small gq-muted" style={{ whiteSpace: 'nowrap', margin: '0 8px' }} title={access.user.role}>{access.user.name}</span>
         <button className="btn-secondary btn-sm" onClick={() => window.toggleTheme?.()}>Theme</button>

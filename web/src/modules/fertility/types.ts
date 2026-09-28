@@ -29,7 +29,7 @@ export interface PhaseEvent { id: number; phase: string; event_date: string; not
 
 export interface CaseSummary {
   id: string; phase: string; phase_date: string | null; status: string; updated_at: string;
-  doctor_name: string | null; dietitian_name: string | null;
+  doctor_name: string | null; dietitian_name: string | null; open_alerts?: number;
   partners: { id: string; sex: Sex; name: string; age: number | null; missing: string[] | null }[];
 }
 
@@ -47,8 +47,14 @@ export interface EnginePartner {
   partnerId: string; sex: Sex; name: string; assessed: boolean; missingRequired: string[] | null;
   redFlags: number; findings: Finding[]; dataGaps: string[]; staleLabs: string[];
 }
+export interface Alert {
+  id: number; partner_id: string; partner_name: string; sex: Sex; rule_id: string; message: string;
+  created_at: string; ack_at: string | null; ack_by_name?: string | null; ack_note: string | null;
+}
+
 export interface EngineRun {
   id: number; created_at: string; engine: string; run_by_name?: string | null;
+  newAlerts?: { partner: string; ruleId: string; message: string }[];
   output: { engineVersion: string; phase: string; pregnancyPending: boolean; formulaChangesStopped: boolean;
     draftRulesUsed: number; partners: EnginePartner[] };
 }

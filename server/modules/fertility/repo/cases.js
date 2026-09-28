@@ -9,6 +9,7 @@ function casesRepo(pool) {
     const args = scope.all ? [] : [scope.doctorId || scope.dietitianId];
     const r = await pool.query(`
       SELECT c.*, to_char(c.phase_date,'YYYY-MM-DD') AS phase_date, d.name AS doctor_name, dt.name AS dietitian_name,
+             (SELECT COUNT(*)::int FROM fx_alerts al WHERE al.case_id = c.id AND al.ack_at IS NULL) AS open_alerts,
              COALESCE(json_agg(json_build_object(
                'id', p.id, 'sex', p.sex, 'name', p.name, 'age', p.age,
                'missing', (SELECT a.missing FROM fx_assessments a WHERE a.partner_id = p.id ORDER BY a.version DESC LIMIT 1)

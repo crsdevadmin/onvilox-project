@@ -18,23 +18,39 @@ const { casesRoutes } = require('./routes/cases');
 const { rulesRepo } = require('./repo/rules');
 const { rulesService } = require('./services/rules');
 const { rulesRoutes } = require('./routes/rules');
+const { alertsRepo } = require('./repo/alerts');
+const { alertsService } = require('./services/alerts');
+const { alertsRoutes } = require('./routes/alerts');
+const { ingredientsRepo } = require('./repo/ingredients');
+const { ingredientsService } = require('./services/ingredients');
+const { ingredientsRoutes } = require('./routes/ingredients');
+const { formulasRepo } = require('./repo/formulas');
+const { formulasService } = require('./services/formulas');
+const { formulasRoutes } = require('./routes/formulas');
 
 const code = 'fertility';
 
-function mount(app, { pool, access, authenticateToken }) {
+function mount(app, { pool, access, authenticateToken, notify }) {
   const svc = casesService(casesRepo(pool));
-  const rules = rulesService(rulesRepo(pool), svc);
-  ensureFertilitySchema(pool).then(() => rules.seed())
+  const aRepo = alertsRepo(pool);
+  const alerts = alertsService(aRepo, svc, notify);
+  const ingredients = ingredientsService(ingredientsRepo(pool));
+  const formulas = formulasService(formulasRepo(pool), svc, ingredients, aRepo, notify);
+  const rules = rulesService(rulesRepo(pool), svc, alerts);
+  ensureFertilitySchema(pool).then(() => rules.seed()).then(() => ingredients.seed())
     .catch(e => console.error('fertility migration:', e.message));
 
   const r = express.Router();
   r.use(authenticateToken, requireModule(access, code));
 
-  // Store home. Orders arrive with weekly formulations (next release).
+  // Minimal module home (store orders are at /orders).
   r.get('/home', (req, res) => res.json({ module: req.module, orders: [] }));
 
   r.use(casesRoutes(svc));
   r.use(rulesRoutes(rules));
+  r.use(alertsRoutes(alerts));
+  r.use(ingredientsRoutes(ingredients));
+  r.use(formulasRoutes(formulas));
   app.use('/api/fertility', r);
 }
 
