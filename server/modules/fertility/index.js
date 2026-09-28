@@ -1,30 +1,35 @@
 // Fertility module — server entry point.
 //
-// Structure this module will grow into (one concern per folder, small files):
-//   routes/      thin HTTP handlers — parse input, call a service, send JSON
-//   services/    business logic (cases, assessments, weekly formulations)
-//   engine/      pathway → red flags → nutrition risk → phenotype → rules
-//                → targets → ingredient safety → formulation (pure functions)
-//   rules/       clinician-approved rule packs as versioned data (JSON)
+//   assessment/  data dictionary (fields.js) + validation — drives the web forms
 //   repo/        SQL only
+//   services/    business logic and who-may-do-what
+//   routes/      thin HTTP handlers
 //   schema.js    this module's tables (fx_*)
+//   engine/      (next) pathway → red flags → risk → phenotype → rules → targets
+//                → ingredient safety → formulation — built only from rules signed
+//                off in the clinical rule catalogue
 //
 // Every route is behind requireModule('fertility'): no module grant → 403.
 const express = require('express');
 const { requireModule } = require('../../core/access/middleware');
+const { ensureFertilitySchema } = require('./schema');
+const { casesRepo } = require('./repo/cases');
+const { casesService } = require('./services/cases');
+const { casesRoutes } = require('./routes/cases');
 
 const code = 'fertility';
 
-function mount(app, { access, authenticateToken }) {
+function mount(app, { pool, access, authenticateToken }) {
+  ensureFertilitySchema(pool).catch(e => console.error('fertility migration:', e.message));
+  const svc = casesService(casesRepo(pool));
+
   const r = express.Router();
   r.use(authenticateToken, requireModule(access, code));
 
-  // Phase 0 placeholder: proves the guard and tells the shell who is asking.
-  // Replaced by real case / assessment endpoints in Fertility V1-a.
-  r.get('/home', (req, res) => {
-    res.json({ module: req.module, cases: [], orders: [], phase: 'platform-foundation' });
-  });
+  // Store home. Orders arrive with weekly formulations (next release).
+  r.get('/home', (req, res) => res.json({ module: req.module, orders: [] }));
 
+  r.use(casesRoutes(svc));
   app.use('/api/fertility', r);
 }
 

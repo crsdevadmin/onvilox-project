@@ -5,7 +5,7 @@
   "main": "server/index.js",
   "scripts": {
     "start": "node server/index.js",
-    "test": "node --test server/core/access/logic.test.js",
+    "test": "node --test server/core/access/logic.test.js server/modules/fertility/assessment/validate.test.js",
     "build:web": "cd web && npm install && npm run build"
   },
   "dependencies": {

@@ -1,13 +1,23 @@
 import { api } from '../../core/api';
+import type { FormValues } from '../../ui';
 import type { ModuleAccess } from '../../core/types';
+import type { CaseDetail, CaseSummary, FxSchema, PartnerInput, Sex } from './types';
 
-export interface FertilityHome {
-  module: ModuleAccess;
-  cases: unknown[];
-  orders: unknown[];
-  phase: string;
-}
+const base = '/api/fertility';
+let schemaCache: Promise<FxSchema> | null = null;
 
 export const fertilityApi = {
-  home: () => api.get<FertilityHome>('/api/fertility/home'),
+  home: () => api.get<{ module: ModuleAccess; orders: unknown[] }>(`${base}/home`),
+  schema: () => (schemaCache ??= api.get<FxSchema>(`${base}/schema`).catch(e => { schemaCache = null; throw e; })),
+  cases: () => api.get<CaseSummary[]>(`${base}/cases`),
+  get: (id: string) => api.get<CaseDetail>(`${base}/cases/${id}`),
+  create: (body: { female?: PartnerInput; male?: PartnerInput; phase: string; phaseDate: string }) =>
+    api.post<{ id: string }>(`${base}/cases`, body),
+  addPartner: (id: string, sex: Sex, p: PartnerInput) => api.post(`${base}/cases/${id}/partners`, { sex, ...p }),
+  saveAssessment: (id: string, pid: string, data: FormValues) =>
+    api.put<{ version: number; missing: string[] }>(`${base}/cases/${id}/partners/${pid}/assessment`, { data }),
+  addLab: (id: string, pid: string, lab: Record<string, string>) => api.post(`${base}/cases/${id}/partners/${pid}/labs`, lab),
+  setPhase: (id: string, phase: string, date: string, note: string) => api.post(`${base}/cases/${id}/phase`, { phase, date, note }),
+  dietitians: () => api.get<{ id: string; name: string }[]>(`${base}/dietitians`),
+  setDietitian: (id: string, dietitianId: string | null) => api.put(`${base}/cases/${id}/dietitian`, { dietitianId }),
 };

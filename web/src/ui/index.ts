@@ -8,3 +8,4 @@ export { DataTable, type Column } from './DataTable';
 export { Tabs } from './Tabs';
 export { TopBar, type NavItem } from './TopBar';
 export { Layout } from './Layout';
+export { SchemaForm, type FieldDef, type SectionDef, type FormValues, type FieldOption } from './SchemaForm';
