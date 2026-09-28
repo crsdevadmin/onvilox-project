@@ -15,3 +15,6 @@ Thumbs.db
 # Not project files; they appear as untracked junk and must never be committed.
 .fuse_hidden*
 **/.fuse_hidden*
+
+# Vite temp files
+web/vite.config.ts.timestamp-*

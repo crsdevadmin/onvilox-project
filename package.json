@@ -4,7 +4,9 @@
   "description": "Onvilox Assessment Application",
   "main": "server/index.js",
   "scripts": {
-    "start": "node server/index.js"
+    "start": "node server/index.js",
+    "test": "node --test server/core/access/logic.test.js",
+    "build:web": "cd web && npm install && npm run build"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",

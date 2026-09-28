@@ -34,9 +34,12 @@
           hospital_name: data.user.hospital_name,
           storeId: data.user.storeId || null,
           username: username,
-          token: data.token
+          token: data.token,
+          // Modules this user may use ([{code,name,role}]) — null if the server
+          // could not tell, in which case the legacy role routing applies.
+          modules: Array.isArray(data.modules) ? data.modules : null
         });
-        return { ok: true, route: routeForRole(data.user.role) };
+        return { ok: true, route: data.landing || routeForRole(data.user.role) };
       }
 
       const errData = await res.json().catch(() => ({}));
@@ -61,9 +64,20 @@
     return '/login';
   }
 
+  // Oncology pages are the legacy module. A user whose Oncology access was
+  // removed (known from the session saved at login) is sent to the module
+  // shell instead of a page whose API calls would all be refused.
+  function hasModule(code){
+    const u = getCurrentUser();
+    if(!u || !Array.isArray(u.modules)) return true;   // older session: unknown → allow
+    if(u.role === 'ADMIN' || u.role === 'SUPER_ADMIN') return true;
+    return u.modules.some(m => m.code === code);
+  }
+
   function requireRole(allowedRoles){
     const u = getCurrentUser();
     if(!u){ window.location.href='/login'; return; }
+    if(!hasModule('onco')){ window.location.href = '/app/'; return; }
     if(Array.isArray(allowedRoles) && allowedRoles.length){
       if(!allowedRoles.includes(u.role)){
         window.location.href = routeForRole(u.role);
@@ -72,5 +86,5 @@
     }
   }
 
-  global.auth = { getCurrentUser, login, logout, requireRole, routeForRole };
+  global.auth = { getCurrentUser, login, logout, requireRole, routeForRole, hasModule };
 })(window);

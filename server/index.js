@@ -50,7 +50,7 @@ app.use(express.json({ limit: '2mb' }));
 // assets that rarely change, like images/fonts, may still be cached by the browser.)
 // Never serve working files, decks, QA folders or personal documents from the
 // project root — express.static would otherwise publish everything deployed.
-const _PRIVATE_PATHS = /^\/(claude(%20| )outputs|_deck_qa|_hos_qa|_inv_qa|server|node_modules|\.(?!well-known)[^/]*)(\/|$)|\.(md|pptx|pdf|mp4|bak[^/]*|ps1|py|sql|log|zip)$/i;
+const _PRIVATE_PATHS = /^\/(claude(%20| )outputs|_deck_qa|_hos_qa|_inv_qa|server|node_modules|web|app-dist|\.(?!well-known)[^/]*)(\/|$)|\.(md|pptx|pdf|mp4|bak[^/]*|ps1|py|sql|log|zip)$/i;
 app.use((req, res, next) => {
   let p = req.path;
   try { p = decodeURIComponent(p); } catch (e) {}
@@ -151,6 +151,13 @@ const authenticateToken = (req, res, next) => {
     next();
   });
 };
+
+// ── Platform core + clinical modules ────────────────────────────────────────
+// Module access (Oncology / Fertility), the /api/access admin API, the Fertility
+// module's API and the /app web shell. Registered BEFORE the legacy routes below
+// so the Oncology access guard sits in front of all of them. See server/platform.js.
+const { registerPlatform } = require('./platform');
+const platform = registerPlatform(app, { pool, authenticateToken });
 
 // --- ROUTES ---
 
@@ -449,7 +456,16 @@ app.post('/api/auth/login', async (req, res) => {
     if (!validPassword) return res.status(400).json({ error: 'Invalid password' });
 
     const token = jwt.sign({ id: user.id, role: user.role }, process.env.JWT_SECRET);
-    res.json({ token, user: { id: user.id, name: user.name, role: user.role, hospital_name: user.hospital_name, storeId: user.store_id || null } });
+    // Which modules this user may use, and where they land. If the access
+    // lookup fails, login still succeeds and the browser falls back to the
+    // legacy role-based route (Oncology) — exactly the behaviour before modules.
+    let modules = null, landing = null;
+    try {
+      const a = await platform.access.forUser(user.id, { fresh: true });
+      if (a) { modules = a.modules; landing = a.landing; }
+    } catch (e) { console.warn('login: module access lookup failed:', e.message); }
+    res.json({ token, modules, landing,
+      user: { id: user.id, name: user.name, role: user.role, hospital_name: user.hospital_name, storeId: user.store_id || null } });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

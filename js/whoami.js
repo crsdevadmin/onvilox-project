@@ -26,6 +26,20 @@
     el.innerHTML = '<span style="font-size:12.5px;font-weight:800;">' + esc(name) + '</span>'
       + '<span style="font-size:10.5px;font-weight:600;opacity:.75;' + (info.role === 'ASSISTANT' && !info.doctor ? 'color:#dc2626;opacity:1;' : '') + '">' + esc(sub) + '</span>';
     el.title = (name ? name + ' — ' : '') + sub;
+    // Users with more than one module get a one-click switch to the module shell.
+    try {
+      const me = auth.getCurrentUser();
+      const mods = (me && Array.isArray(me.modules)) ? me.modules : [];
+      const isAdmin = info.role === 'ADMIN' || info.role === 'SUPER_ADMIN';
+      if ((isAdmin || mods.length > 1) && !document.getElementById('moduleSwitch')) {
+        const a = document.createElement('a');
+        a.id = 'moduleSwitch';
+        a.href = isAdmin ? '/app/fertility' : '/app/choose';
+        a.textContent = isAdmin ? 'Fertility ›' : 'Switch module ›';
+        a.style.cssText = 'margin-right:14px;font-size:12px;font-weight:700;white-space:nowrap;';
+        el.parentNode.insertBefore(a, el.nextSibling);
+      }
+    } catch (e) {}
     window.__whoami = info;
     try { document.dispatchEvent(new CustomEvent('whoami', { detail: info })); } catch (e) {}
   }
