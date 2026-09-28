@@ -150,6 +150,12 @@ async function ensureFertilitySchema(pool) {
       updated_at  TIMESTAMPTZ DEFAULT NOW(),
       updated_by  TEXT)`);
   await pool.query('CREATE INDEX IF NOT EXISTS idx_fx_orders_store ON fx_orders(store_id, status)');
+  // Pricing (shared model, server/core/pricing) and batch details for the label.
+  for (const col of ["price_status TEXT NOT NULL DEFAULT 'AWAITING_STORE'", 'store_price NUMERIC(12,2)', 'markup_pct NUMERIC(8,2)',
+    'base_price NUMERIC(12,2)', 'doctor_amount NUMERIC(12,2)', 'final_price NUMERIC(12,2)', 'price_note TEXT',
+    "price_history JSONB NOT NULL DEFAULT '[]'", 'batch_no TEXT', 'mfg_date DATE', 'exp_date DATE']) {
+    await pool.query(`ALTER TABLE fx_orders ADD COLUMN IF NOT EXISTS ${col}`);
+  }
   // Clinical rules — editable by admins at any time; every change is versioned.
   await pool.query(`CREATE TABLE IF NOT EXISTS fx_rules (
       id                TEXT PRIMARY KEY,

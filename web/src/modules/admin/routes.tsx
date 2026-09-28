@@ -9,7 +9,7 @@ import { IngredientsPage } from '../fertility/ingredients/IngredientsPage';
 
 export const adminRoutes: RouteObject = {
   path: 'admin',
-  element: <RequireAdmin><Layout nav={[{ to: '/admin/access', label: 'Module Access' }, { to: '/admin/fertility-rules', label: 'Fertility Rules' }, { to: '/admin/fertility-ingredients', label: 'Ingredients' }]} /></RequireAdmin>,
+  element: <RequireAdmin><Layout nav={[{ to: '/admin/access', label: 'Module Access' }, { to: '/admin/fertility-rules', label: 'Fertility Rules' }, { to: '/admin/fertility-ingredients', label: 'Ingredients' }, { to: '/fertility/store', label: 'Fertility Orders' }]} /></RequireAdmin>,
   children: [
     { path: 'access', element: <AccessPage /> },
     { path: 'fertility-rules', element: <RulesPage /> },

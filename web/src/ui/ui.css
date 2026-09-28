@@ -84,3 +84,21 @@ body.light .gq-shell-main a:not(.card):not([class*='btn']) { color: var(--gq-tea
 .gq-alerts { border: 1px solid var(--rose); background: var(--rose-dim); border-radius: 12px; padding: 12px 14px; margin-bottom: 16px; }
 .gq-alert-row { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 8px 0; border-top: 1px solid var(--border-2); margin-top: 8px; }
 #root button:disabled { opacity: .45; cursor: not-allowed; filter: grayscale(.4); }
+.gq-price { border-top: 1px solid var(--border-2); margin-top: 10px; padding-top: 8px; }
+/* Printable label — always black on white, in both themes and on paper. */
+.gq-label { background: #fff; color: #111; max-width: 520px; padding: 18px 20px; border: 1px solid #999; border-radius: 6px; font-size: 12.5px; }
+.gq-label table { width: 100%; border-collapse: collapse; margin: 8px 0; }
+.gq-label th, .gq-label td { text-align: left; padding: 3px 4px; border-bottom: 1px solid #ddd; color: #111; font-weight: 400;
+  background: transparent; text-transform: none; letter-spacing: 0; font-size: 12.5px; vertical-align: top; }
+.gq-label th { font-weight: 700; white-space: nowrap; }
+.gq-label-head { display: flex; justify-content: space-between; border-bottom: 2px solid #25716f; padding-bottom: 8px; margin-bottom: 8px; }
+.gq-label-brand { font-family: var(--font-display); font-size: 20px; font-weight: 800; letter-spacing: 2px; color: #25716f; }
+.gq-label-mrp { font-size: 18px; font-weight: 800; }
+.gq-label-warn { border: 2px solid #c0344a; color: #c0344a; font-weight: 700; padding: 6px 8px; margin: 6px 0; }
+.gq-label-items thead th { border-bottom: 2px solid #111; }
+@media print {
+  body { background: #fff !important; }
+  .topbar, .gq-noprint, .page-header { display: none !important; }
+  .gq-shell-main { padding: 0 !important; animation: none !important; }
+  .gq-label { border: none; max-width: none; }
+}

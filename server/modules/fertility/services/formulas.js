@@ -8,7 +8,6 @@ const { PHASES } = require('../assessment/fields');
 class HttpError extends Error { constructor(status, msg, extra) { super(msg); this.status = status; Object.assign(this, extra); } }
 const ADMIN = ['ADMIN', 'SUPER_ADMIN'];
 const isDate = s => /^\d{4}-\d{2}-\d{2}$/.test(String(s || '')) && !isNaN(Date.parse(s));
-const TRANSITIONS = { NEW: ['IN_PRODUCTION', 'CANCELLED'], IN_PRODUCTION: ['READY', 'CANCELLED'], READY: ['DISPATCHED', 'CANCELLED'], DISPATCHED: ['DELIVERED'] };
 
 function formulasService(repo, cases, ingredients, alertsRepo, notify) {
   const need = (mod, roles, what) => { if (!ADMIN.includes(mod.role) && !roles.includes(mod.role)) throw new HttpError(403, `Your role cannot ${what}`); };
@@ -90,22 +89,6 @@ function formulasService(repo, cases, ingredients, alertsRepo, notify) {
       if (!(await repo.reject(formulaId, user.id, String(body.note).slice(0, 500)))) throw new HttpError(409, 'Only a draft can be rejected');
     },
 
-    // ── store ──
-    async orders(user, mod, access) {
-      if (ADMIN.includes(mod.role)) return repo.orders(undefined);
-      need(mod, ['STORE', 'STORE_APPROVER'], 'view store orders');
-      if (!access.user.storeId) throw new HttpError(403, 'You are not linked to a store');
-      return repo.orders(access.user.storeId);
-    },
-
-    async setOrderStatus(user, mod, access, orderId, to) {
-      need(mod, ['STORE', 'STORE_APPROVER'], 'update orders');
-      const o = await repo.order(orderId);
-      if (!o || (!ADMIN.includes(mod.role) && o.store_id !== access.user.storeId)) throw new HttpError(404, 'Order not found');
-      if (!(TRANSITIONS[o.status] || []).includes(to)) throw new HttpError(400, `Cannot move an order from ${o.status} to ${to}`);
-      if (to === 'CANCELLED' && !['STORE_APPROVER', ...ADMIN].includes(mod.role)) throw new HttpError(403, 'Only a store approver can cancel');
-      if (!(await repo.setOrderStatus(orderId, o.status, to, user.id))) throw new HttpError(409, 'The order changed — reload');
-    },
   };
 }
 

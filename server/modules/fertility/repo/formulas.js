@@ -49,22 +49,12 @@ function formulasRepo(pool) {
     return r.rows[0] ? r.rows[0].store_id : null;
   }
 
-  // ── orders ──
-  const O_SELECT = `SELECT o.*, s.name AS store_name, u.name AS updated_by_name FROM fx_orders o
-                      LEFT JOIN stores s ON s.id = o.store_id LEFT JOIN users u ON u.id = o.updated_by`;
-  const orders = async storeId => (await pool.query(
-    `${O_SELECT} WHERE ${storeId === undefined ? 'TRUE' : storeId === null ? 'o.store_id IS NULL' : 'o.store_id=$1'}
-      ORDER BY (o.status IN ('DELIVERED','CANCELLED')), o.created_at DESC LIMIT 300`, storeId ? [storeId] : [])).rows;
-  const order = async id => (await pool.query(`${O_SELECT} WHERE o.id=$1`, [id])).rows[0] || null;
-  const setOrderStatus = async (id, from, to, userId) => (await pool.query(
-    `UPDATE fx_orders SET status=$3, updated_by=$4, updated_at=NOW() WHERE id=$1 AND status=$2 RETURNING id`, [id, from, to, userId])).rowCount > 0;
-
   // Store staff of a store who hold a fertility store role (push on new orders).
   const storeStaff = async storeId => (await pool.query(
     `SELECT u.id FROM users u JOIN user_module_access a ON a.user_id = u.id
       WHERE u.store_id=$1 AND a.module_code='fertility' AND a.revoked_at IS NULL AND a.role IN ('STORE','STORE_APPROVER')`, [storeId])).rows.map(x => x.id);
 
-  return { forCase, get, insert, updateDraft, reject, approve, storeForDoctor, orders, order, setOrderStatus, storeStaff };
+  return { forCase, get, insert, updateDraft, reject, approve, storeForDoctor, storeStaff };
 }
 
 module.exports = { formulasRepo };

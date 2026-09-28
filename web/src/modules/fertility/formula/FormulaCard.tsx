@@ -4,11 +4,14 @@ import { useState } from 'react';
 import { Badge, Banner } from '../../../ui';
 import { formulaApi, type Formula } from './api';
 import { ChecksList } from './ChecksList';
+import type { Order } from '../orders/api';
+import { PricePanel } from '../orders/PricePanel';
 
 const TONE: Record<string, 'ok' | 'warn' | 'bad' | 'neutral' | 'info'> = { DRAFT: 'warn', APPROVED: 'ok', REJECTED: 'bad', SUPERSEDED: 'neutral' };
 
-export function FormulaCard({ f, canApprove, canEdit, onEdit, onChanged }: {
-  f: Formula; canApprove: boolean; canEdit: boolean; onEdit: () => void; onChanged: () => void;
+export function FormulaCard({ f, canApprove, canEdit, order, priceRole, onEdit, onChanged }: {
+  f: Formula; canApprove: boolean; canEdit: boolean; order?: Order; priceRole: 'doctor' | 'admin' | null;
+  onEdit: () => void; onChanged: () => void;
 }) {
   const [ack, setAck] = useState(false);
   const [note, setNote] = useState('');
@@ -37,6 +40,7 @@ export function FormulaCard({ f, canApprove, canEdit, onEdit, onChanged }: {
       {f.notes && <p className="gq-small">Notes: {f.notes}</p>}
       {f.decision_note && <p className="gq-small">Decision note: {f.decision_note}</p>}
       {f.status === 'DRAFT' && <ChecksList checks={f.checks} />}
+      {order && f.status === 'APPROVED' && priceRole && <PricePanel o={order} who={priceRole} onChanged={onChanged} />}
       {err && <Banner tone="bad" onClose={() => setErr(null)}>{err}</Banner>}
       {f.status === 'DRAFT' && (
         <div className="gq-row" style={{ marginTop: 8 }}>

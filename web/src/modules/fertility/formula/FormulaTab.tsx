@@ -9,6 +9,8 @@ import { CAN_EDIT, CAN_MANAGE, sexLabel } from '../helpers';
 import { ingredientsApi } from '../ingredients/api';
 import type { CaseDetail, Sex } from '../types';
 import { formulaApi, type Formula } from './api';
+import { ordersApi } from '../orders/api';
+import { isAdmin } from '../../../core/types';
 import { FormulaCard } from './FormulaCard';
 import { FormulaEditor } from './FormulaEditor';
 
@@ -18,6 +20,7 @@ export function FormulaTab({ c }: { c: CaseDetail }) {
   const [editing, setEditing] = useState<Formula | 'new' | null>(null);
   const { data: all, loading, error, reload } = useAsync(() => formulaApi.list(c.id), [c.id]);
   const { data: ingredients } = useAsync(ingredientsApi.list, []);
+  const { data: orders, reload: reloadOrders } = useAsync(() => ordersApi.forCase(c.id), [c.id]);
   const p = c.partners.find(x => x.sex === sex);
   if (loading || !ingredients) return <Loading />;
   if (error) return <Banner tone="bad">{error}</Banner>;
@@ -38,7 +41,9 @@ export function FormulaTab({ c }: { c: CaseDetail }) {
             draft={editing === 'new' ? undefined : editing} onDone={() => { setEditing(null); void reload(); }} />
         ) : mine.length ? mine.map(f => (
           <FormulaCard key={f.id} f={f} canApprove={CAN_MANAGE.includes(role)} canEdit={canEdit}
-            onEdit={() => setEditing(f)} onChanged={() => { void reload(); }} />
+            order={(orders || []).find(o => o.formula_id === f.id && o.status !== 'CANCELLED')}
+            priceRole={isAdmin(role) ? 'admin' : role === 'DOCTOR' ? 'doctor' : null}
+            onEdit={() => setEditing(f)} onChanged={() => { void reload(); void reloadOrders(); }} />
         )) : <EmptyState>No formula yet for {p.name}.</EmptyState>}
       </Card>
     </>

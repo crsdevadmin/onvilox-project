@@ -27,6 +27,9 @@ const { ingredientsRoutes } = require('./routes/ingredients');
 const { formulasRepo } = require('./repo/formulas');
 const { formulasService } = require('./services/formulas');
 const { formulasRoutes } = require('./routes/formulas');
+const { ordersRepo } = require('./repo/orders');
+const { ordersService } = require('./services/orders');
+const { ordersRoutes } = require('./routes/orders');
 
 const code = 'fertility';
 
@@ -36,6 +39,7 @@ function mount(app, { pool, access, authenticateToken, notify }) {
   const alerts = alertsService(aRepo, svc, notify);
   const ingredients = ingredientsService(ingredientsRepo(pool));
   const formulas = formulasService(formulasRepo(pool), svc, ingredients, aRepo, notify);
+  const orders = ordersService(ordersRepo(pool), svc, notify);
   const rules = rulesService(rulesRepo(pool), svc, alerts);
   ensureFertilitySchema(pool).then(() => rules.seed()).then(() => ingredients.seed())
     .catch(e => console.error('fertility migration:', e.message));
@@ -51,6 +55,7 @@ function mount(app, { pool, access, authenticateToken, notify }) {
   r.use(alertsRoutes(alerts));
   r.use(ingredientsRoutes(ingredients));
   r.use(formulasRoutes(formulas));
+  r.use(ordersRoutes(orders));
   app.use('/api/fertility', r);
 }
 
