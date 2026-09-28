@@ -3490,7 +3490,10 @@ app.post('/api/hospitals', authenticateToken, async (req, res) => {
 });
 
 // Users: Create (admin)
-app.post('/api/users', authenticateToken, async (req, res) => {
+// User and store create / delete / password reset / store assignment are
+// admin-only. They previously checked only that the caller was signed in, so
+// any doctor, assistant or store login could create a SUPER_ADMIN account.
+app.post('/api/users', authenticateToken, requireAdminOnly, async (req, res) => {
   const { id, name, email, password, role, hospital_name, store_id, phone } = req.body;
   try {
     const hash = await bcrypt.hash(password, 10);
@@ -3506,7 +3509,7 @@ app.post('/api/users', authenticateToken, async (req, res) => {
 });
 
 // Users: Delete
-app.delete('/api/users/:id', authenticateToken, async (req, res) => {
+app.delete('/api/users/:id', authenticateToken, requireAdminOnly, async (req, res) => {
   const userId = req.params.id;
   try {
     // Patients reference a doctor via assigned_doctor_id / created_by_id (foreign keys
@@ -3532,7 +3535,7 @@ app.get('/api/users/:id/store', authenticateToken, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.patch('/api/users/:id/store', authenticateToken, async (req, res) => {
+app.patch('/api/users/:id/store', authenticateToken, requireAdminOnly, async (req, res) => {
   const { storeId } = req.body;
   try {
     await pool.query('UPDATE users SET store_id = $1 WHERE id = $2', [storeId || null, req.params.id]);
@@ -3541,7 +3544,7 @@ app.patch('/api/users/:id/store', authenticateToken, async (req, res) => {
 });
 
 // Users: Reset Password
-app.put('/api/users/:id/password', authenticateToken, async (req, res) => {
+app.put('/api/users/:id/password', authenticateToken, requireAdminOnly, async (req, res) => {
   const { password } = req.body;
   const targetId = req.params.id;
   try {
@@ -3580,7 +3583,7 @@ app.get('/api/stores', authenticateToken, async (req, res) => {
 });
 
 // Stores: Create
-app.post('/api/stores', authenticateToken, async (req, res) => {
+app.post('/api/stores', authenticateToken, requireAdminOnly, async (req, res) => {
   const { id, name, hospital, location } = req.body;
   const fssai = req.body.fssai_number || req.body.fssai || null;
   const address = req.body.address || null;
@@ -3597,7 +3600,7 @@ app.post('/api/stores', authenticateToken, async (req, res) => {
 });
 
 // Stores: Delete
-app.delete('/api/stores/:id', authenticateToken, async (req, res) => {
+app.delete('/api/stores/:id', authenticateToken, requireAdminOnly, async (req, res) => {
   try {
     await pool.query('DELETE FROM stores WHERE id = $1', [req.params.id]);
     res.json({ success: true });
