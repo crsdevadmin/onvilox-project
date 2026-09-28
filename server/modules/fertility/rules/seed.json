@@ -1,5 +1,5 @@
 {
- "catalogue_version": "v0.1",
+ "catalogue_version": "v0.2",
  "rules": [
   {
    "id": "G-01",
@@ -450,14 +450,47 @@
    "behaviour": "REVIEW",
    "evidence_level": "A",
    "sources": "S5",
-   "notes": "",
+   "notes": "Weight-gain threshold (2 kg between check-ins) and symptom list: clinic to confirm.",
    "status": "DRAFT",
-   "engine_mode": "MANUAL",
-   "condition": null,
+   "engine_mode": "CONDITION",
+   "condition": {
+    "any": [
+     {
+      "fact": "ci_abdominal_distension",
+      "op": "is_true"
+     },
+     {
+      "fact": "ci_abdominal_pain",
+      "op": "is_true"
+     },
+     {
+      "fact": "ci_vomiting",
+      "op": "is_true"
+     },
+     {
+      "fact": "ci_breathlessness",
+      "op": "is_true"
+     },
+     {
+      "fact": "ci_reduced_urine",
+      "op": "is_true"
+     },
+     {
+      "fact": "ci_clinician_ohss_concern",
+      "op": "is_true"
+     },
+     {
+      "fact": "ci_weight_change_kg",
+      "op": ">=",
+      "value": 2
+     }
+    ]
+   },
    "phases": [
     "F7",
     "F8"
-   ]
+   ],
+   "upgrade_note": "Catalogue v0.2: rule now runs from the weekly check-in / assessment data"
   },
   {
    "id": "RF-06",
@@ -473,11 +506,23 @@
    "sources": "—",
    "notes": "",
    "status": "DRAFT",
-   "engine_mode": "MANUAL",
-   "condition": null,
+   "engine_mode": "CONDITION",
+   "condition": {
+    "any": [
+     {
+      "fact": "ci_bleeding",
+      "op": "is_true"
+     },
+     {
+      "fact": "ci_abdominal_pain",
+      "op": "is_true"
+     }
+    ]
+   },
    "phases": [
     "F9"
-   ]
+   ],
+   "upgrade_note": "Catalogue v0.2: rule now runs from the weekly check-in / assessment data"
   },
   {
    "id": "RF-07",
@@ -585,11 +630,15 @@
    "sources": "—",
    "notes": "",
    "status": "DRAFT",
-   "engine_mode": "MANUAL",
-   "condition": null,
+   "engine_mode": "CONDITION",
+   "condition": {
+    "fact": "ci_unable_oral_24h",
+    "op": "is_true"
+   },
    "phases": [
     "F8"
-   ]
+   ],
+   "upgrade_note": "Catalogue v0.2: rule now runs from the weekly check-in / assessment data"
   },
   {
    "id": "RF-12",
@@ -1087,9 +1136,13 @@
    "sources": "S9",
    "notes": "",
    "status": "DRAFT",
-   "engine_mode": "MANUAL",
-   "condition": null,
-   "phases": []
+   "engine_mode": "CONDITION",
+   "condition": {
+    "fact": "iodised_salt",
+    "op": "is_false"
+   },
+   "phases": [],
+   "upgrade_note": "Catalogue v0.2: rule now runs from the weekly check-in / assessment data"
   },
   {
    "id": "F0-08",
@@ -1365,9 +1418,16 @@
    "sources": "S3",
    "notes": "",
    "status": "DRAFT",
-   "engine_mode": "MANUAL",
-   "condition": null,
-   "phases": []
+   "engine_mode": "CONDITION",
+   "condition": {
+    "fact": "supplements",
+    "op": "contains_any",
+    "value": [
+     "inositol"
+    ]
+   },
+   "phases": [],
+   "upgrade_note": "Catalogue v0.2: rule now runs from the weekly check-in / assessment data"
   },
   {
    "id": "F2-08",
@@ -1636,11 +1696,31 @@
    "sources": "—",
    "notes": "",
    "status": "DRAFT",
-   "engine_mode": "MANUAL",
-   "condition": null,
+   "engine_mode": "CONDITION",
+   "condition": {
+    "any": [
+     {
+      "fact": "ci_bloating_mild",
+      "op": "is_true"
+     },
+     {
+      "fact": "ci_early_satiety",
+      "op": "is_true"
+     },
+     {
+      "fact": "ci_nausea",
+      "op": "is_true"
+     },
+     {
+      "fact": "ci_constipation",
+      "op": "is_true"
+     }
+    ]
+   },
    "phases": [
     "F7"
-   ]
+   ],
+   "upgrade_note": "Catalogue v0.2: rule now runs from the weekly check-in / assessment data"
   },
   {
    "id": "F7-04",
@@ -1718,11 +1798,15 @@
    "sources": "S5",
    "notes": "",
    "status": "DRAFT",
-   "engine_mode": "MANUAL",
-   "condition": null,
+   "engine_mode": "CONDITION",
+   "condition": {
+    "fact": "ci_clinician_ohss_concern",
+    "op": "is_true"
+   },
    "phases": [
     "F8"
-   ]
+   ],
+   "upgrade_note": "Catalogue v0.2: rule now runs from the weekly check-in / assessment data"
   },
   {
    "id": "F9-01",
@@ -1826,11 +1910,14 @@
    "sources": "—",
    "notes": "",
    "status": "DRAFT",
-   "engine_mode": "SYSTEM",
-   "condition": null,
-   "phases": [
-    "F9"
-   ]
+   "engine_mode": "CONDITION",
+   "condition": {
+    "fact": "ci_pregnancy_test",
+    "op": "=",
+    "value": "POSITIVE"
+   },
+   "phases": [],
+   "upgrade_note": "Catalogue v0.2: rule now runs from the weekly check-in / assessment data"
   },
   {
    "id": "F9-06",
@@ -1846,11 +1933,16 @@
    "sources": "—",
    "notes": "",
    "status": "DRAFT",
-   "engine_mode": "SYSTEM",
-   "condition": null,
+   "engine_mode": "CONDITION",
+   "condition": {
+    "fact": "ci_pregnancy_test",
+    "op": "=",
+    "value": "NEGATIVE"
+   },
    "phases": [
     "F9"
-   ]
+   ],
+   "upgrade_note": "Catalogue v0.2: rule now runs from the weekly check-in / assessment data"
   },
   {
    "id": "M-01",
@@ -2197,9 +2289,29 @@
    "sources": "—",
    "notes": "",
    "status": "DRAFT",
-   "engine_mode": "SYSTEM",
-   "condition": null,
-   "phases": []
+   "engine_mode": "CONDITION",
+   "condition": {
+    "any": [
+     {
+      "fact": "ci_days_ago",
+      "op": "missing"
+     },
+     {
+      "fact": "ci_days_ago",
+      "op": ">",
+      "value": 7
+     }
+    ]
+   },
+   "phases": [
+    "F0",
+    "F1",
+    "F6",
+    "F7",
+    "F8",
+    "F9"
+   ],
+   "upgrade_note": "Catalogue v0.2: rule now runs from the weekly check-in / assessment data"
   },
   {
    "id": "MO-02",

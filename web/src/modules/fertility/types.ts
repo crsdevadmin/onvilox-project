@@ -5,6 +5,7 @@ export type Sex = 'F' | 'M';
 export interface FxSchema {
   female: SectionDef[]; male: SectionDef[]; phases: FieldOption[];
   labs: { code: string; label: string; unit: string }[];
+  checkin: { female: SectionDef[]; male: SectionDef[] };
 }
 
 export interface Lab {
@@ -16,6 +17,12 @@ export interface Partner {
   id: string; sex: Sex; name: string; age: number | null; phone: string | null; mrn: string | null;
   assessment: { version: number; data: Record<string, unknown>; missing: string[]; created_at: string; created_by_name: string | null } | null;
   labs: Lab[];
+  checkins: Checkin[];
+}
+
+export interface Checkin {
+  id: number; checkin_date: string; phase: string | null; data: Record<string, unknown>;
+  created_at: string; created_by_name: string | null;
 }
 
 export interface PhaseEvent { id: number; phase: string; event_date: string; note: string | null; created_by_name: string | null }

@@ -3,6 +3,7 @@
 // for the admin condition builder. Adding a fact here makes it available to
 // every rule — no rule code changes.
 const { fieldsFor, LABS } = require('../assessment/fields');
+const { checkinFields, CHECKIN_FRESH_DAYS } = require('../assessment/checkin');
 
 // WHO 2021 lower reference limits (rule M-01) — data, not code.
 const SEMEN_LIMITS = [
@@ -47,7 +48,19 @@ function factCatalogue() {
     { key: `lab_${l.code}_status`, label: `${l.label} — status vs report range`, type: 'choice', sex: 'B',
       options: LAB_STATUS.map(v => ({ value: v, label: v })) },
   ]);
-  return [...derived, ...seen.values(), ...labs];
+  const ci = new Map();
+  for (const sex of ['F', 'M']) {
+    for (const f of checkinFields(sex)) {
+      if (f.type === 'textarea' || f.type === 'text') continue;
+      if (ci.has(f.key)) { ci.get(f.key).sex = 'B'; continue; }
+      ci.set(f.key, { key: 'ci_' + f.key, label: 'Check-in: ' + f.label, type: typeOf(f), unit: f.unit, options: f.options, sex });
+    }
+  }
+  const ciDerived = [
+    { key: 'ci_days_ago', label: 'Check-in: days since last check-in', type: 'number', unit: 'days', sex: 'B' },
+    { key: 'ci_weight_change_kg', label: 'Check-in: weight change since previous check-in', type: 'number', unit: 'kg', sex: 'B' },
+  ];
+  return [...derived, ...seen.values(), ...labs, ...ciDerived, ...ci.values()];
 }
 
 const num = v => (v === null || v === undefined || v === '' ? undefined : Number(v));
@@ -77,6 +90,18 @@ function buildFacts(c, partner) {
     if (status === 'LOW' && !isStale) low++;
   }
   f.labs_low_count = low;
+
+  // Latest check-in. Answers count only while fresh (weekly); days-since is always known.
+  const cis = (partner.checkins || []).slice().sort((a, b) => String(b.checkin_date).localeCompare(String(a.checkin_date)));
+  if (cis[0]) {
+    const age = Math.floor((Date.now() - Date.parse(cis[0].checkin_date)) / 86400000);
+    f.ci_days_ago = Math.max(0, age);
+    if (age <= CHECKIN_FRESH_DAYS) {
+      for (const [k, v] of Object.entries(cis[0].data || {})) f['ci_' + k] = v;
+      const w0 = num(cis[0].data && cis[0].data.weight_kg), w1 = cis[1] && num(cis[1].data && cis[1].data.weight_kg);
+      if (w0 !== undefined && w1 !== undefined) f.ci_weight_change_kg = Math.round((w0 - w1) * 10) / 10;
+    }
+  }
 
   if (partner.sex === 'M' && d.sa_conc !== undefined) {
     f.sa_abnormal_count = SEMEN_LIMITS.filter(s => d[s.key] !== undefined && Number(d[s.key]) < s.min).length;

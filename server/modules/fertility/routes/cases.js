@@ -1,6 +1,7 @@
 // /api/fertility/* HTTP handlers — parse, call the service, send JSON.
 const express = require('express');
 const { FEMALE, MALE, PHASES, LABS } = require('../assessment/fields');
+const { CHECKIN } = require('../assessment/checkin');
 
 function casesRoutes(svc) {
   const r = express.Router();
@@ -12,7 +13,7 @@ function casesRoutes(svc) {
     }
   };
 
-  r.get('/schema', (req, res) => res.json({ female: FEMALE, male: MALE, phases: PHASES, labs: LABS }));
+  r.get('/schema', (req, res) => res.json({ female: FEMALE, male: MALE, phases: PHASES, labs: LABS, checkin: CHECKIN }));
 
   r.get('/cases', h(async (req, res) => res.json(await svc.list(req.user, req.module))));
   r.post('/cases', h(async (req, res) => res.status(201).json({ id: await svc.create(req.user, req.module, req.body || {}) })));

@@ -5,6 +5,7 @@
 //   fx_assessments    versioned assessment per partner (append-only)
 //   fx_labs           lab results with unit, reference range and date (rule G-09)
 //   fx_phase_events   treatment-phase timeline (F0 … F9, CLOSED)
+//   fx_checkins       weekly check-ins (weight, adherence, symptoms, pregnancy test)
 //   fx_rules          clinical rules (seeded from rules/seed.json, then admin-edited)
 //   fx_rule_history   every version of every rule
 //   fx_engine_runs    every engine run with its full output (audit)
@@ -58,6 +59,15 @@ async function ensureFertilitySchema(pool) {
       note       TEXT,
       created_by TEXT,
       created_at TIMESTAMPTZ DEFAULT NOW())`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS fx_checkins (
+      id           BIGSERIAL PRIMARY KEY,
+      partner_id   TEXT NOT NULL REFERENCES fx_partners(id) ON DELETE CASCADE,
+      checkin_date DATE NOT NULL,
+      phase        TEXT,
+      data         JSONB NOT NULL,
+      created_by   TEXT,
+      created_at   TIMESTAMPTZ DEFAULT NOW())`);
+  await pool.query('CREATE INDEX IF NOT EXISTS idx_fx_checkins_partner ON fx_checkins(partner_id, checkin_date DESC)');
   // Clinical rules — editable by admins at any time; every change is versioned.
   await pool.query(`CREATE TABLE IF NOT EXISTS fx_rules (
       id                TEXT PRIMARY KEY,

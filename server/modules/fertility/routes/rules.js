@@ -24,6 +24,8 @@ function rulesRoutes(svc) {
   r.post('/rules', adminOnly, h(async (req, res) => res.status(201).json({ id: await svc.create(req.user, req.module, req.body || {}) })));
   r.put('/rules/:id', adminOnly, h(async (req, res) => { await svc.update(req.user, req.module, req.params.id, req.body || {}); res.json({ ok: true }); }));
 
+  r.post('/cases/:id/partners/:pid/checkins', h(async (req, res) =>
+    res.status(201).json(await svc.checkin(req.user, req.module, req.params.id, req.params.pid, req.body || {}))));
   r.post('/cases/:id/engine', h(async (req, res) => res.json(await svc.run(req.user, req.module, req.params.id))));
   r.get('/cases/:id/engine', h(async (req, res) => res.json(await svc.latest(req.user, req.module, req.params.id))));
   return r;

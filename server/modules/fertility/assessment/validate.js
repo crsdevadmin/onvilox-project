@@ -5,10 +5,12 @@ const { fieldsFor } = require('./fields');
 const blank = v => v === null || v === undefined || v === '';
 
 // Returns { data, errors } — data keeps only known keys, typed.
-function cleanAssessment(sex, input) {
+function cleanAssessment(sex, input) { return cleanFields(fieldsFor(sex), input); }
+
+function cleanFields(fields, input) {
   const out = {};
   const errors = [];
-  for (const f of fieldsFor(sex)) {
+  for (const f of fields) {
     const v = (input || {})[f.key];
     if (blank(v)) continue;
     if (f.type === 'number') {
@@ -38,4 +40,8 @@ function missingRequired(sex, data) {
   return fieldsFor(sex).filter(f => f.required && blank((data || {})[f.key])).map(f => f.label);
 }
 
-module.exports = { cleanAssessment, missingRequired };
+function missingIn(fields, data) {
+  return fields.filter(f => f.required && blank((data || {})[f.key])).map(f => f.label);
+}
+
+module.exports = { cleanAssessment, missingRequired, cleanFields, missingIn };

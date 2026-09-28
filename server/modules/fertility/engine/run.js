@@ -7,6 +7,7 @@ const { buildFacts } = require('./facts');
 const { evaluate } = require('./conditions');
 
 const ENGINE_VERSION = 'fx-engine-1.0';
+const SEVERITY = ['BLOCK', 'REVIEW', 'FLAG', 'AUTO'];
 const ORDER = ['RED_FLAG', 'SAFETY_MODE', 'REFERRAL', 'PHENOTYPE', 'RECOMMENDATION', 'INGREDIENT', 'MONITORING', 'INFO'];
 
 function applies(rule, partner, phase) {
@@ -35,7 +36,9 @@ function runEngine(rules, c) {
     // NP-11: two or more nutrition phenotypes → "multiple risks" priority order.
     const np11 = rules.find(r => r.id === 'NP-11' && r.status !== 'RETIRED');
     if (np11 && findings.filter(f => f.kind === 'PHENOTYPE').length >= 2) findings.push(finding(np11));
-    findings.sort((a, b) => ORDER.indexOf(a.kind) - ORDER.indexOf(b.kind) || a.ruleId.localeCompare(b.ruleId));
+    // Most urgent first: finding type, then behaviour (hard stop / review before suggestions), then ID.
+    findings.sort((a, b) => ORDER.indexOf(a.kind) - ORDER.indexOf(b.kind)
+      || SEVERITY.indexOf(a.behaviour) - SEVERITY.indexOf(b.behaviour) || a.ruleId.localeCompare(b.ruleId));
     return {
       partnerId: p.id, sex: p.sex, name: p.name,
       assessed: !!p.assessment, missingRequired: p.assessment ? p.assessment.missing : null,

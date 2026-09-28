@@ -1,6 +1,7 @@
 // Fertility cases: who may see / change what, and input validation.
 // Routes call these; SQL lives in repo/cases.js.
-const { cleanAssessment, missingRequired } = require('../assessment/validate');
+const { cleanAssessment, missingRequired, cleanFields, missingIn } = require('../assessment/validate');
+const { checkinFields } = require('../assessment/checkin');
 const { PHASES, LABS } = require('../assessment/fields');
 
 class HttpError extends Error { constructor(status, msg) { super(msg); this.status = status; } }
@@ -112,6 +113,21 @@ function casesService(repo) {
       if (refLow !== null && refHigh !== null && refLow > refHigh) throw new HttpError(400, 'Reference low is above high');
       if (!isDate(b.collectedOn) || b.collectedOn > latestDate()) throw new HttpError(400, 'Enter a valid collection date (not in the future)');
       await repo.addLab(partnerId, { analyte, value, unit: unit.slice(0, 20), refLow, refHigh, collectedOn: b.collectedOn, source: b.source }, user.id);
+      await repo.touch(caseId);
+    },
+
+    async addCheckin(user, mod, caseId, partnerId, b) {
+      need(mod, ['DOCTOR', 'ASSISTANT', 'DIETITIAN'], 'record check-ins');
+      const c = await load(user, mod, caseId);
+      const p = await repo.partner(caseId, partnerId);
+      if (!p) throw new HttpError(404, 'Partner not found');
+      if (!isDate(b.date) || b.date > latestDate()) throw new HttpError(400, 'Enter the check-in date (not in the future)');
+      const fields = checkinFields(p.sex);
+      const { data, errors } = cleanFields(fields, b.data);
+      if (errors.length) throw new HttpError(400, errors.join('; '));
+      const missing = missingIn(fields, data);
+      if (missing.length) throw new HttpError(400, 'Required: ' + missing.join(', '));
+      await repo.addCheckin(partnerId, b.date, c.phase, data, user.id);
       await repo.touch(caseId);
     },
 

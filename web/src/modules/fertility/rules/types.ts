@@ -16,6 +16,9 @@ export interface Rule {
   ivf_decision: string | null; diet_decision: string | null; reviewer_comments: string | null;
   reviewed_by: string | null; reviewed_on: string | null;
   version: number; updated_at: string; updated_by_name: string | null;
+  has_catalogue_update?: boolean;
+  catalogue_update?: (Pick<Rule, 'engine_mode' | 'condition' | 'phases' | 'notes' | 'kind' | 'trigger_text' | 'action_text'>
+    & { catalogue_version: string; note: string }) | null;
 }
 
 export interface RuleHistoryRow {

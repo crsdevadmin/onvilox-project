@@ -18,6 +18,8 @@ export const fertilityApi = {
     api.put<{ version: number; missing: string[] }>(`${base}/cases/${id}/partners/${pid}/assessment`, { data }),
   addLab: (id: string, pid: string, lab: Record<string, string>) => api.post(`${base}/cases/${id}/partners/${pid}/labs`, lab),
   setPhase: (id: string, phase: string, date: string, note: string) => api.post(`${base}/cases/${id}/phase`, { phase, date, note }),
+  addCheckin: (id: string, pid: string, date: string, data: FormValues) =>
+    api.post<EngineRun>(`${base}/cases/${id}/partners/${pid}/checkins`, { date, data }),
   runEngine: (id: string) => api.post<EngineRun>(`${base}/cases/${id}/engine`, {}),
   latestRun: (id: string) => api.get<EngineRun | null>(`${base}/cases/${id}/engine`),
   dietitians: () => api.get<{ id: string; name: string }[]>(`${base}/dietitians`),

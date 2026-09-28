@@ -47,7 +47,8 @@ export function RulesPage() {
         {loading ? <Loading /> : (
           <DataTable<Rule> rows={rows} rowKey={r => r.id} empty="No rules match."
             columns={[
-              { key: 'id', header: 'Rule', render: r => <Link to={encodeURIComponent(r.id)}><strong>{r.id}</strong></Link> },
+              { key: 'id', header: 'Rule', render: r => <div><Link to={encodeURIComponent(r.id)}><strong>{r.id}</strong></Link>
+                {r.has_catalogue_update && <div><Badge tone="info" title="A catalogue update is waiting for review">Update</Badge></div>}</div> },
               { key: 'area', header: 'Area', render: r => <span className="gq-small">{r.area}</span> },
               { key: 'if', header: 'If', width: '30%', render: r => <span className="gq-small">{r.trigger_text}</span> },
               { key: 'kind', header: 'Type', render: r => <div className="gq-small">{pretty(r.kind)}

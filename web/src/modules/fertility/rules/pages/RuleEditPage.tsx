@@ -58,6 +58,17 @@ export function RuleEditPage() {
       <PageHeader title={isNew ? 'New rule' : `Rule ${ruleId}`}
         subtitle={rule ? `Version ${rule.version} · last changed ${new Date(rule.updated_at).toLocaleString()}${rule.updated_by_name ? ' by ' + rule.updated_by_name : ''}` : 'Starts as a draft'} />
       {msg && <Banner tone={msg.tone} onClose={() => setMsg(null)}>{msg.text}</Banner>}
+      {rule?.catalogue_update && (
+        <Banner tone="info">
+          Rule catalogue {rule.catalogue_update.catalogue_version} has an update for this rule that was not applied because it
+          had been edited here. {rule.catalogue_update.note}.{rule.catalogue_update.notes ? ` Catalogue note: “${rule.catalogue_update.notes}”` : ''}
+          {' '}<button className="btn-secondary btn-sm" onClick={() => {
+            const u = rule.catalogue_update!;
+            setR(s => ({ ...s, engine_mode: u.engine_mode, condition: u.condition, phases: u.phases, kind: u.kind,
+              trigger_text: u.trigger_text, action_text: u.action_text }));
+            setNote(`Applied catalogue ${u.catalogue_version} update`);
+          }}>Load the update into the form</button> (your notes are kept; review, then save)
+        </Banner>)}
 
       <Card title="Rule">
         <div className="gq-form-grid">

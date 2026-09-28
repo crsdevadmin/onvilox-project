@@ -20,8 +20,23 @@ const ENUMS = {
 };
 const TEXT = ['area', 'pathway', 'rule_type', 'trigger_text', 'action_text', 'sources', 'notes', 'reviewer_comments', 'reviewed_by'];
 
+const SEED = require(path.join(__dirname, '..', 'rules', 'seed.json'));
+const UPGRADE = ['engine_mode', 'condition', 'phases', 'notes', 'kind', 'trigger_text', 'action_text'];
+// Key-order-independent JSON (Postgres jsonb does not keep key order).
+const canon = v => (Array.isArray(v) ? `[${v.map(canon).join(',')}]`
+  : v && typeof v === 'object' ? `{${Object.keys(v).sort().map(k => JSON.stringify(k) + ':' + canon(v[k])).join(',')}}`
+  : JSON.stringify(v ?? null));
+const differsFromSeed = (cur, r, keys = UPGRADE) => keys.some(k => canon(cur[k] ?? null) !== canon(r[k] ?? null));
+
 function rulesService(repo, cases) {
   const catalogue = factCatalogue();
+  // A catalogue update that could not be applied because an admin had edited the rule.
+  const suggestion = cur => {
+    const r = SEED.rules.find(x => x.id === cur.id);
+    // notes are not compared: an admin's own note should not keep the suggestion alive
+    if (!r || !r.upgrade_note || !cur.updated_by || !differsFromSeed(cur, r, UPGRADE.filter(k => k !== 'notes'))) return null;
+    return { catalogue_version: SEED.catalogue_version, note: r.upgrade_note, ...Object.fromEntries(UPGRADE.map(k => [k, r[k] ?? null])) };
+  };
   const phaseCodes = PHASES.map(p => p.value);
 
   function clean(body, existing) {
@@ -60,20 +75,34 @@ function rulesService(repo, cases) {
   const needAdmin = mod => { if (!isAdmin(mod.role)) throw new HttpError(403, 'Only admins can change clinical rules'); };
 
   return {
+    // Load the rule catalogue shipped with the code.
+    //  - New rules are inserted as drafts.
+    //  - A catalogue update (rule carries upgrade_note) is applied ONLY to rules
+    //    no person has ever edited (last change made by the system). A rule an admin
+    //    has changed is never overwritten — the skipped update is logged.
     async seed() {
-      const { rules, catalogue_version } = require(path.join(__dirname, '..', 'rules', 'seed.json'));
-      let n = 0;
-      for (const r of rules) if (await repo.insert(r, null, `Seeded from rule catalogue ${catalogue_version}`)) n++;
-      if (n) console.log(`fertility rules: seeded ${n} new rule(s) from catalogue ${catalogue_version}`);
+      const { rules, catalogue_version } = SEED;
+      let added = 0, upgraded = 0; const kept = [];
+      for (const r of rules) {
+        if (await repo.insert(r, null, `Seeded from rule catalogue ${catalogue_version}`)) { added++; continue; }
+        if (!r.upgrade_note) continue;
+        const cur = await repo.get(r.id);
+        if (!differsFromSeed(cur, r)) continue;
+        if (cur.updated_by) { kept.push(r.id); continue; }
+        const patch = Object.fromEntries(UPGRADE.map(k => [k, r[k] ?? null]));
+        if (await repo.update(r.id, patch, cur.version, null, r.upgrade_note)) upgraded++;
+      }
+      if (added || upgraded) console.log(`fertility rules: catalogue ${catalogue_version} — ${added} added, ${upgraded} updated`);
+      if (kept.length) console.warn(`fertility rules: catalogue ${catalogue_version} has updates for admin-edited rules (left unchanged): ${kept.join(', ')}`);
     },
 
     facts: () => catalogue,
-    list: () => repo.all(),
+    list: async () => (await repo.all()).map(r => ({ ...r, has_catalogue_update: !!suggestion(r) })),
 
     async get(id) {
       const r = await repo.get(id);
       if (!r) throw new HttpError(404, 'Rule not found');
-      return { ...r, history: await repo.history(id) };
+      return { ...r, catalogue_update: suggestion(r), history: await repo.history(id) };
     },
 
     async create(user, mod, body) {
@@ -109,6 +138,13 @@ function rulesService(repo, cases) {
       const output = runEngine(await repo.all(), c);
       const saved = await repo.saveRun(caseId, ENGINE_VERSION, output, user.id);
       return { id: saved.id, created_at: saved.created_at, engine: ENGINE_VERSION, output };
+    },
+
+    // Saving a check-in re-runs the rules at once, so a red-flag symptom
+    // (e.g. OHSS signs, rule RF-05) is surfaced the moment it is entered.
+    async checkin(user, mod, caseId, partnerId, body) {
+      await cases.addCheckin(user, mod, caseId, partnerId, body);
+      return this.run(user, mod, caseId);
     },
 
     async latest(user, mod, caseId) {

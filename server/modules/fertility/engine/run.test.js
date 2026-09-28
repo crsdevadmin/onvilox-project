@@ -74,3 +74,43 @@ test('missing data is reported as a gap, not a finding', () => {
   assert.ok(p.dataGaps.includes('bmi'));
   assert.ok(!ids(p).includes('NP-03'));
 });
+
+const daysAgo = n => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
+const withCheckins = (phase, checkins) => {
+  const c = structuredClone(couple);
+  c.phase = phase;
+  c.partners[0].checkins = checkins;
+  return c;
+};
+
+test('check-in: OHSS signs during stimulation raise RF-05 and stop formula changes', () => {
+  const out = runEngine(rules, withCheckins('F7', [{ checkin_date: daysAgo(1), data: { weight_kg: 77, abdominal_pain: true } }]));
+  assert.ok(ids(out.partners[0]).includes('RF-05'));
+  assert.strictEqual(out.formulaChangesStopped, true);
+});
+
+test('check-in: 2 kg gain between check-ins raises RF-05; mild bloating only gives F7-03', () => {
+  const gain = runEngine(rules, withCheckins('F7', [
+    { checkin_date: daysAgo(0), data: { weight_kg: 79.5 } }, { checkin_date: daysAgo(3), data: { weight_kg: 77 } }]));
+  assert.strictEqual(gain.partners[0].facts.ci_weight_change_kg, 2.5);
+  assert.ok(ids(gain.partners[0]).includes('RF-05'));
+  const mild = runEngine(rules, withCheckins('F7', [{ checkin_date: daysAgo(0), data: { weight_kg: 77, bloating_mild: true } }]));
+  assert.ok(ids(mild.partners[0]).includes('F7-03') && !ids(mild.partners[0]).includes('RF-05'));
+});
+
+test('check-in: answers older than 7 days are not used; overdue check-in prompts MO-01', () => {
+  const out = runEngine(rules, withCheckins('F7', [{ checkin_date: daysAgo(10), data: { weight_kg: 77, abdominal_pain: true } }]));
+  assert.ok(!ids(out.partners[0]).includes('RF-05'));
+  assert.ok(ids(out.partners[0]).includes('MO-01'));
+});
+
+test('check-in: positive pregnancy test → F9-05 in any phase; negative in F9 → F9-06', () => {
+  const pos = runEngine(rules, withCheckins('F9', [{ checkin_date: daysAgo(0), data: { weight_kg: 77, pregnancy_test: 'POSITIVE' } }]));
+  assert.ok(ids(pos.partners[0]).includes('F9-05'));
+  const neg = runEngine(rules, withCheckins('F9', [{ checkin_date: daysAgo(0), data: { weight_kg: 77, pregnancy_test: 'NEGATIVE' } }]));
+  assert.ok(ids(neg.partners[0]).includes('F9-06') && !ids(neg.partners[0]).includes('F9-05'));
+});
+
+test('no rule is left MANUAL in catalogue v0.2', () => {
+  assert.deepStrictEqual(seed.filter(r => r.engine_mode === 'MANUAL').map(r => r.id), []);
+});

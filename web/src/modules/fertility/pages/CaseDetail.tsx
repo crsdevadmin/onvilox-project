@@ -6,13 +6,14 @@ import { useAsync } from '../../../core/useAsync';
 import { Badge, Banner, Card, Loading, PageHeader, Tabs } from '../../../ui';
 import { fertilityApi } from '../api';
 import { CareTeam } from '../components/CareTeam';
+import { CheckinsTab } from '../components/CheckinsTab';
 import { DecisionSupport } from '../components/DecisionSupport';
 import { PartnerTab } from '../components/PartnerTab';
 import { PhasePanel } from '../components/PhasePanel';
 import { CAN_EDIT, CAN_MANAGE, CAN_OPEN_CASE, phaseLabel } from '../helpers';
 import { useFxSchema } from '../useFxSchema';
 
-type Tab = 'F' | 'M' | 'phase' | 'rules';
+type Tab = 'F' | 'M' | 'checkins' | 'phase' | 'rules';
 
 export function CaseDetail() {
   const { caseId = '' } = useParams();
@@ -36,8 +37,10 @@ export function CaseDetail() {
         subtitle={<>Phase <Badge tone="info">{c.phase}</Badge> {phaseLabel(schema.phases, c.phase)}{c.phase_date ? ` · since ${c.phase_date}` : ''}</>}
         actions={<CareTeam c={c} canManage={CAN_MANAGE.includes(role)} onSaved={reloadQuiet} />} />
       <Tabs<Tab> value={tab} onChange={setTab} tabs={[
-        { key: 'F', label: 'Female partner' }, { key: 'M', label: 'Male partner' }, { key: 'phase', label: 'Treatment phase' }, { key: 'rules', label: 'Decision support' }]} />
-      {tab === 'rules' ? <DecisionSupport c={c} schema={schema} /> : tab === 'phase' ? (
+        { key: 'F', label: 'Female partner' }, { key: 'M', label: 'Male partner' }, { key: 'checkins', label: 'Check-ins' }, { key: 'phase', label: 'Treatment phase' }, { key: 'rules', label: 'Decision support' }]} />
+      {tab === 'rules' ? <DecisionSupport key={c.updated_at} c={c} schema={schema} />
+        : tab === 'checkins' ? <CheckinsTab c={c} schema={schema} canEdit={CAN_EDIT.includes(role)} onSaved={reloadQuiet} onOpenFindings={() => setTab('rules')} />
+        : tab === 'phase' ? (
         <Card><PhasePanel c={c} phases={schema.phases} canManage={CAN_MANAGE.includes(role)} onSaved={reloadQuiet} /></Card>
       ) : (
         <PartnerTab key={tab} c={c} sex={tab} schema={schema} canEdit={CAN_EDIT.includes(role)}

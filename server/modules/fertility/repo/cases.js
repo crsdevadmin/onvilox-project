@@ -40,6 +40,12 @@ function casesRepo(pool) {
                 ref_low::float8 AS ref_low, ref_high::float8 AS ref_high
            FROM fx_labs WHERE partner_id=$1 ORDER BY fx_labs.collected_on DESC, id DESC`, [p.id])).rows;
     }
+    for (const p of partners) {
+      p.checkins = (await pool.query(
+        `SELECT c.id, to_char(c.checkin_date,'YYYY-MM-DD') AS checkin_date, c.phase, c.data, c.created_at, u.name AS created_by_name
+           FROM fx_checkins c LEFT JOIN users u ON u.id = c.created_by
+          WHERE c.partner_id=$1 ORDER BY c.checkin_date DESC, c.id DESC LIMIT 26`, [p.id])).rows;
+    }
     const events = (await pool.query(
       `SELECT e.*, to_char(e.event_date,'YYYY-MM-DD') AS event_date, u.name AS created_by_name FROM fx_phase_events e LEFT JOIN users u ON u.id = e.created_by
         WHERE e.case_id=$1 ORDER BY e.event_date DESC, e.id DESC`, [id])).rows;
@@ -89,6 +95,11 @@ function casesRepo(pool) {
       [partnerId, l.analyte, l.value, l.unit, l.refLow, l.refHigh, l.collectedOn, l.source || null, userId]);
   }
 
+  async function addCheckin(partnerId, date, phase, data, userId) {
+    await pool.query('INSERT INTO fx_checkins (partner_id, checkin_date, phase, data, created_by) VALUES ($1,$2,$3,$4,$5)',
+      [partnerId, date, phase, JSON.stringify(data), userId]);
+  }
+
   async function setPhase(caseId, phase, date, note, userId) {
     await pool.query(`UPDATE fx_cases SET phase=$2, phase_date=$3, status=$4, updated_at=NOW() WHERE id=$1`,
       [caseId, phase, date, phase === 'CLOSED' ? 'CLOSED' : 'ACTIVE']);
@@ -114,7 +125,7 @@ function casesRepo(pool) {
         WHERE a.module_code='fertility' AND a.role=$1 AND a.revoked_at IS NULL ORDER BY u.name`, [role])).rows;
   }
 
-  return { list, get, create, addPartner, partner, saveAssessment, addLab, setPhase, setDietitian, touch, mappedDoctor, moduleUsers };
+  return { list, get, create, addPartner, partner, saveAssessment, addLab, addCheckin, setPhase, setDietitian, touch, mappedDoctor, moduleUsers };
 }
 
 module.exports = { casesRepo };
