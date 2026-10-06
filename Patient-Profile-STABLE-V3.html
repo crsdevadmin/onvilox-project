@@ -8051,8 +8051,18 @@ function renderWxRxRecipe(recipe, targets) {
   var elProt  = document.getElementById('wxRxHeroProt');
   var elSrv   = document.getElementById('wxRxHeroSrv');
   var elRoute = document.getElementById('wxRxHeroRoute');
-  if (elKcal)  elKcal.textContent  = (t.suppKcal    || '') + ' kcal';
-  if (elProt)  elProt.textContent  = (t.suppProtein  || '') + ' g';
+  // Headline = the patient's TOTAL daily target (same as Total Kcal / Total
+  // Protein in the weekly values). When the patient still eats, the formula
+  // covers only part of it — show that portion underneath.
+  var _totKcal = t.totalKcal || parseFloat((document.getElementById('wxRx_totalKcal') || {}).value) || t.suppKcal || 0;
+  var _totProt = t.totalProtein || parseFloat((document.getElementById('wxRx_totalProtein') || {}).value) || t.suppProtein || 0;
+  var _fromFormula = function(supp, total, unit) {
+    return (total && supp && total > supp)
+      ? '<div style="font-size:10px;font-weight:600;color:rgba(255,255,255,.6);margin-top:2px;">formula ' + supp + ' ' + unit + ' · rest from diet</div>'
+      : '<div style="font-size:10px;font-weight:600;color:rgba(255,255,255,.6);margin-top:2px;">all from formula</div>';
+  };
+  if (elKcal)  elKcal.innerHTML  = (_totKcal || '') + ' kcal' + _fromFormula(t.suppKcal, _totKcal, 'kcal');
+  if (elProt)  elProt.innerHTML  = (_totProt || '') + ' g'    + _fromFormula(t.suppProtein, _totProt, 'g');
   if (elSrv)   elSrv.textContent   = srv + ' servings/day';
   if (elRoute) elRoute.textContent = t.feedingRoute  || 'Oral Feeding';
 
