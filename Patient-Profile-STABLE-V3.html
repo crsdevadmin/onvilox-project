@@ -7875,6 +7875,12 @@ async function generateRxFromLog(logId, weekNo) {
         showWxRxPanel(dbExisting);
         return;
       }
+      // A validation refusal (e.g. no weight on this weekly entry) is not a server outage:
+      // the client-side fallback would only produce an Rx that can never be approved.
+      if (res.status >= 400 && res.status < 500) {
+        alert('Cannot generate the prescription:\n' + (errBody.error || errBody.message || ('HTTP ' + res.status)));
+        return;
+      }
       // No existing Rx in DB — fall back to client-side generation so the doctor isn't blocked
       console.warn('generate-weekly-rx server error; falling back to client-side targets:', errBody);
       var fbLog = (_monLogs || []).find(function(l){ return l.id == logId; });
@@ -8504,14 +8510,16 @@ async function approveWxRx() {
         _wxRxId = savedRx.id;
         await loadWeeklyPrescriptions();
       } else {
+        var reGenErr = await reGen.json().catch(function(){ return {}; });
+        var _approveFailReason = reGenErr.error || reGenErr.message || ('HTTP ' + reGen.status);
         // Server still failing — check if a record now exists in DB
         await loadWeeklyPrescriptions();
         var found = _wxRxList.find(function(r){ return r.week_number == _wxRxCurWeekNo; });
         if (found) _wxRxId = found.id;
       }
-    } catch(ex) { console.warn('Re-generate on approve failed:', ex); }
+    } catch(ex) { console.warn('Re-generate on approve failed:', ex); var _approveFailReason = ex.message; }
     if (!_wxRxId) {
-      alert('Cannot approve: the prescription could not be saved to the database. Please check your connection and try "Generate Rx" again.');
+      alert('Cannot approve: the prescription could not be saved to the database.\n\nReason: ' + (_approveFailReason || 'no response from server') + '\n\nFix the above, then click "Generate Rx" again.');
       return;
     }
   }
