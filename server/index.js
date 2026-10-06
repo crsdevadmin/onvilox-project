@@ -978,9 +978,13 @@ function calcWeeklyRxTargets(baseline, mon, formulas) {
 
   // ── Feeding route — preserved from initial plan ──
   // Read from finalPlan.feedingMethod first, then patient-level fields
+  // The patient's CURRENT feeding method (profile) wins over the route stored
+  // on the last generated plan: when a patient is switched to tube feeding the
+  // old plan still says "Oral Feeding" until it is regenerated, and the weekly
+  // Rx silently assumed ~60% oral intake (formula covered only 40%).
   const _fp0 = fd.finalPlan || fd.engineOutput || {};
-  const feedingRoute = _fp0.feedingMethod || _fp0.prescribedRoute
-                    || fd.prescribedRoute  || fd.feedingMethod || '';
+  const feedingRoute = fd.feedingMethod || _fp0.feedingMethod || _fp0.prescribedRoute
+                    || fd.prescribedRoute || '';
   // isTubeFeed based on saved plan's feeding route — but monitoring oralIntake overrides this.
   // If the doctor records oralIntake > 0 in the monitoring form, the patient IS eating orally.
   const _savedRouteIsTube = /enteral|tube|ng[- ]?tube|peg|jej|parenteral|tpn/i.test(feedingRoute);
@@ -1422,13 +1426,22 @@ app.post('/api/weekly-prescriptions/:id/approve', authenticateToken, async (req,
     // missing. Prefer the linked log, else the newest weekly log for that week.
     let _liveParams = rx.clinical_params;
     try {
-      const lg = (await pool.query(
-        `SELECT data FROM monitoring_logs
+      // Newest weekly entry for THIS week wins — including one saved as a fresh
+      // entry instead of an edit (previously the stale linked log always won,
+      // so values filled in a new entry still read as missing). The linked log
+      // is the fallback when no entry carries this week number.
+      const _rows = (await pool.query(
+        `SELECT id, data FROM monitoring_logs
           WHERE (id = $1 OR (patient_id = $2 AND type='weekly'))
-          ORDER BY (id = $1) DESC, recorded_at DESC`,
+          ORDER BY recorded_at DESC, id DESC`,
         [rx.monitoring_log_id || -1, rx.patient_id])).rows
-        .map(r => (typeof r.data === 'string' ? (() => { try { return JSON.parse(r.data); } catch (e) { return {}; } })() : (r.data || {})))
-        .find(d => rx.monitoring_log_id ? true : parseInt(d.week, 10) === rx.week_number);
+        .map(r => ({ id: r.id, d: (typeof r.data === 'string' ? (() => { try { return JSON.parse(r.data); } catch (e) { return {}; } })() : (r.data || {})) }));
+      const _pick = _rows.find(r => parseInt(r.d.week, 10) === rx.week_number)
+                 || _rows.find(r => r.id === rx.monitoring_log_id);
+      const lg = _pick ? _pick.d : null;
+      if (_pick && _pick.id !== rx.monitoring_log_id) {
+        await pool.query('UPDATE weekly_prescriptions SET monitoring_log_id=$1 WHERE id=$2', [_pick.id, rx.id]).catch(() => {});
+      }
       if (lg && Object.keys(lg).length) {
         _liveParams = lg;
         // Keep the prescription's copy in step so the queue and reports agree.
