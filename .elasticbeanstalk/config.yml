@@ -1,4 +1,7 @@
 branch-defaults:
+  default:
+    environment: onvilox-production
+    group_suffix: null
   main:
     environment: onvilox-production
     group_suffix: null

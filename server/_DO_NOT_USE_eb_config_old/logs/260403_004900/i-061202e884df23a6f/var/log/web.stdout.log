@@ -1,0 +1,18 @@
+Apr  1 16:49:07 ip-172-31-80-237 web[2147]: Server running on port 8080
+Apr  1 17:01:52 ip-172-31-80-237 web[3149]: Server running on port 8080
+Apr  1 17:31:27 ip-172-31-80-237 web[4655]: Server running on port 8080
+Apr  1 17:37:02 ip-172-31-80-237 web[5343]: Server running on port 8080
+Apr  2 17:43:20 ip-172-31-80-237 web[5343]: (node:5343) Warning: SECURITY WARNING: The SSL modes 'prefer', 'require', and 'verify-ca' are treated as aliases for 'verify-full'.
+Apr  2 17:43:20 ip-172-31-80-237 web[5343]: In the next major version (pg-connection-string v3.0.0 and pg v9.0.0), these modes will adopt standard libpq semantics, which have weaker security guarantees.
+Apr  2 17:43:20 ip-172-31-80-237 web[5343]: To prepare for this change:
+Apr  2 17:43:20 ip-172-31-80-237 web[5343]: - If you want the current behavior, explicitly use 'sslmode=verify-full'
+Apr  2 17:43:20 ip-172-31-80-237 web[5343]: - If you want libpq compatibility now, use 'uselibpqcompat=true&sslmode=require'
+Apr  2 17:43:20 ip-172-31-80-237 web[5343]: See https://www.postgresql.org/docs/current/libpq-ssl.html for libpq SSL mode definitions.
+Apr  2 17:43:20 ip-172-31-80-237 web[5343]: (Use `node --trace-warnings ...` to show where the warning was created)
+Apr  2 17:57:25 ip-172-31-80-237 web[54032]: Server running on port 8080
+Apr  2 18:39:52 ip-172-31-80-237 web[55983]: Server running on port 8080
+Apr  2 19:08:06 ip-172-31-80-237 web[55983]: Patient create error: INSERT has more target columns than expressions
+Apr  2 19:08:07 ip-172-31-80-237 web[55983]: Plan create error: insert or update on table "nutrition_plans" violates foreign key constraint "nutrition_plans_patient_id_fkey"
+Apr  2 19:09:33 ip-172-31-80-237 web[57550]: Server running on port 8080
+Apr  2 19:11:42 ip-172-31-80-237 web[57550]: Patient create error: INSERT has more target columns than expressions
+Apr  2 19:11:42 ip-172-31-80-237 web[57550]: Plan create error: insert or update on table "nutrition_plans" violates foreign key constraint "nutrition_plans_patient_id_fkey"

@@ -22,3 +22,4 @@ _inv_qa/
 *.bak*
 store.html.bak-artwork
 .DS_Store
+server/_DO_NOT_USE_eb_config_old/
