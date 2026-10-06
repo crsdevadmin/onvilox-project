@@ -6428,6 +6428,19 @@ async function saveMonitorLog(type) {
       var idx = _monLogs.findIndex(function(l){ return l.id === _editingLogId; });
       if (idx !== -1) _monLogs[idx] = saved;
       cancelEditWeekly();
+      // The server recalculated this week's Rx from the edited entry (e.g. oral
+      // intake 0 -> full replacement). Reload it; if the review panel is open,
+      // refresh it so a later Save/Approve can't write the old values back.
+      try {
+        await loadWeeklyPrescriptions();
+        var _wkEdited = data.week;
+        var _panel = document.getElementById('wxRxPanel');
+        var _fresh = _wxRxList.find(function(r){ return r.week_number == _wkEdited; });
+        if (_fresh && _panel && _panel.style.display !== 'none' && _wxRxId === _fresh.id) {
+          window._lastMonitoringOralIntake = data.oralIntake != null ? Number(data.oralIntake) : null;
+          showWxRxPanel(_fresh);
+        }
+      } catch (_) {}
     } else {
       // ── NEW ENTRY ────────────────────────────────────────────────────
       // Ensure patient exists in DB. Capture the returned integer ID — the server may assign
@@ -8087,7 +8100,13 @@ function renderWxRxRecipe(recipe, targets) {
   var perSrvC = Math.round(rt.carbs   / srv * 10) / 10;
   var perSrvF = Math.round(rt.fat     / srv * 10) / 10;
   var setEl = function(id, val) { var el=document.getElementById(id); if(el) el.textContent = val; };
-  setEl('wxRxMacroDP',  rt.protein + ' g');
+  // Glutamine is a fixed adjunct ON TOP of the protein target — say so.
+  var _glut = (recipe.ingredients || []).filter(function(i){ return /glutamine/i.test(i.name); })
+                .reduce(function(a, i){ return a + (i.grams || 0); }, 0);
+  var _dpEl = document.getElementById('wxRxMacroDP');
+  if (_dpEl) _dpEl.innerHTML = rt.protein + ' g' + (_glut > 0
+    ? '<div style="font-size:10px;font-weight:600;color:#64748b;">blend ' + Math.round((rt.protein - _glut) * 10) / 10 + ' g + glutamine ' + _glut + ' g (extra, not part of target)</div>'
+    : '');
   setEl('wxRxMacroPPS', perSrvP    + ' g');
   setEl('wxRxMacroDC',  rt.carbs   + ' g');
   setEl('wxRxMacroCPS', perSrvC    + ' g');
@@ -8156,7 +8175,7 @@ function renderWxRxRecipe(recipe, targets) {
   // Totals row
   var totDiv = document.getElementById('wxRxTotals');
   if (totDiv && recipe.totals) {
-    var breakdown = recipe.proteinBreakdown ? ' <span style="color:#94a3b8;">(' + recipe.proteinBreakdown + ')</span>' : '';
+    var breakdown = recipe.proteinBreakdown ? ' <span style="color:#94a3b8;">(' + recipe.proteinBreakdown.replace(/ extra \(not part of target\)/, '').replace(/Glutamine (\d+(?:\.\d+)?)g/, 'Glutamine $1g extra — not part of the ' + ((targets && targets.suppProtein) || '') + 'g target') + ')</span>' : '';
     totDiv.innerHTML = '<b>Daily Batch Totals</b> &nbsp;·&nbsp; Powder: <b>' + recipe.totals.powder + ' g</b> &nbsp;|&nbsp; Protein: <b>' + recipe.totals.protein + 'g</b>' + breakdown + ' &nbsp;|&nbsp; Carbs: <b>' + recipe.totals.carbs + 'g</b> &nbsp;|&nbsp; Fat: <b>' + recipe.totals.fat + 'g</b>';
   }
 }

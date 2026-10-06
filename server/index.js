@@ -939,7 +939,7 @@ function calcWeeklyRecipe(suppKcal, suppProtein, formulation, proteinOpts) {
         contrib: { protein: glutGrams, carbs: 0, fat: 0 } }
     ]),
     totals: { powder: totalPowder, protein: totalProtein, carbs: totalCarbs, fat: totalFat },
-    proteinBreakdown: `${blend.code} blend ${protDeliv}g + Glutamine ${glutGrams}g`
+    proteinBreakdown: `${blend.code} blend ${protDeliv}g + Glutamine ${glutGrams}g extra (not part of target)`
   };
 }
 
@@ -1884,15 +1884,16 @@ app.put('/api/monitoring/:logId', authenticateToken, async (req, res) => {
     );
     if (!result.rowCount) return res.status(404).json({ error: 'Log not found' });
     const log = result.rows[0];
-    res.json(log);
 
     // The weekly prescription keeps its own copy of the week's readings
     // (clinical_params) taken when it was generated. Editing the log left that
     // copy stale, so a value the doctor had just filled in still read as
     // missing and the week could not be approved. Refresh the copy — and the
     // targets, since the readings drive them — for the week still in review.
+    // Refresh the open weekly Rx BEFORE responding, so the page can reload it
+    // and never re-save stale targets over the refreshed ones.
     if (log.type === 'weekly') {
-      (async () => {
+      await (async () => {
         try {
           // Match on the log first, then fall back to this patient's week —
           // an older prescription may have been generated from a different log
@@ -1926,6 +1927,7 @@ app.put('/api/monitoring/:logId', authenticateToken, async (req, res) => {
         } catch (e) { console.warn('weekly Rx refresh after log edit:', e.message); }
       })();
     }
+    res.json(log);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
