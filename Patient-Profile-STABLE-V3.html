@@ -8114,10 +8114,22 @@ function renderWxRxRecipe(recipe, targets) {
   setEl('wxRxMacroFPS', perSrvF    + ' g');
 
   // Per-serving summary cards
-  var perSrvKcal = t.suppKcal ? Math.round(t.suppKcal / srv) : '—';
-  var perSrvProt = t.suppProtein ? Math.round(t.suppProtein / srv * 10) / 10 : '—';
-  setEl('wxRxPerSrvKcal', perSrvKcal + (t.suppKcal ? ' kcal' : ''));
-  setEl('wxRxPerSrvProt', perSrvProt + (t.suppProtein ? ' g' : ''));
+  // Per serving = what is actually in one scoop: the daily batch ÷ servings.
+  // (Previously this divided the TARGET, so it ignored the glutamine and never
+  // matched the batch table — e.g. 8.3 g shown vs 13.9 g actually delivered.)
+  var _sub = function(txt) { return '<div style="font-size:10px;font-weight:600;color:#64748b;margin-top:2px;">' + txt + '</div>'; };
+  var _batchKcal = Math.round((rt.protein || 0) * 4 + (rt.carbs || 0) * 4 + (rt.fat || 0) * 9);
+  var _glutSrv   = (recipe.ingredients || []).filter(function(i){ return /glutamine/i.test(i.name); })
+                     .reduce(function(a, i){ return a + (i.grams || 0); }, 0);
+  var _kEl = document.getElementById('wxRxPerSrvKcal');
+  var _pEl = document.getElementById('wxRxPerSrvProt');
+  if (_kEl) _kEl.innerHTML = _batchKcal
+    ? Math.round(_batchKcal / srv) + ' kcal' + _sub(_batchKcal + ' kcal batch ÷ ' + srv + (t.suppKcal ? ' (target ' + Math.round(t.suppKcal / srv) + ')' : ''))
+    : '—';
+  if (_pEl) _pEl.innerHTML = rt.protein
+    ? perSrvP + ' g' + _sub(rt.protein + ' g batch ÷ ' + srv + (_glutSrv ? ' · incl. ' + Math.round(_glutSrv / srv * 10) / 10 + ' g glutamine' : '')
+                     + (t.suppProtein ? ' (target ' + Math.round(t.suppProtein / srv * 10) / 10 + ')' : ''))
+    : '—';
 
   // Macro ratio (P/C/F %)
   var totalMacroKcal = (rt.protein || 0) * 4 + (rt.carbs || 0) * 4 + (rt.fat || 0) * 9;
