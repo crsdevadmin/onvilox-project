@@ -57,8 +57,16 @@
     _showInstallBanner();
   });
 
+  function _isInstalled() {
+    return window.navigator.standalone === true ||
+      (window.matchMedia && matchMedia('(display-mode: standalone)').matches);
+  }
+  function _ss(k, v) { try { if (v === undefined) return sessionStorage.getItem(k); sessionStorage.setItem(k, v); } catch (e) { return null; } }
+
   function _showInstallBanner() {
-    if (localStorage.getItem('pwa_install_dismissed')) return;
+    if (_isInstalled() || _ss('pwa_install_later')) return;
+    if (document.getElementById('pwaInstallBanner')) return;
+    if (!document.body) { document.addEventListener('DOMContentLoaded', _showInstallBanner); return; }
     const banner = document.createElement('div');
     banner.id = 'pwaInstallBanner';
     banner.style.cssText = 'position:fixed;bottom:0;left:0;right:0;background:#0e2247;color:#fff;padding:12px 20px;display:flex;align-items:center;justify-content:space-between;z-index:9999;font-size:14px;box-shadow:0 -2px 12px rgba(0,0,0,0.3);';
@@ -81,7 +89,7 @@
     if (!_deferredPrompt) return;
     _deferredPrompt.prompt();
     _deferredPrompt.userChoice.then(r => {
-      if (r.outcome === 'accepted') localStorage.setItem('pwa_install_dismissed', '1');
+      if (r.outcome !== 'accepted') _ss('pwa_install_later', '1');
       _deferredPrompt = null;
       const b = document.getElementById('pwaInstallBanner');
       if (b) b.remove();
@@ -89,7 +97,7 @@
   };
 
   window._dismissInstall = function() {
-    localStorage.setItem('pwa_install_dismissed', '1');
+    _ss('pwa_install_later', '1');   // ask again on the next visit
     const b = document.getElementById('pwaInstallBanner');
     if (b) b.remove();
   };
@@ -103,9 +111,7 @@
     const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     const standalone = window.navigator.standalone === true || (window.matchMedia && matchMedia('(display-mode: standalone)').matches);
     if (!isIOS || standalone) return;
-    let until = 0;
-    try { until = parseInt(localStorage.getItem('pwa_ios_hint_until') || '0', 10); } catch (e) {}
-    if (Date.now() < until) return;
+    try { if (sessionStorage.getItem('pwa_ios_hint_later')) return; } catch (e) {}
     const show = () => {
       if (document.getElementById('pwaInstallBanner')) return;
       const banner = document.createElement('div');
@@ -115,14 +121,14 @@
         <div style="display:flex;align-items:center;gap:12px;">
           <span style="font-size:24px;">📲</span>
           <div>
-            <div style="font-weight:700;">Install Gquence on your iPhone</div>
+            <div style="font-weight:700;">Install the Gquence app</div>
             <div style="font-size:12px;opacity:0.85;">In Safari tap <b>Share</b> <span style="display:inline-block;border:1px solid rgba(255,255,255,.5);border-radius:4px;padding:0 4px;">⬆︎</span> then <b>Add to Home Screen</b>. Needed for notifications.</div>
           </div>
         </div>
         <button id="pwaIosClose" style="background:transparent;color:#fff;border:1px solid rgba(255,255,255,0.4);border-radius:6px;padding:8px 12px;cursor:pointer;font-size:13px;white-space:nowrap;">Got it</button>`;
       document.body.appendChild(banner);
       document.getElementById('pwaIosClose').onclick = () => {
-        try { localStorage.setItem('pwa_ios_hint_until', String(Date.now() + 7 * 864e5)); } catch (e) {}
+        try { sessionStorage.setItem('pwa_ios_hint_later', '1'); } catch (e) {}
         banner.remove();
       };
     };
