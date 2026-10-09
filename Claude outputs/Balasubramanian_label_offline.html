@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gquence Label (offline)</title>
+<style>
+body{font-family:Arial,Helvetica,sans-serif;margin:0}
+.bar{max-width:820px;margin:16px auto;background:#fff;border:1px solid #cbd5e1;border-radius:8px;padding:14px 18px;font-size:13px;color:#334155}
+.bar button{background:#0e2247;color:#fff;border:none;border-radius:6px;padding:9px 18px;font-weight:700;cursor:pointer;font-size:14px}
+[contenteditable]{outline:none;border-radius:2px}
+@media screen{[contenteditable]{background:#fef9c3;min-width:8mm;display:inline-block}}
+
+    /* Label sheet = 100mm wide x 75mm tall */
+    :root { --lw:100mm; --lh:75mm; }
+    body { background:#eef2f7; }
+    .controls { max-width: 820px; margin: 16px auto; }
+    .label-wrap { display:flex; flex-direction:column; align-items:center; gap:14px; padding-bottom:40px; }
+
+    .label {
+      width: var(--lw); height: var(--lh); box-sizing: border-box;
+      background:#fff; color:#0f172a; padding: 4mm 5mm; overflow:hidden;
+      font-family: Arial, Helvetica, sans-serif; position:relative;
+    }
+    @media screen {
+      .label { border:1px solid #cbd5e1; box-shadow:0 4px 16px rgba(0,0,0,.12); border-radius:4px; }
+      .label-cap { font-size:11px; color:#64748b; font-weight:700; text-transform:uppercase; letter-spacing:.05em; margin-bottom:4px; }
+    }
+    .label * { line-height: 1.18; }
+
+    /* ---- FRONT ---- */
+    .brand { font-size:9px; font-weight:800; letter-spacing:.12em; color:#000000; text-transform:uppercase; }
+    .pname { font-size:17px; font-weight:800; margin:1mm 0 0.5mm; }
+    .pmeta { font-size:10px; color:#334155; margin-bottom:1.5mm; }
+    .pmeta b { color:#0f172a; }
+    .tt-title { font-size:9px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:#000000; border-top:1px solid #e2e8f0; padding-top:1.5mm; margin-top:1mm; }
+    .tt-grid { display:grid; grid-template-columns:1fr 1fr; gap:1.5mm 4mm; margin-top:1.5mm; }
+    .tt-item .l { font-size:8.5px; color:#64748b; text-transform:uppercase; letter-spacing:.04em; }
+    .tt-item .v { font-size:14px; font-weight:800; color:#0f172a; }
+    .tt-item .u { font-size:9px; font-weight:600; color:#475569; }
+
+    /* ---- BACK ---- */
+    .back { display:flex; gap:4mm; height:100%; }
+    .back-left { flex:1; display:flex; flex-direction:column; }
+    .back-right { width:38mm; display:flex; flex-direction:column; justify-content:space-between; border-left:1px solid #e2e8f0; padding-left:3mm; }
+    .sec-h { font-size:8px; font-weight:800; letter-spacing:.05em; text-transform:uppercase; color:#000000; margin-bottom:1mm; }
+    .ps-grid { display:grid; grid-template-columns:1fr 1fr; gap:1mm 3mm; margin-bottom:2mm; }
+    .ps-item .l { font-size:7.5px; color:#64748b; text-transform:uppercase; }
+    .ps-item .v { font-size:11.5px; font-weight:800; }
+    .formula-list { font-size:9px; color:#1e293b; }
+    .formula-list span { display:inline-block; margin:0.4mm 0; }
+    .reg { font-size:8.5px; color:#0f172a; }
+    .reg .row { display:flex; justify-content:space-between; gap:2mm; margin-bottom:0.6mm; }
+    .reg .row .k { color:#64748b; }
+    .reg .row .vv { font-weight:800; text-align:right; }
+    .mfgby { font-size:8px; color:#0f172a; text-align:right; }
+    .mfgby .t { font-size:7.5px; color:#64748b; text-transform:uppercase; letter-spacing:.04em; }
+    .mfgby .n { font-weight:800; font-size:9px; }
+
+    @media print {
+      @page { size: 100mm 75mm; margin: 0; }
+      html, body { background:#fff; margin:0; padding:0; }
+      .no-print { display:none !important; }
+      .label-wrap { padding:0; gap:0; }
+      .label { border:none !important; box-shadow:none !important; border-radius:0; page-break-after: always; }
+      .label-cap { display:none !important; }
+    }
+  
+</style></head><body>
+<div class="bar no-print">
+  <b>Offline label — Balasubramanian.</b> Every <span style="background:#fef9c3;padding:0 4px;">yellow</span> value is editable: click it and type. Check every value against the approved prescription before printing. Yellow does not print.<br><br>
+  <button onclick="window.print()">Print labels</button>
+  &nbsp; Printer: 100 × 75 mm label, margins none, scale 100%.
+</div>
+<div class="label-wrap" id="labels">
+  <div><div class="label-cap no-print">Front label · 100 × 75 mm</div>
+    <div class="label">
+      <div class="brand">Gquence · Therapeutic Nutrition</div>
+      <div class="pname" contenteditable>Balasubramanian</div>
+      <div class="pmeta"><b contenteditable>__</b> yr &nbsp;·&nbsp; <b contenteditable>M</b> &nbsp;·&nbsp; UHIC: <b contenteditable>______</b></div>
+      <div class="tt-title">Per Serving</div>
+      <div class="tt-grid">
+        <div class="tt-item"><div class="l">Energy</div><div class="v"><span contenteditable>621</span> <span class="u">kcal</span></div></div>
+        <div class="tt-item"><div class="l">Protein</div><div class="v"><span contenteditable>20.5</span> <span class="u">g</span></div></div>
+        <div class="tt-item"><div class="l">Servings / Day</div><div class="v"><span contenteditable>3</span> <span class="u">servings/day</span></div></div>
+        <div class="tt-item"><div class="l">Route</div><div class="v" style="font-size:11px;" contenteditable>Enteral Feeding – Tube</div></div>
+      </div>
+    </div></div>
+  <div><div class="label-cap no-print">Back label · 100 × 75 mm</div>
+    <div class="label"><div class="back">
+      <div class="back-left">
+        <div class="sec-h">Per Serving — Energy &amp; Macros</div>
+        <div class="ps-grid">
+          <div class="ps-item"><div class="l">Energy</div><div class="v"><span contenteditable>621</span> kcal</div></div>
+          <div class="ps-item"><div class="l">Protein</div><div class="v"><span contenteditable>20.5</span> g</div></div>
+          <div class="ps-item"><div class="l">Carbohydrate</div><div class="v"><span contenteditable>57.6</span> g</div></div>
+          <div class="ps-item"><div class="l">Fat</div><div class="v"><span contenteditable>31.8</span> g</div></div>
+        </div>
+        <div class="sec-h">Daily Batch Formulation</div>
+        <div class="formula-list" contenteditable style="font-size:8.5px;">• Milk Protein Concentrate (MPC) — 39 g<br>• Soy Protein Isolate (SPI) — 39 g<br>• Maltodextrin (DE 19) — 123.9 g<br>• MCT Powder (70%) — 132 g<br>• Omega-3 Powder — 3.9 g<br>• L-Glutamine — 16 g<br><b>Total powder 353.8 g/day · 3 × ~118 g</b></div>
+      </div>
+      <div class="back-right">
+        <div class="reg">
+          <div class="row"><span class="k">FSSAI No.</span><span class="vv" contenteditable>__________</span></div>
+          <div class="row"><span class="k">Batch No.</span><span class="vv" contenteditable>GQ-050-W2-2610-3883</span></div>
+          <div class="row"><span class="k">Mfg Date</span><span class="vv" contenteditable>08/10/2026</span></div>
+          <div class="row"><span class="k">Exp Date</span><span class="vv" contenteditable>08/04/2028</span></div>
+        </div>
+        <div class="mfgby"><div class="t">Manufactured by</div>
+          <div class="n" contenteditable>Store name</div><div contenteditable>Store address</div></div>
+      </div>
+    </div></div></div>
+</div>
+</body></html>

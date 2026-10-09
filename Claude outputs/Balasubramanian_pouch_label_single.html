@@ -1,0 +1,89 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>Gquence pouch label (offline)</title><style>
+body{margin:0;background:#eef2f7;font-family:Arial,Helvetica,sans-serif}
+.bar{max-width:620px;margin:16px auto;background:#fff;border:1px solid #cbd5e1;border-radius:8px;padding:12px 16px;font-size:13px;color:#334155}
+.bar button{background:#0e2247;color:#fff;border:none;border-radius:6px;padding:9px 18px;font-weight:700;cursor:pointer}
+@media screen{[contenteditable]{background:#fef9c3;border-radius:2px;outline:none}}
+    /* ---- Artwork pouch label 100 x 75 mm (single panel, matches print artwork) ---- */
+    .lbl2 { --a2s:1; width:100mm; height:75mm; box-sizing:border-box; background:#fff; color:#000; padding:2mm; font-family:Arial,Helvetica,sans-serif; margin:10px auto; overflow:hidden; }
+    .lbl2 * { line-height:1.16; }
+    .a2-bleed { height:100%; box-sizing:border-box; border:1.1px dashed #2f6f72; border-radius:2.5mm; padding:1.5mm; }
+    .a2-frame { height:100%; box-sizing:border-box; border:0.8px solid #8a8a8a; padding:2mm 2.4mm; display:flex; gap:2.8mm; }
+    .a2-l { flex:1 1 0; min-width:0; display:flex; flex-direction:column; }
+    .a2-r { width:38mm; flex:none; display:flex; flex-direction:column; }
+    .a2-h { font-size:calc(9.5px * var(--a2s)); font-weight:800; letter-spacing:.05em; text-transform:uppercase; color:#000; border-bottom:1.2px solid #000; padding-bottom:0.5mm; margin-bottom:1mm; }
+    .a2-brand { font-size:calc(8px * var(--a2s)); font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:#000; margin-bottom:1.5mm; }
+    .a2-name { font-size:calc(13px * var(--a2s)); font-weight:800; margin-bottom:0.8mm; }
+    .a2-kv { display:grid; grid-template-columns:auto 1fr; gap:0.7mm 1.8mm; font-size:calc(9px * var(--a2s)); }
+    .a2-kv .k { color:#000; white-space:nowrap; }
+    .a2-kv .v { font-weight:700; color:#000; }
+    /* app.css styles bare th/td globally (font-size:13.5px, padding, colour). A rule on the
+       bare element always beats a value inherited from .a2-nt, so the label has to restate
+       its own type scale or the nutrition table renders ~2x too big and overflows 75mm. */
+    .lbl2 table { width:100%; border-collapse:collapse; border-spacing:0; }
+    .lbl2 th, .lbl2 td { padding:0; margin:0; background:none; border:none; color:#000;
+      font-size:calc(9px * var(--a2s)); font-weight:400; letter-spacing:normal; text-transform:none;
+      white-space:normal; vertical-align:baseline; text-align:left; }
+    .a2-nt { width:100%; border-collapse:collapse; font-size:calc(9px * var(--a2s)); margin-top:0.4mm; }
+    .a2-nt th { font-size:calc(7.6px * var(--a2s)); font-weight:800; text-transform:uppercase; letter-spacing:.02em; color:#000; text-align:right; padding:0 0 0.5mm; border-bottom:1.2px solid #000; }
+    .a2-nt th:first-child { text-align:left; }
+    .a2-nt td { padding:0.7mm 0; border-bottom:0.6px solid #9a9a9a; text-align:right; font-weight:800; }
+    .a2-nt td:first-child { text-align:left; font-weight:400; color:#000; }
+    .a2-nt tr:last-child td { border-bottom:none; }
+    .a2-ing { font-size:calc(8.6px * var(--a2s)); color:#000; }
+    .a2-note { font-size:calc(7.6px * var(--a2s)); color:#000; margin-top:1.6mm; }
+    .a2-reg { margin-top:auto; }
+    .a2-flav { font-size:calc(7.8px * var(--a2s)); font-weight:800; letter-spacing:.01em; text-transform:uppercase; text-align:center; border-top:1.2px solid #000; border-bottom:1.2px solid #000; padding:0.7mm 0; margin-bottom:1.3mm; }
+    .a2-row { display:grid; grid-template-columns:auto 2.4mm 1fr; align-items:baseline; font-size:calc(9px * var(--a2s)); margin-bottom:0.6mm; }
+    .a2-row .k { color:#000; }
+    .a2-row .c { text-align:center; color:#000; }
+    .a2-row .v { font-weight:800; overflow-wrap:anywhere; }
+    .a2-row.bold .k { font-weight:800; }
+    .a2-fine { font-size:calc(7.6px * var(--a2s)); color:#000; grid-column:1 / -1; }
+
+
+@page{size:100mm 75mm;margin:0}
+@media print{body{background:#fff} .bar{display:none} .lbl2{margin:0!important} .lbl2 .a2-bleed{border:none!important;border-radius:0!important;padding:0!important}
+ *{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+</style></head><body>
+<div class="bar"><b>Single pouch label — Balasubramanian.</b> Yellow values are editable (click and type); yellow does not print.<br><br>
+<button onclick="window.print()">Print</button> &nbsp;Paper 100 × 75 mm · margins 0 · scale 100%</div>
+<div class="lbl2" id="lblArt"><div class="a2-bleed"><div class="a2-frame">
+ <div class="a2-l">
+  <div class="a2-brand">Gquence &middot; Therapeutic Nutrition</div>
+  <div class="a2-h">Patient Information</div>
+  <div class="a2-name" contenteditable>Mr. Balasubramanian</div>
+  <div class="a2-kv">
+   <div class="k">UHIC</div><div class="v"><span contenteditable>Ac01.0002515367</span></div>
+   <div class="k">Age / Sex</div><div class="v"><span contenteditable>80 yr / Male</span></div>
+   <div class="k">Indication</div><div class="v"><span contenteditable>Laryngeal Cancer - Supraglottic</span></div>
+   <div class="k">Route</div><div class="v"><span contenteditable>Enteral Feeding – Tube</span></div>
+   <div class="k">Servings / day</div><div class="v"><span contenteditable>3</span></div>
+   <div class="k">Prescription</div><div class="v"><span contenteditable>Week 2</span></div>
+  </div>
+  <div class="a2-h" style="margin-top:1.6mm;">Nutrition Column</div>
+  <table class="a2-nt"><thead><tr><th>Nutrient</th><th>Per serving</th><th>Per day</th></tr></thead><tbody>
+   <tr><td>Energy (kcal)</td><td><span contenteditable>621</span></td><td><span contenteditable>1863</span></td></tr>
+   <tr><td>Protein (g)</td><td><span contenteditable>20.5</span></td><td><span contenteditable>61.5</span></td></tr>
+   <tr><td>Carbohydrate (g)</td><td><span contenteditable>57.6</span></td><td><span contenteditable>172.8</span></td></tr>
+   <tr><td>Fat (g)</td><td><span contenteditable>31.8</span></td><td><span contenteditable>95.4</span></td></tr>
+  </tbody></table>
+ </div>
+ <div class="a2-r">
+  <div class="a2-h">Ingredients</div>
+  <div class="a2-ing" contenteditable>MCT Powder (70%), Maltodextrin (DE 19), Milk Protein Concentrate (MPC), Soya Protein Isolate (SPI), L-Glutamine powder, Omega-3 Powder.</div>
+  <div class="a2-note">Store in a cool, dry place, away from sunlight. Use under medical supervision. Not for parenteral use.</div>
+  <div class="a2-reg">
+   <div class="a2-flav">Contains permitted synthetic flavours</div>
+   <div class="a2-row"><span class="k">FSSAI Lic. No.</span><span class="c">:</span><span class="v" contenteditable>12422999000936</span></div>
+   <div class="a2-row"><span class="k">Batch No.</span><span class="c">:</span><span class="v" contenteditable>GQ-050-W2-2610-3883</span></div>
+   <div class="a2-row"><span class="k">Mfg. Date</span><span class="c">:</span><span class="v" contenteditable>08/10/2026</span></div>
+   <div class="a2-row"><span class="k">Exp. Date</span><span class="c">:</span><span class="v" contenteditable>08/04/2027</span></div>
+   <div class="a2-row bold"><span class="k">Net weight</span><span class="c">:</span><span class="v" contenteditable>56 g</span></div>
+   <div class="a2-row bold"><span class="k">Max. Retail Price</span><span class="c">:</span><span class="v" contenteditable>Rs. 8500</span></div>
+   <div class="a2-row"><span class="a2-fine">(inclusive of all taxes)</span></div>
+   <div class="a2-row bold"><span class="k">U.S.P / g</span><span class="c">:</span><span class="v" contenteditable>Rs. 3.61</span></div>
+   <div class="a2-row"><span class="a2-fine" contenteditable>Mfd by: Fortius Fudz, 14, 4th cross street, Sivalingapuram, Korattur, Chennai - 600076</span></div>
+  </div>
+ </div>
+</div></div></div>
+</body></html>

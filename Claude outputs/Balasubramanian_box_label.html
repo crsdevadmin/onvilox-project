@@ -1,0 +1,75 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>Gquence box label (offline)</title><style>
+body{margin:0;background:#eef2f7;font-family:Arial,Helvetica,sans-serif}
+.bar{max-width:620px;margin:16px auto;background:#fff;border:1px solid #cbd5e1;border-radius:8px;padding:12px 16px;font-size:13px;color:#334155}
+.bar button{background:#0e2247;color:#fff;border:none;border-radius:6px;padding:9px 18px;font-weight:700;cursor:pointer}
+@media screen{[contenteditable]{background:#fef9c3;border-radius:2px;outline:none}}
+    .lb-brand { font-size:8.5px;font-weight:800;letter-spacing:.12em;color:#000000;text-transform:uppercase; }
+    /* ---- Box label 100 x 150 mm ---- */
+    .lbl3 { width:100mm; height:150mm; box-sizing:border-box; background:#fff; color:#0f172a; padding:5mm; font-family:Arial,Helvetica,sans-serif; border:1px solid #cbd5e1; border-radius:4px; box-shadow:0 4px 14px rgba(0,0,0,.12); margin:10px auto; overflow:hidden; }
+    .lbl3 * { line-height:1.2; }
+    .b3-h { font-size:9px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:#000000;border-bottom:1px solid #e2e8f0;padding-bottom:1mm;margin:2.5mm 0 1.5mm; }
+    .b3-h:first-of-type { margin-top:1.5mm; }
+    .b3-tbl { width:100%;border-collapse:collapse;font-size:10px; }
+    .b3-tbl td { padding:0.9mm 1mm;border-bottom:1px solid #f1f5f9;vertical-align:top; }
+    .b3-tbl td.k { color:#64748b;width:42%; }
+    .b3-tbl td.v { font-weight:700;text-align:right; }
+    .b3-spec { width:100%;border-collapse:collapse;font-size:10px; }
+    .b3-spec th { font-size:8px;text-transform:uppercase;letter-spacing:.03em;color:#64748b;text-align:left;padding:1mm;border-bottom:1.5px solid #e2e8f0; }
+    .b3-spec th.r, .b3-spec td.r { text-align:right; }
+    .b3-spec td { padding:1mm;border-bottom:1px solid #f1f5f9; }
+    .b3-spec tfoot td { font-weight:800;border-top:1.5px solid #e2e8f0;border-bottom:none; }
+    .b3-foot { display:flex;justify-content:space-between;gap:3mm;margin-top:2.5mm;border-top:1px solid #e2e8f0;padding-top:2mm; }
+    .b3-foot .reg .r { display:flex;justify-content:space-between;font-size:8.5px;gap:3mm;margin-bottom:0.6mm; }
+    .b3-foot .reg .r .k { color:#64748b; } .b3-foot .reg .r .vv { font-weight:800; }
+    .b3-foot .mfgby { text-align:right;font-size:8px; } .b3-foot .mfgby .t { color:#64748b;text-transform:uppercase;font-size:7.5px; } .b3-foot .mfgby .n { font-weight:800;font-size:9px; }
+
+
+.lbl3{padding:4mm 5mm!important}
+.b3-h{margin:2mm 0 1mm!important}
+.b3-tbl,.b3-spec{font-size:9px!important}
+.b3-tbl td,.b3-spec td{padding:0.55mm 1mm!important}
+.b3-spec th{padding:0.6mm 1mm!important}
+.b3-foot{margin-top:2mm!important;padding-top:1.5mm!important}
+@page{size:100mm 150mm;margin:0}
+@media print{body{background:#fff} .bar{display:none} .lbl3{margin:0!important;border:none!important;box-shadow:none!important;border-radius:0!important}
+ .lbl3,.lbl3 *{color:#000!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+</style></head><body>
+<div class="bar"><b>Box label — Mr. Balasubramanian.</b> Yellow values are editable; yellow does not print.<br><br>
+<button onclick="window.print()">Print</button> &nbsp;Paper 100 × 150 mm · margins 0 · scale 100%</div>
+<div class="lbl3" id="lblBox">
+ <div class="lb-brand">Gquence · Personalized Oncology Nutrition</div>
+ <div style="font-size:13px;font-weight:800;margin-top:1mm;" contenteditable>Mr. Balasubramanian</div>
+ <div class="b3-h">Patient Details</div>
+ <table class="b3-tbl">
+  <tr><td class="k">UHIC</td><td class="v"><span contenteditable>Ac01.0002515367</span></td></tr>
+  <tr><td class="k">Age / Sex</td><td class="v"><span contenteditable>80 yr / Male</span></td></tr>
+  <tr><td class="k">Cancer</td><td class="v"><span contenteditable>Laryngeal Cancer - Supraglottic</span></td></tr>
+  <tr><td class="k">Regimen</td><td class="v"><span contenteditable>—</span></td></tr>
+  <tr><td class="k">Feeding Route</td><td class="v"><span contenteditable>Enteral Feeding – Tube</span></td></tr>
+  <tr><td class="k">Servings / Day</td><td class="v"><span contenteditable>3</span></td></tr>
+ </table>
+ <div class="b3-h">Macro Distribution</div>
+ <table class="b3-spec"><thead><tr><th>Nutrient</th><th class="r">Per Serving</th><th class="r">Daily Total</th></tr></thead><tbody>
+  <tr><td>Energy (kcal)</td><td class="r"><span contenteditable>621</span></td><td class="r"><span contenteditable>1863</span></td></tr>
+  <tr><td>Protein (g)</td><td class="r"><span contenteditable>20.5</span></td><td class="r"><span contenteditable>61.5</span></td></tr>
+  <tr><td>Carbohydrate (g)</td><td class="r"><span contenteditable>57.6</span></td><td class="r"><span contenteditable>172.8</span></td></tr>
+  <tr><td>Fat (g)</td><td class="r"><span contenteditable>31.8</span></td><td class="r"><span contenteditable>95.4</span></td></tr>
+ </tbody></table>
+ <div style="font-size:9px;color:#475569;margin-top:1mm;">Protein source: <b contenteditable>Protein Plan P5 · Renal Support — MPC 50% · SPI 50%</b></div>
+ <div class="b3-h">Production Specifications (Daily Batch)</div>
+ <table class="b3-spec"><thead><tr><th>Component</th><th class="r">Quantity</th></tr></thead>
+  <tbody><tr><td><span contenteditable>MCT Powder (70%)</span></td><td class="r"><span contenteditable>132</span> g</td></tr><tr><td><span contenteditable>Maltodextrin (DE 19)</span></td><td class="r"><span contenteditable>123.9</span> g</td></tr><tr><td><span contenteditable>Milk Protein Concentrate (MPC)</span></td><td class="r"><span contenteditable>39</span> g</td></tr><tr><td><span contenteditable>Soya Protein Isolate (SPI)</span></td><td class="r"><span contenteditable>39</span> g</td></tr><tr><td><span contenteditable>L-Glutamine powder</span></td><td class="r"><span contenteditable>16</span> g</td></tr><tr><td><span contenteditable>Omega-3 Powder</span></td><td class="r"><span contenteditable>3.9</span> g</td></tr></tbody>
+  <tfoot><tr><td>Total batch energy</td><td class="r"><span contenteditable>1864 kcal</span></td></tr>
+  <tr><td>Total batch protein</td><td class="r"><span contenteditable>78.4 g</span></td></tr></tfoot>
+ </table>
+ <div class="b3-foot">
+  <div class="reg">
+   <div class="r"><span class="k">FSSAI</span><span class="vv" contenteditable>12422999000936</span></div>
+   <div class="r"><span class="k">Batch No.</span><span class="vv" contenteditable>GQ-050-W2-2610-3883</span></div>
+   <div class="r"><span class="k">Mfg Date</span><span class="vv" contenteditable>08/10/2026</span></div>
+   <div class="r"><span class="k">Exp Date</span><span class="vv" contenteditable>08/04/2027</span></div>
+  </div>
+  <div class="mfgby"><div class="t">Manufactured by</div><div class="n" contenteditable>Fortius Fudz</div>
+   <div contenteditable>14, 4th cross street, Sivalingapuram,<br>Korattur, Chennai - 600076</div></div>
+ </div>
+</div></body></html>
