@@ -6,11 +6,12 @@
   }
 
   function setCurrentUser(u){
-    db.setTable(SESSION_KEY, u);
+    return db.setTable(SESSION_KEY, u);
   }
 
   function logout(){
-    localStorage.removeItem(db.key(SESSION_KEY));
+    if (db.removeTable) db.removeTable(SESSION_KEY);
+    else { try { localStorage.removeItem(db.key(SESSION_KEY)); } catch (e) {} }
     window.location.href = '/login';
   }
 
@@ -39,6 +40,12 @@
           // could not tell, in which case the legacy role routing applies.
           modules: Array.isArray(data.modules) ? data.modules : null
         });
+        // If the browser refused to keep the session, every page would send the
+        // user straight back here. Say so instead of looping silently.
+        if (!getCurrentUser()) {
+          return { ok: false, error: 'This browser is blocking storage, so the login cannot be kept. '
+            + 'On iPad/iPhone: turn off Private Browsing, or Settings → Safari → Clear History and Website Data, then try again.' };
+        }
         return { ok: true, route: data.landing || routeForRole(data.user.role) };
       }
 
