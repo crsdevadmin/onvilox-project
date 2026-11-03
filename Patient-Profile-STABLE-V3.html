@@ -2517,7 +2517,7 @@
         <script src="/js/engine-config.js"></script>
         <script src="/js/ai-report-service.js"></script>
         <script src="/js/intake-calculator.js"></script>
-        <script src="/js/essentials-layout.js?v=1"></script>
+        <script src="/js/essentials-layout.js?v=2"></script>
         <script>
           // Edit Patient Details: required fields first, the rest folded away.
           window.addEventListener('DOMContentLoaded', function () {
@@ -2528,9 +2528,22 @@
               root: root,
               basics: name.closest('.form-grid'),
               cards: root.querySelector('.clinical-cards-grid'),
-              extra: [{ id: 'epRegimen', markRequired: true }],
+              rows: [
+                { title: 'Patient',            ids: ['epName', 'epAge', 'epSex'] },
+                { title: 'Body measurements',  ids: ['epWeight', 'epHeight'] },
+                { title: 'Key labs',           ids: ['epCreatinine', 'epCRP', 'epBloodSugar', 'epAlbumin', 'epHemoglobin'] },
+                { title: 'Cancer & treatment', ids: ['epCancer', 'epRegimen'] },
+                { title: 'Feeding',            ids: ['epFeeding', 'epGi'] }
+              ],
+              relabel: { epHeight: 'Height (cm)', epGi: 'GI Issues (hydrolysed formula?)' },
+              hints: { epHeight: 'In centimetres, e.g. 162 (not 1.62)', epRegimen: 'Pick from the list.' },
+              markRequired: ['epRegimen'],
+              hide: ['epMetastasisTags', 'epGenomicMarkersTags'],
+              widePanels: ['epStage'],
+              basicsInto: 'epMUAC',
               resetOnShow: true
             });
+
           });
         </script>
 
