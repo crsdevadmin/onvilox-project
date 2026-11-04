@@ -862,7 +862,14 @@
       // KPI counts (based on all patients for this doctor)
       const total = patients.length;
       const pending = patients.filter(p => (p.status || 'CREATED') === 'CREATED').length;
-      const progress = patients.filter(p => ['APPROVED', 'PROCESSING'].includes(effectiveStatus(p))).length;
+      // In Progress = a product is actually being made for the patient
+      // (processing requested / processing / dispatch requested). Approved
+      // patients still waiting on a store price are not in production yet, and
+      // closed / discharged patients are never "in progress".
+      let _closedIds = [];
+      try { _closedIds = (_closed || []).map(c => String(c.id)); } catch (e) { _closedIds = []; }
+      const progress = patients.filter(p => !_closedIds.includes(String(p.id))
+        && effectiveStatus(p) === 'PROCESSING').length;
       const ready = patients.filter(p => ['READY', 'DISPATCHED', 'DELIVERED'].includes(effectiveStatus(p))).length;
 
       const setKpi = (id, val) => {
