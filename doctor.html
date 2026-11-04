@@ -151,6 +151,24 @@
                padding:10px 20px 14px; border-top:1px solid var(--border); }
     .ps-note { font-size:11px; color:var(--text-3); }
     @media (max-width: 1000px) { .ps-grid { grid-template-columns:1fr; } }
+    /* All weekly entries pop-up */
+    #wlModal { position:fixed; inset:0; z-index:1001; display:none; background:rgba(2,6,23,.55);
+               align-items:flex-start; justify-content:center; padding:60px 16px 24px; overflow-y:auto; }
+    #wlModal.on { display:flex; }
+    .wl-box { width:100%; max-width:1180px; background:var(--surface); border:1px solid var(--border-2); border-radius:14px;
+              box-shadow:0 20px 60px rgba(0,0,0,.35); padding:18px 20px; }
+    .wl-head { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:14px; }
+    .wl-head h3 { margin:0 0 4px; font-size:18px; font-weight:800; color:var(--text); }
+    .wl-scroll { overflow-x:auto; border:1px solid var(--border); border-radius:10px; }
+    table.wl { border-collapse:collapse; width:100%; font-size:12.5px; }
+    table.wl th, table.wl td { padding:8px 12px; border-bottom:1px solid var(--border); white-space:nowrap; text-align:right; }
+    table.wl th { position:sticky; top:0; background:var(--surface-2); font-size:10.5px; letter-spacing:.06em; text-transform:uppercase; color:var(--text-2); }
+    table.wl td.k { text-align:left; color:var(--text-2); font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.05em;
+                    position:sticky; left:0; background:var(--surface); }
+    table.wl th.k { text-align:left; position:sticky; left:0; z-index:1; }
+    table.wl td.v { color:var(--text); font-weight:700; }
+    table.wl td.note { white-space:normal; min-width:160px; text-align:left; font-weight:500; color:var(--text-2); }
+    .wl-empty { padding:24px; text-align:center; color:var(--text-3); }
     /* Drafts open as a pop-up over the dashboard, not inside it */
     #draftsPanel { position:fixed; inset:0; z-index:1000; background:rgba(2,6,23,.55);
                    align-items:flex-start; justify-content:center; padding:80px 16px 24px; overflow-y:auto; }
@@ -476,6 +494,19 @@
     <div class="dnote" id="qdNote"></div>
   </aside>
   <div class="qtoast" id="qToast" role="status" aria-live="polite"></div>
+  <!-- All weekly entries of one patient, as a pop-up -->
+  <div id="wlModal" onclick="if(event.target===this) closeWeeklyLog()">
+    <div class="wl-box" role="dialog" aria-modal="true" aria-labelledby="wlTitle">
+      <div class="wl-head">
+        <div><h3 id="wlTitle">Weekly entries</h3><div class="qsub" id="wlSub"></div></div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <span id="wlNew"></span>
+          <button class="qbtn qbtn-ghost qbtn-sm" onclick="closeWeeklyLog()" aria-label="Close">✕</button>
+        </div>
+      </div>
+      <div id="wlBody"></div>
+    </div>
+  </div>
 
   <!-- QR Modal -->
   <div id="qrOverlay" class="modal-overlay" onclick="closeQr()">
@@ -1207,6 +1238,9 @@
           + (hist.length ? qHistTable(Object.assign({}, q, { history: hist }))
                          : '<div class="ps-na">No weekly entries yet. Use “+ Weekly entry” to add the first one.</div>')
           + '</div>';
+      } else {
+        weeklyBlock = '<div class="ps-weekly"><div class="ps-title">Weekly progress</div>'
+          + '<div class="ps-na">Patient is closed. Use “All weekly entries” to see the weeks recorded.</div></div>';
       }
       return `
       <div class="ps-wrap">
@@ -1248,7 +1282,8 @@
           <span style="display:flex;gap:8px;flex-wrap:wrap;">
             ${q
               ? `<button class="qbtn qbtn-cyan qbtn-sm" onclick="event.stopPropagation(); openWeeklyEntry('${p.id}')">+ Weekly entry${q.currentWeek != null ? ' (week ' + ((q.pendingRx && (q.pendingRx.missingFields || []).length) ? q.pendingRx.weekNumber : (q.currentWeek || 0) + 1) + ')' : ''}</button>`
-              : `<a class="qbtn qbtn-cyan qbtn-sm" href="/patients/profile?id=${p.id}&section=weekly">+ Weekly entry</a>`}
+              : ''}
+            <button class="qbtn qbtn-ghost qbtn-sm" onclick="event.stopPropagation(); openWeeklyLog('${p.id}')">All weekly entries</button>
             ${q && q.pendingRx && !((q.pendingRx.missingFields || []).length)
               ? `<a class="qbtn qbtn-sm" style="background:var(--green);color:#fff;" href="/patients/profile?id=${p.id}&section=approve">Review &amp; approve week ${q.pendingRx.weekNumber}</a>` : ''}
             <a class="qbtn qbtn-ghost qbtn-sm" href="/patients/profile?id=${p.id}">Open full report</a>
@@ -1257,6 +1292,78 @@
         </div>
       </div>`;
     }
+
+    // ── All weekly entries (pop-up) ───────────────────────────────────────
+    // Reads the patient's full monitoring log straight from the database, so it
+    // works for every patient — including discharged ones not in the queue.
+    async function openWeeklyLog(pid) {
+      const pat = (getPatients() || []).find(x => String(x.id) === String(pid)) || {};
+      const q = _qFor(pid);
+      document.getElementById('wlTitle').textContent = 'Weekly entries';
+      document.getElementById('wlSub').textContent = (pat.name || '') + (pat.uhic ? ' · UHIC ' + pat.uhic : '');
+      document.getElementById('wlNew').innerHTML = q
+        ? '<button class="qbtn qbtn-cyan qbtn-sm" onclick="closeWeeklyLog(); openWeeklyEntry(\'' + pid + '\')">+ New weekly entry</button>'
+        : '<span class="qsub">Patient is closed — reopen to add entries</span>';
+      const body = document.getElementById('wlBody');
+      body.innerHTML = '<div class="wl-empty">Loading…</div>';
+      document.getElementById('wlModal').classList.add('on');
+      let logs = [];
+      try {
+        const res = await fetch(_api() + '/api/patients/' + encodeURIComponent(pid) + '/monitoring', { headers: _hdr() });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        logs = (await res.json()).filter(l => l.type === 'weekly');
+      } catch (e) {
+        body.innerHTML = '<div class="wl-empty">Could not load the weekly entries (' + _esc(e.message) + ').</div>';
+        return;
+      }
+      if (!logs.length) {
+        body.innerHTML = '<div class="wl-empty">No weekly entries recorded yet.</div>';
+        return;
+      }
+      // Oldest week first, left to right — the same direction as the trend.
+      logs.sort((a, b) => {
+        const wa = parseFloat((a.data || {}).week), wb = parseFloat((b.data || {}).week);
+        if (!isNaN(wa) && !isNaN(wb) && wa !== wb) return wa - wb;
+        return new Date(a.recorded_at) - new Date(b.recorded_at);
+      });
+      const D = logs.map(l => l.data || {});
+      const ht = parseFloat(pat.height);
+      const bmiOf = d => d.bmi != null ? d.bmi : (d.weight && ht ? Math.round(d.weight / Math.pow(ht / 100, 2) * 10) / 10 : null);
+      const rows = [
+        ['Date', d => d.date || null],
+        ['Weight', d => d.weight, ' kg'], ['BMI', bmiOf], ['MUAC', d => d.muac, ' cm'],
+        ['Hand grip', d => d.handGrip, ' kg'], ['ECOG', d => d.ecog, '', true],
+        ['Albumin', d => d.albumin, ' g/dL'], ['CRP', d => d.crp, ' mg/L', true],
+        ['Blood glucose', d => d.glucose, ' mg/dL', true], ['Creatinine', d => d.creatinine, ' mg/dL', true],
+        ['Urea', d => d.urea, ' mg/dL', true], ['Oral intake', d => d.oralIntake, '%'],
+        ['Compliance', d => d.compliance, '%'], ['Interruptions', d => d.interruptions || null]
+      ];
+      const cell = (v, u) => (v === null || v === undefined || v === '') ? '<span class="ps-na">—</span>' : _esc(String(v)) + (u ? '<span class="ps-u">' + u + '</span>' : '');
+      let html = '<div class="wl-scroll"><table class="wl"><thead><tr><th class="k"></th>'
+        + D.map((d, i) => '<th>Week ' + (d.week != null ? _esc(String(d.week)) : '?') + '</th>').join('') + '</tr></thead><tbody>';
+      rows.forEach(r => {
+        const vals = D.map(r[1]);
+        if (!vals.some(v => v !== null && v !== undefined && v !== '')) return;   // hide never-filled rows
+        html += '<tr><td class="k">' + r[0] + '</td>' + vals.map((v, i) => {
+          const num = parseFloat(v), prev = i ? parseFloat(vals[i - 1]) : NaN;
+          const delta = (typeof r[2] === 'string' && !isNaN(num) && !isNaN(prev)) ? qDelta(num, prev, r[3]) : '';
+          return '<td class="v">' + cell(v, typeof r[2] === 'string' ? r[2] : '') + delta + '</td>';
+        }).join('') + '</tr>';
+      });
+      if (D.some(d => d.notes)) {
+        html += '<tr><td class="k">Notes</td>' + D.map(d => '<td class="note">' + (d.notes ? _esc(d.notes) : '<span class="ps-na">—</span>') + '</td>').join('') + '</tr>';
+      }
+      html += '</tbody></table></div>';
+      const w = D.map(d => parseFloat(d.weight)).filter(v => !isNaN(v));
+      if (w.length > 1) html += '<div style="display:flex;align-items:center;gap:12px;margin-top:12px;">'
+        + '<span class="qsub">Weight trend</span>' + qSpark(w, 160, 32)
+        + '<span class="qsub">' + w[0] + ' → ' + w[w.length - 1] + ' kg (' + (w[w.length - 1] - w[0]).toFixed(1) + ')</span></div>';
+      html += '<div class="qsub" style="margin-top:10px;">' + D.length + ' weekly entr' + (D.length === 1 ? 'y' : 'ies')
+        + '. To correct an entry, open the full report → Weekly monitoring.</div>';
+      body.innerHTML = html;
+    }
+    function closeWeeklyLog() { document.getElementById('wlModal').classList.remove('on'); }
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeWeeklyLog(); });
 
     function toggleDetails(id) {
       const el = document.getElementById('details_' + id);

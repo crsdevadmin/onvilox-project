@@ -7443,10 +7443,18 @@ async function loadMonitoringLogs() {
     _monLogs = await res.json();
     renderMonitorTables();
     try { renderPatientCharts(); } catch (e) { console.warn('patient charts:', e); }
+    // A discharged / closed patient needs no weekly entries — never show the
+    // "update due" banner for one.
+    var _isClosed = false;
+    try {
+      var cr = await fetch(apiBase + '/api/patients/' + p.id + '/closure', { headers: { Authorization: token } });
+      if (cr.ok) _isClosed = !!(await cr.json()).closed;
+    } catch (e) { /* unknown — fall back to the usual check */ }
     // Weekly assessment due notification (5-day review cycle)
     (function() {
       var banner = document.getElementById('weeklyDueBanner');
       if (!banner) return;
+      if (_isClosed) { banner.style.display = 'none'; return; }
       var weeklyLogs = _monLogs.filter(function(l){ return l.type === 'weekly'; });
       var msgEl = banner.querySelector('.wb-msg');
       var REVIEW_DAYS = 5;   // same cycle as the doctor dashboard queue

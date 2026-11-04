@@ -5335,6 +5335,18 @@ app.get('/api/closure-reasons', authenticateToken, (req, res) => {
 });
 
 // Close a patient. Works for ANY patient, not only trial-enrolled ones.
+// Is this patient currently closed (discharged, deceased, lost …)? Used by the
+// profile page so it does not nag for weekly entries on a closed patient.
+app.get('/api/patients/:id/closure', authenticateToken, async (req, res) => {
+  try {
+    const r = await pool.query(
+      `SELECT reason, closed_at, confirmed_at FROM patient_closures
+        WHERE patient_id = $1 AND reopened_at IS NULL ORDER BY closed_at DESC LIMIT 1`, [req.params.id]);
+    const c = r.rows[0];
+    res.json(c ? { closed: true, reason: c.reason, closedAt: c.closed_at } : { closed: false });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 app.post('/api/patients/:id/close', authenticateToken, async (req, res) => {
   const { reason, note } = req.body || {};
   const spec = CLOSURE_REASONS[reason];
