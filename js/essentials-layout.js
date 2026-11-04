@@ -16,7 +16,7 @@
  *   markRequired: [ids],           // add the red * to these labels
  *   hide: [ids],                   // fields not used any more (kept in DOM, hidden)
  *   firstPanels: [ids],            // panels (found by a field id) shown first in the fold
- *   widePanels: [ids],             // panels (found by a field id) that take a full row
+ *   (each optional section is its own collapsible bar)
  *   basicsInto: id,                // optional leftover basics go into this field's panel
  *   resetOnShow: true              // collapse again every time root is re-shown
  * });
@@ -54,14 +54,19 @@
       .gq-more-toggle[aria-expanded="true"] .gq-arrow { transform:rotate(180deg); }
       .gq-more { margin-top:16px; }
       .gq-more[hidden] { display:none !important; }
-      .gq-more-grid { display:grid !important; grid-template-columns:repeat(2, minmax(0, 1fr)) !important;
-                      gap:20px !important; align-items:stretch !important; margin-top:0 !important; }
-      .gq-more-grid > .ai-panel { margin:0 !important; min-height:0 !important; }
-      .gq-more-grid > .gq-full { grid-column:1 / -1 !important; }
+      .gq-more-grid { display:flex !important; flex-direction:column; gap:12px; margin-top:0 !important; }
+      .gq-more-grid > .ai-panel { margin:0 !important; min-height:0 !important; grid-column:auto !important; }
+      .gq-acc:not(.gq-acc-open) { padding-top:14px !important; padding-bottom:14px !important; }
+      .gq-acc-head { cursor:pointer; user-select:none; display:flex !important; align-items:center; gap:10px;
+                     margin:0 !important; border-bottom:0 !important; padding-bottom:0 !important; }
+      .gq-acc-head:focus-visible { outline:2px solid var(--cyan, #0369a1); outline-offset:4px; border-radius:6px; }
+      .gq-acc-meta { margin-left:auto; display:flex; align-items:center; gap:12px; flex:none; }
+      .gq-acc-count { font-size:11px; font-weight:700; color:var(--green, #047857); }
+      .gq-acc-arrow { font-size:14px; color:var(--text-2, #64748b); transition:transform .2s; }
+      .gq-acc-open .gq-acc-arrow { transform:rotate(180deg); }
+      .gq-acc-body { margin-top:16px; }
+      .gq-acc-body[hidden] { display:none !important; }
       @media (max-width: 1100px) { .gq-ess-grid { grid-template-columns:repeat(2, minmax(0, 1fr)); } }
-      @media (max-width: 760px) {
-        .gq-more-grid { grid-template-columns:1fr !important; }
-      }
       @media (max-width: 560px) { .gq-ess-grid { grid-template-columns:1fr; } }
     `;
     const s = document.createElement('style');
@@ -185,31 +190,69 @@
     if (basics.querySelector('.form-group')) more.insertBefore(basics, panelGrid);
     else basics.style.display = 'none';
 
-    // Half-width cards pair up first; wide cards follow, one per row.
-    const wideIds = (cfg.widePanels || []).map(function (id) {
-      const g = groupOf(id); return g && g.closest('.ai-panel');
-    });
-    const isWide = function (p) {
-      return wideIds.indexOf(p) !== -1 || /1\s*\/\s*-1/.test(p.style.gridColumn || '');
-    };
-    // Panels named in firstPanels lead the fold, each on its own row.
+    // Each section becomes a bar of its own that opens on click, so the
+    // doctor opens only the topic they want. firstPanels lead the list.
     const first = (cfg.firstPanels || []).map(function (id) {
       const g = groupOf(id); return g && g.closest('.ai-panel');
     }).filter(function (p, i, a) { return p && panels.indexOf(p) !== -1 && a.indexOf(p) === i; });
-    const restPanels = panels.filter(function (p) { return first.indexOf(p) === -1; });
-    const half = restPanels.filter(function (p) { return !isWide(p); });
-    const wide = first.concat(restPanels.filter(isWide));
-    if (half.length % 2 === 1) wide.push(half.pop());
-    first.concat(half, wide.slice(first.length)).forEach(function (p) {
-      if (wide.indexOf(p) !== -1) p.classList.add('gq-full');
+    const ordered = first.concat(panels.filter(function (p) { return first.indexOf(p) === -1; }));
+    const bars = [];
+    ordered.forEach(function (p) {
       panelGrid.appendChild(p);
+      const head = p.firstElementChild;
+      if (!head) return;
+      const body = document.createElement('div');
+      body.className = 'gq-acc-body';
+      while (head.nextSibling) body.appendChild(head.nextSibling);
+      p.appendChild(body);
+      p.classList.add('gq-acc');
+      head.classList.add('gq-acc-head');
+      head.setAttribute('role', 'button');
+      head.setAttribute('tabindex', '0');
+      const meta = document.createElement('span');
+      meta.className = 'gq-acc-meta';
+      meta.innerHTML = '<span class="gq-acc-count"></span><span class="gq-acc-arrow">&#9660;</span>';
+      head.appendChild(meta);
+      const bar = { panel: p, head: head, body: body, count: meta.firstChild };
+      bars.push(bar);
+      function flip() { setBar(bar, !p.classList.contains('gq-acc-open')); }
+      head.addEventListener('click', flip);
+      head.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); flip(); }
+      });
+      setBar(bar, false);
     });
+
+    function setBar(bar, open) {
+      bar.panel.classList.toggle('gq-acc-open', open);
+      bar.body.hidden = !open;
+      bar.head.setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
+    // "3 filled" on each bar, so existing data is visible without opening it.
+    function updateCounts() {
+      bars.forEach(function (bar) {
+        let n = 0;
+        bar.body.querySelectorAll('input, textarea').forEach(function (el) {
+          if (el.readOnly || el.type === 'hidden' || el.closest('[style*="display:none"], [style*="display: none"]')) return;
+          if (el.closest('.tag-box')) return;
+          if (String(el.value || '').trim() !== '') n++;
+        });
+        bar.body.querySelectorAll('.tag-container').forEach(function (c) {
+          if (c.children.length) n++;
+        });
+        bar.count.textContent = n ? n + ' filled' : '';
+      });
+    }
+    more.addEventListener('input', updateCounts);
+    more.addEventListener('change', updateCounts);
 
     ess.parentNode.insertBefore(toggle, ess.nextSibling);
     toggle.parentNode.insertBefore(more, toggle.nextSibling);
     if (!cards.children.length) cards.style.display = 'none';
 
     function setOpen(open) {
+      if (open) updateCounts();
+      else bars.forEach(function (b) { setBar(b, false); });
       more.hidden = !open;
       toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
       toggle.querySelector('.gq-more-label').textContent =
@@ -219,8 +262,10 @@
 
     // Open automatically if validation flags a field inside the fold.
     new MutationObserver(function () {
-      if (!more.hidden) return;
-      if (more.querySelector('.field-invalid, .validation-msg.validation-error')) setOpen(true);
+      const bad = more.querySelector('.field-invalid, .validation-msg.validation-error');
+      if (!bad) return;
+      if (more.hidden) setOpen(true);
+      bars.forEach(function (b) { if (b.body.contains(bad)) setBar(b, true); });
     }).observe(more, { subtree: true, attributes: true, attributeFilter: ['class'] });
 
     // Start collapsed each time the form is opened.
