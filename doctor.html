@@ -391,9 +391,7 @@
                   onclick="toggleWeekQueue()">Hide</button>
         </div>
         <div class="qtabs" id="qTabs">
-          <button class="qtab on" data-b="rx"    onclick="setQBucket('rx')">Awaiting your approval <span class="n" id="qn-rx">0</span></button>
-          <button class="qtab"    data-b="asmt"  onclick="setQBucket('asmt')">Weekly assessment due <span class="n" id="qn-asmt">0</span></button>
-          <button class="qtab"    data-b="daily" onclick="setQBucket('daily')">Daily logs missing <span class="n" id="qn-daily">0</span></button>
+          <button class="qtab on" data-b="asmt"  onclick="setQBucket('asmt')">Weekly assessment due <span class="n" id="qn-asmt">0</span></button>
           <button class="qtab"    data-b="price" onclick="setQBucket('price')">Price approval <span class="n" id="qn-price">0</span></button>
         </div>
       </div>
@@ -1188,7 +1186,7 @@
     // ══════════════════════════════════════════════════════════════════════
 
     let _queue = [];            // rows straight from the endpoint
-    let _qBucket = 'rx';        // which bucket tab is showing
+    let _qBucket = 'asmt';        // which bucket tab is showing
     let _qBusy = false;         // guards against double-submitting an approval
 
     function _api() { return (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : ''; }
@@ -1607,7 +1605,8 @@
       setN('qn-rx', b.rx.length); setN('qn-asmt', b.asmt.length); setN('qn-daily', b.daily.length);
       setN('qn-price', b.price.length);
 
-      const total = b.rx.length + b.asmt.length + b.daily.length + b.price.length;
+      // "Awaiting approval" and "Daily logs missing" tabs were removed from the queue.
+      const total = b.asmt.length + b.price.length;
       const cnt = document.getElementById('qCount');
       if (cnt) {
         cnt.textContent = total;
