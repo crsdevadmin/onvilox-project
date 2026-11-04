@@ -15,6 +15,7 @@
  *   hints:   { id: 'hint text' },  // small line under the input
  *   markRequired: [ids],           // add the red * to these labels
  *   hide: [ids],                   // fields not used any more (kept in DOM, hidden)
+ *   firstPanels: [ids],            // panels (found by a field id) shown first in the fold
  *   widePanels: [ids],             // panels (found by a field id) that take a full row
  *   basicsInto: id,                // optional leftover basics go into this field's panel
  *   resetOnShow: true              // collapse again every time root is re-shown
@@ -191,10 +192,15 @@
     const isWide = function (p) {
       return wideIds.indexOf(p) !== -1 || /1\s*\/\s*-1/.test(p.style.gridColumn || '');
     };
-    const half = panels.filter(function (p) { return !isWide(p); });
-    const wide = panels.filter(isWide);
-    if (half.length % 2 === 1) wide.unshift(half.pop());
-    half.concat(wide).forEach(function (p) {
+    // Panels named in firstPanels lead the fold, each on its own row.
+    const first = (cfg.firstPanels || []).map(function (id) {
+      const g = groupOf(id); return g && g.closest('.ai-panel');
+    }).filter(function (p, i, a) { return p && panels.indexOf(p) !== -1 && a.indexOf(p) === i; });
+    const restPanels = panels.filter(function (p) { return first.indexOf(p) === -1; });
+    const half = restPanels.filter(function (p) { return !isWide(p); });
+    const wide = first.concat(restPanels.filter(isWide));
+    if (half.length % 2 === 1) wide.push(half.pop());
+    first.concat(half, wide.slice(first.length)).forEach(function (p) {
       if (wide.indexOf(p) !== -1) p.classList.add('gq-full');
       panelGrid.appendChild(p);
     });

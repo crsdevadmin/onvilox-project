@@ -2517,7 +2517,7 @@
         <script src="/js/engine-config.js"></script>
         <script src="/js/ai-report-service.js"></script>
         <script src="/js/intake-calculator.js"></script>
-        <script src="/js/essentials-layout.js?v=2"></script>
+        <script src="/js/essentials-layout.js?v=3"></script>
         <script>
           // Edit Patient Details: required fields first, the rest folded away.
           window.addEventListener('DOMContentLoaded', function () {
@@ -2539,7 +2539,7 @@
               hints: { epHeight: 'In centimetres, e.g. 162 (not 1.62)', epRegimen: 'Pick from the list.' },
               markRequired: ['epRegimen'],
               hide: ['epMetastasisTags', 'epGenomicMarkersTags'],
-              widePanels: ['epStage'],
+              firstPanels: ['epStage', 'epRadiationTechnique'],
               basicsInto: 'epMUAC',
               resetOnShow: true
             });
