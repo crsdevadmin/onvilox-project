@@ -116,6 +116,10 @@
              border:1px solid var(--amber); color:var(--amber); background:var(--amber-dim);
              border-radius:5px; padding:1px 6px; }
 
+    /* Drafts open as a pop-up over the dashboard, not inside it */
+    #draftsPanel { position:fixed; inset:0; z-index:1000; background:rgba(2,6,23,.55);
+                   align-items:flex-start; justify-content:center; padding:80px 16px 24px; overflow-y:auto; }
+    #draftsPanel .drafts-pop { width:100%; max-width:960px; margin:0; box-shadow:0 20px 60px rgba(0,0,0,.35); }
     /* Drafts — unfinished records, violet so they read as "not yet real" */
     .dcards { display:flex; gap:10px; flex-wrap:wrap; }
     .dcard { flex:1; min-width:230px; background:var(--surface-2); border:1px solid var(--violet);
@@ -333,7 +337,7 @@
     <!-- ── Unfinished patient records ──────────────────────────────────
          Drafts are inert: no plan, no store job. They sit above the queue
          so an interrupted record is visible rather than quietly forgotten. -->
-    <div id="draftsPanel" style="display:none;"></div>
+    <div id="draftsPanel" style="display:none;" onclick="if(event.target===this) toggleDraftsPanel()"></div>
 
     <!-- ── Early-warning risk panel ── -->
     <div id="riskPanel" style="display:none;"></div>
@@ -2343,9 +2347,11 @@
     function toggleDraftsPanel(){
       _draftsOpen = !_draftsOpen;
       renderDrafts();
-      const el = document.getElementById('draftsPanel');
-      if (_draftsOpen && el) el.scrollIntoView({ behavior:'smooth', block:'start' });
     }
+    // Escape closes the Drafts pop-up.
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && _draftsOpen) toggleDraftsPanel();
+    });
     function _draftDaysLeft(iso){
       const t = new Date(iso).getTime();
       if (isNaN(t)) return null;
@@ -2385,15 +2391,16 @@
       const cnt = document.getElementById('draftsCount');
       if (cnt){ cnt.textContent = _drafts.length; cnt.style.display = _drafts.length ? 'inline-block' : 'none'; }
       if (!_draftsOpen){ el.style.display = 'none'; return; }
-      el.style.display = 'block';
+      el.style.display = 'flex';
       if (!_drafts.length){
-        el.innerHTML = `<div class="card" style="border-left:4px solid var(--violet);">
-          <h2 style="margin:0 0 6px;font-size:15px;">Drafts</h2>
+        el.innerHTML = `<div class="card drafts-pop" style="border-left:4px solid var(--violet);">
+          <div style="display:flex;align-items:center;margin-bottom:6px;"><h2 style="margin:0;font-size:15px;">Drafts</h2>
+          <button class="qbtn qbtn-ghost qbtn-sm" style="margin-left:auto" onclick="toggleDraftsPanel()">Close</button></div>
           <div style="font-size:12.5px;color:var(--text-2);">No drafts. Drafts not edited for ${_draftMaxDays} days are deleted automatically.</div></div>`;
         return;
       }
       el.innerHTML = `
-        <div class="card" style="border-left:4px solid var(--violet);">
+        <div class="card drafts-pop" style="border-left:4px solid var(--violet);">
           <div style="display:flex;align-items:center;gap:11px;flex-wrap:wrap;margin-bottom:12px;">
             <h2 style="margin:0;font-size:15px;">Drafts</h2>
             <span style="font-size:10.5px;font-weight:800;color:var(--bg);background:var(--violet);
