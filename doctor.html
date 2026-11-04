@@ -116,6 +116,40 @@
              border:1px solid var(--amber); color:var(--amber); background:var(--amber-dim);
              border-radius:5px; padding:1px 6px; }
 
+
+    /* ── Patient summary (expanded row) — report style ── */
+    .ps-wrap { margin:8px 0 14px; border:1px solid var(--border-2); border-radius:14px; background:var(--surface);
+               overflow:hidden; cursor:default; }
+    .ps-head { display:flex; justify-content:space-between; align-items:center; gap:16px; flex-wrap:wrap;
+               padding:16px 20px; background:var(--surface-2); border-bottom:1px solid var(--border); border-left:4px solid var(--cyan); }
+    .ps-name { font-size:18px; font-weight:800; color:var(--text); }
+    .ps-sub { font-size:12px; color:var(--text-2); margin-top:2px; }
+    .ps-chips { display:flex; flex-wrap:wrap; gap:6px; padding:12px 20px 0; }
+    .ps-chip { font-size:11px; font-weight:800; padding:3px 10px; border-radius:999px; border:1px solid var(--border-2); }
+    .ps-chip.ok { color:var(--green); background:var(--green-dim); border-color:transparent; }
+    .ps-chip.warn { color:var(--amber); background:var(--amber-dim); border-color:transparent; }
+    .ps-chip.bad { color:var(--rose); background:var(--rose-dim); border-color:transparent; }
+    .ps-grid { display:grid; grid-template-columns:1fr 1fr 1.2fr; gap:14px; padding:14px 20px; }
+    .ps-card { border:1px solid var(--border); border-radius:10px; padding:12px 14px; background:var(--bg-2); }
+    .ps-card-accent { border-color:var(--cyan); }
+    .ps-title { font-size:10.5px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:var(--cyan); margin-bottom:8px; }
+    .ps-t2 { color:var(--text-3); font-weight:700; letter-spacing:.04em; margin-left:4px; }
+    .ps-kv { display:flex; justify-content:space-between; gap:12px; padding:6px 0; border-bottom:1px dashed var(--border); font-size:13px; }
+    .ps-kv:last-child { border-bottom:0; }
+    .ps-k { color:var(--text-2); }
+    .ps-v { color:var(--text); font-weight:700; text-align:right; }
+    .ps-u { color:var(--text-3); font-weight:500; font-size:11px; }
+    .ps-na { color:var(--text-3); font-weight:500; }
+    .ps-kv.ps-low .ps-v, .ps-kv.ps-high .ps-v { color:var(--rose); }
+    .ps-big { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:8px; }
+    .ps-tile { border-radius:8px; background:var(--cyan-dim); padding:10px 12px; }
+    .ps-tl { font-size:10.5px; color:var(--text-2); font-weight:700; text-transform:uppercase; letter-spacing:.05em; }
+    .ps-tv { font-size:20px; font-weight:800; color:var(--text); margin-top:2px; }
+    .ps-ts { font-size:11px; color:var(--text-2); }
+    .ps-foot { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;
+               padding:10px 20px 14px; border-top:1px solid var(--border); }
+    .ps-note { font-size:11px; color:var(--text-3); }
+    @media (max-width: 1000px) { .ps-grid { grid-template-columns:1fr; } }
     /* Drafts open as a pop-up over the dashboard, not inside it */
     #draftsPanel { position:fixed; inset:0; z-index:1000; background:rgba(2,6,23,.55);
                    align-items:flex-start; justify-content:center; padding:80px 16px 24px; overflow-y:auto; }
@@ -326,7 +360,7 @@
         <div class="kpi-value" id="kpiProgress">0</div>
       </div>
       <div class="kpi-card">
-        <div class="kpi-label">Ready / Delivered</div>
+        <div class="kpi-label" title="Patients still under care whose latest product has been dispatched or delivered">Product Delivered (active)</div>
         <div class="kpi-value" id="kpiReady">0</div>
       </div>
     </div>
@@ -870,7 +904,10 @@
       try { _closedIds = (_closed || []).map(c => String(c.id)); } catch (e) { _closedIds = []; }
       const progress = patients.filter(p => !_closedIds.includes(String(p.id))
         && effectiveStatus(p) === 'PROCESSING').length;
-      const ready = patients.filter(p => ['READY', 'DISPATCHED', 'DELIVERED'].includes(effectiveStatus(p))).length;
+      // Patients still under care whose latest product has been dispatched or
+      // delivered. Discharged / closed patients are left out.
+      const ready = patients.filter(p => !_closedIds.includes(String(p.id))
+        && ['READY', 'DISPATCHED', 'DELIVERED'].includes(effectiveStatus(p))).length;
 
       const setKpi = (id, val) => {
         const el = document.getElementById(id);
@@ -1114,38 +1151,92 @@
         const detailsRow = document.createElement('tr');
         detailsRow.id = `details_${p.id}`;
         detailsRow.style.display = 'none';
-        detailsRow.innerHTML = `
-      <td colspan="8">
-        <div class="card" style="margin:10px 0 0 0; box-shadow:none; border:1px solid #e5e7eb;">
-          <div style="display:flex; gap:24px; flex-wrap:wrap;">
-            <div style="min-width:260px;">
-              <div style="font-weight:700; margin-bottom:10px;">Patient Details</div>
-              <div><b>Age/Sex:</b> ${p.age || '-'} / ${p.sex || '-'}</div>
-              <div><b>Weight/Height:</b> ${p.weight || '-'} kg / ${p.height || '-'} cm</div>
-              <div><b>Albumin:</b> ${p.albumin || '-'} g/dL</div>
-              <div><b>Feeding:</b> ${p.feedingMethod || '-'}</div>
-              <div><b>Regimen:</b> ${p.regimen || '-'}</div>
-            </div>
-
-            <div style="min-width:260px;">
-              <div style="font-weight:700; margin-bottom:10px;">Nutrition Preview (Engine)</div>
-              ${preview ? `
-                <div><b>Calories/day:</b> ${preview.dailyCalories} kcal</div>
-                <div><b>Protein/day:</b> ${preview.dailyProtein} g</div>
-                <div><b>Per Serving (2x):</b> ${preview.perServingCalories} kcal, ${preview.perServingProtein} g protein</div>
-                <div><b>Macros/serving:</b> C ${preview.macroCarbs} g, F ${preview.macroFat} g</div>
-                <div><b>Protein Type:</b> ${preview.proteinType}</div>
-              ` : `<div style="color:#6b7280;">Preview unavailable (missing inputs)</div>`}
-              <div style="margin-top:10px;color:#6b7280;font-size:13px;">
-                Full report includes calculation trace + doctor overrides.
-              </div>
-            </div>
-          </div>
-        </div>
-      </td>
-    `;
+        detailsRow.innerHTML = `<td colspan="8">${patientSummaryHtml(p, preview, statusHtml)}</td>`;
         table.appendChild(detailsRow);
       });
+    }
+
+    // ── Patient summary (row expanded by clicking the patient) ────────────
+    // Laid out like the generated report: a header strip, then three panels
+    // (patient, clinical, nutrition targets) and the key risk flags.
+    function _sv1(v, unit, dp) {
+      const n = parseFloat(v);
+      if (v === null || v === undefined || v === '' || (typeof v !== 'string' && isNaN(n)) || (typeof v === 'number' && n === 0)) return '<span class="ps-na">—</span>';
+      const txt = (dp != null && !isNaN(n)) ? n.toFixed(dp) : _esc(String(v));
+      return txt + (unit ? '<span class="ps-u"> ' + unit + '</span>' : '');
+    }
+    function _flagLab(v, lowBad, hi) {
+      const n = parseFloat(v);
+      if (isNaN(n) || n === 0) return '';
+      if (lowBad != null && n < lowBad) return ' ps-low';
+      if (hi != null && n > hi) return ' ps-high';
+      return '';
+    }
+    function patientSummaryHtml(p, plan, statusHtml) {
+      const bmi = (p.weight && p.height) ? (p.weight / Math.pow(p.height / 100, 2)) : null;
+      const wl = parseFloat(p.weightLossPercent);
+      const kv = (k, v, cls) => '<div class="ps-kv' + (cls || '') + '"><span class="ps-k">' + k + '</span><span class="ps-v">' + v + '</span></div>';
+      const chips = [];
+      if (plan) {
+        if (plan.nutritionRisk) chips.push('<span class="ps-chip ' + (plan.nutritionRisk === 'High' ? 'bad' : plan.nutritionRisk === 'Moderate' ? 'warn' : 'ok') + '">Nutrition risk: ' + _esc(plan.nutritionRisk) + '</span>');
+        if (plan.mustRisk) chips.push('<span class="ps-chip ' + (/High/.test(plan.mustRisk) ? 'bad' : /Medium/.test(plan.mustRisk) ? 'warn' : 'ok') + '">MUST: ' + _esc(plan.mustRisk) + '</span>');
+        if (plan.cachexia) chips.push('<span class="ps-chip bad">Cachexia</span>');
+        if (plan.sarcopenia) chips.push('<span class="ps-chip bad">Sarcopenia</span>');
+        if (plan.hasRenalIssue) chips.push('<span class="ps-chip warn">Renal protein cap</span>');
+      }
+      const tgt = plan ? `
+          <div class="ps-big">
+            <div class="ps-tile"><div class="ps-tl">Calories / day</div><div class="ps-tv">${_sv1(plan.dailyCalories, 'kcal')}</div><div class="ps-ts">${_sv1(plan.kcalPerKg, 'kcal/kg')}</div></div>
+            <div class="ps-tile"><div class="ps-tl">Protein / day</div><div class="ps-tv">${_sv1(plan.dailyProtein, 'g')}</div><div class="ps-ts">${_sv1(plan.proteinPerKg, 'g/kg')}</div></div>
+          </div>
+          ${kv('Servings / day', _sv1(plan.servingsPerDay))}
+          ${kv('Per serving', _sv1(plan.perServingCalories, 'kcal') + ' · ' + _sv1(plan.perServingProtein, 'g protein'))}
+          ${kv('Carbs / Fat per serving', _sv1(plan.macroCarbs, 'g') + ' · ' + _sv1(plan.macroFat, 'g'))}
+          ${kv('Protein type', _sv1(plan.proteinType))}
+          ${kv('Route', _sv1(plan.prescribedRoute))}`
+        : '<div class="ps-na" style="padding:8px 0;">Targets not available — weight, height or other key inputs are missing.</div>';
+      return `
+      <div class="ps-wrap">
+        <div class="ps-head">
+          <div>
+            <div class="ps-name">${_esc(p.name || 'Unnamed')}</div>
+            <div class="ps-sub">UHIC ${_esc(p.uhic || '—')} · ${_esc(p.cancer || 'Cancer type not set')}</div>
+          </div>
+          <div class="ps-status">${statusHtml || ''}</div>
+        </div>
+        ${chips.length ? '<div class="ps-chips">' + chips.join('') + '</div>' : ''}
+        <div class="ps-grid">
+          <div class="ps-card">
+            <div class="ps-title">Patient</div>
+            ${kv('Age / Sex', _sv1(p.age) + ' / ' + _sv1(p.sex))}
+            ${kv('Weight', _sv1(p.weight, 'kg'))}
+            ${kv('Height', _sv1(p.height, 'cm'))}
+            ${kv('BMI', bmi ? _sv1(bmi, '', 1) : '<span class="ps-na">—</span>', bmi && bmi < 18.5 ? ' ps-low' : '')}
+            ${kv('Weight loss', isNaN(wl) ? '<span class="ps-na">—</span>' : wl.toFixed(1) + '<span class="ps-u"> %</span>', wl >= 10 ? ' ps-low' : '')}
+            ${kv('Feeding', _sv1(p.feedingMethod))}
+          </div>
+          <div class="ps-card">
+            <div class="ps-title">Clinical</div>
+            ${kv('Regimen', _sv1(p.regimen))}
+            ${kv('Stage', _sv1(p.cancerStage))}
+            ${kv('Albumin', _sv1(p.albumin, 'g/dL'), _flagLab(p.albumin, 3.5, null))}
+            ${kv('CRP', _sv1(p.crp, 'mg/L'), _flagLab(p.crp, null, 10))}
+            ${kv('Creatinine', _sv1(p.creatinine, 'mg/dL'), _flagLab(p.creatinine, null, 1.3))}
+            ${kv('Hemoglobin', _sv1(p.hemoglobin, 'g/dL'), _flagLab(p.hemoglobin, 12, null))}
+          </div>
+          <div class="ps-card ps-card-accent">
+            <div class="ps-title">Nutrition targets <span class="ps-t2">rule engine</span></div>
+            ${tgt}
+          </div>
+        </div>
+        <div class="ps-foot">
+          <span class="ps-note">Values in red are outside the normal range. The full report has the calculation trace and doctor overrides.</span>
+          <span style="display:flex;gap:8px;">
+            <a class="qbtn qbtn-cyan qbtn-sm" href="/patients/profile?id=${p.id}">Open full report</a>
+            <button class="qbtn qbtn-ghost qbtn-sm" onclick="event.stopPropagation(); openPdf('${p.id}', this)">Download PDF</button>
+          </span>
+        </div>
+      </div>`;
     }
 
     function toggleDetails(id) {
