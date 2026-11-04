@@ -722,6 +722,15 @@
     </div>
   </div>
 
+  <!-- Shortcut bar: jump to any part of this long page without scrolling -->
+  <div id="gqJumpBar" class="gq-jump" role="navigation" aria-label="Page sections">
+    <button type="button" data-go="report">Report</button>
+    <button type="button" data-go="weekly">Weekly monitoring</button>
+    <button type="button" data-go="daily">Daily log</button>
+    <button type="button" data-go="edit" id="gqJumpEdit">Edit details</button>
+    <button type="button" data-go="approve" id="gqJumpApprove" class="gq-jump-approve" hidden>✓ Review &amp; approve week</button>
+  </div>
+
   <div class="container page">
     <div class="hospital-report" id="pdfExportRoot">
 
@@ -1517,7 +1526,11 @@
                   <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#0e2247;">Auto-Generated Weekly Prescription</div>
                   <div id="wxRxBatch" style="font-size:15px;font-weight:800;color:#b91c1c;margin-top:2px;"></div>
                 </div>
-                <span id="wxRxStatus" style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;background:#fef9c3;color:#854d0e;">Pending Review</span>
+                <span style="display:flex;align-items:center;gap:8px;">
+                  <span id="wxRxStatus" style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;background:#fef9c3;color:#854d0e;">Pending Review</span>
+                  <!-- Same action as the button at the bottom of this panel, so approval does not need a long scroll. -->
+                  <button onclick="approveWxRx()" id="wxRxApproveTopBtn" style="display:none;background:#16a34a;color:#fff;border:none;border-radius:6px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;">✓ Approve &amp; Send to Store</button>
+                </span>
               </div>
 
               <!-- Flags / clinical notes -->
@@ -8698,6 +8711,92 @@ function showRxPreview(rxId, oralIntake) {
 function closeRxPreview() {
   document.getElementById('rxPreviewOverlay').style.display = 'none';
 }
+</script>
+
+<style>
+  .gq-jump { position:sticky; z-index:99; display:flex; gap:6px; flex-wrap:wrap; align-items:center;
+             padding:8px 24px; background:var(--surface, #fff); border-bottom:1px solid var(--border-2, rgba(0,0,0,.12));
+             box-shadow:0 2px 10px rgba(0,0,0,.08); }
+  .gq-jump button { border:1px solid var(--border-2, rgba(0,0,0,.15)); background:var(--surface-2, #f8fafc);
+             color:var(--text, #0e2247); border-radius:999px; padding:7px 14px; font-size:12px; font-weight:700; cursor:pointer; }
+  .gq-jump button:hover { border-color:var(--cyan, #0369a1); }
+  .gq-jump .gq-jump-approve { margin-left:auto; background:#16a34a; border-color:#16a34a; color:#fff; }
+  .gq-flash { animation:gqFlash 1.6s ease-out 1; }
+  @keyframes gqFlash { 0% { box-shadow:0 0 0 4px rgba(34,211,238,.9); } 100% { box-shadow:0 0 0 0 rgba(34,211,238,0); } }
+  @media print { .gq-jump { display:none !important; } }
+</style>
+<script>
+(function () {
+  function $(id) { return document.getElementById(id); }
+  function visible(el) { return !!el && el.offsetParent !== null; }
+  function topOffset() {
+    var tb = document.querySelector('.topbar'), jb = $('gqJumpBar');
+    return (tb ? tb.offsetHeight : 0) + (jb ? jb.offsetHeight : 0) + 12;
+  }
+  function goTo(el) {
+    if (!el) return;
+    var y = el.getBoundingClientRect().top + window.pageYOffset - topOffset();
+    window.scrollTo({ top: Math.max(0, y), behavior: 'smooth' });
+    el.classList.remove('gq-flash'); void el.offsetWidth; el.classList.add('gq-flash');
+  }
+  function go(where) {
+    if (where === 'report') return goTo($('reportDoc'));
+    if (where === 'weekly' || where === 'daily') {
+      if (typeof showMonitorTab === 'function') showMonitorTab(where);
+      return goTo(where === 'weekly' ? ($('monPanelWeekly') || $('monitoringSection')) : $('monitoringSection'));
+    }
+    if (where === 'edit') return goTo($('editPatientSection'));
+    if (where === 'approve') {
+      if (typeof showMonitorTab === 'function') showMonitorTab('weekly');
+      return goTo($('wxRxPanel'));
+    }
+  }
+  window.gqJumpTo = go;
+
+  // Keep the bar and the top Approve button in step with the page.
+  function sync() {
+    var tb = document.querySelector('.topbar'), jb = $('gqJumpBar');
+    if (jb && tb) jb.style.top = tb.offsetHeight + 'px';
+    var bottomBtn = $('wxRxApproveBtn'), topBtn = $('wxRxApproveTopBtn');
+    var panel = $('wxRxPanel');
+    var pending = !!panel && panel.style.display !== 'none' && !!bottomBtn && bottomBtn.style.display !== 'none';
+    if (topBtn) topBtn.style.display = pending ? '' : 'none';
+    var ja = $('gqJumpApprove');
+    if (ja) {
+      ja.hidden = !pending;
+      if (pending) ja.textContent = '✓ Review & approve' + (window._wxRxCurWeekNo ? ' week ' + window._wxRxCurWeekNo : ' week');
+    }
+    var je = $('gqJumpEdit'), ep = $('editPatientSection');
+    if (je) je.hidden = !(ep && ep.style.display !== 'none');
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    var params = new URLSearchParams(location.search);
+    if (params.get('print') === '1' || params.get('store') === '1') { var jb = $('gqJumpBar'); if (jb) jb.style.display = 'none'; }
+    var bar = $('gqJumpBar');
+    if (bar) bar.addEventListener('click', function (e) {
+      var b = e.target.closest('button[data-go]'); if (b) go(b.getAttribute('data-go'));
+    });
+    sync(); setInterval(sync, 1000);
+    window.addEventListener('resize', sync);
+
+    // Arriving from the dashboard with ?section=weekly | approve | edit:
+    // wait for the data to load, then open that part of the page.
+    var want = params.get('section');
+    if (want) {
+      var tries = 0;
+      var t = setInterval(function () {
+        tries++;
+        var ready = visible($('monitoringSection')) || tries > 20;
+        if (want === 'approve' && $('wxRxPanel') && $('wxRxPanel').style.display === 'none' && tries < 20) ready = false;
+        if (!ready) return;
+        clearInterval(t);
+        if (want === 'approve' && $('wxRxPanel') && $('wxRxPanel').style.display === 'none') want = 'weekly';
+        go(want);
+      }, 500);
+    }
+  });
+})();
 </script>
 </body>
 

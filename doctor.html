@@ -146,6 +146,7 @@
     .ps-tl { font-size:10.5px; color:var(--text-2); font-weight:700; text-transform:uppercase; letter-spacing:.05em; }
     .ps-tv { font-size:20px; font-weight:800; color:var(--text); margin-top:2px; }
     .ps-ts { font-size:11px; color:var(--text-2); }
+    .ps-weekly { margin:0 20px 14px; border:1px solid var(--border); border-radius:10px; padding:12px 14px; background:var(--bg-2); overflow-x:auto; }
     .ps-foot { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;
                padding:10px 20px 14px; border-top:1px solid var(--border); }
     .ps-note { font-size:11px; color:var(--text-3); }
@@ -1195,6 +1196,18 @@
           ${kv('Protein type', _sv1(plan.proteinType))}
           ${kv('Route', _sv1(plan.prescribedRoute))}`
         : '<div class="ps-na" style="padding:8px 0;">Targets not available — weight, height or other key inputs are missing.</div>';
+      // Weekly progress — the last three weekly entries from the work-queue
+      // payload, so the doctor sees the trend before adding the next week.
+      const q = _qFor(p.id);
+      let weeklyBlock = '';
+      if (q) {
+        const hist = (q.history || []).filter(r => r.wk != null).slice(-3);
+        weeklyBlock = '<div class="ps-weekly"><div class="ps-title">Weekly progress'
+          + (q.currentWeek ? ' <span class="ps-t2">currently week ' + q.currentWeek + '</span>' : '') + '</div>'
+          + (hist.length ? qHistTable(Object.assign({}, q, { history: hist }))
+                         : '<div class="ps-na">No weekly entries yet. Use “+ Weekly entry” to add the first one.</div>')
+          + '</div>';
+      }
       return `
       <div class="ps-wrap">
         <div class="ps-head">
@@ -1229,10 +1242,16 @@
             ${tgt}
           </div>
         </div>
+        ${weeklyBlock}
         <div class="ps-foot">
           <span class="ps-note">Values in red are outside the normal range. The full report has the calculation trace and doctor overrides.</span>
-          <span style="display:flex;gap:8px;">
-            <a class="qbtn qbtn-cyan qbtn-sm" href="/patients/profile?id=${p.id}">Open full report</a>
+          <span style="display:flex;gap:8px;flex-wrap:wrap;">
+            ${q
+              ? `<button class="qbtn qbtn-cyan qbtn-sm" onclick="event.stopPropagation(); openWeeklyEntry('${p.id}')">+ Weekly entry${q.currentWeek != null ? ' (week ' + ((q.pendingRx && (q.pendingRx.missingFields || []).length) ? q.pendingRx.weekNumber : (q.currentWeek || 0) + 1) + ')' : ''}</button>`
+              : `<a class="qbtn qbtn-cyan qbtn-sm" href="/patients/profile?id=${p.id}&section=weekly">+ Weekly entry</a>`}
+            ${q && q.pendingRx && !((q.pendingRx.missingFields || []).length)
+              ? `<a class="qbtn qbtn-sm" style="background:var(--green);color:#fff;" href="/patients/profile?id=${p.id}&section=approve">Review &amp; approve week ${q.pendingRx.weekNumber}</a>` : ''}
+            <a class="qbtn qbtn-ghost qbtn-sm" href="/patients/profile?id=${p.id}">Open full report</a>
             <button class="qbtn qbtn-ghost qbtn-sm" onclick="event.stopPropagation(); openPdf('${p.id}', this)">Download PDF</button>
           </span>
         </div>
@@ -1322,7 +1341,11 @@
         renderClosed();
         // The Week / Next Review columns read from _queue, so the table has to
         // be redrawn once the queue lands — it renders before this resolves.
+        // Keep any patient summaries the doctor had open.
+        const _open = Array.prototype.slice.call(document.querySelectorAll('tr[id^="details_"]'))
+          .filter(r => r.style.display !== 'none').map(r => r.id);
         render();
+        _open.forEach(id => { const el = document.getElementById(id); if (el) el.style.display = 'table-row'; });
       } catch (e) { /* offline — the queue simply stays as it was */ }
     }
 
