@@ -2023,7 +2023,7 @@
                     <div class="range-hint">Normal: 15 - 36 mg/dL</div>
                   </div>
                   <div class="form-group">
-                    <label class="required">Hemoglobin (g/dL) <span id="epHemoglobin_status"
+                    <label>Hemoglobin (g/dL) <span id="epHemoglobin_status"
                         class="status-badge"></span></label>
                     <input id="epHemoglobin" type="number" step="0.1"
                       oninput="validateOptionalNumber('epHemoglobin','Hemoglobin',2,25); updateLabStatus('epHemoglobin', this.value)">
@@ -2517,7 +2517,7 @@
         <script src="/js/engine-config.js"></script>
         <script src="/js/ai-report-service.js"></script>
         <script src="/js/intake-calculator.js"></script>
-        <script src="/js/essentials-layout.js?v=3"></script>
+        <script src="/js/essentials-layout.js?v=4"></script>
         <script>
           // Edit Patient Details: required fields first, the rest folded away.
           window.addEventListener('DOMContentLoaded', function () {
@@ -2531,7 +2531,7 @@
               rows: [
                 { title: 'Patient',            ids: ['epName', 'epAge', 'epSex'] },
                 { title: 'Body measurements',  ids: ['epWeight', 'epHeight'] },
-                { title: 'Key labs',           ids: ['epCreatinine', 'epCRP', 'epBloodSugar', 'epAlbumin', 'epHemoglobin'] },
+                { title: 'Key labs',           ids: ['epCreatinine', 'epCRP', 'epBloodSugar', 'epAlbumin'] },
                 { title: 'Cancer & treatment', ids: ['epCancer', 'epRegimen'] },
                 { title: 'Feeding',            ids: ['epFeeding', 'epGi'] }
               ],
@@ -2539,7 +2539,7 @@
               hints: { epHeight: 'In centimetres, e.g. 162 (not 1.62)', epRegimen: 'Pick from the list.' },
               markRequired: ['epRegimen'],
               hide: ['epMetastasisTags', 'epGenomicMarkersTags'],
-              firstPanels: ['epStage', 'epRadiationTechnique'],
+              firstPanels: ['epStage', 'epRadiationTechnique', 'epToxMucositis'],
               basicsInto: 'epMUAC',
               resetOnShow: true
             });

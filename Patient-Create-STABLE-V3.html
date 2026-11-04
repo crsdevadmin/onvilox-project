@@ -460,7 +460,7 @@
         <div class="range-hint">Normal: 15 - 36 mg/dL</div>
       </div>
       <div class="form-group">
-        <label class="required">Hemoglobin (g/dL) <span id="hemoglobin_status" class="status-badge"></span></label>
+        <label>Hemoglobin (g/dL) <span id="hemoglobin_status" class="status-badge"></span></label>
         <input type="number" id="hemoglobin" step="0.1" oninput="validateField(this,'Hemoglobin'); updateLabStatus('hemoglobin', this.value)">
         <div class="range-hint">Normal: 12 - 16 g/dL</div>
         <div class="validation-msg" id="hemoglobin_msg"></div>
@@ -979,7 +979,7 @@ window.addEventListener('DOMContentLoaded', function () {
 <script src="/js/form-loader.js"></script>
 <script src="/js/patient-store.js?v=3.3"></script>
 <script src="/js/intake-calculator.js"></script>
-<script src="/js/essentials-layout.js?v=3"></script>
+<script src="/js/essentials-layout.js?v=4"></script>
 <script>
 // Required fields first; optional sections folded behind "Show more details".
 window.addEventListener('DOMContentLoaded', function () {
@@ -992,7 +992,7 @@ window.addEventListener('DOMContentLoaded', function () {
     rows: [
       { title: 'Patient',           ids: ['patientName', 'uhic', 'age', 'sex'] },
       { title: 'Body measurements', ids: ['usualWeight', 'weight', 'height'] },
-      { title: 'Key labs',          ids: ['creatinine', 'crp', 'bloodSugar', 'albumin', 'hemoglobin'] },
+      { title: 'Key labs',          ids: ['creatinine', 'crp', 'bloodSugar', 'albumin'] },
       { title: 'Cancer & treatment', ids: ['cancerInput', 'regimenInput', 'radiationStatus'] },
       { title: 'Feeding',           ids: ['feedingMethod', 'reducedFoodIntake'] }
     ],
@@ -1002,7 +1002,7 @@ window.addEventListener('DOMContentLoaded', function () {
       radiationStatus: 'Set this for RT-only patients.'
     },
     hide: ['metastasisTags', 'genomicMarkersTags'],
-    firstPanels: ['cancerStage', 'radiationTechnique'],
+    firstPanels: ['cancerStage', 'radiationTechnique', 'toxMucositis'],
     basicsInto: 'muac'
   });
 });
@@ -1039,7 +1039,7 @@ function updateCompletenessScore() {
   const mandatoryIds = [
     'patientName', 'uhic', 'age', 'sex', 'usualWeight', 'weight', 'height', 
     'reducedFoodIntake', 'cancerInput', 'regimenInput', 'albumin', 'crp', 
-    'creatinine', 'bloodSugar', 'hemoglobin', 'feedingMethod'
+    'creatinine', 'bloodSugar', 'feedingMethod'
   ];
   const total = mandatoryIds.length;
   let filled = 0;
@@ -1266,7 +1266,6 @@ async function submitPatient(){
     { id: "crp", name: "CRP" },
     { id: "creatinine", name: "Creatinine" },
     { id: "bloodSugar", name: "Blood Sugar" },
-    { id: "hemoglobin", name: "Hemoglobin" },
     { id: "feedingMethod", name: "Feeding Method" }
   ];
 
@@ -1768,7 +1767,6 @@ const INTAKE_QUESTIONS = [
     help:'Used to calculate weight-loss %.' },
   { f:'albumin',           q:'<b>Serum albumin</b> in g/dL?',             unit:'g/dL', na:true },
   { f:'crp',               q:'<b>CRP</b> in mg/L?',                       unit:'mg/L', na:true },
-  { f:'hemoglobin',        q:'<b>Haemoglobin</b> in g/dL?',               unit:'g/dL', na:true },
   { f:'bloodSugar',        q:'<b>Blood sugar</b> in mg/dL?',              unit:'mg/dL', na:true },
   { f:'creatinine',        q:'<b>Creatinine</b> in mg/dL?',               unit:'mg/dL', na:true,
     help:'Controls the renal protein cap.' },
