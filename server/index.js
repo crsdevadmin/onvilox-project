@@ -5524,8 +5524,15 @@ function _draftOwner(req) {
 // List this doctor's drafts. Returns a summary per draft — enough for the
 // dashboard card (name, progress, what is still missing) without shipping
 // every field of every draft.
+// Drafts are for an interrupted entry, not storage: one not touched for
+// DRAFT_MAX_AGE_DAYS is deleted the next time anyone's draft list is read.
+const DRAFT_MAX_AGE_DAYS = 7;
 app.get('/api/drafts', authenticateToken, async (req, res) => {
   try {
+    await pool.query(
+      `DELETE FROM patient_drafts WHERE updated_at < NOW() - ($1::int * INTERVAL '1 day')`,
+      [DRAFT_MAX_AGE_DAYS]
+    ).catch(e => console.warn('draft cleanup:', e.message));
     const r = await pool.query(
       `SELECT id, patient_name, data, sources, next_question, created_at, updated_at
          FROM patient_drafts WHERE doctor_id = $1 ORDER BY updated_at DESC`,
@@ -5550,7 +5557,7 @@ app.get('/api/drafts', authenticateToken, async (req, res) => {
         updatedAt: d.updated_at
       };
     });
-    res.json({ drafts: out });
+    res.json({ drafts: out, maxAgeDays: DRAFT_MAX_AGE_DAYS });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
