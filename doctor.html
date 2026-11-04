@@ -263,6 +263,7 @@
     <div class="nav">
       <span class="nav-pill" id="rolePill">DOCTOR</span>
       <a href="/admin/trials">Clinical Trials</a>
+      <a href="#" id="draftsNav" onclick="toggleDraftsPanel(); return false;" title="Unfinished patient records">Drafts <span id="draftsCount" style="display:none;font-size:10.5px;font-weight:800;color:var(--bg);background:var(--violet);border-radius:999px;padding:1px 7px;margin-left:3px;"></span></a>
       <a href="#" onclick="auth.logout()">Logout</a>
       <button id="themeToggleBtn" onclick="toggleTheme()" class="theme-toggle-btn" style="margin-left: 20px;">
         <span id="themeIcon">🌙</span> <span id="themeLabel">Dark</span>
@@ -1076,7 +1077,7 @@
         mainRow.onclick = () => toggleDetails(p.id);
 
         mainRow.innerHTML = `
-      <td><button class="linklike" onclick="showQr(\'${p.id}\');event.stopPropagation();" title="Show QR for patient">${p.name}</button></td>
+      <td><span style="font-weight:700;">${p.name}</span></td>
       <td>${p.uhic}</td>
       <td>${p.cancer}</td>
       <td>${weekCell(p.id)}</td>
@@ -1092,7 +1093,6 @@
           <button class="btn-secondary" onclick="openPdf('${p.id}', this)" style="padding: 6px 10px; border-radius: 6px; display:flex; align-items:center; justify-content:center;" title="${hasAI ? 'Download PDF' : 'Download PDF (AI review still running)'}">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/><path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/></svg>
           </button>
-          ${csdBtn}
           ${dischargeBtn}
           <button class="btn-secondary" onclick="confirmDelete('${p.id}', '${p.name.replace(/'/g, "\\'")}')" style="padding: 6px 10px; border-radius: 6px; display:flex; align-items:center; justify-content:center; color:#dc2626;" title="Delete Patient Record">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg>
@@ -2338,6 +2338,20 @@
     //  thing that stops an interrupted record from being forgotten entirely.
     // ══════════════════════════════════════════════════════════════════════
     let _drafts = [];
+    let _draftMaxDays = 7;
+    // The Drafts list opens from the "Drafts" link in the top bar.
+    let _draftsOpen = false;
+    function toggleDraftsPanel(){
+      _draftsOpen = !_draftsOpen;
+      renderDrafts();
+      const el = document.getElementById('draftsPanel');
+      if (_draftsOpen && el) el.scrollIntoView({ behavior:'smooth', block:'start' });
+    }
+    function _draftDaysLeft(iso){
+      const t = new Date(iso).getTime();
+      if (isNaN(t)) return null;
+      return Math.max(0, Math.ceil((t + _draftMaxDays * 86400000 - Date.now()) / 86400000));
+    }
 
     async function loadDrafts(){
       try {
@@ -2349,6 +2363,7 @@
         if (!res.ok) return;
         const data = await res.json();
         _drafts = data.drafts || [];
+        _draftMaxDays = data.maxAgeDays || 7;
         renderDrafts();
       } catch (e) { /* offline — leave the panel as it was */ }
     }
@@ -2368,8 +2383,16 @@
     function renderDrafts(){
       const el = document.getElementById('draftsPanel');
       if (!el) return;
-      if (!_drafts.length){ el.style.display = 'none'; return; }
+      const cnt = document.getElementById('draftsCount');
+      if (cnt){ cnt.textContent = _drafts.length; cnt.style.display = _drafts.length ? 'inline-block' : 'none'; }
+      if (!_draftsOpen){ el.style.display = 'none'; return; }
       el.style.display = 'block';
+      if (!_drafts.length){
+        el.innerHTML = `<div class="card" style="border-left:4px solid var(--violet);">
+          <h2 style="margin:0 0 6px;font-size:15px;">Drafts</h2>
+          <div style="font-size:12.5px;color:var(--text-2);">No drafts. Drafts not edited for ${_draftMaxDays} days are deleted automatically.</div></div>`;
+        return;
+      }
       el.innerHTML = `
         <div class="card" style="border-left:4px solid var(--violet);">
           <div style="display:flex;align-items:center;gap:11px;flex-wrap:wrap;margin-bottom:12px;">
@@ -2377,7 +2400,9 @@
             <span style="font-size:10.5px;font-weight:800;color:var(--bg);background:var(--violet);
                          border-radius:999px;padding:2px 8px;">${_drafts.length}</span>
             <span style="font-size:11.5px;color:var(--text-2);">
-              Unfinished records — no nutrition plan generated for any of them</span>
+              Unfinished records — no nutrition plan generated for any of them.
+              Drafts not edited for ${_draftMaxDays} days are deleted automatically.</span>
+            <button class="qbtn qbtn-ghost qbtn-sm" style="margin-left:auto" onclick="toggleDraftsPanel()">Close</button>
           </div>
           <div class="dcards">
             ${_drafts.map(d => {
@@ -2386,7 +2411,7 @@
               return `<div class="dcard">
                 <div class="nm${named ? '' : ' unnamed'}">${named ? _esc(d.patientName) : 'Unnamed patient'}
                   <span class="dbadge">Draft</span></div>
-                <div class="dmeta">Saved ${_draftAgo(d.updatedAt)} · ${d.fieldsFilled} field${d.fieldsFilled===1?'':'s'} entered</div>
+                <div class="dmeta">Saved ${_draftAgo(d.updatedAt)} · ${d.fieldsFilled} field${d.fieldsFilled===1?'':'s'} entered${(() => { const n = _draftDaysLeft(d.updatedAt); return n == null ? '' : ' · deleted ' + (n <= 1 ? 'within a day' : 'in ' + n + ' days') + ' if not edited'; })()}</div>
                 ${miss.length
                   ? `<div class="dmiss">Still needs: ${miss.join(', ')}</div>`
                   : `<div class="dmiss" style="color:var(--green)">Ready to activate</div>`}
