@@ -308,6 +308,27 @@
     <div id="completenessScore" class="completeness-pct">0%</div>
   </div>
 
+  <!-- DAILY FORMULA TARGETS — filled live from the rule engine; doctor may override -->
+  <div class="gq-rate" id="rateBox">
+    <div class="gq-rate-head">
+      <span class="gq-rate-title">Daily formula targets</span>
+      <span class="gq-rate-sub">Filled automatically by the rule engine as you enter the patient's details. Change a value only to override it.</span>
+    </div>
+    <div class="gq-rate-grid">
+      <div class="form-group">
+        <label>Kcal / kg / day <span class="gq-rate-src" id="kcalPerKg_src"></span></label>
+        <input type="number" id="kcalPerKg" step="0.5" min="20" max="50" placeholder="Enter weight &amp; height">
+        <div class="gq-rate-why" id="kcalPerKg_why"></div>
+      </div>
+      <div class="form-group">
+        <label>Protein / kg / day <span class="gq-rate-src" id="proteinPerKg_src"></span></label>
+        <input type="number" id="proteinPerKg" step="0.1" min="0.5" max="3" placeholder="Enter weight &amp; height">
+        <div class="gq-rate-why" id="proteinPerKg_why"></div>
+      </div>
+      <button type="button" class="gq-rate-reset" id="rateReset" hidden onclick="gqRateReset()">Reset to rule-engine values</button>
+    </div>
+  </div>
+
   <div class="form-grid">
 
   <!-- DEMOGRAPHICS ONLY -->
@@ -848,20 +869,6 @@
         <label>Additional Notes</label>
         <textarea id="notes" placeholder="Clinical notes..." rows="2"></textarea>
       </div>
-      <!-- Formula Rate Overrides -->
-      <div style="grid-column:1 / -1;margin-top:6px;padding:12px 14px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;">
-        <div style="font-size:10px;font-weight:800;color:#1e40af;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:10px;">Formula Rate Overrides <span style="font-weight:400;color:#64748b;text-transform:none;">(optional — leave blank to use auto-calculated values from rule engine)</span></div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-          <div class="form-group" style="margin:0;">
-            <label style="font-size:11px;font-weight:700;color:#0e2247;">Kcal / kg / day</label>
-            <input type="number" id="kcalPerKg" step="0.5" min="20" max="50" placeholder="e.g. 35 (auto if blank)" style="width:100%;font-size:14px;font-weight:700;padding:8px 10px;border:2px solid #3b82f6;border-radius:6px;box-sizing:border-box;">
-          </div>
-          <div class="form-group" style="margin:0;">
-            <label style="font-size:11px;font-weight:700;color:#0e2247;">Protein / kg / day</label>
-            <input type="number" id="proteinPerKg" step="0.1" min="0.5" max="3" placeholder="e.g. 1.8 (auto if blank)" style="width:100%;font-size:14px;font-weight:700;padding:8px 10px;border:2px solid #3b82f6;border-radius:6px;box-sizing:border-box;">
-          </div>
-        </div>
-      </div>
     </div>
   </div>
 
@@ -979,6 +986,109 @@ window.addEventListener('DOMContentLoaded', function () {
 <script src="/js/form-loader.js"></script>
 <script src="/js/patient-store.js?v=3.3"></script>
 <script src="/js/intake-calculator.js"></script>
+<style>
+  .gq-rate { border:2px solid var(--violet, #8b5cf6); border-radius:14px; padding:16px 20px; margin:0 0 18px;
+             background:var(--surface, #fff); }
+  .gq-rate-head { display:flex; flex-wrap:wrap; align-items:baseline; gap:10px; margin-bottom:12px; }
+  .gq-rate-title { font-size:16px; font-weight:800; color:var(--text, #0e2247); }
+  .gq-rate-sub { font-size:12px; color:var(--text-2, #64748b); }
+  .gq-rate-grid { display:grid; grid-template-columns:repeat(2, minmax(0, 260px)) auto; gap:14px 16px; align-items:start; }
+  .gq-rate-grid .form-group { margin:0; }
+  .gq-rate-grid .form-group > label { min-height:2.6em; display:flex; align-items:flex-end; flex-wrap:wrap; gap:4px; }
+  .gq-rate-grid input { font-size:16px; font-weight:700; }
+  .gq-rate-src { font-size:10px; font-weight:800; padding:2px 7px; border-radius:999px; margin-left:4px;
+                 text-transform:none; letter-spacing:0; }
+  .gq-rate-src.auto { background:var(--cyan-dim, rgba(3,105,161,.08)); color:var(--cyan, #0369a1); }
+  .gq-rate-src.manual { background:var(--amber-dim, rgba(180,83,9,.08)); color:var(--amber, #b45309); }
+  .gq-rate-why { font-size:11px; color:var(--text-2, #64748b); margin-top:4px; min-height:14px; }
+  .gq-rate-reset { align-self:center; justify-self:start; margin-top:18px; background:none; border:1px solid var(--border-2, rgba(0,0,0,.15));
+                   color:var(--text, #0e2247); border-radius:8px; padding:8px 12px; font-size:12px; font-weight:700; cursor:pointer; }
+  @media (max-width: 640px) { .gq-rate-grid { grid-template-columns:1fr; } }
+</style>
+<script>
+// Daily formula targets: show the rule engine's kcal/kg and protein/kg as the
+// default, updating live as the form is filled. A value the doctor changes is
+// kept as an override; an untouched default is NOT sent as an override, so the
+// engine keeps adapting the targets as the patient's data changes.
+(function () {
+  var IDS = ['kcalPerKg', 'proteinPerKg'];
+  var lastAuto = { kcalPerKg: '', proteinPerKg: '' };
+  var lastKey = '';
+
+  function fmt(id, v) {
+    if (v == null || !isFinite(v) || v <= 0) return '';
+    return id === 'kcalPerKg' ? String(Math.round(v * 2) / 2) : String(Math.round(v * 10) / 10);
+  }
+  function isAuto(id) {
+    var el = document.getElementById(id);
+    if (!el) return false;
+    var v = (el.value || '').trim();
+    return v === '' || v === lastAuto[id];
+  }
+  window.gqRateIsAuto = function (id) { return IDS.indexOf(id) !== -1 && isAuto(id); };
+  window.gqRateOverride = function (id) {
+    if (isAuto(id)) return null;
+    var n = parseFloat(document.getElementById(id).value);
+    return n > 0 ? n : null;
+  };
+  window.gqRateReset = function () {
+    IDS.forEach(function (id) { document.getElementById(id).value = ''; });
+    lastKey = ''; refresh();
+  };
+
+  function paint(auto) {
+    var anyManual = false;
+    IDS.forEach(function (id) {
+      var el = document.getElementById(id);
+      var src = document.getElementById(id + '_src');
+      var why = document.getElementById(id + '_why');
+      var a = auto ? fmt(id, auto[id]) : '';
+      var unit = id === 'kcalPerKg' ? ' kcal/kg' : ' g/kg';
+      if (isAuto(id)) {
+        el.value = a;                 // follow the engine
+        lastAuto[id] = a;
+        src.className = 'gq-rate-src auto';
+        src.textContent = a ? 'Auto' : '';
+        why.textContent = a ? 'From the rule engine for this patient' : '';
+      } else {
+        lastAuto[id] = a;
+        anyManual = true;
+        src.className = 'gq-rate-src manual';
+        src.textContent = 'Doctor override';
+        why.textContent = a ? 'Rule engine suggests ' + a + unit : '';
+      }
+    });
+    document.getElementById('rateReset').hidden = !anyManual;
+  }
+
+  function refresh() {
+    if (typeof buildPatientFromForm !== 'function' || typeof generateNutritionPlan !== 'function') return;
+    var p;
+    try { p = buildPatientFromForm(); } catch (e) { return; }
+    p.kcalPerKg = null; p.proteinPerKg = null; p.lastUpdate = null;
+    var key = JSON.stringify(p) + '|' + IDS.map(function (id) { return document.getElementById(id).value; }).join(',');
+    if (key === lastKey) return;
+    lastKey = key;
+    if (!(p.weight > 0) || !(p.height > 0)) { paint(null); return; }
+    var out = null;
+    try { out = generateNutritionPlan(p); } catch (e) { out = null; }
+    paint(out ? { kcalPerKg: out.kcalPerKg, proteinPerKg: out.proteinPerKg } : null);
+  }
+
+  var timer = null;
+  function schedule() { clearTimeout(timer); timer = setTimeout(refresh, 300); }
+  window.addEventListener('DOMContentLoaded', function () {
+    var card = document.getElementById('rateBox');
+    card = card && card.closest('.card');
+    if (!card) return;
+    ['input', 'change', 'click'].forEach(function (t) { card.addEventListener(t, schedule, true); });
+    // Values filled by the AI assistant or a resumed draft arrive without
+    // input events, so also check now and then (cheap: skipped if unchanged).
+    setInterval(refresh, 2500);
+    setTimeout(refresh, 800);
+  });
+})();
+</script>
 <script src="/js/essentials-layout.js?v=5"></script>
 <script>
 // Required fields first; optional sections folded behind "Show more details".
@@ -1114,6 +1224,7 @@ function collectDraft(){
     const el = document.getElementById(id);
     if (!el) return;
     const v = (el.value || '').trim();
+    if (typeof gqRateIsAuto === 'function' && gqRateIsAuto(id)) return;
     if (v !== '') {
       data[id] = v;
       // Anything typed into the form is the doctor's own entry unless the
@@ -1250,57 +1361,10 @@ window.addEventListener('beforeunload', e => {
   if (_draftDirty){ e.preventDefault(); e.returnValue = ''; }
 });
 
-async function submitPatient(){
-  const fields = [
-    { id: "patientName", name: "Patient Name" },
-    { id: "uhic", name: "UHIC Code" },
-    { id: "age", name: "Age" },
-    { id: "sex", name: "Sex" },
-    { id: "usualWeight", name: "Usual Weight" },
-    { id: "weight", name: "Current Weight" },
-    { id: "height", name: "Height" },
-    { id: "reducedFoodIntake", name: "Reduced Food Intake %" },
-    { id: "cancerInput", name: "Cancer Type" },
-    { id: "regimenInput", name: "Chemo Regimen or Radiation Status" },
-    { id: "albumin", name: "Serum Albumin" },
-    { id: "crp", name: "CRP" },
-    { id: "creatinine", name: "Creatinine" },
-    { id: "bloodSugar", name: "Blood Sugar" },
-    { id: "feedingMethod", name: "Feeding Method" }
-  ];
-
-  let isValid = true;
-  const missingFields = [];
-  let firstInvalidEl = null;
-  for (let f of fields) {
-    if (f.id === 'regimenInput') {
-      if (!validateRegimen()) {
-        if (!firstInvalidEl) firstInvalidEl = document.getElementById('regimenInput');
-        missingFields.push(f.name);
-        isValid = false;
-      }
-      continue;
-    }
-    const el = document.getElementById(f.id);
-    if (!validateField(el, f.name)) {
-      if (!firstInvalidEl) firstInvalidEl = el;
-      missingFields.push(f.name);
-      isValid = false;
-    }
-  }
-
-  if (!isValid) {
-    const eb = document.getElementById('errorBox');
-    if (eb) {
-      eb.innerHTML = '<b>Missing required fields:</b> ' + missingFields.join(', ') + '. Please fill these in before submitting.';
-      eb.style.display = 'block';
-      eb.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
-    if (firstInvalidEl) firstInvalidEl.scrollIntoView({ behavior: "smooth", block: "center" });
-    return;
-  }
-
-  const patient = {
+// The patient record exactly as Create Patient saves it. Also used to preview
+// the rule engine's kcal / protein targets while the form is being filled.
+function buildPatientFromForm(){
+  return {
     name: document.getElementById('patientName').value,
     uhic: document.getElementById('uhic').value,
     age: parseInt(document.getElementById('age').value),
@@ -1388,9 +1452,64 @@ async function submitPatient(){
     toxNausea: parseInt(document.getElementById('toxNausea').value) || 0,
     toxDiarrhea: parseInt(document.getElementById('toxDiarrhea').value) || 0,
     lastUpdate: new Date().toISOString(),
-    kcalPerKg:    parseFloat(document.getElementById('kcalPerKg').value)    || null,
-    proteinPerKg: parseFloat(document.getElementById('proteinPerKg').value) || null
+    // Only a doctor's own value is an override; the rule-engine default is
+    // left to the engine so it keeps adapting as the patient changes.
+    kcalPerKg:    gqRateOverride('kcalPerKg'),
+    proteinPerKg: gqRateOverride('proteinPerKg')
   };
+}
+
+async function submitPatient(){
+  const fields = [
+    { id: "patientName", name: "Patient Name" },
+    { id: "uhic", name: "UHIC Code" },
+    { id: "age", name: "Age" },
+    { id: "sex", name: "Sex" },
+    { id: "usualWeight", name: "Usual Weight" },
+    { id: "weight", name: "Current Weight" },
+    { id: "height", name: "Height" },
+    { id: "reducedFoodIntake", name: "Reduced Food Intake %" },
+    { id: "cancerInput", name: "Cancer Type" },
+    { id: "regimenInput", name: "Chemo Regimen or Radiation Status" },
+    { id: "albumin", name: "Serum Albumin" },
+    { id: "crp", name: "CRP" },
+    { id: "creatinine", name: "Creatinine" },
+    { id: "bloodSugar", name: "Blood Sugar" },
+    { id: "feedingMethod", name: "Feeding Method" }
+  ];
+
+  let isValid = true;
+  const missingFields = [];
+  let firstInvalidEl = null;
+  for (let f of fields) {
+    if (f.id === 'regimenInput') {
+      if (!validateRegimen()) {
+        if (!firstInvalidEl) firstInvalidEl = document.getElementById('regimenInput');
+        missingFields.push(f.name);
+        isValid = false;
+      }
+      continue;
+    }
+    const el = document.getElementById(f.id);
+    if (!validateField(el, f.name)) {
+      if (!firstInvalidEl) firstInvalidEl = el;
+      missingFields.push(f.name);
+      isValid = false;
+    }
+  }
+
+  if (!isValid) {
+    const eb = document.getElementById('errorBox');
+    if (eb) {
+      eb.innerHTML = '<b>Missing required fields:</b> ' + missingFields.join(', ') + '. Please fill these in before submitting.';
+      eb.style.display = 'block';
+      eb.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+    if (firstInvalidEl) firstInvalidEl.scrollIntoView({ behavior: "smooth", block: "center" });
+    return;
+  }
+
+  const patient = buildPatientFromForm();
 
   try {
     const saved = savePatient(patient);
