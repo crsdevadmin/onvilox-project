@@ -1460,6 +1460,21 @@ function buildPatientFromForm(){
 }
 
 async function submitPatient(){
+  // Rate overrides: the field's min/max are not enforced by the browser on read,
+  // so check them here before anything is saved.
+  {
+    const _rk = gqRateOverride('kcalPerKg'), _rp = gqRateOverride('proteinPerKg');
+    const _bad = [];
+    if (_rk != null && (_rk < 10 || _rk > 60)) _bad.push(`Kcal / kg / day = ${_rk} (allowed 10–60)`);
+    if (_rp != null && (_rp < 0.4 || _rp > 3)) _bad.push(`Protein / kg / day = ${_rp} (allowed 0.4–3)`);
+    if (_bad.length) {
+      alert('Please correct these values before saving:\n\n' + _bad.join('\n') +
+            '\n\nClear the box to use the system-calculated rate.');
+      const _el = document.getElementById(_rp != null && (_rp < 0.4 || _rp > 3) ? 'proteinPerKg' : 'kcalPerKg');
+      if (_el) { _el.focus(); _el.style.borderColor = '#dc2626'; }
+      return;
+    }
+  }
   const fields = [
     { id: "patientName", name: "Patient Name" },
     { id: "uhic", name: "UHIC Code" },

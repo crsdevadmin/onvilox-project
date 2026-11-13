@@ -3751,6 +3751,15 @@
             if (window._renderSafetyAlerts) window._renderSafetyAlerts();
           }
 
+          // Rate sanity limits — shared by every place a doctor can type a per-kg rate.
+          window.gqRateProblems = function (kcalPerKg, proteinPerKg) {
+            const out = [];
+            const k = parseFloat(kcalPerKg), p = parseFloat(proteinPerKg);
+            if (k > 0 && (k < 10 || k > 60)) out.push(`Energy ${Math.round(k * 10) / 10} kcal/kg/day (allowed 10–60)`);
+            if (p > 0 && (p < 0.4 || p > 3)) out.push(`Protein ${Math.round(p * 10) / 10} g/kg/day (allowed 0.4–3)`);
+            return out;
+          };
+
           async function approveFromReport() {
             if (!canEditOrApprove() || me.role === 'ASSISTANT') {
               alert('Only the assigned doctor can approve this patient.');
@@ -3759,6 +3768,25 @@
             if (patient.status !== 'CREATED') {
               alert('Patient is already approved or in production.');
               return;
+            }
+
+            // HARD BLOCK: a plan with impossible per-kg rates must never reach production.
+            {
+              const _fp = patient.finalPlan || {};
+              const _wt = parseFloat(_fp.calcWeight || patient.weight) || 0;
+              const _dailyBatch = _fp.recipe && _fp.recipe.isDailyBatch === true;
+              const _recipeKcal = (_fp.recipe && _fp.recipe.recipeKcal)
+                ? (_dailyBatch ? _fp.recipe.recipeKcal : _fp.recipe.recipeKcal * (_fp.servingsPerDay || 4)) : 0;
+              const _kpk = _wt > 0 ? Math.max(parseFloat(_fp.kcalPerKg) || 0, _recipeKcal / _wt) : (parseFloat(_fp.kcalPerKg) || 0);
+              const _ppk = Math.max(parseFloat(_fp.proteinPerKg) || 0,
+                                    _wt > 0 && _fp.dailyProtein ? _fp.dailyProtein / _wt : 0);
+              const _probs = gqRateProblems(_kpk, _ppk);
+              if (_probs.length) {
+                alert('APPROVAL BLOCKED — this plan has values outside safe clinical limits:\n\n' +
+                      _probs.join('\n') +
+                      '\n\nOpen Edit Patient Details, correct the kcal/kg or protein/kg override (or clear it), and update the plan.');
+                return;
+              }
             }
 
             // Safety alert awareness check — informational only, does not block approval
@@ -6445,6 +6473,14 @@ async function saveMonitorLog(type) {
       kcalPerKg:    gn('monW_kcalPerKg')    || null,
       proteinPerKg: gn('monW_proteinPerKg') || null
     };
+    {
+      const _rp = gqRateProblems(data.kcalPerKg, data.proteinPerKg);
+      if (_rp.length) {
+        alert('Please correct these values before saving:\n\n' + _rp.join('\n') +
+              '\n\nLeave the box empty to use the system-calculated rate.');
+        return;
+      }
+    }
     // Require at least week number and weight before saving
     if (!data.week && !data.weight) {
       alert('Please enter at least the Week Number and Weight before saving.');
@@ -8283,8 +8319,13 @@ function recomputeWxRxRecipe() {
   // updated Total Protein but the hero/recipe snapped back to the old rate.)
   var fKcalPerKg = parseFloat(document.getElementById('wxRx_kcalPerKg').value)    || 0;
   var fProtPerKg = parseFloat(document.getElementById('wxRx_proteinPerKg').value) || 0;
-  if (fKcalPerKg > 0) t.kcalPerKg    = fKcalPerKg;
-  if (fProtPerKg > 0) t.proteinPerKg = fProtPerKg;
+  if (fKcalPerKg >= 10  && fKcalPerKg <= 60) t.kcalPerKg    = fKcalPerKg;
+  if (fProtPerKg >= 0.4 && fProtPerKg <= 3)  t.proteinPerKg = fProtPerKg;
+  ['wxRx_kcalPerKg', 'wxRx_proteinPerKg'].forEach(function (id) {
+    var el = document.getElementById(id), v = parseFloat(el && el.value) || 0;
+    var bad = v > 0 && (id === 'wxRx_kcalPerKg' ? (v < 10 || v > 60) : (v < 0.4 || v > 3));
+    if (el) el.style.borderColor = bad ? '#dc2626' : '#3b82f6';
+  });
 
   if (calcWeight > 0 && t.kcalPerKg && t.proteinPerKg) {
     // Recompute from weight × rates
@@ -8577,6 +8618,14 @@ async function saveWxRxAdjustments() {
 }
 
 async function approveWxRx() {
+  {
+    var _k = document.getElementById('wxRx_kcalPerKg'), _p = document.getElementById('wxRx_proteinPerKg');
+    var _rp = gqRateProblems(_k && _k.value, _p && _p.value);
+    if (_rp.length) {
+      alert('APPROVAL BLOCKED — values outside safe clinical limits:\n\n' + _rp.join('\n'));
+      return;
+    }
+  }
   // If _wxRxId is null (client-side fallback due to server error), try to save to DB first
   if (!_wxRxId) {
     var pid = window.patient && window.patient.id;

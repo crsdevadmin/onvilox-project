@@ -412,12 +412,22 @@ function generateNutritionPlan(patient, engineConfig) {
   // If the doctor entered kcalPerKg / proteinPerKg at patient creation (or in the patient
   // profile), use those values instead of the auto-calculated tiers.
   // Renal safety cap on protein is always enforced regardless of override.
+  // A value outside the clinical range is a data-entry error (e.g. height 173
+  // typed into the protein box gave 12,439 g protein / 61,231 kcal), so it is
+  // ignored and the rule-engine rate is used instead, with a recorded alert.
+  var rateOverrideRejected = [];
   if (patient.kcalPerKg && parseFloat(patient.kcalPerKg) > 0) {
-    kcalPerKg = parseFloat(patient.kcalPerKg);
+    var _drKcal = parseFloat(patient.kcalPerKg);
+    if (_drKcal >= 10 && _drKcal <= 60) kcalPerKg = _drKcal;
+    else rateOverrideRejected.push(`Kcal/kg override ${_drKcal} is outside 10–60 kcal/kg — ignored, ${kcalPerKg} kcal/kg used`);
   }
   if (patient.proteinPerKg && parseFloat(patient.proteinPerKg) > 0) {
     var _drProtein = parseFloat(patient.proteinPerKg);
-    proteinPerKg = hasRenalIssue ? Math.min(_drProtein, fv('protein_renal', 0.8)) : _drProtein;
+    if (_drProtein >= 0.4 && _drProtein <= 3) {
+      proteinPerKg = hasRenalIssue ? Math.min(_drProtein, fv('protein_renal', 0.8)) : _drProtein;
+    } else {
+      rateOverrideRejected.push(`Protein/kg override ${_drProtein} is outside 0.4–3 g/kg — ignored, ${proteinPerKg} g/kg used`);
+    }
   }
 
   const baseDailyCalories = Math.round(calcWeight * kcalPerKg);
@@ -829,6 +839,11 @@ function generateNutritionPlan(patient, engineConfig) {
 
   // Convert to array for the report renderer
   safetyAlerts = Object.values(safetyStatus);
+  if (rateOverrideRejected.length) {
+    safetyAlerts.push({ level: 'danger', condition: 'INVALID RATE OVERRIDE', severity: 'High',
+      message: 'INVALID RATE OVERRIDE: ' + rateOverrideRejected.join('. ') + '. Correct the value in Edit Patient Details.',
+      action: rateOverrideRejected.join('. ') + '. Correct the value in Edit Patient Details.' });
+  }
   
   // Adaptive Servings: Increase frequency for high calorie/low appetite to decrease per-serving volume
   let servingsPerDay = Math.round(fv('servings_base', 3));

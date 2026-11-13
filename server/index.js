@@ -1048,7 +1048,8 @@ function calcWeeklyRxTargets(baseline, mon, formulas) {
   const fUreaHigh           = parseFloat(F.urea_high)               || 45;
 
   // Doctor override from monitoring entry takes highest priority
-  const baseKcalPerKg = mon.kcalPerKg || _fpKcalPerKg || fKcalCachexia;
+  const _okRate = (v, lo, hi) => { const n = parseFloat(v); return (n >= lo && n <= hi) ? n : null; };
+  const baseKcalPerKg = _okRate(mon.kcalPerKg, 10, 60) || _okRate(_fpKcalPerKg, 10, 60) || fKcalCachexia;
 
   // protein/kg: stored value → derive from totalDailyProtein/calcWeight → stored dailyProtein/calcWeight → default
   const _fpProtPerKg = fp.proteinPerKg
@@ -1057,7 +1058,7 @@ function calcWeeklyRxTargets(baseline, mon, formulas) {
     || fd.proteinPerKg
     || null;
   // Doctor override from monitoring entry takes highest priority
-  const baseProteinPerKg = mon.proteinPerKg || _fpProtPerKg || fProtBaseline;
+  const baseProteinPerKg = _okRate(mon.proteinPerKg, 0.4, 3) || _okRate(_fpProtPerKg, 0.4, 3) || fProtBaseline;
 
   // ECOG adjustment: step down if status has deteriorated from baseline
   const baseEcog = parseInt(fd.ecogStatus || '0', 10);
@@ -1459,6 +1460,21 @@ app.post('/api/weekly-prescriptions/:id/approve', authenticateToken, async (req,
         message: 'This week cannot be approved yet — ' + _missing.join(', ')
                + (_missing.length === 1 ? ' is' : ' are') + ' missing from the weekly entry.'
       });
+    }
+
+    // Hard limit on per-kg rates — the server is the enforcement point, not the UI.
+    {
+      let _t = rx.targets;
+      if (typeof _t === 'string') { try { _t = JSON.parse(_t); } catch (e) { _t = {}; } }
+      _t = _t || {};
+      const _bad = [];
+      const _k = parseFloat(_t.kcalPerKg), _p = parseFloat(_t.proteinPerKg);
+      if (_k > 0 && (_k < 10 || _k > 60)) _bad.push(`Energy ${_k} kcal/kg/day (allowed 10–60)`);
+      if (_p > 0 && (_p < 0.4 || _p > 3)) _bad.push(`Protein ${_p} g/kg/day (allowed 0.4–3)`);
+      if (_bad.length) {
+        return res.status(400).json({ error: 'RATE_OUT_OF_RANGE', problems: _bad,
+          message: 'This prescription cannot be approved: ' + _bad.join('; ') + '.' });
+      }
     }
 
     // Mark approved
