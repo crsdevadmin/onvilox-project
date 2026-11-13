@@ -2184,6 +2184,16 @@
                     </select>
                   </div>
                   <div class="form-group">
+                    <label>Energy (kcal / kg / day)</label>
+                    <input type="number" id="epKcalPerKg" min="10" max="60" step="0.5" placeholder="Blank = system rate">
+                    <div class="validation-msg" id="epKcalPerKg_msg"></div>
+                  </div>
+                  <div class="form-group">
+                    <label>Protein (g / kg / day)</label>
+                    <input type="number" id="epProteinPerKg" min="0.4" max="3" step="0.1" placeholder="Blank = system rate">
+                    <div class="validation-msg" id="epProteinPerKg_msg"></div>
+                  </div>
+                  <div class="form-group">
                     <label>ECOG Status</label>
                     <select id="epECOG">
                       <option value="0">0 - Fully Active</option>
@@ -2543,10 +2553,13 @@
                 { title: 'Body measurements',  ids: ['epWeight', 'epHeight'] },
                 { title: 'Key labs',           ids: ['epCreatinine', 'epCRP', 'epBloodSugar', 'epAlbumin'] },
                 { title: 'Cancer & treatment', ids: ['epCancer', 'epRegimen'] },
-                { title: 'Feeding',            ids: ['epFeeding', 'epGi'] }
+                { title: 'Feeding',            ids: ['epFeeding', 'epGi'] },
+                { title: 'Formula targets',    ids: ['epKcalPerKg', 'epProteinPerKg'] }
               ],
               relabel: { epHeight: 'Height (cm)', epGi: 'GI Issues (hydrolysed formula?)' },
-              hints: { epHeight: 'In centimetres, e.g. 162 (not 1.62)', epRegimen: 'Pick from the list.' },
+              hints: { epHeight: 'In centimetres, e.g. 162 (not 1.62)', epRegimen: 'Pick from the list.',
+                       epKcalPerKg: 'Allowed 10–60. Leave blank to use the system-calculated rate.',
+                       epProteinPerKg: 'Allowed 0.4–3. Leave blank to use the system-calculated rate.' },
               markRequired: ['epRegimen'],
               hide: ['epMetastasisTags', 'epGenomicMarkersTags'],
               firstPanels: ['epStage', 'epRadiationTechnique', 'epToxMucositis'],
@@ -3031,6 +3044,9 @@
               document.getElementById('epCRP').value = patient.crp ?? 0;
               document.getElementById('epGi').value = String(!!patient.giIssues);
               document.getElementById('epFeeding').value = patient.feedingMethod ?? '';
+              { const _ek = document.getElementById('epKcalPerKg'), _ep = document.getElementById('epProteinPerKg');
+                if (_ek) { _ek.value = patient.kcalPerKg || ''; _ek.style.borderColor = ''; }
+                if (_ep) { _ep.value = patient.proteinPerKg || ''; _ep.style.borderColor = ''; } }
               toggleEditIntakeUI();
               document.getElementById('epCancer').value = patient.cancer ?? '';
               loadRegimensForCancer(patient.cancer);
@@ -3574,6 +3590,23 @@
             }
 
             // apply edits
+            // Per-kg rate overrides: blank = system rate; out-of-range blocks the save.
+            {
+              const _ek = document.getElementById('epKcalPerKg'), _ep = document.getElementById('epProteinPerKg');
+              const _k = _ek ? parseFloat(_ek.value) : NaN, _p = _ep ? parseFloat(_ep.value) : NaN;
+              const _probs = gqRateProblems(_k, _p);
+              [[_ek, _k, 10, 60], [_ep, _p, 0.4, 3]].forEach(function (r) {
+                if (r[0]) r[0].style.borderColor = (r[1] > 0 && (r[1] < r[2] || r[1] > r[3])) ? '#dc2626' : '';
+              });
+              if (_probs.length) {
+                alert('Please correct these values before saving:\n\n' + _probs.join('\n') +
+                      '\n\nLeave the box empty to use the system-calculated rate.');
+                ((_p > 0 && (_p < 0.4 || _p > 3)) ? _ep : _ek).focus();
+                return;
+              }
+              patient.kcalPerKg    = _k > 0 ? _k : null;
+              patient.proteinPerKg = _p > 0 ? _p : null;
+            }
             patient.name = document.getElementById('epName').value.trim();
             patient.age = parseInt(document.getElementById('epAge').value);
             patient.sex = document.getElementById('epSex').value;
