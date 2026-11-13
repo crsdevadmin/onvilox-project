@@ -2,20 +2,23 @@ branch-defaults:
   default:
     environment: onvilox-production
     group_suffix: null
+  feature/platform-modules:
+    environment: gquence-prod
+    group_suffix: null
   main:
     environment: onvilox-production
     group_suffix: null
 global:
-  application_name: onvilox-api
+  application_name: gquence
   branch: null
   default_ec2_keyname: null
-  default_platform: Node.js 20
-  default_region: us-east-1
+  default_platform: Node.js 22
+  default_region: ap-south-1
   include_git_submodules: true
   instance_profile: null
   platform_name: null
   platform_version: null
-  profile: null
+  profile: fortel
   repository: null
-  sc: null
+  sc: git
   workspace_type: Application

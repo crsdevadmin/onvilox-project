@@ -18,3 +18,13 @@ Thumbs.db
 
 # Vite temp files
 web/vite.config.ts.timestamp-*
+
+# Elastic Beanstalk Files
+.elasticbeanstalk/*
+!.elasticbeanstalk/*.cfg.yml
+!.elasticbeanstalk/*.global.yml
+
+# Doctor mobile app
+mobile/node_modules/
+mobile/.expo/
+mobile/dist/
